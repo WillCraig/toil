@@ -167,15 +167,16 @@ describe('review round 1 (#229)', () => {
     const ns = (OPENSHIFT['payments-dev'] as { deployments: unknown[] }).deployments;
     const staging = (OPENSHIFT['checkout-staging'] as { deployments: unknown[] }).deployments;
     const base = { dossier: 'mixed' };
+    const GH = { owner: 'imagile', repo: 'payments-web' };
     const canned: Canned[] = [
       { command: 'dossiers show', input: base, data: showData(mixed) },
       { command: 'bitbucket pr list', input: { ...base, state: 'ALL' }, data: BITBUCKET_PRS },
       ...Object.entries(BITBUCKET_PR_GETS).map(([id, data]) => ({ command: 'bitbucket pr get', input: { ...base, id: Number(id), include: PR_INCLUDE }, data })),
       // No board named, so the repository's issues are read; this test is about deployments, so there are none.
-      { command: 'github issue list', input: { ...base, state: 'all' }, data: [] },
-      { command: 'github pr list', input: { ...base, state: 'all' }, data: GITHUB_PRS },
-      ...Object.entries(GITHUB_PR_GETS).map(([number, data]) => ({ command: 'github pr get', input: { ...base, number: Number(number), include: PR_INCLUDE }, data })),
-      { command: 'github repo file', input: { ...base, path: '.github/CODEOWNERS' }, data: GITHUB_CODEOWNERS },
+      { command: 'github issue list', input: { ...base, ...GH, state: 'all' }, data: [] },
+      { command: 'github pr list', input: { ...base, ...GH, state: 'all' }, data: GITHUB_PRS },
+      ...Object.entries(GITHUB_PR_GETS).map(([number, data]) => ({ command: 'github pr get', input: { ...base, ...GH, number: Number(number), include: PR_INCLUDE }, data })),
+      { command: 'github repo file', input: { ...base, ...GH, path: '.github/CODEOWNERS' }, data: GITHUB_CODEOWNERS },
       { command: 'openshift deployment list', input: { ...base, env: 'dev', namespace: 'mixed-dev' }, data: { namespace: 'mixed-dev', kind: 'Deployment', count: 2, deployments: [...ns, ...staging] } },
     ];
     const fixture = fixtureExecute(canned);

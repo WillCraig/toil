@@ -249,6 +249,31 @@ describe("editing a dossier's name and description in place (#342)", () => {
   });
 });
 
+describe('a place the sync could not read (#542)', () => {
+  const without = (dossier: string, command: string) => fixtureExecute(CANNED.filter((c) => !(c.command === command && c.input.dossier === dossier))).execute;
+
+  it('is one quiet line on the Pull requests view when its pull requests failed, and none on the board', async () => {
+    await open('#/dossier/card-payments/prs', { execute: without('card-payments', 'bitbucket pr list') });
+    const note = screen.getByText(/^bitbucket:/);
+    expect(note.className).toBe('note');
+    expect(within(note).getByRole('link', { name: 'pull requests not read' }).getAttribute('href')).toBe('#queue');
+    cleanup();
+    await open('#/dossier/card-payments/board', { execute: without('card-payments', 'bitbucket pr list') });
+    expect(document.body.textContent).not.toContain('bitbucket: pull requests not read');
+  });
+
+  it('is one quiet line on the board when its work items failed, and none on the Pull requests view', async () => {
+    await open('#/dossier/card-payments/board', { execute: without('card-payments', 'jira issue search') });
+    const note = screen.getByText(/^jira:/);
+    expect(note.className).toBe('note');
+    expect(note.textContent).toBe('jira: work items not read');
+    expect(within(note).queryByRole('link')).toBeNull();
+    cleanup();
+    await open('#/dossier/card-payments/prs', { execute: without('card-payments', 'jira issue search') });
+    expect(document.body.textContent).not.toContain('jira: work items not read');
+  });
+});
+
 describe('the pull requests view', () => {
   it('ranks the open pull requests by wait, with what each waits on, its author kind, items and flags', async () => {
     await open('#/dossier/checkout-web/prs');

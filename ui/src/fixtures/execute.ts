@@ -44,10 +44,12 @@ export interface Canned {
 const card = 'card-payments';
 const settle = 'settlement';
 const checkout = 'checkout-web';
+/** The repository the sample's GitHub calls name outright: the loader passes owner and repo for every repository it reads. */
+const GH = { owner: 'imagile', repo: 'payments-web' };
 const at = (dossier: string, area: string, env?: string, deployment?: string) => ({ dossier, area, ...(env ? { env } : {}), ...(deployment ? { deployment } : {}) });
 /** `pr get <n> --include …` for each pull request a host's fixture holds. */
-const gets = (dossier: string, area: string, field: string, byNumber: Record<number, unknown>, deployment?: string): Canned[] =>
-  Object.entries(byNumber).map(([n, data]) => ({ command: `${area} pr get`, input: { dossier, [field]: Number(n), include: PR_INCLUDE }, data, ...at(dossier, area, undefined, deployment) }));
+const gets = (dossier: string, area: string, field: string, byNumber: Record<number, unknown>, deployment?: string, scope: Record<string, unknown> = {}): Canned[] =>
+  Object.entries(byNumber).map(([n, data]) => ({ command: `${area} pr get`, input: { dossier, ...scope, [field]: Number(n), include: PR_INCLUDE }, data, ...at(dossier, area, undefined, deployment) }));
 
 export const CANNED: Canned[] = [
   { command: 'dossiers list', input: {}, data: listData() },
@@ -79,12 +81,12 @@ export const CANNED: Canned[] = [
   { command: 'ado run list', input: { dossier: settle, name: 'settlement-deploy', top: 20 }, data: ADO_DEPLOY_RUNS, ...at(settle, 'ado') },
 
   // checkout-web
-  { command: 'github project items', input: { dossier: checkout, project: 7 }, data: GITHUB_PROJECT_ITEMS, ...at(checkout, 'github') },
-  { command: 'github issue get', input: { dossier: checkout, number: GITHUB_NUMBERS, subIssues: true }, data: GITHUB_ISSUES, ...at(checkout, 'github') },
-  ...GITHUB_NUMBERS.map((number) => ({ command: 'github issue history', input: { dossier: checkout, number }, data: GITHUB_EVENTS[number], ...at(checkout, 'github') })),
-  { command: 'github pr list', input: { dossier: checkout, state: 'all' }, data: GITHUB_PRS, ...at(checkout, 'github') },
-  ...gets(checkout, 'github', 'number', GITHUB_PR_GETS),
-  { command: 'github repo file', input: { dossier: checkout, path: CODEOWNERS_PATHS[0] }, data: GITHUB_CODEOWNERS, ...at(checkout, 'github') },
+  { command: 'github project items', input: { dossier: checkout, owner: GH.owner, project: 7 }, data: GITHUB_PROJECT_ITEMS, ...at(checkout, 'github') },
+  { command: 'github issue get', input: { dossier: checkout, ...GH, number: GITHUB_NUMBERS, subIssues: true }, data: GITHUB_ISSUES, ...at(checkout, 'github') },
+  ...GITHUB_NUMBERS.map((number) => ({ command: 'github issue history', input: { dossier: checkout, ...GH, number }, data: GITHUB_EVENTS[number], ...at(checkout, 'github') })),
+  { command: 'github pr list', input: { dossier: checkout, ...GH, state: 'all' }, data: GITHUB_PRS, ...at(checkout, 'github') },
+  ...gets(checkout, 'github', 'number', GITHUB_PR_GETS, undefined, GH),
+  { command: 'github repo file', input: { dossier: checkout, ...GH, path: CODEOWNERS_PATHS[0] }, data: GITHUB_CODEOWNERS, ...at(checkout, 'github') },
   { command: 'bitbucket pr list', input: { dossier: checkout, state: 'ALL' }, data: BITBUCKET_CLOUD_PRS, ...at(checkout, 'bitbucket', undefined, 'cloud') },
   ...gets(checkout, 'bitbucket', 'id', BITBUCKET_CLOUD_PR_GETS, 'cloud'),
   { command: 'openshift deployment list', input: { dossier: checkout, env: 'staging', namespace: 'checkout-staging' }, data: OPENSHIFT['checkout-staging'], ...at(checkout, 'openshift', 'staging') },

@@ -178,6 +178,11 @@ function BoardTab({ person }: { person?: string }) {
   return (
     <div className="tab-panels">
       <Panel id="board" title={term('board', h ? `${h.sprint.name} board` : 'Board')} calls={dossier.calls.work} alerts={false}>
+        {(dossier.readTargets ?? []).filter((t) => !t.work).map((t) => (
+          <p key={t.label} className="note">
+            {t.label}: work items not read
+          </p>
+        ))}
         {filter && <BoardFilter name={filter.name} shown={mine.length} all={filter.items.length} />}
         <div className="board-tools">
           <Checkbox className="check" isSelected={attentionOnly} onChange={setAttentionOnly} data-attention-only="">

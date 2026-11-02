@@ -140,6 +140,11 @@ export function PullRequests() {
         <p className="lede">
           {queue.length} open across {new Set(prs.map((c) => c.repo)).size} {new Set(prs.map((c) => c.repo)).size === 1 ? 'repository' : 'repositories'}, {prs.length - queue.length} merged or closed. Read {dateTime(now)}. <Help topic="prs" />
         </p>
+        {(dossier.readTargets ?? []).filter((t) => !t.pullRequests).map((t) => (
+          <p key={t.label} className="note">
+            {t.label}: <a href="#queue">pull requests not read</a>
+          </p>
+        ))}
         {(dossier.prNotes ?? []).map((n, i) => (
           <p key={i} role="note" className="failure">
             {n}
