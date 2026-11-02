@@ -5,7 +5,7 @@ import { connectionEnvName, connectionsOf, defaultConnectionName, envName, type 
 import { resolveConnection, selectConnection } from './connection.js';
 import { refusesDeployment } from './deployments.js';
 import type { ContextReport, ContextSource, ContextValue, Warning } from './envelope.js';
-import { ToilError } from './errors.js';
+import { StrandedInput, ToilError } from './errors.js';
 import type { SecretStore } from './keychain.js';
 
 /**
@@ -105,6 +105,9 @@ export async function resolveCall(
   // 1 and 2 for the rest. Their git step waits for the connection, so a
   // parser can trust only a remote on that connection's host.
   const early: Record<string, ContextValue> = {};
+  const stranded = new Map<string, StrandedInput>();
+  const namedAround = new Map<string, StrandedInput>();
+  const isCheck = def.path[def.path.length - 1] === 'check-dossier';
   for (const name of Object.keys(needs)) {
     const spec = declared[name]!;
     const explicit = input[name];
@@ -113,7 +116,26 @@ export async function resolveCall(
       continue;
     }
     // With --connection named, an input that selects one can only agree with it or give way, so the dossier isn't asked for it.
-    const fromDossier = spec.selectsConnection && typeof input.connection === 'string' ? undefined : dossier(area.name, name, input);
+    let fromDossier: string | undefined;
+    try {
+      fromDossier = spec.selectsConnection && typeof input.connection === 'string' ? undefined : dossier(area.name, name, input);
+    } catch (err) {
+      // A per-repo value with no repo to read it for: a command that needs it is told, one that doesn't gets nothing for it, never a git or connection value.
+      if (!(err instanceof StrandedInput)) throw err;
+      // The call named another per-repo input itself, so this one falls through as before; step 4 says where it came from.
+      if (err.callNamed) {
+        namedAround.set(name, err);
+        fromDossier = undefined;
+      } else {
+        // An input only some deployments take waits for the connection: Cloud never asks Data Center's project (step 4 decides).
+        if (needs[name] === 'required' && !spec.deployments) throw err;
+        stranded.set(name, err);
+      // Said on the call, so a later "could not determine" error comes with the reason beside it (principle 4).
+      // check-dossier reads every per-repo value through the dossier's view by design, so the advice would be wrong there.
+        if (!isCheck) warn({ code: 'DOSSIER_REPO_UNMATCHED', message: `${err.message} ${err.fix ?? ''}`.trim() });
+        continue;
+      }
+    }
     const found = checked(area, name, spec, fromDossier, 'dossier') ?? (spec.selectsConnection ? checked(area, name, spec, await fromGit(spec, undefined), 'git') : undefined);
     if (found) early[name] = found;
   }
@@ -148,6 +170,11 @@ export async function resolveCall(
   const here = def.deployments ? (def.deployments.routes[String(connection[def.deployments.by])]?.context ?? {}) : needs;
   for (const [name, need] of Object.entries(here)) {
     const spec = declared[name]!;
+    const strandedHere = stranded.get(name);
+    if (strandedHere) {
+      if (need === 'required') throw strandedHere;
+      continue;
+    }
     const setting = spec.setting === undefined ? undefined : connection[spec.setting];
     // An input the area gives to other deployments, which this one takes only because its command lists it, comes from the call or the
     // dossier alone: the connection's setting, defaults, env, git and the area default are documented as the other deployment's, and a
@@ -162,6 +189,8 @@ export async function resolveCall(
       (spec.selectsConnection ? undefined : checked(area, name, spec, await fromGit(spec, connection), 'git')) ??
       checked(area, name, spec, setting === undefined || setting === null ? undefined : String(setting), 'connection') ??
       checked(area, name, spec, spec.default, 'default');
+    const around = namedAround.get(name);
+    if (value && around && !isCheck) warn({ code: 'DOSSIER_REPO_UNMATCHED', message: `${around.message} ${name} came from ${value.source === 'git' ? 'the git remote' : value.source === 'connection' ? "the connection's setting" : value.source === 'default' ? "the area's default" : value.source} instead. Pass --${name} too, or run inside one of the dossier's repos (--cwd <repo folder>).` });
     if (value) inputs[name] = value;
     else if (need === 'required') missing.push(name);
   }
@@ -186,7 +215,13 @@ export function dossierConnection(config: ResolvedConfig, area: AnyArea, dossier
   const early: Record<string, ContextValue> = {};
   for (const [name, spec] of Object.entries(declared)) {
     if (!spec.selectsConnection) continue;
-    const found = checked(area, name, spec, dossier(area.name, name, {}), 'dossier');
+    let value: string | undefined;
+    try {
+      value = dossier(area.name, name, {});
+    } catch (err) {
+      if (!(err instanceof StrandedInput)) throw err;
+    }
+    const found = checked(area, name, spec, value, 'dossier');
     if (found) early[name] = found;
   }
   const def = { path: [area.name, 'dossier'], area } as unknown as AnyCommand;

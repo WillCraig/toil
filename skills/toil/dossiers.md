@@ -71,7 +71,9 @@ Every area command runs the same steps, on the CLI and over MCP alike:
    environment: the call's `--env` when the area has one, else the dossier's `env`.
 3. **Fill the inputs.** Each context input the area declares (`--project`, `--repo`,
    `--owner`) resolves in one order: the call's own value, then the dossier, then the
-   git remote, then the connection's setting, then the area's default.
+   git remote, then the connection's setting, then the area's default. (A per-repo
+   dossier value that no repo of the dossier matched stops there instead: see
+   "Several services, one product?" below.)
    `toil <area> --help` says which inputs a dossier can fill ("defaults to your
    dossier's …").
 4. **Pick the connection.** By the section's `connection` name, or by its `host`,
@@ -432,6 +434,12 @@ line; for an agent, the `dossiers_show` tool, the `toil://dossiers/<name>` resou
   is compared with your connections' hosts, nothing more.
 - **Several services, one product?** One dossier, several `repos`, and per-repo values
   where they differ (`"repo": { "payments-core": "payments-core", "ledger": "ledger-svc" }`).
+  From a folder that is none of those repos, a call that needs a per-repo value fails
+  (`INVALID_INPUT`, naming the repos) rather than use git's or the connection's: use
+  `--cwd` inside one of them, or pass the flag (passing another per-repo input, such
+  as `--repo`, lets the rest resolve as usual, with a warning naming where each came from). A call that doesn't strictly need it
+  carries a `DOSSIER_REPO_UNMATCHED` warning instead, and a later "could not
+  determine" error is that warning's consequence.
 - **One service in several products?** Put a dossier in each, and pass `--dossier`
   when the folder matches both.
 - **Edits while `toil mcp` runs?** Dossiers are read on every call, so an edit applies

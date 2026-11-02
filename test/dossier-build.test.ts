@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { checkDossier as jiraCheckDossier } from '../src/areas/jira/server/check-dossier.js';
 import { createIssue } from '../src/areas/jira/server/issues.js';
+import { dossierConnection, type DossierLookup } from '../src/core/call-context.js';
+import { StrandedInput } from '../src/core/errors.js';
 import type { AnyCommand } from '../src/core/command.js';
 import { toolName } from '../src/core/command.js';
 import type { ResolvedConfig, Settings, Source } from '../src/core/config.js';
@@ -216,6 +218,15 @@ describe('an agent never points a dossier at a connection with writes on', () =>
     // Making it the default would: refused.
     expect((await mcp(d, 'dossiers_env', { dossier: 'payments', env: 'prod', area: 'demo-context', default: true })).envelope.error?.code).toBe('WRITE_DISABLED');
     expect(ok(await cli(d, ['dossiers', 'link', 'payments', 'demo-context', '--connection', 'prod', '--replace']))).toMatchObject({ changed: true });
+  });
+
+  it('still reads the rest of the binding when a selecting input is held per repo and the check has no repo to read it for (#540)', () => {
+    // The dossier commands ask with no repo by design; a per-repo `env` gives way, and the dossier's `connection` still decides.
+    const lookup: DossierLookup = (_area, key) => {
+      if (key === 'env') throw new StrandedInput('INVALID_INPUT', 'stranded');
+      return key === 'connection' ? 'prod' : undefined;
+    };
+    expect(dossierConnection(configOf(), demoContextArea, lookup)).toMatchObject({ value: 'prod', source: 'dossier' });
   });
 
   it("judges a change by the call's own resolver, so an environment that selects a connection with writes on is refused too", async () => {

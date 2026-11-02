@@ -3,7 +3,7 @@ import { basename, delimiter, isAbsolute, join, relative, resolve } from 'node:p
 import type { DossierLookup, GitRemoteReader } from './call-context.js';
 import { CONNECTION_NAME, connectionsOf, type ResolvedConfig } from './config.js';
 import type { DossierReport, Warning } from './envelope.js';
-import { ToilError } from './errors.js';
+import { StrandedInput, ToilError } from './errors.js';
 import { forwardSlashes, isSystemPath, type Workspace } from './files.js';
 import { findGitRepo, readGitBranch, readGitRemotes, type GitContext } from './git-repo.js';
 import { assertLocalPath } from './local-path.js';
@@ -1206,10 +1206,26 @@ export function createDossierCatalog(o: CatalogOptions): DossierCatalog {
       // The dossier's environment is the same `--env` an area already has; it
       // applies to the areas the environment lists (docs/dossiers.md, One --env).
       if (key === 'env' && areaNames.get(area)?.context.includes('env')) return dossier.env !== undefined && ownValue(ownValue(dossier.environments, dossier.env), area) ? dossier.env : undefined;
+      let stranded: string[] | undefined;
       for (const section of sectionsFor(dossier, area, env)) {
         const value = ownValue(section, key);
         if (typeof value === 'string') return value;
         if (isRecord(value) && applied.repo !== undefined && typeof ownValue(value, applied.repo) === 'string') return ownValue(value, applied.repo) as string;
+        if (isRecord(value) && stranded === undefined) stranded = Object.keys(value);
+      }
+      // A per-repo value with no repo to read it for must not hand the key to git or the connection: the other inputs
+      // came from this dossier, so the pair would be one nobody configured (#540). The call's own value never reaches here.
+      // A call that names another per-repo input itself (`--repo`) has chosen its target: the rest is the caller's pairing, not the dossier's.
+      const named = (): boolean => sectionsFor(dossier, area, env).some((section) => Object.keys(section).some((k) => k !== key && (areaNames.get(area)?.context.includes(k) ?? false) && isRecord(ownValue(section, k)) && typeof input[k] === 'string'));
+      // A folder that matched a repo the map doesn't name keeps the old fall-through; only a folder matching none is stranded.
+      if (stranded !== undefined && applied.repo === undefined) {
+        const callNamed = named();
+        const repos = dossier.repos.map((r) => r.name);
+        const same = repos.length === stranded.length && repos.every((r) => stranded!.includes(r));
+        throw new StrandedInput('INVALID_INPUT', `Dossier ${dossier.name} sets ${area} ${key} per repo (${stranded.join(', ')}), and the call's folder is none of its repos${repos.length > 0 && !same ? ` (${repos.join(', ')})` : ''}.`, {
+          callNamed,
+          fix: `Run from inside one of the dossier's repos (--cwd <repo folder>), pass --${key} yourself, or give ${key} a plain value in the dossier.`,
+        });
       }
       return undefined;
     };
