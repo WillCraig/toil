@@ -44,12 +44,14 @@ const list = (over: Partial<AdapterList> & { ready?: Record<string, boolean> } =
 });
 
 describe('the order the agent is chosen in', () => {
-  it("is the dossier's remembered agent, then the default from Settings, then nothing", () => {
+  it("is the dossier's remembered agent, then the default from Settings, then the first one ready, then nothing", () => {
     expect(defaultAgent(list({ remembered: 'codex' }))).toEqual({ name: 'codex', source: 'dossier' });
     expect(defaultAgent(list({ remembered: null }))).toEqual({ name: 'claude', source: 'settings' });
     expect(defaultAgent(list())).toEqual({ name: 'claude', source: 'settings' });
-    expect(defaultAgent(list({ remembered: 'codex', ready: { codex: false, claude: false } }))).toBeNull();
-    expect(defaultAgent(list({ chosen: null }))).toBeNull();
+    expect(defaultAgent(list({ remembered: 'codex', ready: { codex: false, claude: false } }))).toEqual({ name: 'copilot', source: 'ready', skippedDefault: true });
+    expect(defaultAgent(list({ chosen: null }))).toEqual({ name: 'claude', source: 'ready' });
+    expect(defaultAgent(list({ chosen: 'copilot', ready: { copilot: false } }))).toEqual({ name: 'claude', source: 'ready', skippedDefault: true });
+    expect(defaultAgent(list({ ready: { claude: false, codex: false, copilot: false } }))).toBeNull();
     expect(defaultAgent(null)).toBeNull();
   });
 
@@ -63,6 +65,8 @@ describe('the order the agent is chosen in', () => {
     expect(sourceHint(false, { name: 'codex', source: 'dossier' })).toBe('last used on this dossier');
     expect(sourceHint(false, { name: 'claude', source: 'settings' })).toBe('your default');
     expect(sourceHint(true, { name: 'claude', source: 'settings' })).toBe('picked for this chat');
+    expect(sourceHint(false, { name: 'claude', source: 'ready', skippedDefault: true })).toBe("your default can't run");
+    expect(sourceHint(false, { name: 'claude', source: 'ready' })).toBe('the first one ready');
     expect(sourceHint(false, null)).toBeNull();
   });
 });
@@ -182,6 +186,12 @@ describe('the server', () => {
         if (a instanceof Error) throw a;
         return a;
       },
+      async *stream(_ctx, _d, _p, _s, _c, extra) {
+        asked.push(extra?.adapter);
+        const a = answer(extra?.adapter);
+        if (a instanceof Error) throw a;
+        yield a;
+      },
       adapterOptions: () => list(),
     };
     const ui = createUiServer({ settings: { host: '127.0.0.1', port: 0, basePath: '/', dataDir: app, retentionDays: 30, sample: true }, store: fixtureStore(), agent, appDir: app, version: '0.0.0-test', toil: { version: '0.1.0', contractVersion: 1 }, token: TOKEN, dossierAgents: store });
@@ -219,12 +229,31 @@ describe('the server', () => {
     expect(new DossierAgents(dirOf(store)).get('card-payments')).toBe('claude');
   });
 
-  it('remembers nothing from a question that is not Analyze, one that names no agent, or one that fails or comes back empty', async () => {
+  it('remembers an ordinary question that names an agent', async () => {
+    const store = new DossierAgents(folder());
+    const { origin, sid, csrf } = await boot(store, () => whole);
+    await send(origin, '/api/agent/ask', sid, { dossier: 'card-payments', prompt: 'What is blocked?', adapter: 'codex' }, csrf);
+    expect(store.get('card-payments')).toBe('codex');
+    // Streamed, as the page asks: the same.
+    await send(origin, '/api/agent/ask', sid, { dossier: 'settlement', prompt: 'What is blocked?', adapter: 'claude', stream: true }, csrf);
+    expect(store.get('settlement')).toBe('claude');
+  });
+
+  it('refuses a fallback that names no adapter', async () => {
+    const store = new DossierAgents(folder());
+    const { origin, sid, csrf } = await boot(store, () => whole);
+    const res = await send(origin, '/api/agent/ask', sid, { dossier: 'card-payments', prompt: 'What is blocked?', fallback: true }, csrf);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body).error.message).toContain('fallback names no adapter');
+  });
+
+  it('remembers nothing from a question that names no agent, names only a fallback, or fails or comes back empty', async () => {
     const store = new DossierAgents(folder());
     let next: Answer | Error = whole;
     const { origin, sid, csrf } = await boot(store, () => next);
-    await send(origin, '/api/agent/ask', sid, { dossier: 'card-payments', prompt: 'What is blocked?', adapter: 'codex' }, csrf);
+    await send(origin, '/api/agent/ask', sid, { dossier: 'card-payments', prompt: 'What is blocked?' }, csrf);
     await send(origin, '/api/agent/ask', sid, { dossier: 'card-payments', prompt: 'analyze' }, csrf);
+    await send(origin, '/api/agent/ask', sid, { dossier: 'card-payments', prompt: 'What is blocked?', adapter: 'codex', fallback: true }, csrf);
     next = new Error('The agent is not signed in.');
     expect((await send(origin, '/api/agent/ask', sid, { dossier: 'card-payments', prompt: 'analyze', adapter: 'codex' }, csrf)).status).toBe(502);
     next = { ...whole, parts: [] };

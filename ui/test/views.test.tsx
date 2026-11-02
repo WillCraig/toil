@@ -740,6 +740,23 @@ describe('the chat up front (#343)', () => {
       }
     });
 
+    it("starts on the first ready agent when the default from Settings can't run, and sends it", async () => {
+      const sent: AskExtra[] = [];
+      const agent: Agent = {
+        starters: () => [],
+        adapters: async () => ({ chosen: 'copilot', remembered: null, options: [ready('copilot', 'GitHub Copilot', false), ready('claude', 'Claude'), ready('codex', 'Codex')] }),
+        ask: async (_d, _p, _s, _c, extra) => {
+          sent.push(extra ?? {});
+          return { prompt: 'Analyze', parts: [{ text: 'Fine.' }], citations: [], by: 'Claude', proposals: [] };
+        },
+      };
+      await open('#/dossier/card-payments', { agent, preview: false });
+      const chat = await analyze();
+      expect(sent).toEqual([{ adapter: 'claude', fallback: true }]);
+      expect(within(chat).getByRole('button', { name: /^Claude/ })).toBeTruthy();
+      expect(hint(chat)).toBe("(your default can't run)");
+    });
+
     it('starts one run for two presses while the agent list loads, and Stop cancels it', async () => {
       let release!: (l: AdapterList) => void;
       const listing = new Promise<AdapterList>((r) => (release = r));

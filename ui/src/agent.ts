@@ -89,6 +89,8 @@ export const MAX_HISTORY_ANSWER = 1500;
 export interface AskExtra {
   /** The adapter this chat switched to; absent, the one chosen in Settings answers. */
   adapter?: string;
+  /** The adapter was the chat's fallback (Settings' choice can't run), not anyone's choice, so the dossier doesn't remember it. */
+  fallback?: boolean;
   history?: HistoryTurn[];
 }
 

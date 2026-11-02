@@ -188,10 +188,10 @@ function useChat() {
     const history: HistoryTurn[] = turns
       .flatMap((t) => (t.done && !t.error && t.answer?.parts.length ? [{ prompt: t.prompt, answer: textOf(t.answer).slice(0, MAX_HISTORY_ANSWER + 1), by: t.answer.by }] : []))
       .slice(-MAX_HISTORY_TURNS);
-    // A picked agent goes as it is; an unpicked chat sends the dossier's remembered one (#494), and the Settings default as before: by sending nothing.
+    // A picked agent goes as it is; an unpicked chat sends the dossier's remembered one (#494) or the first ready one when the default can't run, and the Settings default as before: by sending nothing.
     const from = defaultAgent(list);
-    const sent = adapter ?? (from?.source === 'dossier' ? from.name : null);
-    const extra = { ...(sent ? { adapter: sent } : {}), ...(history.length ? { history } : {}) };
+    const sent = adapter ?? (from && from.source !== 'settings' ? from.name : null);
+    const extra = { ...(sent ? { adapter: sent } : {}), ...(!adapter && from?.source === 'ready' ? { fallback: true } : {}), ...(history.length ? { history } : {}) };
     const controller = new AbortController();
     abort.current = controller;
     const started = Date.now();
@@ -687,7 +687,7 @@ function AgentSwitch({ label, list, current, onPick }: { label: string; list: Ad
                   })}
                 </ul>
               )}
-              <p className="note">Switching holds for this chat, from its next question. Analyze remembers the one it last ran on for this dossier; your default stays under Settings, Agent.</p>
+              <p className="note">Switching holds for this chat, from its next question. The chat starts on the agent last used for this dossier, else your default under Settings, Agent, else the first agent that's ready.</p>
             </>
           )}
         </Dialog>
@@ -725,7 +725,7 @@ export function AskInfo({ agentLabel }: { agentLabel: string | undefined }) {
             About these answers
           </Heading>
           <p>{voice}</p>
-          <p>Answered by {agentLabel ?? 'the agent chosen in Settings'}. Analyze starts on the agent last used for this dossier, else your default under Settings, Agent.</p>
+          <p>Answered by {agentLabel ?? 'the agent chosen in Settings'}. The chat starts on the agent last used for this dossier, else your default under Settings, Agent, else the first agent that's ready.</p>
           <p>The agent only reads: its tools can't change a ticket, and anything it suggests comes back as a proposal for you to apply.</p>
           <p>
             Change the voice under <a href="#/settings/toil">Settings, General</a>, and add your own instructions or voice under <a href="#/settings/agent">Settings, Agent</a>.

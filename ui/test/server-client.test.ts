@@ -140,6 +140,16 @@ describe('httpAgent streaming (#251)', () => {
     await expect(run()).rejects.toThrow(/stopped partway/);
   });
 
+  it('sends the chat\'s adapter, and says when it is only a fallback, so the server does not remember it (#543)', async () => {
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify(answer('a')), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    const agent = await httpAgent({ ...SESSION, agent: 'claude' }, []);
+    await agent.ask('d', 'q', undefined, undefined, { adapter: 'claude', fallback: true });
+    await agent.ask('d', 'q', undefined, undefined, { adapter: 'codex' });
+    const bodies = fetch.mock.calls.filter(([url]) => String(url).endsWith('api/agent/ask')).map(([, init]) => JSON.parse(String(init.body)));
+    expect(bodies.map((b) => [b.adapter, b.fallback])).toEqual([['claude', true], ['codex', undefined]]);
+  });
+
   it('carries a notice naming the three adapters when the server has none', async () => {
     const agent = await httpAgent({ ...SESSION, agent: 'none' }, []);
     for (const p of ['@anthropic-ai/claude-agent-sdk', '@github/copilot-sdk', '@openai/codex-sdk']) expect(agent.notice).toContain(p);
