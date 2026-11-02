@@ -4,7 +4,7 @@ import { columns, proposeMove, statusFor } from '../src/model/board.ts';
 import { burnup } from '../src/model/burnup.ts';
 import { age, aging, cycleTime, cycleTimes, doneAt, percentile, throughput, weekStart } from '../src/model/flow.ts';
 import { dependencyGraph } from '../src/model/graph.ts';
-import { insights, needsAttention, prepare, type Context } from '../src/model/insights.ts';
+import { groupInsights, insights, needsAttention, prepare, type Context } from '../src/model/insights.ts';
 import { Buffer } from 'node:buffer';
 import { spawnSync } from 'node:child_process';
 import { commandLine, defaultShell, quote, readLine, unsafe } from '../src/proposal.ts';
@@ -261,6 +261,17 @@ describe('insights', () => {
     const p = prepare(ctx([a, b], { changes: [pr('o1', ['c:I-1'], 'open'), pr('m1', ['c:I-1'], 'merged'), pr('m2', ['c:I-2'], 'merged')], deployments: [dep] }));
     expect(insights(a, p).map((i) => i.code)).toEqual(['pr-no-build', 'built-not-deployed', 'unestimated']);
     expect(insights(b, p).map((i) => [i.code, i.text])).toEqual([['deployed-not-closed', 'Running in dev, but still In Progress'], ['unestimated', 'No estimate']]);
+  });
+
+  it('groups an item blocking two open items, or blocked by two, into one entry per code (#541)', () => {
+    const link = (direction: 'inward' | 'outward', target: string) => ({ type: 'blocks' as const, direction, target, name: 'blocks' });
+    const a = item({ id: 'c:G-1', links: [link('outward', 'c:G-2'), link('outward', 'c:G-3'), link('inward', 'c:G-4'), link('inward', 'c:G-5')] });
+    const others = ['c:G-2', 'c:G-3', 'c:G-4', 'c:G-5'].map((id) => item({ id }));
+    const all = insights(a, prepare(ctx([a, ...others])));
+    expect(all.map((i) => i.code)).toEqual(['blocked', 'blocked', 'blocking', 'blocking', 'unestimated']);
+    const groups = groupInsights(all);
+    expect(groups.map((g) => [g.code, g.insights.length])).toEqual([['blocked', 2], ['blocking', 2], ['unestimated', 1]]);
+    expect(groups[1]!.insights.map((i) => i.text)).toEqual(['Blocks [[c:G-2]]', 'Blocks [[c:G-3]]']);
   });
 
   it('calls work stale after five quiet days, and only open work', () => {

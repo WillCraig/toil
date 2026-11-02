@@ -135,6 +135,29 @@ export function insights(item: WorkItem, p: Prepared): Insight[] {
   return out.sort((a, b) => b.weight - a.weight);
 }
 
+/** One insight code on one item, with every insight that raised it. */
+export interface InsightGroup {
+  code: InsightCode;
+  weight: Insight['weight'];
+  insights: Insight[];
+}
+
+/**
+ * The insights collapsed to one group per code, in the order they arrive: an
+ * item that blocks two others raises `blocking` twice, and a card has room
+ * for one chip saying so (#541). The full list stays on the item, which
+ * reads `insights()` itself.
+ */
+export function groupInsights(list: Insight[]): InsightGroup[] {
+  const groups = new Map<InsightCode, InsightGroup>();
+  for (const i of list) {
+    const g = groups.get(i.code);
+    if (g) g.insights.push(i);
+    else groups.set(i.code, { code: i.code, weight: i.weight, insights: [i] });
+  }
+  return [...groups.values()];
+}
+
 export interface Attention {
   id: string;
   score: number;

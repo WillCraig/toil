@@ -6,7 +6,7 @@
  * lanyard.
  */
 
-import { INSIGHT_LABEL, type Insight, type InsightCode } from '../model/insights.ts';
+import { groupInsights, INSIGHT_LABEL, type Insight, type InsightCode, type InsightGroup } from '../model/insights.ts';
 import { STATUS_CATEGORY_LABEL } from '../format.ts';
 import { useSkins, useTerm } from '../skins.tsx';
 import type { ChangeRef, StatusCategory } from '../toil.ts';
@@ -50,39 +50,54 @@ const INSIGHT_ICON: Record<InsightCode, string> = {
 };
 
 /**
- * An item's insights, most pressing first, up to `max`. `compact` draws each
- * as its icon alone, for the board's cards: the word stays in the chip as
- * text for a screen reader and as its tooltip, and shows beside the icon
- * while the card has keyboard focus (views.css), so a sighted keyboard user
- * isn't left decoding pictures.
+ * An item's insights, most pressing first, up to `max` chips. One chip per
+ * insight code: an item blocking two others shows "Blocking 2", not two
+ * identical chips (#541), and `max` and "+N more" count chips. `titles` names
+ * the items an insight cites, for the tooltip. `compact` draws each as its
+ * icon alone, for the board's cards: the word stays in the chip as text for a
+ * screen reader and as its tooltip, and shows beside the icon while the card
+ * has keyboard focus (views.css), so a sighted keyboard user isn't left
+ * decoding pictures.
  */
-export function InsightChips({ insights, max = 3, compact = false }: { insights: Insight[]; max?: number; compact?: boolean }) {
+export function InsightChips({ insights, max = 3, compact = false, titles }: { insights: Insight[]; max?: number; compact?: boolean; titles?: ReadonlyMap<string, { title: string }> }) {
   if (!insights.length) return null;
-  const shown = insights.slice(0, max);
-  const rest = insights.slice(max);
+  const groups = groupInsights(insights);
+  const shown = groups.slice(0, max);
+  const rest = groups.slice(max);
   return (
     <ul className={`insight-chips${compact ? ' insight-chips--compact' : ''}`} aria-label="Insights">
-      {shown.map((i) =>
-        compact ? (
-          <li key={i.code} className={`insight insight--icon insight--w${i.weight}`} title={INSIGHT_LABEL[i.code]}>
+      {shown.map((g) => {
+        const word = wordOf(g);
+        return compact ? (
+          <li key={g.code} className={`insight insight--icon insight--w${g.weight}`} title={groupTitle(g, word, titles)}>
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
-              <path d={INSIGHT_ICON[i.code]} />
+              <path d={INSIGHT_ICON[g.code]} />
             </svg>
-            <span className="insight-word">{INSIGHT_LABEL[i.code]}</span>
+            <span className="insight-word">{word}</span>
           </li>
         ) : (
-          <li key={i.code} className={`insight insight--w${i.weight}`}>
-            {INSIGHT_LABEL[i.code]}
+          <li key={g.code} className={`insight insight--w${g.weight}`}>
+            {word}
           </li>
-        ),
-      )}
+        );
+      })}
       {rest.length > 0 && (
-        <li className="insight insight--more" {...(compact ? { title: rest.map((i) => INSIGHT_LABEL[i.code]).join(', ') } : {})}>
+        <li className="insight insight--more" {...(compact ? { title: rest.map(wordOf).join(', ') } : {})}>
           +{rest.length} more
         </li>
       )}
     </ul>
   );
+}
+
+/** A chip's word: the label, with a count when several insights share the code. */
+const wordOf = (g: InsightGroup) => (g.insights.length > 1 ? `${INSIGHT_LABEL[g.code]} ${g.insights.length}` : INSIGHT_LABEL[g.code]);
+
+/** A chip's tooltip: its word alone for one insight, else the word and what each says, cited items by title. */
+function groupTitle(g: InsightGroup, word: string, titles?: ReadonlyMap<string, { title: string }>): string {
+  if (g.insights.length === 1) return word;
+  const said = g.insights.map((i) => i.text.replace(/\[\[(.+?)\]\]/g, (_, id: string) => titles?.get(id)?.title ?? id));
+  return `${word}: ${said.join('; ')}`;
 }
 
 /**

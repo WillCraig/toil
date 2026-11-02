@@ -275,7 +275,9 @@ deployments themselves.
 The board's cards and its **Needs attention** flag and the flow charts mark
 each open work item with its insights, weightiest first, each naming the data it
 rests on (`ui/src/model/insights.ts`). One the data can't support isn't raised at
-all, rather than raised on a guess.
+all, rather than raised on a guess. A card shows one chip per kind of insight,
+with a count when there are several ("Blocking 2"); its tooltip lists each one,
+and the item view lists them all.
 
 | Insight | Means | Weight |
 |---|---|---|

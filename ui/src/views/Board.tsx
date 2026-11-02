@@ -135,7 +135,7 @@ function CardFace({ item, ids }: { item: WorkItem; ids?: string }) {
           <Avatar person={item.assignee} /> {personText(item.assignee)}
         </span>
         <span className="card-meta">
-          <InsightChips insights={found} compact />
+          <InsightChips insights={found} compact titles={prepared.byId} />
           <span className="field">
             <span className="source">{sourceLabel(item.source.area)}</span> · {estimateText(item)}
           </span>
