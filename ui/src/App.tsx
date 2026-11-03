@@ -539,7 +539,7 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
         <a className="skip" href="#main" onClick={skip} inert={game.open} aria-hidden={game.open || undefined}>
           Skip to content
         </a>
-        <header inert={game.open} aria-hidden={game.open || undefined}>
+        <header className="app-header" inert={game.open} aria-hidden={game.open || undefined}>
           {preview && (
             <p className="banner" role="note">
               <strong>Toil UI beta, on sample data.</strong> Nothing here connects to a tracker.

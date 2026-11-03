@@ -133,11 +133,11 @@
 }
 
 /* The title in neon with a split of its own colour, chromatic aberration on an old screen, and a block cursor after it. */
-[data-theme="sprawl"] h1 {
+[data-theme="sprawl"] #main h1 {
   text-shadow: -1px 0 rgba(var(--sprawl-pink), calc(0.75 * var(--sprawl-glow))), 1px 0 rgba(var(--sprawl-cyan), calc(0.75 * var(--sprawl-glow))), 0 0 14px rgba(var(--sprawl-pink), calc(0.35 * var(--sprawl-glow)));
 }
 
-[data-theme="sprawl"] h1::after {
+[data-theme="sprawl"] #main h1::after {
   content: "";
   display: inline-block;
   width: 0.5em;
@@ -538,11 +538,11 @@
    motion off stops them as it stops the engine's (#437); the tab change is
    the engine's own transition now. */
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme="sprawl"] h1::after {
+  [data-theme="sprawl"] #main h1::after {
     animation: sprawl-blink 1.1s steps(1) infinite;
   }
 
-  [data-theme="sprawl"]:not([data-theme-motion="off"]) h1 {
+  [data-theme="sprawl"]:not([data-theme-motion="off"]) #main h1 {
     animation: sprawl-glitch 0.5s steps(2) 1;
   }
 

@@ -113,7 +113,7 @@
    sprint's first day and sets on its last (`--sprint-progress`, 0 to 1, from
    the dashboard); away from a sprint it stands at midday. Decoration only:
    the sprint panel says the day in words. */
-[data-theme="harvest"] header::before {
+[data-theme="harvest"] .app-header::before {
   --p: var(--sprint-progress, 0.5);
   content: "";
   display: block;
