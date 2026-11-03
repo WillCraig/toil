@@ -1193,6 +1193,12 @@ GitHub CLI signed in (`gh auth login`), or `TOIL_GITHUB_TOKEN` set in the shell.
   script says so: run `claude` once in a terminal, which refreshes its own sign-in,
   or set a token from `claude setup-token`, and start the script again.
 
+To run the same build against your own `~/.toil` instead (your connections and
+dossiers as they are, changed only by what you save in Settings, with Toil UI's own
+data in `.scratch/toil-ui`), run `node ui/scripts/dev-mine.mjs`.
+That's the way to try unreleased changes on real work (`skills/toil/install.md`,
+Trying unreleased changes).
+
 ## Verify before you open a PR: `npm run verify:ui`
 
 One command checks Toil UI the way a reviewer would, and writes what it found to

@@ -1,5 +1,5 @@
 ---
-description: Installing toil from npm or from a clone with no npm install, the toil alias for a clone, and installing this skill for Codex, GitHub Copilot or Claude Code
+description: Installing toil from npm or from a clone with no npm install, the toil alias for a clone, trying unreleased changes from a clone, and installing this skill for Codex, GitHub Copilot or Claude Code
 ---
 
 # Installing toil
@@ -91,6 +91,41 @@ flags, takes it out.
   found after opening a new PowerShell, call `node <clone>/dist/toil.js` directly.
 - **Update** with `git -C toil pull`, which brings the newest release. There is
   nothing to rebuild.
+
+## Trying unreleased changes
+
+`main` holds changes that haven't been released yet. To try them on your own
+connections and dossiers before they ship, build them from a clone. This needs the npm
+registry, for `npm ci`:
+
+```bash
+git clone https://github.com/imagile-dev/toil.git && cd toil
+npm ci --ignore-scripts
+node ui/scripts/dev-mine.mjs
+```
+
+- **It builds toil and Toil UI from the clone,** putting toil in `.scratch/toil`, which
+  git ignores. Then it starts Toil UI on that build against your own `~/.toil`, and
+  prints the URL to open. The committed `dist/` is left alone, so `node dist/toil.js`
+  is still the last release.
+- **It uses your config as it is.** Your connections, credential store entries and
+  dossiers are used unchanged. Toil UI changes them only when you save something in
+  Settings, and its reads go in toil's audit log as usual. `TOIL_*` variables in your
+  shell apply as they do to `toil` typed by hand.
+- **Toil UI keeps its own data in `.scratch/toil-ui`,** not `~/.toil-ui`, so an
+  unreleased build never shares a cache with a released Toil UI. Its settings, such as
+  the agent you choose, start fresh there.
+- **The CLI from the same build** is `node .scratch/toil/toil.js`, with the same
+  arguments as `toil`. It is the full CLI on your real config, the same as `toil`.
+- **This build can replace your installed copy of this skill** with the unreleased
+  version. It does that when it changes your config (from the CLI, or from Toil UI's
+  Settings), and when it runs any command that loads config while your copy came
+  from another toil version. To go back, run `toil skill install --allow-write` again
+  from the released toil, with the same agent flags you installed it with.
+- **Options:** `--no-build` starts the last build, and `--port <n>` fixes the port.
+  `git pull` and run it again to get newer changes.
+- **Unreleased means unfinished.** Anything on `main` may change before it's released.
+  Report what you find with `toil feedback bug`.
 
 ## Installing this skill
 
