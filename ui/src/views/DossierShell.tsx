@@ -107,9 +107,12 @@ export function DossierShell({ tab, heading, dossiers, boardView, peek = null, c
             <SourceBadges sources={dossier.sources} dossier={dossier.name} />
           </div>
         </div>
-        <AskBar />
+        <div className="dossier-bar__ask">
+          <AskBar />
+          {!wide && <AgentsDrawer />}
+        </div>
       </div>
-      <div className="dossier-tabs-row">
+      <div className="dossier-tabs-row" data-tabs-row="">
         <Scroller label="Dossier views" className="dossier-tabs">
           <nav aria-label={`${dossier.name} views`}>
             <ul>
@@ -131,7 +134,6 @@ export function DossierShell({ tab, heading, dossiers, boardView, peek = null, c
             </ul>
           </nav>
         </Scroller>
-        {!wide && <AgentsDrawer />}
       </div>
       {tab === 'board' && boardView && (
         <nav className="board-views" aria-label="Board views">

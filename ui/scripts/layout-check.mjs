@@ -11,6 +11,7 @@
 //   - a child box reaching past the edge of its card (`data-card`);
 //   - something fixed to the bottom of the screen covering the end of the
 //     page once it is scrolled all the way down;
+//   - a tab bar (`data-tabs-row`) that scrolls while a sibling takes more than a tenth of its row, or overlaps it;
 //   - a row that must stay one row (`data-one-row`: the compact header, the
 //     settings tabs) wrapping onto a second;
 //   - the header folded into its Menu at 1440 pixels or wider, where every
@@ -28,7 +29,7 @@
 // from the Ask bar (#343) with its (i) popover, its agent switcher, an answer, its Suggestions menu and
 // Analyze's pulse check, a help (i)'s tooltip and popover (#346), the Agent page's full prompt and its Install dialog shown (#344), a worklog day rebuilt and
 // the calendar on an earlier month, a stand-up written up, and every failing
-// command's recent audit lines open on the Usage page, the bell's list and What's new (#417), and the theme moments' previews
+// command's recent audit lines open on the Usage page (the sample's; real data may have none), the bell's list and What's new (#417), and the theme moments' previews
 // (#419): a loading screen, the launch splash and the sprint recap card. Reduced motion
 // is on, so an animation caught mid-flight can't fail a run; `npm run smoke` then runs
 // MOTION_ROUTES again with motion on, where the moments play.
@@ -202,6 +203,21 @@ function inspect(cards, headerFits) {
     if (tops.size > 1 && Math.max(...mids) - Math.min(...mids) > 12) add('wraps', row, `its items sit on ${tops.size} rows`);
   }
 
+  // A tab bar that has to scroll gets (nearly) its whole row: a button beside it that leaves room for two tabs hides the rest.
+  for (const row of document.querySelectorAll('[data-tabs-row]')) {
+    if (!shown(row)) continue;
+    const body = row.querySelector('[data-scroller]');
+    if (!body || body.scrollWidth <= body.clientWidth + 1) continue;
+    const rowW = row.getBoundingClientRect().width;
+    const b = body.getBoundingClientRect();
+    if (b.width < rowW * 0.9) add('tabs-squeezed', body, `the tabs scroll in ${Math.round(b.width)}px of a ${Math.round(rowW)}px row, the rest of it taken by a sibling`);
+    for (const sib of row.querySelectorAll(':scope > *')) {
+      if (sib.contains(body) || !shown(sib)) continue;
+      const r = sib.getBoundingClientRect();
+      if (r.left < b.right - 1 && r.right > b.left + 1 && r.top < b.bottom - 1 && r.bottom > b.top + 1) add('tabs-covered', sib, 'overlaps the tab bar');
+    }
+  }
+
   // The header folds into its Menu only when its row is full, and at 1440px every theme's row fits the sample's (#387).
   const menu = headerFits && [...document.querySelectorAll('header [data-menu-button]')].find(shown);
   if (menu && window.innerWidth >= 1440) add('folded', menu, `the header shows its Menu at ${window.innerWidth}px, where its full row fits`);
@@ -304,7 +320,7 @@ async function closeOverlays(page) {
 }
 
 /** The states each view is checked in, beyond how it opens. */
-function states(route, width) {
+function states(route, width, sample = true) {
   const out = [];
   // The app's own breakpoint (COMPACT_HEADER in src/App.tsx): below it, the header is the Menu button.
   const compact = width < 1024;
@@ -404,7 +420,8 @@ function states(route, width) {
   }
   if (route === '#/dossier/card-payments/board') out.push({ name: 'attention-only', setup: clickAll('[data-attention-only]'), undoJs: clickAll('[data-attention-only]') });
   // A failing command's recent audit lines, opened under it on the Usage page (#309).
-  if (route === '#/settings/usage') out.push({ name: 'audit-lines', setup: `(async () => { const n = ${clickAll('[data-usage-lines]', '/Show recent failures/')}; await new Promise((r) => setTimeout(r, 300)); return n; })()`, undoJs: clickAll('[data-usage-lines]', '/Hide recent failures/') });
+  // Real data may genuinely have no failed command, and a state that opens nothing is a problem, so only the sample (which always has some) is held to it.
+  if (sample && route === '#/settings/usage') out.push({ name: 'audit-lines', setup: `(async () => { const n = ${clickAll('[data-usage-lines]', '/Show recent failures/')}; await new Promise((r) => setTimeout(r, 300)); return n; })()`, undoJs: clickAll('[data-usage-lines]', '/Hide recent failures/') });
   // The person's instructions are on the Agent page as it opens; the full prompt opens under them (#283).
   // The worklog (#308): a day rebuilt, which says how it compared, and an earlier month in the calendar.
   if (/\/worklog\/\d{4}-\d{2}-\d{2}$/.test(route)) out.push({ name: 'rebuilt', setup: `(async () => { const n = ${clickAll('[data-worklog-rebuild]')}; await new Promise((r) => setTimeout(r, 300)); return n; })()` });
@@ -656,7 +673,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
         await page.evaluate('window.scrollTo(0, 0)');
         checked++;
       }
-      for (const state of states(route, width)) {
+      for (const state of states(route, width, headerFits)) {
         // A state that opens nothing checks nothing, so it's a problem, never a quiet pass. clickAll waits for
         // its element to show, and an item in the compact header's Menu is looked for once the Menu is open (#289).
         // A state that needs focus (`clearOverlays`) first closes any menu or dialog an earlier state left open.

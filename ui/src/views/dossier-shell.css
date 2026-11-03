@@ -15,6 +15,9 @@ main:has(> .dossier-shell) { max-width: 1680px; padding-top: 0.5rem; padding-bot
 .dossier-bar__id { display: grid; gap: 0.2rem; min-width: 0; }
 .dossier-bar__line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; min-width: 0; }
 .dossier-bar__name { margin: 0; font-family: var(--font-display); font-size: clamp(1.3rem, 1.1rem + 0.6vw, 1.6rem); font-weight: 600; line-height: 1.2; min-width: 0; overflow-wrap: anywhere; }
+.dossier-bar__ask { display: flex; flex-wrap: wrap; align-items: start; gap: 0.5rem; min-width: 0; }
+.dossier-bar__ask .ask-bar { flex: 1 1 20rem; }
+.dossier-bar__ask .agents-open { margin-left: auto; }
 .dossier-bar .ask-bar { min-width: 0; margin: 0; padding: 0.4rem 0.6rem; }
 .sprint-chip { display: inline-flex; align-items: center; padding: 0.1rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }
 .dossier-switch { gap: 0.35rem; }
@@ -34,7 +37,7 @@ main:has(> .dossier-shell) { max-width: 1680px; padding-top: 0.5rem; padding-bot
   .dossier-bar__desc-text { white-space: normal; }
 }
 
-/* The tabs: one row that scrolls sideways when it doesn't fit, with the drawer's button at its end. */
+/* The tabs: one row that scrolls sideways when it doesn't fit, the whole row is theirs. */
 .dossier-tabs-row { display: flex; align-items: end; gap: 0.5rem; border-bottom: 1px solid var(--line); }
 .dossier-tabs { flex: 1 1 auto; }
 .dossier-tabs nav { width: max-content; }

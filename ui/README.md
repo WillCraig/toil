@@ -161,7 +161,8 @@ A dossier opens on its **Overview**, the briefing, in a frame all of its pages s
   (`/worklog`) and **Analyses** (`/analyses`). The Command Center (`/command-center`)
   is the Board tab's **Readiness** view, the stand-up is the Worklog's, and an item's
   page sits under Board, so every address from before the tabs still opens. On a
-  narrow screen the tabs scroll sideways.
+  narrow screen the tabs scroll sideways; below 1200px the Agents button sits beside the
+  Ask bar (under it on a phone), so they get the whole row.
 - **The Agents sidebar**, beside every tab from 1200px wide, and a drawer behind the
   **Agents** button below that: the tracker's inbox, then the dossier's assignments
   in three groups (those that need you, those working, and those gone stale), with the
@@ -1233,7 +1234,8 @@ npm run verify:ui -- --no-build --starter standup
   token` in Toil UI's environment only. It syncs the `sandbox` dossier and runs the
   same check over the home page, the dossier and its Board and Dependencies tabs, its worklog and stand-up, one of its items and the settings pages,
   except that its header may fold into the Menu at 1440px, since a real dossier's name
-  and links can genuinely fill the row.
+  and links can genuinely fill the row, and its Usage page's failed-command lines are
+  opened on the sample only, since real data may have none.
   Without a GitHub sign-in it skips this part and says so; nothing else depends on it.
 - **`--ask`** asks Codex one starter question (`hygiene` unless `--starter <id>`) and
   checks that an answer arrived, that the server verified every `[[id]]` it cites,
