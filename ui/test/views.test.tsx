@@ -714,7 +714,8 @@ describe('the chat up front (#343)', () => {
     expect(last.at(-1)!.prompt).toBe(`Question ${MAX_HISTORY_TURNS + 2}`);
     expect(sent[1]!.history![0]!.answer).toHaveLength(MAX_HISTORY_ANSWER + 1);
     expect(sent.every((e) => (e.history ?? []).length <= 20 && (e.history ?? []).every((t) => t.answer.length <= 20_000))).toBe(true);
-  });
+    // Types a question per turn through userEvent, which the default 5 s does not cover on a Windows runner.
+  }, 30_000);
 
   it('runs Analyze in one press, into the focused view, citing its items', async () => {
     await open('#/dossier/card-payments');
