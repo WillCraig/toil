@@ -26,6 +26,7 @@ import type { DossierData } from '../load.ts';
 import type { AnalysisSummary } from '../model/analysis.ts';
 import { keyLabel, SHORTCUTS, type Shortcut } from '../shortcuts.ts';
 import { DOSSIER_TABS } from '../views/DossierShell.tsx';
+import { setPlain, usePlain } from '../plain-words.ts';
 import type { SyncedAt } from '../views/Dossiers.tsx';
 import { SETTINGS_PAGES } from '../views/Settings.tsx';
 import { Help } from './help.tsx';
@@ -34,6 +35,8 @@ import './palette.css';
 export type PaletteGroup = 'commands' | 'dossiers' | 'tabs' | 'items' | 'analyses' | 'settings' | 'themes';
 
 const GROUP_LABEL: Record<PaletteGroup, string> = { commands: 'Commands', dossiers: 'Dossiers', tabs: 'Tabs', items: 'Items', analyses: 'Analyses', settings: 'Settings', themes: 'Themes' };
+/** The groups plain words (src/plain-words.ts) renames. */
+const PLAIN_GROUP_LABEL: Partial<Record<PaletteGroup, string>> = { dossiers: 'Toil projects', tabs: 'Pages', analyses: 'Past briefings' };
 /** The order with nothing typed. With a query, the groups go in the order of their best match. */
 const GROUP_ORDER: PaletteGroup[] = ['commands', 'dossiers', 'tabs', 'items', 'analyses', 'settings', 'themes'];
 /** The most results a group shows for a query: enough to choose from, few enough to read. */
@@ -94,19 +97,23 @@ export interface EntriesInput {
   adapters: AdapterList | null;
   agentSettings: boolean;
   openShortcuts: () => void;
+  /** Plain words on (src/plain-words.ts): the entries that name a tab, a Toil project or an AI helper use the plain names. */
+  plain?: boolean;
 }
 
 /** Every entry the palette can show, before any query. */
 export function paletteEntries(x: EntriesInput): PaletteEntry[] {
+  const pw = (standard: string, plain: string) => (x.plain ? plain : standard);
   const out: PaletteEntry[] = [];
   const here = x.route.view === 'dossiers' || x.route.view === 'settings' ? null : x.route.dossier;
   const current = here ? x.loaded[here] : undefined;
   if (x.onSync) out.push({ id: 'cmd:sync', group: 'commands', label: 'Sync now', detail: 'Read every dossier through toil into the cache', go: { run: x.onSync } });
   if (here && current?.ok) {
     out.push({ id: 'cmd:ask', group: 'commands', label: `Ask about ${here}`, detail: 'Focus the Ask bar', go: { command: { kind: 'ask' } } });
-    out.push({ id: 'cmd:analyze', group: 'commands', label: `Analyze ${here}`, detail: "The agent's pulse check of the dossier", go: { command: { kind: 'analyze' } } });
+    out.push({ id: 'cmd:analyze', group: 'commands', label: pw(`Analyze ${here}`, `Get a briefing on ${here}`), detail: pw("The agent's pulse check of the dossier", "An AI helper writes a briefing of what needs attention"), go: { command: { kind: 'analyze' } } });
+    out.push({ id: 'cmd:agents', group: 'commands', label: pw('Open the Agents panel', 'Open the AI helpers panel'), detail: pw('Assignments, the inbox and limits', 'What the AI helpers are doing, and what waits on you'), text: 'agents ai helpers assignments inbox', go: { command: { kind: 'agents' } } });
     const item = x.focused ? current.value.items.find((i) => i.id === x.focused) : undefined;
-    if (item && x.canAssign) out.push({ id: 'cmd:assign', group: 'commands', label: `Assign ${shortKey(item)} to an agent`, detail: item.title, go: { command: { kind: 'assign', id: item.id } } });
+    if (item && x.canAssign) out.push({ id: 'cmd:assign', group: 'commands', label: pw(`Assign ${shortKey(item)} to an agent`, `Give ${shortKey(item)} to an AI helper`), detail: item.title, go: { command: { kind: 'assign', id: item.id } } });
     for (const o of x.adapters?.options ?? []) {
       if (!o.ready) continue;
       const label = o.model ? `${o.label} (${o.model})` : o.label;
@@ -114,12 +121,14 @@ export function paletteEntries(x: EntriesInput): PaletteEntry[] {
     }
   }
   if (x.agentSettings) out.push({ id: 'cmd:agent-default', group: 'commands', label: 'Choose the default agent', detail: 'Settings, Agent', go: { href: '#/settings/agent' } });
+  out.push({ id: 'cmd:plain-words', group: 'commands', label: pw('Use plain words', "Use toil's own terms"), detail: pw('Everyday words for tabs and headings', 'Dossier, pull request, agent'), text: 'plain words everyday terms jargon', go: { run: () => setPlain(!x.plain) } });
   out.push({ id: 'cmd:shortcuts', group: 'commands', label: 'Keyboard shortcuts', detail: `Press ${SHORTCUTS.shortcuts.keys.join('')} anywhere`, go: { run: x.openShortcuts } });
 
-  out.push({ id: 'dossier:*', group: 'dossiers', label: 'All dossiers', go: { href: '#/' } });
+  out.push({ id: 'dossier:*', group: 'dossiers', label: pw('All dossiers', 'All Toil projects'), go: { href: '#/' } });
   for (const d of x.dossiers) out.push({ id: `dossier:${d}`, group: 'dossiers', label: d, go: { href: dossierHref(d) } });
   for (const d of x.dossiers) {
-    for (const t of DOSSIER_TABS) out.push({ id: `tab:${d}:${t.id}`, group: 'tabs', label: t.label, detail: d, text: `${t.label} ${d}`, go: { href: t.href(d) } });
+    // With plain words on, a tab is found by either name: its plain label shows, and its own term still matches a search.
+    for (const t of DOSSIER_TABS) out.push({ id: `tab:${d}:${t.id}`, group: 'tabs', label: pw(t.label, t.plain), detail: d, text: `${pw(t.label, t.plain)} ${t.label} ${d}`, go: { href: t.href(d) } });
     // How Analyze briefs it (#494): its page in Settings, one more way in.
     out.push({ id: `settings:analyze:${d}`, group: 'settings', label: 'How Analyze briefs it', detail: d, text: `analyze settings ${d}`, go: { href: dossierEditHref(d, 'analyze') } });
   }
@@ -199,7 +208,8 @@ export function CommandPalette({ isOpen, onOpenChange, agent, analysesApi, readi
 
   // Built on each render while it's open, which is cheap next to a keystroke (a few hundred entries), and not at all
   // while it's closed: the App re-renders often (a streaming answer), and every item of every dossier is a lot to list for nothing.
-  const entries = isOpen ? paletteEntries({ ...input, analyses, adapters, at }) : [];
+  const plain = usePlain();
+  const entries = isOpen ? paletteEntries({ ...input, analyses, adapters, at, plain: plain.on }) : [];
   const results = paletteResults(entries, query, here);
   const byId = new Map(entries.map((e) => [e.id, e]));
 
@@ -225,7 +235,7 @@ export function CommandPalette({ isOpen, onOpenChange, agent, analysesApi, readi
         <Dialog className="palette" aria-label="Command palette" data-palette="">
           <Autocomplete inputValue={query} onInputChange={setQuery}>
             <SearchField className="palette__search" aria-label="Jump to or run" autoFocus>
-              <Input className="palette__input" placeholder="Jump to a dossier, tab, item or setting, or run a command" data-palette-input="" />
+              <Input className="palette__input" placeholder={plain.pw('Jump to a dossier, tab, item or setting, or run a command', 'Jump to a Toil project, page, item or setting, or run a command')} data-palette-input="" />
             </SearchField>
             <p className="palette__status note" role="status">
               {reading > 0 ? `Reading ${reading} more ${reading === 1 ? 'dossier' : 'dossiers'} from the cache for the item search…` : !query.trim() ? 'Type a key or a title to search the items of every dossier.' : ''}
@@ -233,7 +243,7 @@ export function CommandPalette({ isOpen, onOpenChange, agent, analysesApi, readi
             <Menu className="palette__list" aria-label="Results" onAction={(k) => choose(String(k))} renderEmptyState={() => <p className="palette__empty">Nothing matches “{query.trim()}”.</p>}>
               {results.map((g) => (
                 <MenuSection key={g.group} id={g.group} className="palette__group">
-                  <Header className="menu-header">{GROUP_LABEL[g.group]}</Header>
+                  <Header className="menu-header">{plain.on ? (PLAIN_GROUP_LABEL[g.group] ?? GROUP_LABEL[g.group]) : GROUP_LABEL[g.group]}</Header>
                   {g.entries.map((e) => (
                     // Its name is all of what it shows, the detail line too, so the name a screen reader or voice control uses is the words on screen (WCAG 2.5.3).
                     <MenuItem key={e.id} id={e.id} textValue={e.label} className="menu-item palette__item" data-palette-item={e.group}>

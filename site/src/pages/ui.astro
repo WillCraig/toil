@@ -32,15 +32,15 @@ const home = `#/dossier/${DOSSIER}`;
 
 /** The views the tour walks through: where each opens in the app, and what the frame does there once it loads. */
 const steps = [
-  { id: 'dossiers', label: 'Dossiers', route: '#/', act: null, title: 'Every dossier, one card each', body: 'Its sprint and burn-up, what is in progress and blocked, who is on it, and what changed since you last looked. The dossier you opened last comes first.' },
-  { id: 'dashboard', label: 'Briefing', route: home, act: null, title: 'A briefing, one layer at a time', body: 'What to do first, as a sentence, then the reasons behind it, folded: open one for its items, and an item for its drawer, with why it is there and the next step. Analyze writes it; without an agent, toil works it out by code and says so. The numbers wait behind a fold, and every other view is a tab and a link.' },
+  { id: 'dossiers', label: 'Toil projects', route: '#/', act: null, title: 'Every Toil project, one card each', body: 'Its sprint and burn-up, what is in progress and blocked, who is on it, and what changed since you last looked. The Toil project you opened last comes first.' },
+  { id: 'dashboard', label: 'Briefing', route: home, act: null, title: 'A briefing, one layer at a time', body: 'The sprint\'s status in one sentence, one line on why, and at most three cards for what needs attention. The full briefing, with the reasons behind it, is one step in, and each reason opens to its items. A briefing from an AI helper says so; without one, toil works it out by code and says that instead. Every other view is a tab and a link.' },
   { id: 'board', label: 'Board', route: `${home}/board`, act: 'board', title: 'The board, without the clutter', body: 'The sprint by status, with every card that needs attention flagged and a filter for just those. Each card is a link to its item, and drag and drop never writes to your tracker on its own.' },
-  { id: 'ask', label: 'Ask', route: home, act: 'ask', title: 'Ask, or press Analyze', body: 'The chat takes the screen. Answers stream in under a status line that says what the agent is reading, cite every item they rest on, and suggest changes as proposal cards you apply yourself.' },
+  { id: 'ask', label: 'Ask', route: home, act: 'ask', title: 'Ask a question', body: 'Ask a question: pick one of nine plain questions or type your own. The chat takes the screen, answers stream in under a status line, cite every item they rest on, say how sure they are, and suggest changes as proposal cards you apply yourself.' },
   { id: 'switcher', label: 'Agent switcher', route: home, act: 'switcher', title: 'Pick who answers', body: 'Claude, GitHub Copilot or Codex, whichever is on your machine, for this chat only. A chat switched mid-way carries over. The sample answers with a scripted preview.' },
   { id: 'ticket', label: 'Ticket the work', route: home, act: 'ticket', title: 'Work with no ticket gets one', body: 'Ask for work that no ticket covers and the chat says so, lists the open items closest to it, and offers a sub-task or a new ticket as a proposal.' },
   { id: 'item', label: 'Item', route: `${home}/item/${encodeURIComponent('corp-jira:PAY-101')}`, act: null, title: 'Every item has a page', body: 'Its status and history, what it blocks, its pull requests and builds, and where it is deployed.' },
   { id: 'standup', label: 'Stand-up', route: `${home}/worklog/standup`, act: null, title: 'The stand-up, written from the worklog', body: 'Each person: done, in progress, blocked and next, every line numbered so the write-up can cite it.' },
-  { id: 'worklog', label: 'Worklog', route: `${home}/worklog`, act: null, title: 'What happened, day by day', body: 'What moved, merged, failed or recovered, what the agents did, and your own notes, kept on your machine.' },
+  { id: 'worklog', label: 'What happened', route: `${home}/worklog`, act: null, title: 'What happened, day by day', body: 'What moved, merged, failed or recovered, what the agents did, and your own notes, kept on your machine.' },
   { id: 'settings', label: 'Theme settings', route: '#/settings/toil', act: null, title: 'How far a theme goes', body: 'The theme picker and the checkboxes for wording, voice and particles, kept in this browser and never in toil\'s config.' },
 ];
 const firstStep = 'dashboard';
@@ -271,6 +271,7 @@ const crate = THEMES.find((t) => t.name === DEFAULT_THEME)!;
             </div>
           ))}
         </div>
+        <p class="uix-fine">The table is shown with plain words off. With them on, which is how Toil UI starts, the app reads these places in plain words instead.</p>
         <p class="uix-fine"><a href={url('/docs/themes/')}>Themes, in full</a>: what each theme looks like, its accessibility bar, and how custom instructions and a custom voice work.</p>
       </div>
     </section>
@@ -453,7 +454,7 @@ const crate = THEMES.find((t) => t.name === DEFAULT_THEME)!;
   .uix-table td { min-width: 12rem; }
   .uix-themed-cell { background: var(--t-surface); color: var(--t-ink); font-family: var(--t-font-body); }
 
-  /* The checkboxes show one variant or the other; with no script, the defaults (both on) show. */
+  /* The checkboxes show one variant or the other; with no script, the showcase's own starting point (both on) shows, though the app starts with both off. */
   [data-uix][data-voice='on'] [data-voice-off],
   [data-uix][data-voice='off'] [data-voice-on],
   [data-uix][data-wording='on'] [data-wording-off],

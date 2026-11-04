@@ -34,6 +34,8 @@ export interface Data {
   agent: Agent;
   /** When the data was read: every view shows it (principle 4), and sprint figures are worked out at it. */
   now: string;
+  /** The moment the age of that data is read against (#552): absent, the wall clock. The preview's data stands still, so it sets a fixed one. */
+  viewedAt?: string;
   /** toil's config commands, for a change a person approves on a view (the People view's suggested matches); absent where there are none. */
   config?: ConfigApi;
   /** Reads the dossier again, after a person changed it from a view; absent where nothing can change. */

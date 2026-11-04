@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { analyzeSettings } from '../../../src/core/brief/settings.ts';
 import { useData } from '../data.ts';
 import { dateTime, dossierEditHref, itemHref, peekHref, personText, shortKey, sourceLabel, STATUS_CATEGORY_LABEL, estimateText, unpeekHref } from '../format.ts';
+import { usePlain } from '../plain-words.ts';
 import { briefingOf, itemBriefing, type BriefingView } from '../model/briefing.ts';
 import { matches, typingIn } from '../shortcuts.ts';
 import { ANALYZE } from '../agent.ts';
@@ -41,8 +42,9 @@ export function useBriefing(): BriefingView {
 }
 
 /** Who wrote the briefing, in words: "Analyze, Codex (gpt-5.5), 13 Oct 2026, 07:30 UTC" or "By code". */
-export function briefingSource(view: BriefingView): string {
-  return view.by === 'analyze' && view.analysis ? `Analyze, ${whoText(view.analysis)}, ${dateTime(view.analysis.at)}` : 'By code, no agent';
+export function briefingSource(view: BriefingView, plain = false): string {
+  if (view.by === 'analyze' && view.analysis) return plain ? `Written by an AI helper, ${whoText(view.analysis)}, ${dateTime(view.analysis.at)}` : `Analyze, ${whoText(view.analysis)}, ${dateTime(view.analysis.at)}`;
+  return plain ? "Worked out by the app's own rules, no AI" : 'By code, no agent';
 }
 
 /** Links inside it open the drawer over the page you're on, not the item's page. */
@@ -55,6 +57,7 @@ export function PeekLinks({ children }: { children: ReactNode }) {
 export function ItemDrawer({ id }: { id: string }) {
   const { dossier, byId } = useData();
   const view = useBriefing();
+  const plain = usePlain();
   const heading = useRef<HTMLHeadingElement>(null);
   const here = typeof window === 'undefined' ? '#/' : window.location.hash;
   const close = unpeekHref(here);
@@ -70,7 +73,7 @@ export function ItemDrawer({ id }: { id: string }) {
       setTimeout(() => {
         if (window.location.hash.includes('?item=')) return;
         const key = encodeURIComponent(id);
-        document.querySelector<HTMLElement>(`[data-row="${CSS.escape(id)}"], a.card-key[href$="?item=${CSS.escape(key)}"]`)?.focus();
+        document.querySelector<HTMLElement>(`[data-row="${CSS.escape(id)}"], [data-card-item="${CSS.escape(id)}"], a.card-key[href$="?item=${CSS.escape(key)}"]`)?.focus();
       });
     };
   }, [id, close]);
@@ -95,7 +98,7 @@ export function ItemDrawer({ id }: { id: string }) {
       <aside className="item-drawer" aria-labelledby="drawer-title" data-drawer={id}>
         {head}
         <h2 id="drawer-title" ref={heading} tabIndex={-1} className="drawer__title">
-          Not in this dossier
+          {plain.pw('Not in this dossier', 'Not in this Toil project')}
         </h2>
         <p className="error">
           <code>{id}</code> isn't one of {dossier.name}'s items as Toil UI last read them. Sync the dossier, or check where the link came from.
@@ -149,8 +152,10 @@ export function ItemDrawer({ id }: { id: string }) {
           <ProposalCard key={i} proposal={p} />
         ))}
         {prs.length > 0 && (
-          <section aria-label="Pull requests">
-            <h3 className="drawer__label">Pull requests</h3>
+          <section aria-label={plain.pw('Pull requests', 'Code reviews')}>
+            <h3 className="drawer__label" title={plain.title('Pull requests')}>
+              {plain.pw('Pull requests', 'Code reviews')}
+            </h3>
             <ul className="rows">
               {prs.map((c) => (
                 <li key={c.id}>
@@ -161,8 +166,10 @@ export function ItemDrawer({ id }: { id: string }) {
           </section>
         )}
         {(blockedBy.length > 0 || blocks.length > 0) && (
-          <section aria-label="Chain">
-            <h3 className="drawer__label">Chain</h3>
+          <section aria-label={plain.pw('Chain', 'Linked work')}>
+            <h3 className="drawer__label" title={plain.title('Chain')}>
+              {plain.pw('Chain', 'Linked work')}
+            </h3>
             {blockedBy.length > 0 && (
               <p>
                 Blocked by <Cited text={blockedBy.map((b) => `[[${b}]]`).join(', ')} />
@@ -218,12 +225,13 @@ export const forgetSyncs = () => {
 export function Customize({ lenses }: { lenses: Array<{ lens: string; label: string }> }) {
   const prefs = useBriefingPrefs();
   const { dossier } = useData();
+  const { pw } = usePlain();
   const hide = (lens: string, shown: boolean) => setPrefs({ hidden: shown ? prefs.hidden.filter((h) => h !== lens) : [...new Set([...prefs.hidden, lens])] });
   return (
     <details className="customize">
       <summary className="btn btn--small">Customize</summary>
       <div className="customize__panel">
-        <p className="source">Just for you, in this browser. What Analyze looks for is the dossier's: <a href={dossierEditHref(dossier.name, 'analyze')}>How Analyze briefs {dossier.name}</a>.</p>
+        <p className="source">Just for you, in this browser. What {pw('Analyze', 'a briefing')} looks for is {pw("the dossier's", "the Toil project's")}: <a href={dossierEditHref(dossier.name, 'analyze')}>{pw('How Analyze briefs', 'How briefings are made for')} {dossier.name}</a>.</p>
         <fieldset>
           <legend className="briefing__label">Show</legend>
           <label className="customize__check">
@@ -248,11 +256,11 @@ export function Customize({ lenses }: { lenses: Array<{ lens: string; label: str
           </label>
         </fieldset>
         <fieldset>
-          <legend className="briefing__label">Analyze</legend>
+          <legend className="briefing__label">{pw('Analyze', 'Briefing')}</legend>
           <label className="customize__check">
-            <input type="checkbox" checked={prefs.afterSync} onChange={(e) => setPrefs({ afterSync: e.target.checked })} /> Run Analyze after each sync
+            <input type="checkbox" checked={prefs.afterSync} onChange={(e) => setPrefs({ afterSync: e.target.checked })} /> {pw('Run Analyze after each sync', 'Write a briefing after each sync')}
           </label>
-          <p className="source">Uses your agent's usage. Off, the briefing says when it is older than the data.</p>
+          <p className="source">Uses your {pw('agent', 'AI helper')}'s usage. Off, the briefing says when it is older than the data.</p>
         </fieldset>
       </div>
     </details>

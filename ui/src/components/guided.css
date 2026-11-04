@@ -1,0 +1,56 @@
+/* Ask with training wheels (#552): the guided start and the checks under an answer. Colours are theme tokens, so each
+   theme and scheme wears the same screen. The base is a phone; "Before you ask" moves beside the questions at 700px. */
+
+.guided { display: grid; gap: 1rem; min-width: 0; }
+.guided__main { display: grid; gap: 0.75rem; min-width: 0; align-content: start; }
+.guided__title { margin: 0; font-size: 1.375rem; line-height: 1.25; overflow-wrap: anywhere; }
+.guided__main > p { margin: 0; }
+.guided__notice { display: grid; gap: 0.4rem; padding: 0.6rem 0.75rem; border: 1px solid var(--warn); border-left-width: 4px; border-radius: var(--radius); background: var(--bg); }
+.guided__notice p { margin: 0; }
+.guided__notice summary { cursor: pointer; padding: 0.6rem 0; }
+.guided__groups { display: grid; gap: 1rem; }
+.guided__groups h4 { margin: 0 0 0.4rem; font-size: 1rem; }
+.guided__groups ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+
+.guided-q { font: inherit; display: grid; gap: 0.1rem; width: 100%; min-height: 44px; padding: 0.55rem 0.8rem; text-align: left; border: 1px solid var(--line); border-radius: var(--radius); background: var(--raised); color: var(--ink); cursor: pointer; }
+.guided-q[data-hovered] { border-color: var(--accent); }
+.guided-q[data-focus-visible] { outline: 3px solid var(--focus); outline-offset: 2px; }
+.guided-q[data-disabled] { cursor: not-allowed; opacity: 0.75; }
+.guided-q__text { font-weight: 600; overflow-wrap: anywhere; }
+.guided-q__good { color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+
+.guided-before { align-self: start; padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: var(--radius); background: var(--bg); min-width: 0; }
+.guided-before h3 { margin: 0 0 0.4rem; font-size: 1.0625rem; }
+.guided-before__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.guided-before__bar p { flex: 1 1 11rem; margin: 0; color: var(--muted); font-size: 0.9375rem; }
+.guided-before__list { margin: 0; display: grid; gap: 0.6rem; font-size: 0.9375rem; }
+.guided-before__list > div { display: grid; gap: 0.15rem; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+.guided-before__list > div:first-child { border-top: 0; padding-top: 0; }
+.guided-before dt { font-weight: 600; }
+.guided-before dd { margin: 0; overflow-wrap: anywhere; }
+.guided-before dd p { margin: 0 0 0.2rem; }
+.guided-before dd ul { margin: 0.1rem 0 0.3rem; padding-left: 1.1rem; }
+#guided-before-body { margin-top: 0.6rem; border-top: 1px solid var(--line); padding-top: 0.6rem; }
+
+@media (min-width: 700px) {
+  .guided { grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.5rem; align-items: start; }
+  .guided-before { position: sticky; top: 0; }
+}
+
+/* Under an answer: how sure in a word and a sentence, then one folded line (what it looked at, the time, the usage). */
+.ask-sure { display: grid; gap: 0.4rem; border-top: 1px solid var(--line); padding-top: 0.5rem; min-width: 0; }
+.ask-sure__sure { margin: 0; overflow-wrap: anywhere; }
+.ask-sure__more { min-width: 0; color: var(--muted); font-size: 0.875rem; }
+.ask-sure__more > summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; overflow-wrap: anywhere; }
+.ask-sure__more[open] > summary { margin-bottom: 0.3rem; }
+.ask-sure__more .usage-footer { border-top: 0; padding-top: 0.3rem; }
+.ask-sure__chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.ask-sure__chips li { min-width: 0; max-width: 100%; }
+.ask-sure__safe { margin: 0; }
+.sure { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0 0.7rem 0 0.55rem; border: 1.5px solid var(--sure, var(--muted)); border-radius: 999px; background: var(--surface); color: var(--sure, var(--muted)); }
+.sure strong { color: var(--ink); }
+.sure--high { --sure: var(--ok, var(--accent)); }
+.sure--medium { --sure: var(--warn); }
+.sure--low { --sure: var(--danger); }
+.sure__dots { flex: none; }
+

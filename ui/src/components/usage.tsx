@@ -11,13 +11,46 @@
 import { useId } from 'react';
 import { CAPS_HREF } from '../format.ts';
 import { EditLink } from './help.tsx';
-import { ADAPTER_LABEL, addUp, compact, modelKey, modelLabel, totalsBy, usageParts, type AnswerUsage, type UsageRecord } from '../model-usage.ts';
+import { ADAPTER_LABEL, addUp, compact, dollars, modelKey, modelLabel, totalsBy, usageParts, type AnswerUsage, type UsageRecord } from '../model-usage.ts';
 
-/** The footer under one answer: one line per model, then the quota and any cap notice. */
+/** What the records used, in one phrase for someone who doesn't read tokens: "about $0.04 of usage" (#552). The breakdown is one fold away. */
+export function usageSummary(records: readonly UsageRecord[]): string {
+  const t = addUp(records);
+  const cost = Object.values(t.costUsd).reduce((a, b) => a + b, 0);
+  if (!records.length) return 'no usage reported';
+  return Object.keys(t.costUsd).length ? `about ${cost < 0.01 ? dollars(cost) : `$${cost.toFixed(2)}`} of usage ${t.plan ? '(not billed on your plan)' : '(estimate)'}` : 'no dollar figure reported';
+}
+
+/**
+ * The footer under one answer: a line a person can read, then the model, the
+ * token breakdown and the quota behind a fold, and any cap notice out in the
+ * open, since a limit warning is never something to open a fold for.
+ */
+/** The same line the footer's fold opens from, for a caller that folds it into a line of its own: "about $0.04 of usage", with a sample's label first. */
+export function usageLine(usage: AnswerUsage): string {
+  return `${usage.sample ? 'Sample figures, not from a model. ' : ''}${usageSummary(usage.records)}`;
+}
+
 export function UsageFooter({ usage }: { usage: AnswerUsage }) {
-  const groups = totalsBy(usage.records, modelKey);
   return (
     <div className="usage-footer" role="group" aria-label="What this answer used" data-usage-footer="">
+      <details className="usage-details">
+        <summary className="usage-line">
+          {usage.sample && <span className="usage-sample">Sample figures, not from a model. </span>}
+          {usageSummary(usage.records)}
+        </summary>
+        <UsageBreakdown usage={usage} />
+      </details>
+      <UsageNotices usage={usage} />
+    </div>
+  );
+}
+
+/** The model, the token breakdown and the quota behind an answer's usage line. */
+export function UsageBreakdown({ usage }: { usage: AnswerUsage }) {
+  const groups = totalsBy(usage.records, modelKey);
+  return (
+    <>
       {groups.length === 0 ? (
         <p className="usage-line">{ADAPTER_LABEL[usage.adapter]} reported no usage for this answer.</p>
       ) : (
@@ -41,12 +74,20 @@ export function UsageFooter({ usage }: { usage: AnswerUsage }) {
           (experimental, from the Copilot SDK's account.getQuota).
         </p>
       )}
+    </>
+  );
+}
+
+/** A limit warning is never something to open a fold for. */
+export function UsageNotices({ usage }: { usage: AnswerUsage }) {
+  return (
+    <>
       {usage.notices.map((n, i) => (
         <p key={i} className="usage-notice" role="status">
           {n} <EditLink href={CAPS_HREF} label="Edit the usage caps" />
         </p>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -59,10 +100,13 @@ export function ChatUsage({ usages }: { usages: AnswerUsage[] }) {
   const last = usages[usages.length - 1]!;
   const sample = usages.some((u) => u.sample);
   return (
-    <div className="chat-usage" aria-label="What this chat used" data-chat-usage="">
-      <p className="usage-line">
+    <details className="chat-usage" aria-label="What this chat used" data-chat-usage="">
+      <summary className="usage-line">
         {sample && <span className="usage-sample">Sample figures. </span>}
-        This chat: {all.tokens === undefined ? 'tokens not reported' : `${compact(all.tokens)} tokens`}
+        This chat: {usageSummary(records)}
+      </summary>
+      <p className="usage-line">
+        {all.tokens === undefined ? 'Tokens not reported' : `${compact(all.tokens)} tokens`}
         {groups.length > 1 ? `, on ${groups.length} models` : ''}.
       </p>
       {groups.map((g) => (
@@ -74,7 +118,7 @@ export function ChatUsage({ usages }: { usages: AnswerUsage[] }) {
         </p>
       ))}
       <ContextMeter usage={last} />
-    </div>
+    </details>
   );
 }
 

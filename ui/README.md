@@ -108,6 +108,12 @@ the read window: the retention period, but at least 6 weeks (42 days), so the
 longest view stays whole. A closed item older than that isn't read, and so isn't
 in any view.
 
+## Plain words
+
+Screens read in everyday words by default: a dossier is a **Toil project**, a pull request a **code review**, an agent an **AI helper**, with toil's own term in the hover. Facts, numbers, commands and errors read the same either way. **Settings, General** (and the command palette) turn it off, kept in this browser; `?words=standard` in the address does too. Themed wording and themed agent voice are off until chosen.
+
+The tabs read **Summary**, **Board**, **What blocks what** (Dependencies), **Code reviews**, **People**, **What happened** (Worklog) and **Past briefings** (Analyses); Analyze is **Get a briefing**. A panel's source reads "From Jira and GitHub", with the commands one step in. **Settings → General** has a **Plain words** switch with an (i), and the command palette has **Use plain words** / **Use toil's own terms**. Quoted titles, the tracker's words and a briefing's own sentences are never reworded.
+
 ## The Dossiers view
 
 Toil UI opens on its dossiers, one card each, read from the same data the dashboards
@@ -153,21 +159,24 @@ A dossier opens on its **Overview**, the briefing, in a frame all of its pages s
 
 - **The top row:** its name, with the pencil that renames it; **Switch**, for another
   dossier or the Dossiers view; the sprint and its day; its description, cut to one
-  line with the whole of it in its tooltip, and its sources; and the Ask bar with
-  **Analyze** (The agent, below).
+  line with the whole of it in its tooltip, and its sources (on a phone, a **Details** button beside the name opens them); and the Ask bar, with the
+  **AI helpers** button beside it (The agent, below).
 - **The tabs**, one address each: **Overview** (`#/dossier/<name>`), **Board**
   (`/board`, with how many of its cards need attention), **Dependencies**
   (`/dependencies`), **Pull requests** (`/prs`), **People** (`/people`), **Worklog**
   (`/worklog`) and **Analyses** (`/analyses`). The Command Center (`/command-center`)
   is the Board tab's **Readiness** view, the stand-up is the Worklog's, and an item's
   page sits under Board, so every address from before the tabs still opens. On a
-  narrow screen the tabs scroll sideways; below 1200px the Agents button sits beside the
-  Ask bar (under it on a phone), so they get the whole row.
-- **The Agents sidebar**, beside every tab from 1200px wide, and a drawer behind the
-  **Agents** button below that: the tracker's inbox, then the dossier's assignments
+  narrow screen the tabs scroll sideways; the Agents button sits beside the Ask bar at
+  every width (a compact **AI** with its count on a phone, still named "AI helpers"), so the tabs get the whole row.
+- **The Agents panel**, closed by default at every width: one **Agents** button (**AI helpers** in plain words)
+  beside the Ask bar, counting what waits on you (the tracker's inbox, proposals to approve and
+  questions to answer, and any assignment or proposal that failed, since a closed panel must not hide a failure). From 1200px wide it opens the panel beside every tab, and remembers
+  whether you left it open (in `localStorage`); below that it opens a drawer. The palette's
+  **Open the Agents panel** does the same. It holds: the tracker's inbox, then the dossier's assignments
   in three groups (those that need you, those working, and those gone stale), with the
   finished ones under **Earlier**; then **Renew all stale**, the **Limits**, and this
-  dossier's three newest analyses, each linking to it (Assigning work to an agent, below).
+  dossier's three newest analyses, each linking to it (Assigning work to an agent, below). Each card's title is its link; how many run at once, for how long, and what the inbox is are in the heading's (i), and the tracker's raw label (`agent:refine`) is in the Start dialog.
   While an item's drawer is open (`?item=<id>`, The briefing, below), it takes the
   sidebar's column from 1200px wide, and covers the view from the right below that.
 - **Analyses** lists every Analyze kept for the dossier, newest first: when it was made,
@@ -184,10 +193,29 @@ A dossier opens on its **Overview**, the briefing, in a frame all of its pages s
 ### The briefing
 
 A dossier opens on its briefing: one column to read top to bottom, each part a step
-further in, and each step one you choose (#494).
+further in, and each step one you choose (#494). The tab's top is the answer (#552):
 
-1. **The recommendation:** the one thing to do first, as a sentence. Over it, the
-   sprint and its day, and who wrote the briefing: the latest Analyze, when it is
+- **The status sentence**, the biggest text on the tab: a word with a shape (On
+  track, At risk, Behind, No sprint, or No estimates when no story in the sprint has points) and the rest of the sentence ("Behind: 18 of
+  21 points are left, and 3 working days remain."), with an (i). That it is an estimate is the first line of the fold; "Too early in the sprint to judge a pace" stays on the page. One rule
+  picks the word (`ui/src/model/status.ts`): On track when the points left fit at
+  the pace so far, At risk when at least 75% of them would land or a red reason holds
+  work up, Behind below 75%; the fold says 75% is the app's own rule of thumb. Today isn't counted in the working days left, as on the
+  Toil project cards.
+- **One line on why**, from the briefing on screen, naming items by their titles (quoted as they are, never reworded by plain words), and
+  **How was this worked out?** one step in, with the sums and the rule.
+- **Needs attention**, at most three cards, the same for everyone: the biggest risk,
+  stories that can't start, the oldest code review waiting past the pickup limit;
+  stories not ready to start take the place of an empty one, and an all-clear card
+  says so when nothing needs anyone; if a read failed, that card says which reads could not be read instead of an all-clear. A card's title is its one link, opening the item in
+  its drawer (or its page, as Customize says), with the ticket key in small print.
+- **Outside the fold, too:** one compact line for each red reason no card already tells (it opens the reason in the fold), and the "Couldn't check" line for a panel that could not be read.
+- **Show the full briefing**, closed until you open it, and remembered in this
+  browser: everything below, with Customize. The source and sprint line, any problem
+  with the briefing, and **Go to** stay in view outside it.
+
+1. **The recommendation:** the one thing to do first, as a sentence. The sprint and
+   its day, and who wrote the briefing, stay under the answer, outside the fold: the latest Analyze, when it is
    current (made since the data was read, or the same UTC day) and answered with a
    briefing, with who wrote it, when, and a link to it; otherwise toil's briefing by
    code (`toil dossiers brief`, `src/core/brief/`), with no agent call, which says so,
@@ -554,7 +582,7 @@ dialog's modes, session and system prompt in Renew all stale, hallucination in t
 chat's **About these answers**), its (i) popover also gives each term's first
 sentence from Context Overflow's glossary, with **Read more on Context Overflow**.
 Help's menu then has **Learn**: four of Context Overflow's modules, by task.
-The agent's empty chat has the same **Learn**. **Links to learning content**, under
+**Links to learning content**, under
 **Settings, General** and kept in this browser, is on by default; off, every link to
 Context Overflow and every glossary line is gone, and Help keeps the view's docs and
 What's new.
@@ -597,8 +625,8 @@ until you call it up.
 - **Jump** to a dossier, any of a dossier's tabs (Overview, Board, Dependencies,
   Pull requests, People, Worklog, Analyses), a saved analysis, a settings page, or a
   theme.
-- **Run** Sync now (where Toil UI keeps a cache), and on a dossier's page Ask (it
-  focuses the Ask bar), Analyze, the agent that answers this chat, and Assign the
+- **Run** Sync now (where Toil UI keeps a cache), **Use plain words** / **Use toil's own terms**, and on a dossier's page Ask (it
+  focuses the Ask bar), Analyze, **Open the Agents panel** (**Open the AI helpers panel** in plain words), the agent that answers this chat, and Assign the
   item you were on to an agent: the board card that had focus, or the item whose
   page is open.
 - Matching is fuzzy and ignores case: `pay12` finds `PAY-12`, and each word you
@@ -709,24 +737,44 @@ by the page: `toil audit list`, read-only, to see whether a proposal was applied
 
 ## The agent
 
-Every dossier page has an **Ask bar** in its top row: one line, with **Analyze**
-beside it. Pressing into it opens the **focused view**: the conversation takes the
+Every dossier page has an **Ask bar** in its top row: one line. Pressing into it opens the **focused view**: the conversation takes the
 screen and the page steps back, with a slim strip that keeps the dossier, its sprint
 and the agent answering in sight. **Escape** or **Close** puts it away; the
 conversation stays, for the rest of the dossier's pages, until you reload.
 
-- **Starter questions** are a row of chips before the first question, then a
-  **Suggestions** menu.
+- **The guided start** (#552) is what the chat shows before the first question:
+  "What would you like to know about {name}?", then nine plain questions in four groups
+  (How are we doing? What's in the way? Backlog. For others), beside **Before you ask**. What each is good for is its hover; the one line on the page is that "Who might need help?" never ranks anyone. The dialog's title is the project's name. You can still type your own, except with no AI helper set up, when the questions are off and the notice links to **Settings → AI helper**. Pressing a question asks its text
+  through the same path as typing it; after the first answer the same questions are the
+  **Suggestions** menu. The questions are `src/guided-questions.ts`, not the server's
+  starters, which still back `api/agent/starters`.
+- **Before you ask** is on the page, never in a popover, as the same one line at every width,
+  "It reads what your connections can read, saved and live. It changes nothing.", with a
+  **What AI can see** button that opens the rest: what the AI can see (this Toil project's saved
+  copy, counted as items, code reviews, builds and deployments, and live reads through toil when
+  the copy is not enough, read-only) and what it can't do (change anything in the systems named,
+  see email or chat, read anything your connections can't already read). Who answers is the
+  header's to say, and what it costs is the usage line's.
+- **How sure is this?** is under every finished answer, worked out by code
+  (`src/model/confidence.ts`) and never by the model, with an (i). **High**: every saved read worked, the data
+  is under 24 hours old, and at most 1 in 10 of the items the question needs a field of
+  lacks it. **Medium**: one of those slipped, or the answer names one item its tools never returned. **Low**: a read failed, the data is over 3 days
+  old, there are fewer than 3 items to go on (code reviews, for the question about reviews), or the answer names more than one item its tools never returned, or half of those it cites. A question from the guided start is checked against
+  the panels it needs; a typed question and Analyze against every read. Under the word and its reason is one folded line, "What it looked at · 3 s · about $0.04 of usage (estimate)", which opens to the items the answer cited as links (a cited id the project doesn't hold as the bare
+  id) and the usage breakdown. "Suggestions only. Nothing was changed." is said under the first answer of a conversation, not every one; "Answered by" appears under an answer only when it differs from the header's. The answer's own heading is not drawn (it repeats the question), though a screen reader still has it. The existing proposal
+  cards still show the command to run, with no approve button.
 - **Answers stream in** as the agent writes them, under a **status line** that says
   what it is doing: reading the cache with `owi_query`, reading live through toil with
   `github issue list`, writing, and at the end how long it took. **Stop** cancels the
   question on the server and keeps what had arrived. Claude and Copilot stream as they
   write; Codex's SDK hands over its text a message at a time, so with Codex the status
   line is what moves between messages.
-- **The wording follows the theme**: the bar's placeholder, the welcome and the status
-  words are in each game theme's voice, and Plain stays neutral. The starter questions
+- **The wording follows the theme** when themed wording is on and plain words are off: the bar's placeholder, the welcome and the status
+  words are in each game theme's voice, and Plain stays neutral. With plain words on (the default), they read in plain words. The starter questions
   read the same in every theme.
-- **Analyze** briefs the dossier in one press (#494). Its question comes from toil,
+- **Analyze** briefs the dossier in one press (#494). It is the guided start's first
+  question, "Give me the full briefing", and still the command palette's Get a briefing and the
+  Analyses tab's button; the Ask bar has no button of its own for it. Its question comes from toil,
   `toil dossiers analyze prompt <dossier> --host toil-ui`: the standard method with
   the dossier's own lenses and focus (Tuning Analyze, above). It answers with a
   briefing block, which the server lifts out of the answer and checks, every id in it
@@ -878,7 +926,9 @@ for (docs/decisions/343-ask-up-front.md).
   proposals or what the tools can do. **Show the full prompt** shows exactly what
   the agent is sent.
 
-With no adapter chosen, the chat says so and names the three; its switcher can still
+With no adapter chosen, the chat says in plain words that no AI helper is set up and where
+an engineer sets one up (Settings, Agent), with the three adapters and their packages one
+step in, behind **Details for whoever sets it up**; its switcher can still
 choose an installed one for that chat. `toil-ui --sample` keeps the scripted agent,
 which answers its starter questions and Analyze from the sample data.
 
@@ -906,12 +956,12 @@ called):
 | Codex | `turn.completed`'s `usage`: input (which holds the cached input), cached input, cache writes, output | tokens; a dollar figure only from rates you enter, labelled "computed from your rates". The SDK names no model, so a Codex record names the model you chose, or says it wasn't named |
 | GitHub Copilot | one `assistant.usage` event per model call, with `cost` as the premium-request multiplier, and `session.usage_info` for the context. Copilot bills the multiplier once per prompt: only the call the prompt started (`initiator` `user`) counts it, and the agent's follow-up calls in the tool loop count 0 | tokens and premium requests, never dollars; premium requests left from the SDK's experimental `account.getQuota`, marked experimental |
 
-- **Under each answer**, one line per model: `2.1k in · 380 out · 14k cached · cache
+- **Under each answer**, one line in its folded line, "about $0.04 of usage (estimate)", or "(not billed on your plan)" on a Claude plan. The fold opens to one line per model: `2.1k in · 380 out · 14k cached · cache
   write not reported · ~$0.012 (SDK estimate)`. A figure the SDK didn't report reads
-  "not reported", never 0.
-- **In the chat's heading**, the chat's running total, split by model, and how full
+  "not reported", never 0. A cap notice stays in the open.
+- **In the chat's footer**, from the second answer (one answer's usage is the chat's), the chat's running total, split by model, and how full
   the last answer's context got, where the SDK says (Claude and Copilot; Codex's SDK
-  doesn't).
+  doesn't). On a phone the chat's header is one line, "Answered by … · Change".
 - **Settings, Agent usage** (beside Usage, which counts toil's own commands): the last
   30 days by day, adapter, model and dossier, the chats that used the most, and an
   **Export as CSV** download made in the page.
@@ -1077,7 +1127,7 @@ the worklog's facts, never from the bell.
 Eight built-in themes: Plain, Crate (the default), Harvest, Starship, Realm, Sprawl,
 Frontier and Overworld. Pick
 one from the header, or under **Settings, General**, where two checkboxes say how far
-it goes, both on by default:
+it goes, both off by default (#552):
 
 - **Themed wording:** the theme's own lede, eyebrows, dashboard notes, empty
   states and loading lines, and its names for a sprint, a board or an epic beside

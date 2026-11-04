@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.tsx';
 import { FirstRun, firstRunShows, SAMPLE_COMMAND, TRACKER_AREAS } from '../src/components/first-run.tsx';
 import { ageText, paletteEntries, paletteResults, staleNote, STALE_AFTER_MS, type EntriesInput } from '../src/components/palette.tsx';
@@ -17,6 +17,7 @@ import { fuzzyRank, fuzzyScore } from '../src/fuzzy.ts';
 import { ariaKeys, keysText, matches, SHORTCUTS, typingIn } from '../src/shortcuts.ts';
 import type { Envelope } from '../src/toil.ts';
 import { loaded } from './harness.ts';
+import { standardWords } from './words.ts';
 
 /**
  * The first run, the command palette and the shortcuts sheet (#416): the
@@ -24,6 +25,8 @@ import { loaded } from './harness.ts';
  * checked anywhere else), the palette's entries and results, and each of the
  * three in the App against the fixture execute().
  */
+
+beforeEach(standardWords);
 
 const press = (key: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(window, { key, ...init });
 const openPalette = async () => {
@@ -149,7 +152,7 @@ describe('the palette entries', () => {
     const card = (await loaded('card-payments')).data;
     const item = card.items[0]!;
     const off = paletteEntries(base({ dossiers: ['card-payments'], loaded: { 'card-payments': { ok: true, value: card } } })).filter((e) => e.group === 'commands').map((e) => e.id);
-    expect(off).toEqual(['cmd:shortcuts']);
+    expect(off).toEqual(['cmd:plain-words', 'cmd:shortcuts']);
     const on = paletteEntries(
       base({
         route: { view: 'dashboard', dossier: 'card-payments', tab: 'board' },
@@ -162,7 +165,7 @@ describe('the palette entries', () => {
         adapters: { chosen: 'codex', options: [{ name: 'codex', label: 'Codex', model: null, ready: true, problem: null, fix: null, action: null }, { name: 'claude', label: 'Claude', model: 'haiku', ready: false, problem: 'Not installed', fix: null, action: 'install' }] },
       }),
     ).filter((e) => e.group === 'commands');
-    expect(on.map((e) => e.label)).toEqual(['Sync now', 'Ask about card-payments', 'Analyze card-payments', `Assign ${shortKey(item)} to an agent`, 'Answer with Codex', 'Choose the default agent', 'Keyboard shortcuts']);
+    expect(on.map((e) => e.label)).toEqual(['Sync now', 'Ask about card-payments', 'Analyze card-payments', 'Open the Agents panel', `Assign ${shortKey(item)} to an agent`, 'Answer with Codex', 'Choose the default agent', 'Use plain words', 'Keyboard shortcuts']);
     expect(on.find((e) => e.id === 'cmd:agent:codex')!.go).toEqual({ command: { kind: 'agent', name: 'codex', label: 'Codex' } });
   });
 });

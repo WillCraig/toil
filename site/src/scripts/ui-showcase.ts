@@ -2,8 +2,8 @@
 // checkboxes switch which theme's cards show and reload the framed app in
 // that theme, and the view buttons open a view in the frame. The frame is
 // the real app from the same origin, so for a few views this script also
-// presses what a visitor would (opens the chat, asks the risk question,
-// opens the agent switcher, types a request no ticket covers), by the
+// presses what a visitor would (opens the chat, asks one of the plain
+// questions, opens the agent switcher, types a request no ticket covers), by the
 // controls' visible names, which no theme renames. If the app ever moves a
 // control, the view still opens and the caption says what to press: the
 // tour degrades to a signpost, which is what most tours are anyway.
@@ -40,8 +40,9 @@ if (root && frame) {
 
   const appUrl = () => {
     const q = new URLSearchParams({ theme: state.theme, scheme: schemeOf.get(state.theme) ?? 'system' });
-    if (!state.wording) q.set('wording', 'off');
-    if (!state.voice) q.set('voice', 'off');
+    // The app starts with both off, so say which the page wants every time.
+    q.set('wording', state.wording ? 'on' : 'off');
+    q.set('voice', state.voice ? 'on' : 'off');
     return `${app}?${q}${state.route}`;
   };
 
@@ -82,8 +83,6 @@ if (root && frame) {
     return null;
   }
 
-  const named = (text: string) => (el: Element) => (el.textContent ?? '').trim() === text;
-
   /** Opens the chat from the Ask bar and returns its dialog. */
   async function chat(): Promise<Element | null> {
     (await find<HTMLElement>('[data-ask-bar]'))?.click();
@@ -100,13 +99,12 @@ if (root && frame) {
       if (board && view && current()) view.scrollTo({ top: board.getBoundingClientRect().top + view.scrollY - 16, behavior: 'instant' });
     } else if (kind === 'ask') {
       if (!(await chat()) || !current()) return;
-      // The question the voice comparison below answers, so the frame shows the same answer in the theme's voice.
-      const question = root!.dataset.question ?? '';
+      // "Are we going to finish the sprint?", by its own id: the words on the button change with plain words and themes.
       const starters = '[aria-label="Starter questions"] button';
-      ((await find<HTMLButtonElement>(starters, named(question), 3000)) ?? (await find<HTMLButtonElement>(starters)))?.click();
+      ((await find<HTMLButtonElement>(`${starters}[data-question="finish"]`, () => true, 3000)) ?? (await find<HTMLButtonElement>(starters)))?.click();
     } else if (kind === 'switcher') {
       if (!(await chat()) || !current()) return;
-      (await find<HTMLButtonElement>('[role="dialog"] button', (b) => /change the agent/.test(b.textContent ?? '')))?.click();
+      (await find<HTMLButtonElement>('[role="dialog"] button', (b) => /change the (agent|AI helper)/.test(b.textContent ?? '')))?.click();
     } else if (kind === 'ticket') {
       if (!(await chat()) || !current()) return;
       const field = await find<HTMLInputElement>('[role="dialog"] form.ask-form input');

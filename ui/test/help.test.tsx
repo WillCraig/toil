@@ -4,8 +4,10 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetLearningLinks, setLearningLinks } from '../src/learning.ts';
+import { resetPlain } from '../src/plain-words.ts';
 import { GLOSSARY_SLUGS } from './glossary-terms.ts';
 import { openChat } from './chat.ts';
+import { standardWords } from './words.ts';
 import { App, parseRoute } from '../src/App.tsx';
 import { EditLink, Help } from '../src/components/help.tsx';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
@@ -75,6 +77,11 @@ describe('the help topics', () => {
 });
 
 describe('the (i)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    standardWords();
+  });
+
   it('names its topic, shows its sentences on focus, and opens them with Read more when pressed', async () => {
     render(<Help topic="worklog" />);
     const button = screen.getByRole('button', { name: 'About the worklog' });
@@ -91,6 +98,24 @@ describe('the (i)', () => {
     expect(link.getAttribute('rel')).toBe('noopener noreferrer');
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+});
+
+describe('the (i) in plain words (#552)', () => {
+  it('swaps the jargon in the one catalogue as it draws it, name and sentences alike', async () => {
+    resetPlain();
+    localStorage.clear();
+    render(<Help topic="prs" />);
+    const button = screen.getByRole('button', { name: 'About code reviews' });
+    await userEvent.tab();
+    expect(document.activeElement).toBe(button);
+    await waitFor(() => expect(screen.getByRole('tooltip').textContent).toBe("Read from every code host the Toil project names, the open ones ranked by how long each has waited and on what. Flow figures are the team's, never one person's."));
+  });
+
+  it('says the same as the catalogue with plain words off', async () => {
+    standardWords();
+    render(<Help topic="prs" />);
+    expect(screen.getByRole('button', { name: 'About pull requests' })).toBeTruthy();
   });
 });
 
@@ -149,6 +174,7 @@ describe('edit links', () => {
 describe('learning links (#418)', () => {
   beforeEach(() => {
     localStorage.clear();
+    standardWords();
     resetLearningLinks();
   });
   const entries = Object.entries(HELP).flatMap(([id, t]) => ((t as HelpTopic).glossary ?? []).map((g) => [id, g] as const));
@@ -221,13 +247,10 @@ describe('learning links (#418)', () => {
     expect(document.querySelector('a[href*="context-overflow"], [data-learn-link], [data-learn]')).toBeNull();
   });
 
-  it("offers Learn in the agent's empty chat, and the answers' terms in its (i)", async () => {
+  it("keeps Learn out of the chat's guided start (the header's Help has it), and offers the answers' terms in its (i)", async () => {
     await open('#/dossier/checkout-web');
     const chat = await openChat('checkout-web');
-    await userEvent.click(within(chat).getByRole('button', { name: 'Learn' }));
-    const learn = await screen.findByRole('dialog', { name: 'Learn, on Context Overflow' });
-    expect(within(learn).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(LEARN.map(learnHref));
-    await userEvent.keyboard('{Escape}');
+    expect(within(chat).queryByRole('button', { name: 'Learn' })).toBeNull();
     await userEvent.click(within(chat).getByRole('button', { name: 'About these answers' }));
     const info = await screen.findByRole('dialog', { name: 'About these answers' });
     expect(within(info).getAllByRole('link', { name: /^Read more on Context Overflow/ }).map((a) => a.getAttribute('href'))).toEqual(HELP.answers.glossary.map(glossaryHref));

@@ -14,6 +14,7 @@ import { dossierEditHref, sourceLabel as label } from '../format.ts';
 import { EditLink } from './help.tsx';
 import { matches } from '../shortcuts.ts';
 import type { DossierPreview, PreviewSprint } from '../model/preview.ts';
+import { usePlain } from '../plain-words.ts';
 import './dossier-head.css';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -48,12 +49,13 @@ export function SourceBadges({ sources, dossier }: { sources: Array<{ area: stri
 /** In progress, blocked and waiting on review, as a strip of figures; with the sprint's days left when one runs. */
 export function CountStrip({ preview, sprint = true }: { preview: DossierPreview; sprint?: boolean }) {
   const s = preview.sprint;
+  const { pw } = usePlain();
   return (
     <ul className="count-strip" aria-label="Counts">
       {sprint && s && <Count value={String(s.daysLeft)} label={`${s.daysLeft === 1 ? 'day' : 'days'} left`} />}
       <Count value={String(preview.inProgress)} label="in progress" />
       <Count value={String(preview.blocked)} label="blocked" tone={preview.blocked ? 'warn' : undefined} />
-      <Count value={String(preview.awaitingReview)} label={preview.awaitingReview === 1 ? 'PR waits on review' : 'PRs wait on review'} />
+      <Count value={String(preview.awaitingReview)} label={preview.awaitingReview === 1 ? pw('PR waits on review', 'code review waiting') : pw('PRs wait on review', 'code reviews waiting')} />
     </ul>
   );
 }
@@ -133,6 +135,7 @@ export function Editable({
   const pencil = useRef<HTMLButtonElement>(null);
   const back = useRef(false);
   const id = useId();
+  const { pw } = usePlain();
   const what = field === 'name' ? `Rename ${dossier}` : value ? `Edit ${dossier}'s description` : `Add a description to ${dossier}`;
 
   useEffect(() => {
@@ -225,7 +228,7 @@ export function Editable({
         onKeyDown={onKey}
       />
       <span id={`${id}-hint`} className="edit-hint note">
-        {busy ? 'Saving through toil dossiers describe…' : field === 'name' ? 'Enter renames it with toil dossiers describe; Escape cancels. Lowercase letters, digits and hyphens.' : 'Enter saves it with toil dossiers describe; Escape cancels.'}
+        {busy ? pw('Saving through toil dossiers describe…', 'Saving…') : field === 'name' ? pw('Enter renames it with toil dossiers describe; Escape cancels. Lowercase letters, digits and hyphens.', 'Enter renames it; Escape cancels. Lowercase letters, digits and hyphens.') : pw('Enter saves it with toil dossiers describe; Escape cancels.', 'Enter saves it; Escape cancels.')}
       </span>
       {error && (
         <span id={`${id}-error`} role="alert" className="edit-error failure">

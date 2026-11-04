@@ -23,6 +23,7 @@ import { assignedTo, cardByKey, people } from '../model/people.ts';
 import type { Health } from '../model/sprint.ts';
 import { FLAG_TEXT, trace, type Trace as TraceRow } from '../model/trace.ts';
 import { useTerm, useWords } from '../skins.tsx';
+import { usePlain } from '../plain-words.ts';
 import type { ChangeRef, Deployment } from '../toil.ts';
 import { Board } from './Board.tsx';
 import { Analyses } from './Analyses.tsx';
@@ -56,7 +57,7 @@ function Items({ ids }: { ids: string[] }) {
 }
 
 /** The delivery table's columns: each work item, its pull requests, their latest builds, where it runs, and what to check. */
-function traceColumns(builds: ChangeRef[]): Array<Column<TraceRow>> {
+function traceColumns(builds: ChangeRef[], plain = false): Array<Column<TraceRow>> {
   return [
     {
       header: 'Work item',
@@ -80,8 +81,8 @@ function traceColumns(builds: ChangeRef[]): Array<Column<TraceRow>> {
       ),
     },
     {
-      header: 'Pull requests',
-      label: 'Pull requests',
+      header: plain ? 'Code reviews' : 'Pull requests',
+      label: plain ? 'Code reviews' : 'Pull requests',
       cell: (r) =>
         r.changes.length ? (
           <ul className="plain">
@@ -163,6 +164,7 @@ function BoardTab({ person }: { person?: string }) {
   const filter = useBoardFilter(person);
   const term = useTerm();
   const words = useWords();
+  const plain = usePlain();
   const [gapsOnly, setGapsOnly] = useState(false);
   const [attentionOnly, setAttentionOnly] = useState(false);
   const { health: h, insights: prepared } = useDerived();
@@ -191,14 +193,15 @@ function BoardTab({ person }: { person?: string }) {
             </span>
             Needs attention only ({flagged.length})
           </Checkbox>
-          <p className="note">
-            A flagged card needs action now or a look: it is blocked, its build fails, it is aging or stale, and the like. <Help topic="insights" />
-          </p>
+          <span className="board-tools__help">
+            <Help topic="insights" />
+            <Help topic="board" />
+          </span>
         </div>
         <Board items={cards} />
       </Panel>
 
-      <Panel id="trace" title="Stories, pull requests, builds and deployments" calls={all} alerts={false}>
+      <Panel id="trace" title={plain.text('Stories, pull requests, builds and deployments')} calls={all} alerts={false}>
         <p className="note">{words('trace.note')}</p>
         <Checkbox className="check" isSelected={gapsOnly} onChange={setGapsOnly}>
           <span className="box" aria-hidden="true">
@@ -206,7 +209,7 @@ function BoardTab({ person }: { person?: string }) {
           </span>
           Only items with something to check
         </Checkbox>
-        <DataTable className="trace" label="Work items and their delivery" wide rows={shown} rowKey={(r) => r.item.id} columns={traceColumns(builds)} />
+        <DataTable className="trace" label="Work items and their delivery" wide rows={shown} rowKey={(r) => r.item.id} columns={traceColumns(builds, plain.on)} />
       </Panel>
 
       <div className="panel-grid">
@@ -247,13 +250,14 @@ function BoardTab({ person }: { person?: string }) {
 function DependenciesTab() {
   const { dossier } = useData();
   const term = useTerm();
+  const plain = usePlain();
   const words = useWords();
   return (
     <div className="tab-panels">
       <Panel id="gantt" title="Blocker timeline" calls={[...dossier.calls.work, ...dossier.calls.prs, ...dossier.calls.builds]} alerts={false}>
         <BlockerGantt />
       </Panel>
-      <Panel id="graph" title={term('dependencies', 'Dependencies')} calls={dossier.calls.work} alerts={false}>
+      <Panel id="graph" title={term('dependencies', plain.pw('Dependencies', 'What blocks what'))} calls={dossier.calls.work} alerts={false}>
         <Suspense fallback={<Loader size="panel" message={words('loading.graph')} />}>
           <Graph />
         </Suspense>

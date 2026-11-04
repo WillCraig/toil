@@ -23,6 +23,7 @@ import {
   type KindOrAll, type OpenRow, type PrMetrics, type Sample,
 } from '../model/prs.ts';
 import type { Change } from '../toil.ts';
+import { usePlain } from '../plain-words.ts';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const ALL: KindOrAll[] = ['ALL', ...KINDS];
@@ -122,6 +123,7 @@ const metricColumns: Array<Column<MetricRow>> = [
 
 export function PullRequests() {
   const { dossier, byId, now, sync } = useData();
+  const plain = usePlain();
   const prs = dossier.pullRequests ?? [];
   const queue = openQueue(prs, byId, now);
   const flags = allFlags(prs, byId, now);
@@ -136,7 +138,9 @@ export function PullRequests() {
         <p className="eyebrow">
           <a href={dossierHref(dossier.name)}>{dossier.name}</a>
         </p>
-        <h1 tabIndex={-1}>Pull requests</h1>
+        <h1 tabIndex={-1} title={plain.title('Pull requests')}>
+          {plain.pw('Pull requests', 'Code reviews')}
+        </h1>
         <p className="lede">
           {queue.length} open across {new Set(prs.map((c) => c.repo)).size} {new Set(prs.map((c) => c.repo)).size === 1 ? 'repository' : 'repositories'}, {prs.length - queue.length} merged or closed. Read {dateTime(now)}. <Help topic="prs" />
         </p>

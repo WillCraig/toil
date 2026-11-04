@@ -20,9 +20,10 @@ import { EditLink, Help } from '../components/help.tsx';
 import { ADAPTER_LABEL, addUp, usageParts } from '../model-usage.ts';
 import type { PersonEntry } from '../model/people.ts';
 import type { WorkItem } from '../toil.ts';
-import { ADAPTER_NAME, MODES, MODE_INFO, STATE_LABEL, renewRefusal, runMs, runText, type AssignAdapter, type Assignment, type AssignmentList, type AssignMode } from './model.ts';
+import { ADAPTER_NAME, MODES, STATE_LABEL, modeInfo, renewRefusal, runMs, runText, type AssignAdapter, type Assignment, type AssignmentList, type AssignMode } from './model.ts';
 import { useChatScope } from '../components/ask.tsx';
 import { StaleChip, StaleNote } from '../components/stale.tsx';
+import { usePlain } from '../plain-words.ts';
 import './assign.css';
 
 export const assignmentHref = (dossier: string, id: string) => `${dossierHref(dossier)}/assignment/${encodeURIComponent(id)}`;
@@ -78,13 +79,14 @@ export function usageText(a: Pick<Assignment, 'usage'>): string {
 
 /** One assignment on a card: state, mode, adapter, item, run time and usage. */
 export function AssignmentCard({ a, now }: { a: Assignment; now: string }) {
+  const plain = usePlain();
   const pending = a.proposals.filter((p) => p.status === 'pending').length;
   return (
     <Card className="assign-card">
       <Stack gap="xs">
         <Cluster className="assign-card__top">
           <StateChip a={a} />
-          <span className="assign-mode">{MODE_INFO[a.mode].label}</span>
+          <span className="assign-mode">{modeInfo(a.mode, plain.on).label}</span>
         </Cluster>
         <p className="assign-card__item">
           <ItemLink id={a.item} /> <span className="assign-card__title">{a.itemTitle}</span>
@@ -117,6 +119,7 @@ export function AssignmentCard({ a, now }: { a: Assignment; now: string }) {
  */
 export function AssignForm({ item, list, start, close, onDone }: { item: Pick<WorkItem, 'id' | 'title'>; list: AssignmentList; start?: Assignment; close: () => void; onDone: (a: Assignment) => void }) {
   const { assignments: api, dossier } = useData();
+  const plain = usePlain();
   const usable = list.adapters.filter((a) => !a.problem);
   const [adapter, setAdapter] = useState<AssignAdapter | null>(start?.adapter ?? (usable.find((a) => a.name === list.preferred)?.name ?? usable[0]?.name ?? null));
   const [mode, setMode] = useState<AssignMode>(start?.mode ?? 'refine');
@@ -146,35 +149,35 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
   return (
     <form className="assign-form" onSubmit={submit} noValidate>
       <Heading slot="title" level={2} id="assign-title">
-        {start ? 'Start the assignment' : 'Assign to an agent'}
+        {start ? plain.pw('Start the assignment', 'Start the AI helper') : plain.pw('Assign to an agent', 'Ask an AI helper')}
       </Heading>
       <p className="note">
         <ItemLink id={item.id} /> {item.title}
       </p>
       <RadioGroup className="agent-adapters" value={adapter ?? ''} onChange={(v) => setAdapter(v as AssignAdapter)}>
-        <Label>Adapter</Label>
+        <Label>{plain.pw('Adapter', 'Which AI')}</Label>
         {list.adapters.map((a) => (
           <Radio key={a.name} value={a.name} className="agent-choice" isDisabled={a.problem !== null}>
             <strong>{a.label}</strong>
-            <span className={a.problem ? 'agent-missing' : 'note'}>{a.problem ?? (a.implement ? 'Refine and investigate.' : 'Refine, investigate and implement.')}</span>
+            <span className={a.problem ? 'agent-missing' : 'note'}>{a.problem ?? (a.implement ? plain.pw('Refine and investigate.', 'Tidy up and look into.') : plain.pw('Refine, investigate and implement.', 'Tidy up, look into and try a fix.'))}</span>
           </Radio>
         ))}
       </RadioGroup>
       {start ? (
         <p>
-          Mode: <strong>{MODE_INFO[start.mode].label}</strong>, as the tracker asked ({start.trigger}). {MODE_INFO[start.mode].does}
+          {plain.pw('Mode', 'What it does')}: <strong>{modeInfo(start.mode, plain.on).label}</strong>, as the tracker asked ({start.trigger}). {modeInfo(start.mode, plain.on).does}
         </p>
       ) : (
         <RadioGroup className="agent-adapters" value={mode} onChange={(v) => setMode(v as AssignMode)}>
           <div className="edit-head">
-            <Label className="agent-label">Mode</Label>
+            <Label className="agent-label">{plain.pw('Mode', 'What should it do?')}</Label>
             <Help topic="assignments" />
           </div>
           {MODES.map((m) => (
             <Radio key={m} value={m} className="agent-choice">
-              <strong>{MODE_INFO[m].label}</strong>
+              <strong>{modeInfo(m, plain.on).label}</strong>
               <span className="note">
-                {MODE_INFO[m].does} {MODE_INFO[m].changes}
+                {modeInfo(m, plain.on).does} {modeInfo(m, plain.on).changes}
               </span>
             </Radio>
           ))}
@@ -193,7 +196,9 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
       )}
       {implementOff && <p className="failure">{implementOff}</p>}
       <p className="note">
-        It runs on your adapter's own subscription, {list.settings.concurrent === 1 ? 'one assignment at a time' : `${list.settings.concurrent} assignments at a time`}, for up to {list.settings.timeLimitMinutes} minutes, within your usage caps. Nothing it proposes leaves this machine until you apply it, and applying runs toil's own command through its write gate.
+        {plain.on
+          ? `It runs on your own AI subscription, ${list.settings.concurrent === 1 ? 'one at a time' : `${list.settings.concurrent} at a time`}, for up to ${list.settings.timeLimitMinutes} minutes, within your usage caps. Nothing it suggests leaves this computer until you approve it.`
+          : <>It runs on your adapter's own subscription, {list.settings.concurrent === 1 ? 'one assignment at a time' : `${list.settings.concurrent} assignments at a time`}, for up to {list.settings.timeLimitMinutes} minutes, within your usage caps. Nothing it proposes leaves this machine until you apply it, and applying runs toil's own command through its write gate.</>}
       </p>
       {list.settings.problem && <p className="failure">{list.settings.problem}</p>}
       {api?.disabled && <p className="failure">{api.disabled}</p>}
@@ -204,7 +209,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
       )}
       <div className="assign-actions">
         <Button type="submit" className="btn btn--accent" isDisabled={!canSend}>
-          {busy ? 'Assigning…' : start ? 'Start' : 'Assign'}
+          {busy ? plain.pw('Assigning…', 'Asking…') : start ? 'Start' : plain.pw('Assign', 'Ask the AI helper')}
         </Button>
         <Button className="btn" onPress={close}>
           Cancel
@@ -231,6 +236,7 @@ export function AssignModal({ item, start, isOpen, onOpenChange, onDone }: { ite
 
 function AssignBody({ item, start, close, onDone }: { item: Pick<WorkItem, 'id' | 'title'>; start?: Assignment; close: () => void; onDone: (a: Assignment) => void }) {
   const { assignments: api, dossier } = useData();
+  const plain = usePlain();
   const [list, setList] = useState<AssignmentList | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
@@ -249,7 +255,7 @@ function AssignBody({ item, start, close, onDone }: { item: Pick<WorkItem, 'id' 
   return (
     <div className="assign-form">
       <Heading slot="title" level={2} id="assign-title">
-        Assign to an agent
+        {plain.pw('Assign to an agent', 'Ask an AI helper')}
       </Heading>
       <p className={problem ? 'failure' : 'note'}>{problem ?? 'Reading the adapters on this machine…'}</p>
       <div className="assign-actions">
@@ -277,12 +283,13 @@ export function AssignButton({ item }: { item: Pick<WorkItem, 'id' | 'title'> })
 
 /** One inbox entry: what the tracker asked for, and the Start a person presses. */
 export function InboxRow({ a, onStarted }: { a: Assignment; onStarted: () => void }) {
+  const plain = usePlain();
   const [open, setOpen] = useState(false);
   return (
     <li className="assign-inbox__row">
       <Cluster>
         <span>
-          <ItemLink id={a.item} /> {a.itemTitle}: <strong>{MODE_INFO[a.mode].label.toLowerCase()}</strong>, asked for by the tracker's {a.trigger}.
+          <ItemLink id={a.item} /> {a.itemTitle}: <strong>{modeInfo(a.mode, plain.on).label.toLowerCase()}</strong>
         </span>
         <Button className="btn btn--accent btn--small" onPress={() => setOpen(true)} data-inbox-start="">
           Start<span className="sr-only"> {a.item}</span>…
@@ -349,6 +356,7 @@ interface Renewal {
  * renews the rest. The dossier's chat is on the list when it is stale.
  */
 export function RenewAll({ list, onDone }: { list: AssignmentList; onDone: () => void }) {
+  const plain = usePlain();
   const { assignments: api, dossier } = useData();
   const chat = useChatScope();
   const [open, setOpen] = useState(false);
@@ -365,7 +373,7 @@ export function RenewAll({ list, onDone }: { list: AssignmentList; onDone: () =>
     ...(chat?.session?.stale ? [{ key: 'chat', label: `The chat about ${dossier.name}: ${chat.session.stale.text}`, skip: chat.session.stale.restart ?? (chat.busy ? 'It is answering a question now, and a renew never interrupts one.' : null), run: renewChat }] : []),
     ...list.assignments
       .filter((a) => a.stale)
-      .map((a) => ({ key: a.id, label: `${MODE_INFO[a.mode].label} ${a.item} on ${a.adapter ? ADAPTER_NAME[a.adapter] : 'no adapter'}, ${STATE_LABEL[a.state].toLowerCase()}: ${a.stale!.text}`, skip: renewRefusal(a), run: () => api.renew(a.id) })),
+      .map((a) => ({ key: a.id, label: `${modeInfo(a.mode, plain.on).label} ${a.item} on ${a.adapter ? ADAPTER_NAME[a.adapter] : 'no adapter'}, ${STATE_LABEL[a.state].toLowerCase()}: ${a.stale!.text}`, skip: renewRefusal(a), run: () => api.renew(a.id) })),
   ];
   if (!rows.length && !open) return null;
   const listed = shown ?? rows;
@@ -390,10 +398,10 @@ export function RenewAll({ list, onDone }: { list: AssignmentList; onDone: () =>
       {rows.length > 0 && (
       <Cluster>
         <Button className="btn" onPress={() => (setSaid(null), setShown(rows), setOpen(true))} data-renew-all="">
-          Renew all stale…
+          {plain.pw('Renew all stale…', 'Restart out-of-date…')}
         </Button>
         <span className="note">
-          <StaleChip /> {rows.length === 1 ? 'One session started' : `${rows.length} sessions started`} on instructions that have changed since.
+          <StaleChip /> {rows.length === 1 ? 'One session started' : `${rows.length} sessions started`} {plain.pw('on instructions that have changed since.', 'before an update.')}
         </span>
       </Cluster>
       )}
@@ -403,7 +411,7 @@ export function RenewAll({ list, onDone }: { list: AssignmentList; onDone: () =>
             {({ close }) => (
               <div className="assign-form">
                 <Heading slot="title" level={2} id="renew-title">
-                  Renew stale sessions
+                  {plain.pw('Renew stale sessions', 'Restart out-of-date sessions')}
                 </Heading>
                 <p className="note">Each renews as a fresh session on today's instructions, with what the old one left as context. The old one stays readable. Renew never interrupts a turn, and skips any session waiting on you. <Help topic="stale" /></p>
                 <ul className="rows renew-list">
@@ -475,14 +483,15 @@ export function agentFor(adapter: AssignAdapter, people: readonly PersonEntry[])
 
 /** The People view's part: each adapter with assignments, as a teammate, under the dossier's agent of that name where there is one. */
 export function AgentAssignments({ people }: { people: readonly PersonEntry[] }) {
+  const plain = usePlain();
   const { dossier, now, assignments: api } = useData();
   const { list } = useAssignments(dossier.name);
   if (!api || !list) return null;
   const adapters = [...new Set(list.assignments.flatMap((a) => (a.adapter ? [a.adapter] : [])))].sort();
   return (
     <section className="people-section" aria-labelledby="agent-assignments">
-      <h2 id="agent-assignments">Agents' assignments</h2>
-      <p className="note">What each agent was assigned from Toil UI, as a teammate's plate: its own runs, not the pull requests above.</p>
+      <h2 id="agent-assignments">{plain.pw("Agents' assignments", "AI helpers' work")}</h2>
+      <p className="note">{plain.pw("What each agent was assigned from Toil UI, as a teammate's plate: its own runs, not the pull requests above.", "What each AI helper was asked to do from Toil UI, as a teammate's plate: its own runs, not the code reviews above.")}</p>
       {adapters.length ? (
         <CardGrid min="md" className="people-cards">
           {adapters.map((adapter) => {
@@ -507,7 +516,7 @@ export function AgentAssignments({ people }: { people: readonly PersonEntry[] })
                     <ul className="rows">
                       {mine.map((a) => (
                         <li key={a.id}>
-                          <StateChip a={a} /> {a.stale && <StaleChip />} <a href={assignmentHref(a.dossier, a.id)}>{MODE_INFO[a.mode].label}</a> <ItemLink id={a.item} /> <span className="note">{runText(a.ranMs ?? runMs(a, now))}</span>
+                          <StateChip a={a} /> {a.stale && <StaleChip />} <a href={assignmentHref(a.dossier, a.id)}>{modeInfo(a.mode, plain.on).label}</a> <ItemLink id={a.item} /> <span className="note">{runText(a.ranMs ?? runMs(a, now))}</span>
                         </li>
                       ))}
                     </ul>

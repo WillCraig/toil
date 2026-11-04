@@ -44,7 +44,7 @@ describe('Customize', () => {
     expect(b.querySelector('a[data-row="corp-jira:PAY-101"]')!.getAttribute('href')).toBe('#/dossier/card-payments/item/corp-jira%3APAY-101');
     // The panel offers the way to the dossier's own Analyze settings: one more path there.
     const panel = b.querySelector('details.customize')!;
-    expect(within(panel as HTMLElement).getByRole('link', { name: 'How Analyze briefs card-payments' }).getAttribute('href')).toBe('#/settings/dossiers/card-payments/analyze');
+    expect(within(panel as HTMLElement).getByRole('link', { name: 'How briefings are made for card-payments' }).getAttribute('href')).toBe('#/settings/dossiers/card-payments/analyze');
   });
 });
 

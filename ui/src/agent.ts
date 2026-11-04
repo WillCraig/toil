@@ -123,9 +123,11 @@ export interface Starter {
 /** Who answers in the preview and with --sample: the scripted agent, named so nobody mistakes it for a model. */
 export const SCRIPTED_LABEL = 'a scripted preview, not a model';
 
-/** What the pane says when no adapter is chosen (#251), naming the three. */
-export const NO_AGENT_NOTICE =
-  'No agent is set up in this Toil UI, so nobody can answer yet. Toil UI reasons with the subscription you already have, through one of three adapters: Claude (the Claude Agent SDK, @anthropic-ai/claude-agent-sdk), GitHub Copilot (@github/copilot-sdk) or Codex (@openai/codex-sdk).';
+/** What the pane says when no adapter is chosen (#251, #552): in everyday words, for whoever is asking and not whoever installs. The page adds a link to Settings, Agent, where an engineer sets one up. */
+export const NO_AGENT_NOTICE = 'No agent is set up yet, so nothing can answer questions.';
+/** The step further in, behind a fold: what an engineer needs, with the three adapters and their packages. */
+export const NO_AGENT_DETAILS =
+  'Toil UI reasons with the subscription you already have, through one of three adapters: Claude (the Claude Agent SDK, @anthropic-ai/claude-agent-sdk), GitHub Copilot (@github/copilot-sdk) or Codex (@openai/codex-sdk).';
 export const NO_AGENT_FIX = 'Press Install for the one your organization approves under Settings, Agent, with its CLI on PATH, and choose it there, or pick an installed one for this chat from Answered by, above. The dashboards work without one, and toil-ui --sample shows the scripted agent.';
 
 /**
@@ -142,6 +144,8 @@ export interface AskStyle {
 export interface Agent {
   /** A line the pane shows before any question, such as that no agent is set up. */
   notice?: string;
+  /** What an engineer needs to fix it, shown one step in, behind the notice (#552). */
+  noticeDetails?: string;
   /** Who answers, in words, for the pane's info: an adapter's name, or the scripted preview. */
   label?: string;
   /** The questions offered about a dossier before anyone types. */

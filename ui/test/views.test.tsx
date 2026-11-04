@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
-import { MAX_HISTORY_ANSWER, MAX_HISTORY_TURNS, type AdapterList, type Agent, type AskExtra } from '../src/agent.ts';
+import { standardWords } from './words.ts';
+import { MAX_HISTORY_ANSWER, MAX_HISTORY_TURNS, NO_AGENT_NOTICE, type AdapterList, type Agent, type AskExtra } from '../src/agent.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { askBar, openChat } from './chat.ts';
 import { CANNED, FIXTURE_NOW, callKey, fixtureExecute, type Canned } from '../src/fixtures/execute.ts';
@@ -61,6 +62,7 @@ async function metric(name: RegExp) {
 
 beforeEach(() => {
   localStorage.clear();
+  standardWords();
   document.documentElement.removeAttribute('data-theme');
 });
 
@@ -381,21 +383,24 @@ describe('a dashboard', () => {
   it('answers a starter question about the dossier, streaming, with links to every item it cites', async () => {
     await open('#/dossier/settlement');
     const chat = await openChat('settlement');
-    await userEvent.click(within(chat).getByRole('button', { name: 'Where is this work deployed?' }));
-    const answer = await within(chat).findByRole('heading', { level: 3, name: 'Where is this work deployed?' });
+    await userEvent.click(within(chat).getByRole('button', { name: /^Are we going to finish the sprint\?/ }));
+    const answer = await within(chat).findByRole('heading', { level: 3, name: 'Are we going to finish the sprint?' });
     const pane = answer.parentElement!;
-    await waitFor(() => expect(pane.textContent).toMatch(/Answered by: a scripted preview, not a model, in \d+ s\./));
+    // Who answered is the header's to say; the answer's own line is how sure it is, then one folded line with the time (#552).
+    await waitFor(() => expect(pane.querySelector('details[data-answer-more] summary')!.textContent).toMatch(/^What it looked at · \d+ s/));
+    expect(pane.textContent).not.toContain('Answered by');
     expect(within(pane).getAllByRole('link').map((a) => a.getAttribute('href'))).toContain(item('settlement', 'corp-ado:2305'));
-    // One citation is one item, not "1 items" (#319).
-    expect(pane.textContent).toMatch(/Cites (1 item\.|([02-9]|\d\d+) items\.)/);
+    // What it rests on is under the answer, with how sure it is, and says nothing was changed (#552).
+    expect(pane.textContent).toContain('How sure is this?');
+    expect(pane.textContent).toContain('Suggestions only. Nothing was changed.');
     expect(within(chat).getByRole('log').getAttribute('aria-busy')).toBe('false');
-    expect(within(chat).getByText('You asked:', { exact: false }).closest('.bubble')!.textContent).toBe('You asked: Where is this work deployed?');
+    expect(within(chat).getByText('You asked:', { exact: false }).closest('.bubble')!.textContent).toBe('You asked: Are we going to finish the sprint?');
   });
 
   it("shows the agent's proposals as cards to review, with the command and no way to apply them", async () => {
     await open('#/dossier/settlement');
     const chat = await openChat('settlement');
-    await userEvent.click(within(chat).getByRole('button', { name: "What's at risk in this dossier?" }));
+    await userEvent.click(within(chat).getByRole('button', { name: /^Are we going to finish the sprint\?/ }));
     const card = await within(chat).findByRole('article', { name: 'Proposal: Move 2303 to Sprint 43' });
     expect(card.textContent).toContain('Proposed change, not applied');
     // jsdom has no platform, so the viewer's shell is POSIX; the toggle switches it, for every card.
@@ -643,15 +648,16 @@ describe('the views on a dashboard (#252, #253)', () => {
 });
 
 describe('the chat up front (#343)', () => {
-  const setTheme = (theme: string) => localStorage.setItem('toil-ui.theme', JSON.stringify({ theme }));
+  // Themed wording and voice start off (#552); the tests here that read a theme's own words opt in, as a saved choice.
+  const setTheme = (theme: string) => localStorage.setItem('toil-ui.theme', JSON.stringify({ theme, wording: true, voice: true }));
   beforeEach(() => setTheme('plain'));
 
-  it('is a bar on every dossier page, with its placeholder in the theme\'s words and Analyze beside it', async () => {
+  it('is a bar on every dossier page, with its placeholder in the theme\'s words and no Analyze button of its own (#552)', async () => {
     for (const route of ['#/dossier/card-payments', '#/dossier/card-payments/prs', '#/dossier/card-payments/people', '#/dossier/card-payments/worklog', item('card-payments', 'corp-jira:PAY-102')]) {
       await open(route);
       const bar = askBar('card-payments');
       expect(within(bar).getByRole('textbox', { name: 'Your question' }).getAttribute('placeholder')).toBe('Ask about card-payments');
-      expect(within(bar).getByRole('button', { name: 'Analyze' })).toBeTruthy();
+      expect(within(bar).queryByRole('button', { name: /Analyze|briefing/ })).toBeNull();
       cleanupView();
     }
     setTheme('crate');
@@ -659,14 +665,14 @@ describe('the chat up front (#343)', () => {
     expect(within(askBar('card-payments')).getByRole('textbox', { name: 'Your question' }).getAttribute('placeholder')).toBe('Ask the dock about card-payments');
   });
 
-  it('opens a focused view with the context strip, starters as chips, the welcome in the theme\'s voice, and Escape to leave', async () => {
+  it('opens a focused view with the context strip, the guided start with its questions, and Escape to leave', async () => {
     setTheme('realm');
     const { container } = await open('#/dossier/card-payments');
     const chat = await openChat('card-payments');
-    expect(chat.textContent).toContain('Dossier card-payments');
+    expect(within(chat).getByRole('heading', { level: 2, name: 'Ask about card-payments' })).toBeTruthy();
     expect(chat.textContent).toContain('Sprint 42, day 7 of 10');
-    expect(chat.textContent).toContain('Ask the dungeon master about card-payments');
-    expect(within(chat).getByRole('group', { name: 'Starter questions' }).querySelectorAll('button').length).toBe(5);
+    expect(chat.textContent).toContain('What would you like to know about card-payments?');
+    expect(within(chat).getByRole('group', { name: 'Starter questions' }).querySelectorAll('button').length).toBe(9);
     expect(await violations(container)).toEqual([]);
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Ask about card-payments' })).toBeNull());
@@ -675,18 +681,18 @@ describe('the chat up front (#343)', () => {
   it('folds the starters into Suggestions once a conversation starts, keeps it when closed, and shows how long the answer took', async () => {
     await open('#/dossier/settlement');
     let chat = await openChat('settlement');
-    await userEvent.click(within(chat).getByRole('button', { name: 'Where is this work deployed?' }));
+    await userEvent.click(within(chat).getByRole('button', { name: /^Are we going to finish the sprint\?/ }));
     await waitFor(() => expect(chat.querySelector('[data-ask-status]')!.textContent).toMatch(/^Done in \d+ s$/));
     expect(within(chat).queryByRole('group', { name: 'Starter questions' })).toBeNull();
     await userEvent.click(within(chat).getByRole('button', { name: 'Suggestions' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: "Who's overloaded or blocked?" }));
-    await within(chat).findByRole('heading', { level: 3, name: "Who's overloaded or blocked?" });
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Who might need help?' }));
+    await within(chat).findByRole('heading', { level: 3, name: 'Who might need help?' });
     await userEvent.click(within(chat).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Ask about settlement' })).toBeNull());
     expect(askBar('settlement').textContent).toContain('2 questions in this chat');
     await userEvent.click(within(askBar('settlement')).getByRole('button', { name: 'Open the conversation' }));
     chat = await screen.findByRole('dialog', { name: 'Ask about settlement' });
-    expect(within(chat).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Where is this work deployed?', "Who's overloaded or blocked?"]);
+    expect([...chat.querySelectorAll('.turn h3')].filter((h) => !h.closest('article')).map((h) => h.textContent)).toEqual(['Are we going to finish the sprint?', 'Who might need help?']);
   });
 
   it('keeps sending a long chat inside what the server takes: the last turns, each answer cut short (#344)', async () => {
@@ -712,10 +718,11 @@ describe('the chat up front (#343)', () => {
 
   it('runs Analyze in one press, into the focused view, citing its items', async () => {
     await open('#/dossier/card-payments');
-    await userEvent.click(within(askBar('card-payments')).getByRole('button', { name: 'Analyze' }));
+    await userEvent.click(within(askBar('card-payments')).getByRole('textbox', { name: 'Your question' }));
     const chat = await screen.findByRole('dialog', { name: 'Ask about card-payments' });
+    await userEvent.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
     const answer = await within(chat).findByRole('heading', { level: 3, name: 'Analyze' });
-    await waitFor(() => expect(answer.parentElement!.textContent).toContain('Answered by'));
+    await waitFor(() => expect(answer.parentElement!.textContent).toContain('How sure is this?'));
     expect(within(answer.parentElement!).getAllByRole('link').length).toBeGreaterThan(5);
   });
 
@@ -736,8 +743,9 @@ describe('the chat up front (#343)', () => {
       return { agent, sent };
     }
     const analyze = async () => {
-      await userEvent.click(within(askBar('card-payments')).getByRole('button', { name: 'Analyze' }));
+      await userEvent.click(within(askBar('card-payments')).getByRole('textbox', { name: 'Your question' }));
       const chat = await screen.findByRole('dialog', { name: 'Ask about card-payments' });
+      await userEvent.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
       await within(chat).findByRole('heading', { level: 3, name: 'Analyze' });
       return chat;
     };
@@ -797,9 +805,10 @@ describe('the chat up front (#343)', () => {
         },
       };
       await open('#/dossier/card-payments', { agent, preview: false });
-      await userEvent.click(within(askBar('card-payments')).getByRole('button', { name: 'Analyze' }));
+      await userEvent.click(within(askBar('card-payments')).getByRole('textbox', { name: 'Your question' }));
       const chat = await screen.findByRole('dialog', { name: 'Ask about card-payments' });
-      await userEvent.click(within(chat).getByRole('button', { name: 'Analyze' }));
+      await userEvent.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
+      await userEvent.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
       release({ chosen: 'claude', remembered: null, options: [ready('claude', 'Claude')] });
       await within(chat).findByRole('heading', { level: 3, name: 'Analyze' });
       expect(signals).toHaveLength(1);
@@ -816,7 +825,7 @@ describe('the chat up front (#343)', () => {
       const chat = await screen.findByRole('dialog', { name: 'Ask about card-payments' });
       await userEvent.click(await within(chat).findByRole('button', { name: /change the agent for this chat/ }));
       await userEvent.click(await screen.findByRole('button', { name: /Codex/ }));
-      await userEvent.click(within(chat).getByRole('button', { name: 'Analyze' }));
+      await userEvent.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
       await within(chat).findByRole('heading', { level: 3, name: 'Analyze' });
       expect(first.sent).toEqual([{ adapter: 'codex' }]);
       expect(memory).toEqual({ 'card-payments': 'codex' });
@@ -1201,17 +1210,23 @@ describe('settings', () => {
 
 describe('the agent pane, with a real adapter', () => {
   it('says plainly when no agent is set up', async () => {
-    const agent: Agent = { notice: 'No agent is set up in this Toil UI. Claude, GitHub Copilot or Codex.', starters: () => [], ask: () => Promise.reject(new Error('none')) };
+    const agent: Agent = { notice: NO_AGENT_NOTICE, noticeDetails: 'Toil UI uses Claude, GitHub Copilot or Codex.', starters: () => [], ask: () => Promise.reject(new Error('none')) };
     await open('#/dossier/card-payments', { agent, preview: false });
-    await openChat('card-payments');
-    expect(screen.getByText(/No agent is set up in this Toil UI/).textContent).toContain('GitHub Copilot');
+    const chat = await openChat('card-payments');
+    // In everyday words first (#552; these tests read toil's own terms, and the plain wording is in guided-ask.test.tsx): none yet, and where an engineer sets one up. The packages are one step in, behind a fold.
+    const notice = within(chat).getByText(/No agent is set up yet/).closest('[data-no-agent]')!;
+    expect(within(notice as HTMLElement).getByRole('link', { name: 'Set up an agent' }).getAttribute('href')).toBe('#/settings/agent');
+    const fold = notice.querySelector('details')!;
+    expect(fold.open).toBe(false);
+    expect(fold.textContent).toContain('GitHub Copilot');
+    expect(notice.querySelector('p')!.textContent).not.toContain('GitHub Copilot');
   });
 
   it("shows the server's checks above an answer: ids its tools never returned", async () => {
     const agent: Agent = {
-      starters: () => [{ id: 'risk', label: 'Why is this sprint at risk?' }],
+      starters: () => [],
       ask: async () => ({
-        prompt: 'Why is this sprint at risk?',
+        prompt: 'Are we going to finish the sprint?',
         parts: [{ text: '[[corp-jira:PAY-101]] and [[corp-jira:PAY-999]].' }],
         citations: ['corp-jira:PAY-101', 'corp-jira:PAY-999'],
         by: 'Claude',
@@ -1222,7 +1237,7 @@ describe('the agent pane, with a real adapter', () => {
     };
     const { container } = await open('#/dossier/card-payments', { agent, preview: false });
     await openChat('card-payments');
-    await userEvent.click(await screen.findByRole('button', { name: 'Why is this sprint at risk?' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Are we going to finish the sprint\?/ }));
     const checks = await screen.findByLabelText('Checks on this answer');
     expect(checks.textContent).toContain('corp-jira:PAY-999');
     expect(screen.getByText(/Names 1 its tools never returned/)).toBeTruthy();
@@ -1251,7 +1266,7 @@ describe('failures', () => {
     const agent: Agent = { starters: scriptedAgent().starters, ask: () => Promise.reject(new Error('model endpoint unreachable')) };
     await open('#/dossier/checkout-web', { agent });
     await openChat('checkout-web');
-    await userEvent.click(await screen.findByRole('button', { name: "What's at risk in this dossier?" }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Are we going to finish the sprint\?/ }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe("The agent couldn't answer: model endpoint unreachable");
     expect(screen.getByRole('button', { name: 'Suggestions' }).hasAttribute('disabled')).toBe(false);
@@ -1308,7 +1323,6 @@ describe('themes', () => {
     // Appearance lives in Settings and the palette, never the header (#507).
     expect(screen.queryByRole('button', { name: /Appearance/ })).toBeNull();
     await openChat('card-payments');
-    expect(document.querySelector('.ask img')?.getAttribute('alt')).toBe('');
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await userEvent.click(screen.getByRole('button', { name: /Theme/ }));
@@ -1316,11 +1330,10 @@ describe('themes', () => {
     expect(document.documentElement.dataset.theme).toBe('plain');
     expect(screen.queryByRole('button', { name: /Appearance/ })).toBeNull();
     await openChat('card-payments');
-    expect(document.querySelector('.ask img')).toBeNull();
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(screen.getAllByRole('button').map((b) => b.textContent).filter((t) => !/Plain|Crate|System/.test(t ?? ''))).toEqual(before.filter((t) => !/Plain|Crate|System/.test(t ?? '')));
-    expect(JSON.parse(localStorage.getItem('toil-ui.theme')!)).toEqual({ theme: 'plain', scheme: 'system', wording: true, voice: true });
+    expect(JSON.parse(localStorage.getItem('toil-ui.theme')!)).toEqual({ theme: 'plain', scheme: 'system', wording: false, voice: false });
   });
 
   it('picks Appearance in Settings, not the header', async () => {
@@ -1341,7 +1354,8 @@ describe('themes', () => {
 });
 
 describe('how deep the theme goes (#283)', () => {
-  const setTheme = (theme: string, more: Record<string, unknown> = {}) => localStorage.setItem('toil-ui.theme', JSON.stringify({ theme, ...more }));
+  // Themed wording and voice start off (#552), so a test about a theme's words opts in, as a saved choice.
+  const setTheme = (theme: string, more: Record<string, unknown> = {}) => localStorage.setItem('toil-ui.theme', JSON.stringify({ theme, wording: true, voice: true, ...more }));
 
   it('says the empty states, loading lines and notes in the theme\'s words, and the standard ones with wording off', async () => {
     setTheme('crate');
@@ -1365,14 +1379,14 @@ describe('how deep the theme goes (#283)', () => {
     expect(names()).toEqual(off.map((n) => n.replace(/^heading: Sprint 42(?=:)/, 'heading: Ledger (Sprint 42').replace(/^(heading: Ledger \(Sprint 42: day \d+ of \d+)$/, '$1)').replace(/^heading: Dependencies$/, 'heading: War table (Dependencies)')));
   });
 
-  it('has both boxes on by default under the theme picker, and turns both off, with a note, for Plain', async () => {
+  it('has both boxes off by default under the theme picker (#552), turns one on, and disables both, with a note, for Plain', async () => {
     await open('#/settings/toil');
     const card = screen.getByRole('region', { name: 'Theme' });
     const wording = within(card).getByRole('checkbox', { name: 'Themed wording' }) as HTMLInputElement;
     const voice = within(card).getByRole('checkbox', { name: 'Themed agent voice' }) as HTMLInputElement;
-    expect([wording.checked, voice.checked]).toEqual([true, true]);
+    expect([wording.checked, voice.checked]).toEqual([false, false]);
     await userEvent.click(wording);
-    expect(JSON.parse(localStorage.getItem('toil-ui.theme')!)).toMatchObject({ theme: 'crate', wording: false, voice: true });
+    expect(JSON.parse(localStorage.getItem('toil-ui.theme')!)).toMatchObject({ theme: 'crate', wording: true, voice: false });
     expect(within(card).getByRole('button', { name: 'About themed wording' })).toBeTruthy();
     cleanupView();
     setTheme('plain');
@@ -1391,13 +1405,13 @@ describe('how deep the theme goes (#283)', () => {
     setTheme('crate');
     await open('#/dossier/card-payments');
     await openChat('card-payments');
-    await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
+    await userEvent.click(screen.getByRole('button', { name: /^Are we going to finish the sprint\?/ }));
     expect(await screen.findByText(/3 of 21 points are on the truck/, {}, { timeout: 4000 })).toBeTruthy();
     cleanupView();
     setTheme('crate', { voice: false });
     await open('#/dossier/card-payments');
     await openChat('card-payments');
-    await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
+    await userEvent.click(screen.getByRole('button', { name: /^Are we going to finish the sprint\?/ }));
     expect(await screen.findByText(/3 of 21 points are done and 18 remain/, {}, { timeout: 4000 })).toBeTruthy();
   });
 

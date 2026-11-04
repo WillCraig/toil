@@ -141,6 +141,9 @@ export function sprintDays(start: string, end: string, now: string): { gone: num
   return { gone: weekdays(from, Math.min(Date.parse(now), to)), total: weekdays(from, to) };
 }
 
+/** Working days left in a sprint: the days not yet gone, so today, which has started, is not one of them. The Toil projects cards and the Summary tab both say this number. */
+export const daysLeft = (days: { gone: number; total: number }): number => Math.max(0, days.total - days.gone);
+
 function weekdays(from: number, to: number): number {
   let n = 0;
   for (let t = Math.floor(from / DAY) * DAY; t < to; t += DAY) {

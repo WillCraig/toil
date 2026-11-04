@@ -17,6 +17,7 @@ import { age, cycleTime } from '../model/flow.ts';
 import { INSIGHT_LABEL, insights } from '../model/insights.ts';
 import { entry } from '../model/sprint.ts';
 import { useTerm, useTheme } from '../skins.tsx';
+import { usePlain } from '../plain-words.ts';
 import { ItemAssignments } from '../assign/views.tsx';
 
 /** OWI's link type in words, by direction; the source's own wording is shown beside it. */
@@ -32,6 +33,7 @@ export function ItemView({ id }: { id: string }) {
   const { byId, dossier, now, sync } = useData();
   const theme = useTheme();
   const term = useTerm();
+  const plain = usePlain();
   const { insights: prepared } = useDerived();
   const item = byId.get(id);
   if (!item) {
@@ -70,7 +72,9 @@ export function ItemView({ id }: { id: string }) {
         </p>
       </div>
       <Card as="section" className="panel insights-panel" aria-labelledby="insights">
-        <h2 id="insights">Insights</h2>
+        <h2 id="insights" title={plain.title('Insights')}>
+          {plain.pw('Insights', 'Worth a look')}
+        </h2>
         {found.length ? (
           <ul className="rows">
             {found.map((i) => (
@@ -180,7 +184,7 @@ export function ItemView({ id }: { id: string }) {
           <h2 id="related">Related work</h2>
           {item.children.length > 0 && (
             <>
-              <h3>Children</h3>
+              <h3 title={plain.title('Children')}>{plain.pw('Children', 'Sub-items')}</h3>
               <ul className="rows">
                 {item.children.map((c) => (
                   <li key={c}>
@@ -203,7 +207,7 @@ export function ItemView({ id }: { id: string }) {
           ) : (
             <p>None.</p>
           )}
-          <h3>Pull requests and builds</h3>
+          <h3 title={plain.title('Pull requests and builds')}>{plain.pw('Pull requests and builds', 'Code reviews and builds')}</h3>
           {mine.length ? (
             <ul className="rows">
               {mine.map((c) => (

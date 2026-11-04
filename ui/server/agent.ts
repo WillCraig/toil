@@ -10,7 +10,7 @@
  * and admits when nobody is in.
  */
 
-import { NO_AGENT_FIX, NO_AGENT_NOTICE as NO_AGENT, type AdapterList, type Answer, type AskExtra, type Starter } from '../src/agent.ts';
+import { NO_AGENT_DETAILS, NO_AGENT_FIX, NO_AGENT_NOTICE as NO_AGENT, type AdapterList, type Answer, type AskExtra, type Starter } from '../src/agent.ts';
 import { SAMPLE_ADAPTERS, scriptedAgent } from '../src/fixtures/agent.ts';
 import { AgentError } from './agents/cli.ts';
 import type { RequestContext } from './context.ts';
@@ -54,7 +54,7 @@ export function noAgent(): Agent {
     kind: 'none',
     starters: async () => [],
     ask: async () => {
-      throw new AgentError(NO_AGENT, NO_AGENT_FIX);
+      throw new AgentError(NO_AGENT, `${NO_AGENT_DETAILS} ${NO_AGENT_FIX}`);
     },
   };
 }

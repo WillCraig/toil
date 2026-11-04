@@ -25,7 +25,7 @@ Toil UI's users are often new to agents, so where a screen uses an AI term, its 
 | Renew all stale | session, system prompt, skill |
 | The chat's About these answers | hallucination, primary source, non-determinism |
 
-With those links on, **Help** also has **Learn**, four of Context Overflow's modules by task (new to agents, deciding how much to hand an agent, and branches and pull requests for Implement mode). The agent's empty chat has the same **Learn**.
+With those links on, **Help** also has **Learn**, four of Context Overflow's modules by task (new to agents, deciding how much to hand an agent, and branches and pull requests for Implement mode).
 
 **Links to learning content**, under Settings, General, is on by default and kept in this browser. Off, every link to Context Overflow and every glossary line is gone, and Help keeps the view's docs and What's new, for an organization that blocks outside sites.
 

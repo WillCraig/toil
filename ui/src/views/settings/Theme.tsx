@@ -3,7 +3,7 @@
  * the same theme picker as the header's, then Appearance (System, Light or
  * Dark; it lives here and in the command palette, not the header, #507), then "Themed wording" (the theme's
  * own microcopy) and "Themed agent voice" (its voice in the agent's prompt),
- * both on by default and kept in this browser beside the theme. Plain has no
+ * both off by default (#552) and kept in this browser beside the theme. Plain has no
  * wording or voice of its own, so with Plain both are off and say why. The
  * (i) beside each box links the documentation, which says what each one
  * changes and what it never changes (#346). A theme whose theme.json names particles also gets

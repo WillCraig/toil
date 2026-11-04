@@ -1,10 +1,12 @@
 /**
  * Which theme and colour scheme are showing, and how deep the theme goes
  * (#283): "Themed wording" (the theme's lexicon) and "Themed agent voice" (its
- * voice in the agent's prompt), both on unless switched off. A `?theme=`,
- * `?scheme=`, `?wording=off` or `?voice=off` in the address wins (it makes a
- * view linkable as it looked), then what this browser picked last, then
- * Crate, the default (#277), with both on. The choice is a convenience, so
+ * voice in the agent's prompt), both off until someone switches them on
+ * (#552: a theme's colours, fonts and art are for everyone, its jokes are for
+ * those who ask). A `?theme=`, `?scheme=`, `?wording=` or `?voice=` (`on` or
+ * `off`) in the address wins (it makes a view linkable as it looked), then
+ * what this browser picked last, a saved choice kept exactly as it was, then
+ * Crate, the default (#277), with both off. The choice is a convenience, so
  * storage that refuses (a private window, blocked site data) just means it
  * isn't remembered. Preferences are honoured without a request form.
  *
@@ -45,11 +47,11 @@ function remembered(): Partial<Record<keyof ThemeChoice | 'synced', unknown>> {
   }
 }
 
-/** `?wording=off` and `?voice=off` switch one off, `on` switches it on; anything else leaves it to what was saved. */
+/** `?wording=off` and `?voice=off` switch one off, `on` switches it on; anything else leaves it to what was saved, else off. */
 function flag(param: string | null, saved: unknown): boolean {
   if (param === 'off') return false;
   if (param === 'on') return true;
-  return typeof saved === 'boolean' ? saved : true;
+  return typeof saved === 'boolean' ? saved : false;
 }
 
 export function initialChoice(search: string): ThemeChoice {

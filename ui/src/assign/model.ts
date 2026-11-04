@@ -53,6 +53,31 @@ export const MODE_INFO: Record<AssignMode, { label: string; does: string; change
   },
 };
 
+/**
+ * The same three modes in plain words (src/plain-words.ts): named for what they do, with what they may change said the
+ * same way. Only the words differ; every mode still writes nothing by itself.
+ */
+const MODE_PLAIN: Record<AssignMode, { label: string; does: string; changes: string }> = {
+  refine: {
+    label: 'Tidy up',
+    does: 'Writes clearer "done when" criteria, suggests a size, splits the item if it is too big, checks for duplicates, and lists open questions.',
+    changes: 'Nothing directly: every change comes back as a suggestion for you to approve.',
+  },
+  investigate: {
+    label: 'Look into',
+    does: "Researches the item across the Toil project's tools (related items, code reviews, builds) and writes a report that names where each fact came from.",
+    changes: 'Nothing. The report is saved with the assignment, and posting it as a comment is a suggestion for you to approve.',
+  },
+  implement: {
+    label: 'Try a fix',
+    does: "Works on the item in a separate copy of the Toil project's code, on a new branch that exists only on this computer.",
+    changes: 'Only that copy, with no network. Sharing it and opening a code review are suggestions for you to approve.',
+  },
+};
+
+/** A mode's label and what it does and may change, in toil's words or, with plain words on, everyday ones. */
+export const modeInfo = (mode: AssignMode, plain: boolean) => (plain ? MODE_PLAIN : MODE_INFO)[mode];
+
 export type AssignState = 'queued' | 'working' | 'needs-you' | 'done' | 'failed';
 export const STATES: readonly AssignState[] = ['queued', 'working', 'needs-you', 'done', 'failed'];
 export const STATE_LABEL: Record<AssignState, string> = { queued: 'Queued', working: 'Working', 'needs-you': 'Needs you', done: 'Done', failed: 'Failed' };

@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ConfigApi } from '../src/config.ts';
-import { originOf, themeFromToil, useThemeChoice } from '../src/theme-choice.ts';
+import { initialChoice, originOf, themeFromToil, useThemeChoice } from '../src/theme-choice.ts';
 import type { Envelope } from '../src/toil.ts';
 
 /**
@@ -28,10 +28,34 @@ function fakeSetting(current: string, source: 'env' | 'file' | 'default', set: (
   return { api, calls };
 }
 
+const choiceAt = (search: string) => initialChoice(search);
+
 beforeEach(() => localStorage.clear());
 afterEach(() => {
   localStorage.clear();
   window.history.replaceState(null, '', '/');
+});
+
+describe('how deep a theme goes, for someone who has not chosen (#552)', () => {
+  it('starts with themed wording and themed agent voice off', () => {
+    const { wording, voice } = choiceAt('');
+    expect([wording, voice]).toEqual([false, false]);
+  });
+
+  it('keeps a choice this browser saved, either way', () => {
+    localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'realm', wording: true, voice: false }));
+    expect(choiceAt('')).toMatchObject({ theme: 'realm', wording: true, voice: false });
+  });
+
+  it('still takes ?wording= and ?voice= from the address, over what was saved', () => {
+    expect(choiceAt('?wording=on&voice=on')).toMatchObject({ wording: true, voice: true });
+    localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'realm', wording: true, voice: true }));
+    expect(choiceAt('?wording=off&voice=off')).toMatchObject({ wording: false, voice: false });
+  });
+
+  it('leaves the theme itself, its colours and art, as it was', () => {
+    expect(choiceAt('?theme=realm')).toMatchObject({ theme: 'realm' });
+  });
 });
 
 describe('which theme wins', () => {

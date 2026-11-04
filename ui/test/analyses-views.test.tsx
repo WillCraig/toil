@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
+import { standardWords } from './words.ts';
 import type { AnalysesApi } from '../src/analyses.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureAnalyses, sampleAnalysisRecords } from '../src/fixtures/analyses.ts';
@@ -24,7 +25,10 @@ async function open(hash: string, analyses: AnalysesApi | undefined = fixtureAna
   return view;
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  standardWords();
+});
 afterEach(cleanup);
 
 const list = () => screen.findByRole('list', { name: 'Analyses, newest first' });
@@ -158,8 +162,9 @@ describe('Analyze in the chat', () => {
     await open('#/dossier/checkout-web', undefined);
     const card = await screen.findByRole('region', { name: 'Briefing' });
     expect(card.dataset.recSource).toBe('code');
-    await userEvent.click(within(askBar('checkout-web')).getByRole('button', { name: 'Analyze' }));
+    await userEvent.click(within(askBar('checkout-web')).getByRole('textbox', { name: 'Your question' }));
     const chat = await screen.findByRole('dialog', { name: 'Ask about checkout-web' });
+    await userEvent.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
     const kept = await within(chat).findByRole('link', { name: 'Kept in Analyses' }, { timeout: 5000 });
     expect(within(chat).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Recommendation', 'Reasons']);
     expect((chat.querySelector('details.analysis-evidence') as HTMLDetailsElement).open).toBe(false);

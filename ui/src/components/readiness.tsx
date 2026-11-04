@@ -10,7 +10,8 @@ import { useState } from 'react';
 import { Button } from 'react-aria-components';
 import { useData } from '../data.ts';
 import { dateTime } from '../format.ts';
-import { liveWorkflow, readiness, VERDICT_LABEL, workflowRead, type LiveWorkflow, type Readiness, type Row, type Verdict } from '../model/readiness.ts';
+import { usePlain } from '../plain-words.ts';
+import { liveWorkflow, readiness, VERDICT_LABEL, VERDICT_PLAIN, workflowRead, type LiveWorkflow, type Readiness, type Row, type Verdict } from '../model/readiness.ts';
 import { CALL_OPTIONS, type WorkItem } from '../toil.ts';
 import { Cited } from './items.tsx';
 import { Card } from './layout.tsx';
@@ -23,9 +24,10 @@ const VERDICT_MARK: Record<Verdict, string> = { ready: '✓', thin: '!', blocked
 
 /** The verdict as a chip: a mark and a word, so it reads the same in a theme whose colours don't tell the three apart. */
 export function VerdictChip({ verdict }: { verdict: Verdict }) {
+  const plain = usePlain();
   return (
-    <span className={`verdict verdict--${verdict}`}>
-      <span aria-hidden="true">{VERDICT_MARK[verdict]}</span> {VERDICT_LABEL[verdict]}
+    <span className={`verdict verdict--${verdict}`} title={plain.on && verdict === 'thin' ? plain.title('Thin') : undefined}>
+      <span aria-hidden="true">{VERDICT_MARK[verdict]}</span> {(plain.on ? VERDICT_PLAIN : VERDICT_LABEL)[verdict]}
     </span>
   );
 }

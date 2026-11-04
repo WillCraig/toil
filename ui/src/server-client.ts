@@ -23,7 +23,7 @@
  * that files itself.
  */
 
-import { NO_AGENT_FIX, NO_AGENT_NOTICE, SCRIPTED_LABEL, type AdapterList, type Agent, type Answer, type AskExtra, type AskStyle, type Starter } from './agent.ts';
+import { NO_AGENT_DETAILS, NO_AGENT_FIX, NO_AGENT_NOTICE, SCRIPTED_LABEL, type AdapterList, type Agent, type Answer, type AskExtra, type AskStyle, type Starter } from './agent.ts';
 import type { AreaInfo, ConfigApi, SettingsInfo } from './config.ts';
 import { FEEDBACK_SAMPLE_DISABLED, type FeedbackApi, type FeedbackFields } from './feedback.ts';
 import type { SyncStatus } from '../server/sync.ts';
@@ -292,7 +292,7 @@ export async function httpAgent(session: Session, dossiers: string[], base = './
     starters.set(name, res.ok ? ((await res.json()) as Starter[]) : []);
   }
   return {
-    ...(session.agent === 'none' ? { notice: `${NO_AGENT_NOTICE} ${NO_AGENT_FIX}` } : {}),
+    ...(session.agent === 'none' ? { notice: NO_AGENT_NOTICE, noticeDetails: `${NO_AGENT_DETAILS} ${NO_AGENT_FIX}` } : {}),
     label: AGENT_LABEL[session.agent] ?? session.agent,
     starters: (dossier) => starters.get(dossier) ?? [],
     async adapters(dossier) {

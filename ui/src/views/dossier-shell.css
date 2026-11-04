@@ -32,7 +32,14 @@ main:has(> .dossier-shell) { max-width: 1680px; padding-top: 0.5rem; padding-bot
 .dossier-bar__desc-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dossier-bar__about:has(.editable--open) { flex-wrap: wrap; }
 .dossier-bar__about:has(.editable--open) .dossier-bar__desc { flex: 1 1 100%; }
+.agents-open__short { display: none; }
 @media (max-width: 599px) {
+  /* The Ask row on a phone: the field, Ask and a compact AI helpers button with its count, on one line. The full label stays as the name. */
+  .dossier-bar__ask { flex-wrap: nowrap; align-items: start; }
+  .dossier-bar__ask .ask-bar { flex: 1 1 0; }
+  .dossier-bar__ask .agents-open { margin: 0; min-height: 44px; min-width: 44px; padding-inline: 0.6rem; }
+  .agents-open__short { display: inline; }
+  .agents-open__label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
   .dossier-bar__about { flex-wrap: wrap; }
   .dossier-bar__desc-text { white-space: normal; }
 }
@@ -64,7 +71,7 @@ main:has(> .dossier-shell) { max-width: 1680px; padding-top: 0.5rem; padding-bot
 
 /* The view and the sidebar. The sidebar is as tall as the view and scrolls inside itself, so it never makes the page longer. */
 .dossier-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: stretch; }
-.dossier-shell[data-wide-sidebar] .dossier-body { grid-template-columns: minmax(0, 1fr) 19rem; }
+.dossier-shell[data-side] .dossier-body { grid-template-columns: minmax(0, 1fr) 19rem; }
 .dossier-main { min-width: 0; }
 .dossier-main > .view-head > .eyebrow:first-child { display: none; }
 .agents-side { position: relative; min-height: 24rem; min-width: 0; }
@@ -81,7 +88,6 @@ main:has(> .dossier-shell) { max-width: 1680px; padding-top: 0.5rem; padding-bot
 .agent-card p { margin: 0; }
 .agent-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
 .agent-card__title { color: var(--ink); }
-.agent-card__open { justify-self: start; display: inline-flex; align-items: center; min-height: 32px; }
 .agents-group--needs-you .agent-card { border-left: 4px solid var(--warn); }
 .agents-sidebar .assign-inbox { padding: 0.5rem 0.6rem; }
 .agents-side__analyses { display: grid; gap: 0.35rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
@@ -173,3 +179,5 @@ a.ticket-chip:hover { border-color: var(--link); }
 @media (max-width: 599px) {
   .ticket-chip__title { max-width: 10rem; }
 }
+.agent-card__title { display: inline-block; min-height: 32px; }
+.agent-card__item .item-link { display: inline-block; min-height: 24px; padding-block: 2px; box-sizing: border-box; }

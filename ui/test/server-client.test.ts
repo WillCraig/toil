@@ -150,8 +150,9 @@ describe('httpAgent streaming (#251)', () => {
     expect(bodies.map((b) => [b.adapter, b.fallback])).toEqual([['claude', true], ['codex', undefined]]);
   });
 
-  it('carries a notice naming the three adapters when the server has none', async () => {
+  it('carries a plain notice, and the three adapters one step in, when the server has none', async () => {
     const agent = await httpAgent({ ...SESSION, agent: 'none' }, []);
-    for (const p of ['@anthropic-ai/claude-agent-sdk', '@github/copilot-sdk', '@openai/codex-sdk']) expect(agent.notice).toContain(p);
+    expect(agent.notice).not.toContain('@anthropic-ai');
+    for (const p of ['@anthropic-ai/claude-agent-sdk', '@github/copilot-sdk', '@openai/codex-sdk']) expect(agent.noticeDetails).toContain(p);
   });
 });

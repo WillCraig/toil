@@ -1,7 +1,9 @@
 import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { InsightChips } from '../src/components/bits.tsx';
 import type { Insight } from '../src/model/insights.ts';
+import { setPlain } from '../src/plain-words.ts';
+import { standardWords } from './words.ts';
 
 /**
  * A card draws one chip per insight code, with a count (#541). Two flags that
@@ -12,6 +14,15 @@ const blocking = (id: string): Insight => ({ code: 'blocking', weight: 2, text: 
 const stale: Insight = { code: 'stale', weight: 2, text: 'No update for 6 days', evidence: 'updated' };
 
 describe('insight chips', () => {
+  beforeEach(standardWords);
+
+  it('words the two shorthand chips in everyday words with plain words on, and keeps the rest', () => {
+    setPlain(true);
+    const others: Insight[] = (['pr-no-build', 'aging', 'stale'] as const).map((code) => ({ code, weight: 1, text: code, evidence: code }));
+    const { container } = render(<InsightChips insights={others} />);
+    expect([...container.querySelectorAll('li')].map((c) => c.textContent)).toEqual(['Code review with no build', 'Open a long time', 'Stale']);
+  });
+
   it('draws "Blocking 2" once, its tooltip naming each item it blocks', () => {
     const titles = new Map([['c:A', { title: 'Alpha' }], ['c:B', { title: 'Beta' }]]);
     const { container } = render(<InsightChips insights={[blocking('c:A'), blocking('c:B'), stale]} compact titles={titles} />);

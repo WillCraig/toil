@@ -46,6 +46,8 @@ export const CHECK_LABEL: Record<CheckId, string> = {
   scope: 'Scope',
 };
 export const VERDICT_LABEL: Record<Verdict, string> = { ready: 'Ready', thin: 'Thin', blocked: 'Blocked' };
+/** The same three, in plain words (src/plain-words.ts). */
+export const VERDICT_PLAIN: Record<Verdict, string> = { ready: 'Ready', thin: 'Needs more detail', blocked: 'Blocked' };
 export const VERDICTS: readonly Verdict[] = ['ready', 'thin', 'blocked'];
 
 /** One check's row: its state, and why, with any item it names written as `[[id]]`. */

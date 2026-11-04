@@ -1,0 +1,48 @@
+/* The Summary tab's answer (#552): the status sentence biggest, a line on why, then up to three cards.
+   Colours come only from the theme's tokens; a status is always a word and a shape. */
+
+.sum-hero { display: grid; gap: 0.6rem; }
+.sum-answer { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(1.7rem, 1.1rem + 2.6vw, 2.75rem); line-height: 1.16; text-wrap: balance; overflow-wrap: anywhere; }
+.sum-status { display: inline-flex; align-items: center; gap: 0.3em; }
+.sum-shape { width: 0.78em; height: 0.78em; flex: none; }
+.sum-answer .sum-shape { width: 0.78em; height: 0.78em; }
+.sum-hero[data-status='on-track'] .sum-status { color: var(--ok); }
+.sum-hero[data-status='at-risk'] .sum-status { color: var(--warn); }
+.sum-hero[data-status='behind'] .sum-status { color: var(--danger); }
+.sum-hero[data-status='none'] .sum-status { color: var(--muted); }
+.sum-basis { margin: 0; color: var(--muted); font-size: 0.875rem; }
+.sum-why { margin: 0; max-width: 40rem; color: var(--ink); font-size: clamp(1.05rem, 1rem + 0.35vw, 1.25rem); line-height: 1.45; text-wrap: pretty; }
+.sum-how { font-size: 0.9375rem; }
+.sum-how > summary { display: inline-flex; align-items: center; min-height: 44px; color: var(--link); cursor: pointer; }
+.sum-how ul { margin: 0.1rem 0 0; padding-left: 1.2rem; max-width: 40rem; color: var(--muted); display: grid; gap: 0.4rem; }
+
+.sum-needs { display: grid; gap: 0.5rem; }
+.sum-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+@media (min-width: 62rem) {
+  .sum-cards { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+}
+.sum-card { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; padding: 1rem 1.1rem; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); }
+.sum-kicker { display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--muted); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.sum-kicker .sum-shape { width: 0.95rem; height: 0.95rem; }
+.sum-card[data-tone='danger'] .sum-shape { color: var(--danger); }
+.sum-card[data-tone='warn'] .sum-shape { color: var(--warn); }
+.sum-card[data-tone='ok'] .sum-shape { color: var(--ok); }
+.sum-card__title { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; line-height: 1.3; text-wrap: balance; overflow-wrap: anywhere; }
+.sum-card__why { margin: 0; line-height: 1.45; text-wrap: pretty; }
+.sum-card__more { margin: 0; color: var(--muted); font-size: 0.875rem; }
+.sum-key { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
+.sum-named { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.sum-named li { display: grid; gap: 0.1rem; min-width: 0; font-size: 0.9375rem; }
+.sum-named__text { font-weight: 600; overflow-wrap: anywhere; }
+.sum-named__sub { color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+
+
+
+.briefing__full > summary { display: inline-flex; align-items: center; min-height: 44px; color: var(--link); cursor: pointer; }
+.briefing__full[open] > summary { margin-bottom: 0.5rem; }
+.briefing__full > .briefing__meta { margin-bottom: 0.9rem; }
+.briefing__full > * + * { margin-top: 1.25rem; }
+.sum-card__title a { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 0.2em; }
+.sum-card__title a:hover { text-decoration-color: currentColor; }
+.sum-howrow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; }
+.sum-howrow > .sum-how { flex: 1 1 auto; min-width: 0; }

@@ -99,3 +99,10 @@ h1 .edit-hint, h2 .edit-hint, h1 .edit-error, h2 .edit-error { letter-spacing: n
 
 /* The sources and the pencil that edits them (#346), on one line where they fit. */
 .source-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; min-width: 0; }
+
+/* A card's three pencils (name, description, sources) appear on hover or focus where there is a pointer to hover with, and stay
+   in view on touch, where there is no hover to find them by. Opacity, not display, so the card doesn't shift and a keyboard still reaches them. */
+@media (hover: hover) {
+  .dossier-card .edit-pencil, .dossier-card .edit-link { opacity: 0; transition: opacity 0.12s; }
+  .dossier-card:hover .edit-pencil, .dossier-card:hover .edit-link, .dossier-card:focus-within .edit-pencil, .dossier-card:focus-within .edit-link { opacity: 1; }
+}

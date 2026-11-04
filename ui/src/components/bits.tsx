@@ -8,6 +8,7 @@
 
 import { groupInsights, INSIGHT_LABEL, type Insight, type InsightCode, type InsightGroup } from '../model/insights.ts';
 import { STATUS_CATEGORY_LABEL } from '../format.ts';
+import { usePlain } from '../plain-words.ts';
 import { useSkins, useTerm } from '../skins.tsx';
 import type { ChangeRef, StatusCategory } from '../toil.ts';
 import type { AvatarProps } from './avatar.tsx';
@@ -60,6 +61,7 @@ const INSIGHT_ICON: Record<InsightCode, string> = {
  * decoding pictures.
  */
 export function InsightChips({ insights, max = 3, compact = false, titles }: { insights: Insight[]; max?: number; compact?: boolean; titles?: ReadonlyMap<string, { title: string }> }) {
+  const plain = usePlain();
   if (!insights.length) return null;
   const groups = groupInsights(insights);
   const shown = groups.slice(0, max);
@@ -67,7 +69,7 @@ export function InsightChips({ insights, max = 3, compact = false, titles }: { i
   return (
     <ul className={`insight-chips${compact ? ' insight-chips--compact' : ''}`} aria-label="Insights">
       {shown.map((g) => {
-        const word = wordOf(g);
+        const word = wordOf(g, plain.on);
         return compact ? (
           <li key={g.code} className={`insight insight--icon insight--w${g.weight}`} title={groupTitle(g, word, titles)}>
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
@@ -82,7 +84,7 @@ export function InsightChips({ insights, max = 3, compact = false, titles }: { i
         );
       })}
       {rest.length > 0 && (
-        <li className="insight insight--more" {...(compact ? { title: rest.map(wordOf).join(', ') } : {})}>
+        <li className="insight insight--more" {...(compact ? { title: rest.map((r) => wordOf(r, plain.on)).join(', ') } : {})}>
           +{rest.length} more
         </li>
       )}
@@ -91,7 +93,13 @@ export function InsightChips({ insights, max = 3, compact = false, titles }: { i
 }
 
 /** A chip's word: the label, with a count when several insights share the code. */
-const wordOf = (g: InsightGroup) => (g.insights.length > 1 ? `${INSIGHT_LABEL[g.code]} ${g.insights.length}` : INSIGHT_LABEL[g.code]);
+const wordOf = (g: InsightGroup, plain = false) => {
+  const label = plain ? (PLAIN_INSIGHT_LABEL[g.code] ?? INSIGHT_LABEL[g.code]) : INSIGHT_LABEL[g.code];
+  return g.insights.length > 1 ? `${label} ${g.insights.length}` : label;
+};
+
+/** The two chips whose words are shorthand (src/plain-words.ts); every other one already reads as it is. */
+const PLAIN_INSIGHT_LABEL: Partial<Record<InsightCode, string>> = { 'pr-no-build': 'Code review with no build', aging: 'Open a long time' };
 
 /** A chip's tooltip: its word alone for one insight, else the word and what each says, cited items by title. */
 function groupTitle(g: InsightGroup, word: string, titles?: ReadonlyMap<string, { title: string }>): string {

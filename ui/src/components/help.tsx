@@ -23,32 +23,38 @@ import { useEffect } from 'react';
 import { Button, Dialog, DialogTrigger, Header, Heading, Menu, MenuItem, MenuSection, MenuTrigger, Popover, Text, Tooltip, TooltipTrigger } from 'react-aria-components';
 import { HELP, LEARN, glossaryHref, helpHref, learnHref, type GlossaryEntry, type HelpTopic, type HelpTopicId } from '../help.ts';
 import { useLearningLinks } from '../learning.ts';
+import { usePlain } from '../plain-words.ts';
 import { NewDot } from './whats-new.tsx';
 import './help.css';
 
-export function Help({ topic }: { topic: HelpTopicId }) {
+/** `note` adds a sentence the topic can't hold because it depends on the screen (a limit, a count), after the topic's own text. */
+export function Help({ topic, note }: { topic: HelpTopicId; note?: string }) {
   const t: HelpTopic = HELP[topic];
+  // One catalogue: plain words swap the jargon in it as it is drawn (src/plain-words.ts), never a second copy of each topic.
+  const plain = usePlain();
+  const title = plain.text(t.title);
+  const text = plain.text(t.text) + (plain.on && t.plainNote ? ` ${t.plainNote}` : '') + (note ? ` ${plain.text(note)}` : '');
   return (
     <DialogTrigger>
       <TooltipTrigger delay={400} closeDelay={200}>
-        <Button className="btn help-button" data-help={topic} aria-label={`About ${t.title}`}>
+        <Button className="btn help-button" data-help={topic} aria-label={`About ${title}`}>
           <span aria-hidden="true" className="help-button__mark">
             i
           </span>
         </Button>
         <Tooltip className="help-tooltip" offset={6}>
-          {t.text}
+          {text}
         </Tooltip>
       </TooltipTrigger>
       <Popover className="popover help-popover" placement="bottom" offset={6}>
-        <Dialog className="help-popover__dialog" aria-label={`About ${t.title}`}>
+        <Dialog className="help-popover__dialog" aria-label={`About ${title}`}>
           <Heading slot="title" className="help-popover__title">
-            About {t.title}
+            About {title}
           </Heading>
-          <p>{t.text}</p>
+          <p>{text}</p>
           <p>
             <a href={helpHref(t)} target="_blank" rel="noopener noreferrer" data-read-more="">
-              Read more<span className="sr-only"> about {t.title} in the docs (opens in a new tab)</span>
+              Read more<span className="sr-only"> about {title} in the docs (opens in a new tab)</span>
             </a>
           </p>
           {t.glossary && <Glossary entries={t.glossary} />}

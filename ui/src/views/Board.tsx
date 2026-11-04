@@ -403,9 +403,6 @@ export function Board({ items }: { items: WorkItem[] }) {
 
   return (
     <>
-      <p className="note">
-        One column per status category, across every tracker, each card with its own status word. Drag a card to another column, or open its menu with a right-click, a long press or M, to propose a move: nothing changes until someone applies it with toil.
-      </p>
       <DndContext
         sensors={sensors}
         onDragStart={(e) => setDragging(byId.get(String(e.active.id)) ?? null)}

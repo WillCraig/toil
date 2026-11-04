@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
+import { standardWords } from './words.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureAssignments } from '../src/fixtures/assignments.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
@@ -26,7 +27,10 @@ async function violations(container: HTMLElement) {
   return result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  standardWords();
+});
 afterEach(cleanup);
 
 /** The Agents sidebar (#394): a drawer below 1200px, which jsdom always is, behind the tab row's Agents button. */
@@ -39,15 +43,19 @@ describe('the Agents sidebar', () => {
   it('shows the inbox, waiting for Start, and every assignment by what it waits on, with its state, mode and adapter', async () => {
     await open('#/dossier/card-payments');
     // The count arrives with the assignments, a tick after the heading; on a loaded runner, later still.
-    expect(await screen.findByRole('button', { name: 'Agents, 1 need you' })).toBeTruthy();
+    // The inbox row, one proposal, one question and the failed assignment: a failure counts, since the panel starts closed.
+    expect(await screen.findByRole('button', { name: 'Agents, 4 waiting on you' })).toBeTruthy();
     const lane = await agents();
     const inbox = await within(lane).findByRole('region', { name: 'Agent inbox' });
-    expect(inbox.textContent).toContain("asked for by the tracker's label agent:refine");
+    // The raw label is the item's detail (the Start dialog), not the inbox row.
+    expect(inbox.textContent).not.toContain('agent:refine');
     expect(within(inbox).getByRole('button', { name: /^Start/ })).toBeTruthy();
     expect(within(lane).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Agent inbox', 'Needs you 1', 'Working 1', 'Stale 1', 'Recent analyses']);
     expect([...lane.querySelectorAll('.agent-card .assign-state')].map((c) => c.textContent)).toEqual(['Needs you', 'Working', 'Failed', 'Done']);
     expect(lane.querySelector('details.agents-group--earlier summary')!.textContent).toBe('Earlier (1)');
-    expect(lane.textContent).toContain('2 run at a time, for up to 20 minutes each');
+    // The limits sentence is in the (i) beside the heading.
+    await userEvent.click(within(lane).getAllByRole('button', { name: /^About assigning work/ })[0]!);
+    expect((await screen.findAllByText(/2 run at a time, for up to 20 minutes each/)).length).toBeGreaterThan(0);
   }, 20_000);
 
   it('assigns from a board card, through the dialog, onto the assignment page', async () => {
@@ -173,8 +181,9 @@ describe("a stale chat (#305)", () => {
     render(<App execute={fixtureExecute().execute} agent={agent} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Analyze' }));
+    await user.click(screen.getByRole('textbox', { name: 'Your question' }));
     const chat = await screen.findByRole('dialog', { name: 'Ask about card-payments' });
+    await user.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
     await within(chat).findByText('prompts changed since it started.');
     await user.click(within(chat).getByRole('button', { name: 'Renew' }));
     await within(chat).findByText(/^Renewed on today's instructions\./);

@@ -26,6 +26,7 @@ import { Empty, EmptyButton, EmptyLink } from '../components/empty.tsx';
 import { unchanged, type AnalysisSummary, type AnalysisView } from '../model/analysis.ts';
 import { Loader } from '../moments/Moments.tsx';
 import { useTerm } from '../skins.tsx';
+import { usePlain } from '../plain-words.ts';
 
 export function Analyses({ open }: { open?: string } = {}) {
   return <div className="tab-panels">{open ? <OpenAnalysis id={open} /> : <AnalysisList />}</div>;
@@ -37,25 +38,28 @@ function AnalysisList() {
   const history = chat?.history;
   const list = history?.list ?? null;
   const term = useTerm();
+  const plain = usePlain();
   const { dossier } = useData();
   return (
     <Card as="section" className="panel analyses" aria-labelledby="analyses-title">
-      <h2 id="analyses-title">{term('analyses', 'Analyses')}</h2>
+      <h2 id="analyses-title" title={plain.title('Analyses')}>
+        {term('analyses', plain.pw('Analyses', 'Past briefings'))}
+      </h2>
       <p className="note">
-        Every Analyze kept for {dossier.name}, newest first. <Help topic="analyses" />
+        {plain.pw('Every Analyze kept for', 'Every briefing kept for')} {dossier.name}, newest first. <Help topic="analyses" />
       </p>
       {/* With none kept yet, Analyze now is the empty list's own action (#417), so it isn't drawn twice. */}
       {chat && (list === null || list.length > 0 || running) && (
         <p className="analyses__actions">
-          <Button className="btn" onPress={() => void chat.ask(ANALYZE, 'Analyze')} isDisabled={chat.busy} data-analyze-tab="">
-            Analyze now
+          <Button className="btn" onPress={() => void chat.ask(ANALYZE, plain.pw('Analyze', 'Get a briefing'))} isDisabled={chat.busy} data-analyze-tab="">
+            {plain.pw('Analyze now', 'Get a briefing now')}
           </Button>
           {running && <span className="note"> An analysis is being written now; it joins the list when its answer is whole.</span>}
         </p>
       )}
       {history?.error && <p className="failure">{history.error}</p>}
       {list === null ? (
-        !history?.error && <Loader size="panel" message="Reading the analyses…" />
+        !history?.error && <Loader size="panel" message="Reading the briefings…" />
       ) : list.length ? (
         <ol className="analyses__list" aria-label="Analyses, newest first">
           {list.map((a) => (
@@ -64,11 +68,11 @@ function AnalysisList() {
         </ol>
       ) : running ? null : (
         <Empty
-          message="No analysis kept for this dossier yet."
+          message={plain.pw('No analysis kept for this dossier yet.', 'No briefing kept for this Toil project yet.')}
           action={
             chat ? (
-              <EmptyButton onPress={() => void chat.ask(ANALYZE, 'Analyze')} disabled={chat.busy}>
-                Analyze now
+              <EmptyButton onPress={() => void chat.ask(ANALYZE, plain.pw('Analyze', 'Get a briefing'))} disabled={chat.busy}>
+                {plain.pw('Analyze now', 'Get a briefing now')}
               </EmptyButton>
             ) : (
               <EmptyLink href={dossierHref(dossier.name)}>Open the Overview</EmptyLink>

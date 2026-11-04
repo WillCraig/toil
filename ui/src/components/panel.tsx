@@ -10,6 +10,8 @@ import type { ReactNode } from 'react';
 import { Card } from './layout.tsx';
 import { useSkins } from '../skins.tsx';
 import type { Call } from '../toil.ts';
+import { sourceLabel } from '../format.ts';
+import { usePlain } from '../plain-words.ts';
 
 /** `toil jira issue history` ×8: each command once, with how many calls it took. */
 export function commandsOf(calls: Call[]): Array<{ command: string; count: number }> {
@@ -22,9 +24,28 @@ export function commandsOf(calls: Call[]): Array<{ command: string; count: numbe
   return out;
 }
 
+/** The tools a list of commands read from, by name: `jira issue search` is Jira, `dossiers show` is the saved Toil project settings. */
+export function toolsOf(commands: Array<{ command: string }>): string[] {
+  const names = commands.map((c) => {
+    const area = c.command.split(' ')[0]!;
+    return area === 'dossiers' ? 'your saved Toil projects' : sourceLabel(area);
+  });
+  return [...new Set(names)];
+}
+
+const sentence = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
+
 export function Sources({ calls, alerts = true }: { calls: Call[]; alerts?: boolean }) {
+  const plain = usePlain();
   if (!calls.length) return null;
   const commands = commandsOf(calls);
+  const commandList = commands.map((c, i) => (
+    <span key={c.command}>
+      {i > 0 && ', '}
+      <code>toil {c.command}</code>
+      {c.count > 1 && ` ×${c.count}`}
+    </span>
+  ));
   const failed = alerts ? calls.filter((c) => !c.ok) : [];
   return (
     <>
@@ -34,16 +55,8 @@ export function Sources({ calls, alerts = true }: { calls: Call[]; alerts?: bool
         </p>
       ))}
       <details className="fed-by">
-        <summary>
-          Fed by{' '}
-          {commands.map((c, i) => (
-            <span key={c.command}>
-              {i > 0 && ', '}
-              <code>toil {c.command}</code>
-              {c.count > 1 && ` ×${c.count}`}
-            </span>
-          ))}
-        </summary>
+        <summary>{plain.on ? `From ${sentence(toolsOf(commands))}` : <>Fed by {commandList}</>}</summary>
+        {plain.on && <p className="note">The exact toil commands that read it: {commandList}.</p>}
         <ul className="plain calls">
           {calls.map((c, i) => (
             <li key={i}>

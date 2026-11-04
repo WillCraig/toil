@@ -1,6 +1,8 @@
 /**
  * A dossier's home (#494, replacing #394's Overview): the briefing, one layer
- * at a time. The recommendation first, as a sentence; then the reasons behind
+ * at a time. The status sentence first, as the biggest text (#552), one line
+ * on why and at most three cards for what needs attention; then, behind "Show
+ * the full briefing", the recommendation as a sentence and the reasons behind
  * it, each one line, the first open; each item a row that opens its drawer;
  * what is on track counted, not listed; and, one step in, anything the
  * dossier's focus left out or the code flagged that Analyze didn't mention.
@@ -14,7 +16,9 @@ import { useMemo, type ReactNode } from 'react';
 import { Button, Dialog, DialogTrigger, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { Sparkline } from '../components/charts.tsx';
 import { briefingSource, Customize, PeekLinks, useBriefing } from '../components/briefing.tsx';
-import { useBriefingPrefs } from '../briefing-prefs.ts';
+import { setPrefs, useBriefingPrefs } from '../briefing-prefs.ts';
+import { AnswerHero, NeedsAttention } from '../components/summary.tsx';
+import { answerOf, cardsOf, contextOf } from '../model/summary.ts';
 import { parseRoute } from '../App.tsx';
 import { Help } from '../components/help.tsx';
 import { Cited, PrLink } from '../components/items.tsx';
@@ -26,61 +30,113 @@ import { aging, cycleTimes, throughput } from '../model/flow.ts';
 import { WAITING_LABEL, daysText, openQueue } from '../model/prs.ts';
 import type { BriefingReason } from '../model/briefing.ts';
 import { useSkins, useWords } from '../skins.tsx';
+import { usePlain } from '../plain-words.ts';
 import { Aging, CycleTime, SprintDetail, Throughput } from './Flow.tsx';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export function Overview() {
-  const { dossier } = useData();
-  const { health: h } = useDerived();
+  const { dossier, byId, now } = useData();
+  const { health: h, insights: p } = useDerived();
   const view = useBriefing();
   const prefs = useBriefingPrefs();
-  // A red reason (failing checks, blocked) can be folded but never hidden: principle 4 outranks a layout preference.
+  const plain = usePlain();
+  // Worked out once per briefing and clock, from the models the full briefing below reads, so the two can't disagree.
+  const { answer, cards } = useMemo(() => {
+    const c = contextOf({ d: dossier, now, byId, h, p, view, plain: plain.on });
+    return { answer: answerOf(c), cards: cardsOf(c) };
+  }, [dossier, now, byId, h, p, view, plain.on]);
+  // Customize never hides a red reason (principle 4 outranks a layout preference). The fold can close over it, so a red reason no card tells is a line outside the fold (alerts, below).
   const shown = view.reasons.filter((r) => r.severity === 'danger' || !prefs.hidden.includes(r.lens));
   const hidden = view.reasons.length - shown.length;
+  // The red reasons no card above already tells: the biggest risk is the first reason, and the other two cards are the blocked and waiting lenses.
+  const covered = new Set<string>([cards.some((c) => c.id === 'risk') ? (view.reasons[0]?.lens ?? '') : '', cards.some((c) => c.id === 'blocked') ? 'blocked' : '', cards.some((c) => c.id === 'review') ? 'waiting' : '']);
+  const alerts = view.reasons.filter((r) => r.severity === 'danger' && !covered.has(r.lens));
   const here = typeof window === 'undefined' ? '#/' : window.location.hash;
   // Whose settings tuned this briefing, whenever a dossier tunes it (#494): its file, and whether it's the reader's own.
   const tuned = dossier.analyze && Object.keys(dossier.analyze).length ? dossier.origin : null;
   return (
     <section className="briefing" aria-label="Briefing" data-rec-source={view.by === 'analyze' ? 'analysis' : 'code'}>
+      <AnswerHero answer={answer} />
+      {/* The sprint and its day are on the header's chip; saying it twice is a second signature on the same form. */}
       <p className="briefing__meta">
-        {h && (
-          <span>
-            {h.sprint.name}, day {h.days.gone} of {h.days.total}
-          </span>
-        )}
         <span className="briefing__by source" data-briefing-by={view.by}>
-          {briefingSource(view)}
+          {briefingSource(view, plain.on)}
           {view.stale && `. ${view.stale}`}
           {view.analysis && (
             <>
               {' · '}
-              <a href={analysisHref(dossier.name, view.analysis.id)} data-rec-analysis="">
-                Open the analysis
+              <a href={analysisHref(dossier.name, view.analysis.id)} data-rec-analysis="" title={plain.title('Open the analysis')}>
+                {plain.pw('Open the analysis', 'Open that briefing')}
               </a>
             </>
           )}
         </span>
-        <Customize lenses={view.reasons.filter((r) => r.severity !== 'danger').map((r) => ({ lens: r.lens, label: r.label }))} />
-        {tuned && (
-          <span className="source" data-focus-from="">
-            Analyze settings from {tuned.file}, {tuned.adopted ? 'your own dossier' : "a dossier you haven't adopted"}
-          </span>
-        )}
       </p>
-      <Links page={prefs.opensIn === 'page'}>
-        <h2 className="sr-only">Recommendation</h2>
-        <p className="briefing__head">{view.recommendation ? <Cited text={view.recommendation} /> : 'Nothing needs anyone right now.'}</p>
-        {view.problems.map((p) => (
-          <p key={p} className="briefing__warning" role="note">
-            {p}
-          </p>
-        ))}
-        {view.unknown.length > 0 && (
-          <p className="briefing__warning" role="note">
-            Analyze named {view.unknown.length === 1 ? 'an item' : `${view.unknown.length} items`} that {view.unknown.length === 1 ? "isn't" : "aren't"} this dossier's: <code>{view.unknown.join(', ')}</code>. Treat {view.unknown.length === 1 ? 'it' : 'them'} as unverified.
-          </p>
-        )}
+      {/* A briefing that didn't parse, or named items this dossier lacks, is said up here: a layout fold never hides it. */}
+      {view.problems.map((p) => (
+        <p key={p} className="briefing__warning" role="note">
+          {p}
+        </p>
+      ))}
+      {view.unknown.length > 0 && (
+        <p className="briefing__warning" role="note">
+          {plain.pw('Analyze', 'The briefing')} named {view.unknown.length === 1 ? 'an item' : `${view.unknown.length} items`} that {view.unknown.length === 1 ? "isn't" : "aren't"} {plain.pw("this dossier's", "this Toil project's")}: <code>{view.unknown.join(', ')}</code>. Treat {view.unknown.length === 1 ? 'it' : 'them'} as unverified.
+        </p>
+      )}
+      <NeedsAttention cards={cards} />
+      {/* What principle 4 keeps on screen when the fold is closed: a red reason no card covers, and what couldn't be read. */}
+      {(alerts.length > 0 || view.unchecked.length > 0) && (
+        <div className="reasons briefing__alerts" data-alerts="">
+          {alerts.map((r) => (
+            <p key={r.lens} className="reason reason--line" data-alert={r.lens}>
+              <span className="reason__dot reason__dot--danger" aria-hidden="true" />
+              <button type="button" className="reason__jump" onClick={() => showReason(r.lens)}>
+                <b>{r.label}</b>
+                {r.items.length > 0 && <span className="reason__count">{r.items.length}</span>}
+                <span className="sr-only">, show it in the full briefing</span>
+              </button>
+            </p>
+          ))}
+          {view.unchecked.length > 0 && (
+            <details className="reason" data-unchecked="">
+              <summary>
+                <span className="reason__dot" aria-hidden="true" />
+                <span className="reason__title">
+                  <b>Couldn't check.</b> <span>{view.unchecked.map((u) => u.label).join(', ')}</span>
+                </span>
+              </summary>
+              <div className="reason__body">
+                {view.unchecked.map((u) => (
+                  <p key={u.label}>
+                    {u.label}: {u.note}
+                  </p>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+      <details
+        className="briefing__full"
+        open={prefs.fullOpen}
+        onToggle={(e) => {
+          if (e.currentTarget.open !== prefs.fullOpen) setPrefs({ fullOpen: e.currentTarget.open });
+        }}
+        data-full-briefing=""
+      >
+        <summary>Show the full briefing</summary>
+        <p className="briefing__meta">
+          <Customize lenses={view.reasons.filter((r) => r.severity !== 'danger').map((r) => ({ lens: r.lens, label: r.label }))} />
+          {tuned && (
+            <span className="source" data-focus-from="">
+              {plain.pw('Analyze settings', 'Briefing settings')} from {tuned.file}, {tuned.adopted ? plain.pw('your own dossier', 'your own Toil project') : plain.pw("a dossier you haven't adopted", "a Toil project you haven't adopted")}
+            </span>
+          )}
+        </p>
+        <Links page={prefs.opensIn === 'page'}>
+          <h2 className="sr-only">Recommendation</h2>
+          <p className="briefing__head">{view.recommendation ? <Cited text={view.recommendation} /> : 'Nothing needs anyone right now.'}</p>
         <section aria-labelledby="why-title">
           <h2 id="why-title" className="briefing__label">
             Why <Help topic="briefing" />
@@ -93,34 +149,17 @@ export function Overview() {
               <p className="reason__line">
                 <span className="reason__dot reason__dot--ok" aria-hidden="true" />
                 <span className="reason__title">
-                  <b>On track.</b> <span>{view.onTrack}</span>
+                  <b>On track.</b> <span>{plain.text(view.onTrack)}</span>
                   {hidden > 0 && <span> {hidden === 1 ? 'One reason is' : `${hidden} reasons are`} hidden under Customize.</span>}
                 </span>
               </p>
             </div>
-            {view.unchecked.length > 0 && (
-              <details className="reason" data-unchecked="">
-                <summary>
-                  <span className="reason__dot" aria-hidden="true" />
-                  <span className="reason__title">
-                    <b>Couldn't check.</b> <span>{view.unchecked.map((u) => u.label).join(', ')}</span>
-                  </span>
-                </summary>
-                <div className="reason__body">
-                  {view.unchecked.map((u) => (
-                    <p key={u.label}>
-                      {u.label}: {u.note}
-                    </p>
-                  ))}
-                </div>
-              </details>
-            )}
             {view.leftOut.length > 0 && (
               <details className="reason" data-left-out="">
                 <summary>
                   <span className="reason__dot" aria-hidden="true" />
                   <span className="reason__title">
-                    <b>Left out by the dossier's focus.</b> <span>Analyze set these aside because of "leave out".</span>
+                    <b>{plain.pw("Left out by the dossier's focus.", "Left out by the Toil project's focus.")}</b> <span>{plain.pw('Analyze set these aside because of "leave out".', 'The briefing set these aside because of "leave out".')}</span>
                   </span>
                   <span className="reason__count">{view.leftOut.length}</span>
                 </summary>
@@ -132,7 +171,7 @@ export function Overview() {
                 <summary>
                   <span className="reason__dot reason__dot--warn" aria-hidden="true" />
                   <span className="reason__title">
-                    <b>Flagged by code, not in the briefing.</b> <span>Analyze didn't mention these.</span>
+                    <b>{plain.pw('Flagged by code, not in the briefing.', "Flagged by the app's rules, not in the briefing.")}</b> <span>{plain.pw("Analyze didn't mention these.", "The briefing didn't mention these.")}</span>
                   </span>
                   <span className="reason__count">{view.notMentioned.length}</span>
                 </summary>
@@ -155,22 +194,35 @@ export function Overview() {
             </ul>
           </section>
         )}
-      </Links>
-      <details className="briefing__numbers" open={prefs.numbersOpen}>
-        <summary>The numbers</summary>
-        <MetricStrip />
-      </details>
+        </Links>
+        <details className="briefing__numbers" open={prefs.numbersOpen}>
+          <summary>The numbers</summary>
+          <MetricStrip />
+        </details>
+        </details>
       <nav className="briefing__links" aria-label={`More on ${dossier.name}`}>
         <span className="briefing__label">Go to</span>
         <a href={boardHref(dossier.name)}>Board</a>
-        <a href={dependenciesHref(dossier.name)}>Dependencies</a>
-        <a href={prsHref(dossier.name)}>Pull requests</a>
+        <a href={dependenciesHref(dossier.name)} title={plain.title('Dependencies')}>{plain.pw('Dependencies', 'What blocks what')}</a>
+        <a href={prsHref(dossier.name)} title={plain.title('Pull requests')}>{plain.pw('Pull requests', 'Code reviews')}</a>
         <a href={peopleHref(dossier.name)}>People</a>
-        <a href={worklogHref(dossier.name)}>Worklog</a>
-        <a href={analysesHref(dossier.name)}>Analyses</a>
+        <a href={worklogHref(dossier.name)} title={plain.title('Worklog')}>{plain.pw('Worklog', 'What happened')}</a>
+        <a href={analysesHref(dossier.name)} title={plain.title('Analyses')}>{plain.pw('Analyses', 'Past briefings')}</a>
       </nav>
     </section>
   );
+}
+
+/** Opens the full briefing and the reason a line outside it names, and puts the keyboard on it. */
+function showReason(lens: string) {
+  setPrefs({ fullOpen: true });
+  setTimeout(() => {
+    const d = document.querySelector<HTMLDetailsElement>(`details[data-reason="${CSS.escape(lens)}"]`);
+    if (!d) return;
+    d.open = true;
+    d.scrollIntoView({ block: 'center' });
+    d.querySelector('summary')?.focus();
+  });
 }
 
 /** Item links on the briefing: to the drawer, unless the person chose the item's page under Customize. */
@@ -266,6 +318,7 @@ function MetricStrip() {
   const { dossier, now, byId, sync } = useData();
   const { health: h, insights: p } = useDerived();
   const words = useWords();
+  const { pw } = usePlain();
   // A theme's sprint dressing (Harvest's calendar) hangs on the sprint wherever it shows.
   const { Panel: PanelSkin } = useSkins();
   // Worked out once per dossier and clock: the chat above re-renders the page as each answer streams in.
@@ -292,7 +345,7 @@ function MetricStrip() {
       <ul className="metric-strip">
         <Metric
           id="burnup"
-          label="Burn-up"
+          label={pw('Burn-up', 'Points done')}
           value={last ? `${last.done} of ${last.scope}` : 'No sprint'}
           unit={last ? 'points' : ''}
           spark={<Sparkline values={b?.days.map((d) => d.done) ?? []} against={b?.days.map((d) => d.scope) ?? []} />}
@@ -308,24 +361,24 @@ function MetricStrip() {
             <Empty message={words('empty.sprint')} action={<TrackerAction dossier={dossier.name} sync={sync} />} />
           )}
         </Metric>
-        <Metric id="throughput" label="Throughput" value={String(round1(mean))} unit="a week" spark={<Sparkline kind="bars" values={t.weeks.map((w) => w.items.length)} />} title="Throughput">
+        <Metric id="throughput" label={pw('Throughput', 'Finished')} value={String(round1(mean))} unit="a week" spark={<Sparkline kind="bars" values={t.weeks.map((w) => w.items.length)} />} title={pw('Throughput', 'Finished a week')}>
           <Throughput />
         </Metric>
         <Metric
           id="cycle"
-          label="Cycle time"
+          label={pw('Cycle time', 'Time to finish')}
           value={p.p85 ? `${round1(p.p85.days)}` : String(cycles.length)}
           unit={p.p85 ? 'days, 85% within' : cycles.length === 1 ? 'item timed' : 'items timed'}
           spark={<Sparkline values={cycles.map((c) => c.days)} mark={p.p85?.days ?? null} />}
-          title="Cycle time"
+          title={pw('Cycle time', 'Time to finish')}
         >
           <CycleTime />
         </Metric>
-        <Metric id="aging" label="Aging WIP" value={String(ages.length)} unit={ages.length ? `in progress, oldest ${round1(ages[0]!.days)} d` : 'in progress'} spark={<Sparkline kind="bars" values={ages.map((a) => a.days)} mark={p.p85?.days ?? null} />} title="Aging work in progress">
+        <Metric id="aging" label={pw('Aging WIP', 'Work getting old')} value={String(ages.length)} unit={ages.length ? `in progress, oldest ${round1(ages[0]!.days)} d` : 'in progress'} spark={<Sparkline kind="bars" values={ages.map((a) => a.days)} mark={p.p85?.days ?? null} />} title={pw('Aging work in progress', 'Work getting old')}>
           <p className="note">{words('aging.note')}</p>
           <Aging />
         </Metric>
-        <Metric id="pr-wait" label="PR wait" value={queue.length ? String(round1(longest)) : '0'} unit={queue.length ? `working days, ${queue.length} open` : 'open'} spark={<Sparkline kind="bars" values={waits} />} title="Pull requests waiting">
+        <Metric id="pr-wait" label={pw('PR wait', 'Review wait')} value={queue.length ? String(round1(longest)) : '0'} unit={queue.length ? `working days, ${queue.length} open` : 'open'} spark={<Sparkline kind="bars" values={waits} />} title={pw('Pull requests waiting', 'Code reviews waiting')}>
           {queue.length ? (
             <ul className="rows">
               {queue.map((r) => (
@@ -342,7 +395,7 @@ function MetricStrip() {
             <p>No pull request is open, apart from drafts.</p>
           )}
           <p>
-            <a href={prsHref(dossier.name)}>The Pull requests tab</a> has the whole queue, its flags and its flow.
+            <a href={prsHref(dossier.name)}>{pw('The Pull requests tab', 'The Code reviews tab')}</a> has the whole queue, its flags and its flow.
           </p>
         </Metric>
       </ul>

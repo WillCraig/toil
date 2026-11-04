@@ -1,0 +1,10 @@
+/* Plain words (src/plain-words.ts): a swapped word in a sentence is dotted underneath, the one hint that toil's own term is a hover away. */
+.plain-term {
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+.plain-switch { font-weight: 600; }
+/* A wrapper that carries a control's hover and draws nothing of its own. */
+.plain-hint { display: contents; }

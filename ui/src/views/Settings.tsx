@@ -26,6 +26,8 @@ import { MotionSetting } from './settings/Motion.tsx';
 import { LearningSetting } from './settings/Learning.tsx';
 import { NotifySetting } from '../components/notify.tsx';
 import { ThemeSetting } from './settings/Theme.tsx';
+import { PlainWordsSetting } from '../components/plain-switch.tsx';
+import { usePlain } from '../plain-words.ts';
 import { Usage } from './settings/Usage.tsx';
 import { ModelUsage } from './settings/ModelUsage.tsx';
 import type { ModelUsageApi } from '../server-client.ts';
@@ -37,34 +39,43 @@ import type { ModelUsageApi } from '../server-client.ts';
 export const ADD_CONNECTION_HREF = '#/settings/connections/+add';
 export const CREATE_DOSSIER_HREF = '#/settings/dossiers/+new';
 
-export const SETTINGS_PAGES: Array<{ page: SettingsPage; label: string; about: string; topic: HelpTopicId }> = [
-  { page: 'connections', label: 'Connections', about: 'The connections toil uses: add, test, set the default, turn writes on or off, replace a secret, remove.', topic: 'connections' },
-  { page: 'dossiers', label: 'Dossiers', about: 'Set up a repository that has a dossier, create dossiers, and give them repositories, areas, field names, people and a work-in-progress limit.', topic: 'dossier-setup' },
+export const SETTINGS_PAGES: Array<{ page: SettingsPage; label: string; plain?: { label: string; about: string }; about: string; topic: HelpTopicId }> = [
+  { page: 'connections', label: 'Connections', plain: { label: 'Connections', about: 'Your links to tools such as Jira and GitHub: add one, check that it works, choose the main one, allow or stop changes, update a login, or remove it.' }, about: 'The connections toil uses: add, test, set the default, turn writes on or off, replace a secret, remove.', topic: 'connections' },
+  { page: 'dossiers', label: 'Dossiers', plain: { label: 'Toil projects', about: 'Set up a Toil project: the repositories it covers, its tools, its field names, its people and a limit on work in progress. Create Toil projects here too.' }, about: 'Set up a repository that has a dossier, create dossiers, and give them repositories, areas, field names, people and a work-in-progress limit.', topic: 'dossier-setup' },
   { page: 'toil', label: 'General', about: 'How Toil UI looks, talks, moves, notifies and links out in this browser, and the settings toil has no command for.', topic: 'bounds' },
   { page: 'usage', label: 'Usage', about: "How toil is used on this machine: calls per day, the commands used and failing most, and the ones never called, from toil's local audit log.", topic: 'audit' },
-  { page: 'agent-usage', label: 'Agent usage', about: "What the agent's models used in your chats, and optional caps that stop a runaway.", topic: 'model-usage' },
-  { page: 'agent', label: 'Agent', about: 'Which agent answers questions in the chat, and your own instructions for it.', topic: 'agent' },
+  { page: 'agent-usage', label: 'Agent usage', plain: { label: 'AI usage', about: 'What the AI helpers used in your chats, and optional limits that stop a runaway.' }, about: "What the agent's models used in your chats, and optional caps that stop a runaway.", topic: 'model-usage' },
+  { page: 'agent', label: 'Agent', plain: { label: 'AI helper', about: 'Which AI helper answers questions in the chat, and your own instructions for it.' }, about: 'Which agent answers questions in the chat, and your own instructions for it.', topic: 'agent' },
 ];
 
 export function Settings({ page, at = [], config, agent, modelUsage = null }: { page: SettingsPage; at?: string[]; config: ConfigApi | null; agent?: AgentSettingsPanelProps; modelUsage?: ModelUsageApi | null }) {
   const current = SETTINGS_PAGES.find((p) => p.page === page)!;
   const form = at[0] === '+add' || at[0] === '+new';
   const words = useWords();
+  const plain = usePlain();
+  const shown = (p: (typeof SETTINGS_PAGES)[number]) => ({ label: plain.on && p.plain ? p.plain.label : p.label, about: plain.on && p.plain ? p.plain.about : p.about });
   return (
     <>
       <div className="view-head">
         <p className="eyebrow">{words('settings.eyebrow')}</p>
-        <h1 tabIndex={-1}>toil's configuration</h1>
+        <h1 tabIndex={-1} title={plain.title("toil's configuration")}>
+          {plain.pw("toil's configuration", 'Connections and Toil projects')}
+        </h1>
         <p className="lede">
-          What <code>toil connections</code> and <code>toil dossiers</code> manage, through toil's own commands. <Help topic="settings" />
+          {plain.on ? (
+            <>Your links to tools, and your Toil projects.</>
+          ) : (
+            <>What <code>toil connections</code> and <code>toil dossiers</code> manage, through toil's own commands.</>
+          )}{' '}
+          <Help topic="settings" />
         </p>
       </div>
       <nav className="subnav" aria-label="Settings pages">
         <ul>
           {SETTINGS_PAGES.map((p) => (
             <li key={p.page}>
-              <a href={`#/settings/${p.page}`} aria-current={p.page === page ? 'page' : undefined}>
-                {p.label}
+              <a href={`#/settings/${p.page}`} aria-current={p.page === page ? 'page' : undefined} title={plain.on && p.plain ? plain.title(p.label) : undefined}>
+                {shown(p).label}
               </a>
             </li>
           ))}
@@ -75,12 +86,13 @@ export function Settings({ page, at = [], config, agent, modelUsage = null }: { 
           <strong>Changes are turned off.</strong> {config.disabled}
         </p>
       )}
-      <h2 className="page-title">{current.label}</h2>
+      <h2 className="page-title">{shown(current).label}</h2>
       <p className="lede">
-        {current.about} <Help topic={current.topic} />
+        {shown(current).about} <Help topic={current.topic} />
       </p>
       {page === 'toil' && (
         <>
+          <PlainWordsSetting />
           <ThemeSetting />
           <MotionSetting />
           <NotifySetting />

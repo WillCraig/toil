@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
+import { standardWords } from './words.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureConfig } from '../src/fixtures/config.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
@@ -30,7 +31,10 @@ async function chat(dossier: string) {
   return { pane, say, calls: fixture.calls };
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  standardWords();
+});
 afterEach(cleanup);
 
 describe('the "Not ticketed yet" banner', () => {
@@ -75,7 +79,7 @@ describe('the "Not ticketed yet" banner', () => {
 
   it('stays away from Analyze, which is a question about the dossier, and still catches work asked after it (#343)', async () => {
     const { pane, say } = await chat('settlement');
-    await userEvent.click(within(pane).getByRole('button', { name: 'Analyze' }));
+    await userEvent.click(within(pane).getByRole('button', { name: /^Give me the full briefing/ }));
     await within(pane).findByRole('heading', { level: 3, name: 'Analyze' });
     await waitFor(() => expect(within(pane).getByRole('textbox', { name: 'Your question' })).not.toHaveProperty('disabled', true), { timeout: 8000 });
     expect(within(pane).queryByRole('region', { name: 'Not ticketed yet' })).toBeNull();

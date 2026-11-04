@@ -11,8 +11,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from 'react-aria-components';
+import { usePlain } from '../plain-words.ts';
 import { AssignModal, StateChip, assignmentHref, usageText, POLL_MS } from '../assign/views.tsx';
-import { ADAPTER_NAME, MODE_INFO, renewRefusal, runMs, runText, type AssignedProposal, type Assignment, type AssignmentRecord } from '../assign/model.ts';
+import { ADAPTER_NAME, modeInfo, renewRefusal, runMs, runText, type AssignedProposal, type Assignment, type AssignmentRecord } from '../assign/model.ts';
 import { StaleNote } from '../components/stale.tsx';
 import { Cited, ItemLink } from '../components/items.tsx';
 import { Card, Cluster, DataTable, Path, Scroller } from '../components/layout.tsx';
@@ -27,6 +28,7 @@ const when = (iso: string | null) => (iso ? dateTime(iso) : 'not yet');
 
 export function AssignmentView({ id }: { id: string }) {
   const { dossier, assignments: api, now } = useData();
+  const plain = usePlain();
   const [record, setRecord] = useState<AssignmentRecord | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
@@ -86,13 +88,13 @@ export function AssignmentView({ id }: { id: string }) {
           <a href={dossierHref(a.dossier)}>{a.dossier}</a> · Agent assignment
         </p>
         <h1 tabIndex={-1}>
-          {MODE_INFO[a.mode].label}: {a.itemTitle}
+          {modeInfo(a.mode, plain.on).label}: {a.itemTitle}
         </h1>
         <p className="item-meta">
           <StateChip a={a} /> <ItemLink id={a.item} /> · {a.adapter ? ADAPTER_NAME[a.adapter] : 'no adapter chosen yet'} <EditLink href={AGENT_SETTINGS_HREF} label="Edit the agent settings" /> · {a.origin === 'tracker' ? `queued by the tracker (${a.trigger})` : 'assigned in Toil UI'}
         </p>
         <p className="note">
-          Created {when(a.createdAt)}; started {when(a.startedAt)}; {a.endedAt ? `ended ${when(a.endedAt)}` : 'still going'}; ran {runText(a.ranMs ?? runMs(a, now))}; {usageText(a)}. {MODE_INFO[a.mode].changes}
+          Created {when(a.createdAt)}; started {when(a.startedAt)}; {a.endedAt ? `ended ${when(a.endedAt)}` : 'still going'}; ran {runText(a.ranMs ?? runMs(a, now))}; {usageText(a)}. {modeInfo(a.mode, plain.on).changes}
         </p>
       </div>
 

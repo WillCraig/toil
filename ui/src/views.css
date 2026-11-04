@@ -172,7 +172,8 @@
    focused view it opens, which takes the screen while the page steps back. */
 .ask-bar { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: var(--radius); padding: 0.6rem 0.75rem; margin-bottom: 1.25rem; display: grid; gap: 0.4rem; }
 .ask-bar__form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-.ask-bar__field { flex: 1 1 14rem; min-width: 0; }
+.ask-bar__field { flex: 1 1 14rem; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.ask-bar__field input { min-width: 0; width: 100%; box-sizing: border-box; }
 .ask-bar__form .btn { flex: none; }
 .ask-bar__resume { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .ask-overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: stretch center; padding: 1rem 16px; background: rgb(0 0 0 / 0.6); }
@@ -205,6 +206,8 @@
 .agent-pick__button[data-focus-visible] { outline: 3px solid var(--focus); outline-offset: 2px; }
 .agent-pick__ready { color: var(--ink); font-weight: 600; }
 .agent-pick__why { padding-left: 0.7rem; }
+/* The note's own colour passes contrast on the picker; the accent link colour didn't at 768px (verify:ui, #552). Its underline still marks it. */
+.agent-pick__why a { color: inherit; text-decoration: underline; }
 .log { display: grid; gap: 0.75rem; }
 .turn { display: grid; gap: 0.5rem; }
 .bubble { padding: 0.6rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--line); display: grid; gap: 0.5rem; }
@@ -344,3 +347,7 @@
 .standup-writeup { border-left: 4px solid var(--accent); padding-left: 0.75rem; display: grid; gap: 0.5rem; min-width: 0; overflow-wrap: anywhere; }
 .standup-writeup h3 { margin: 0; font-size: 1rem; }
 .standup-writeup .btn--small { margin: 0 0.15rem; }
+
+/* The usage lines (#552): one readable line, the breakdown behind a fold. */
+.usage-details summary, .chat-usage summary { cursor: pointer; }
+.chat-usage[open] > summary, .usage-details[open] > summary { margin-bottom: 0.15rem; }

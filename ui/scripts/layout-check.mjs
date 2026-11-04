@@ -372,8 +372,8 @@ function states(route, width, sample = true) {
   const closeAsk = clickAll('[data-ask-close]');
   if (/^#\/dossier\/[^/]+$/.test(route)) {
     // The page stays open from one width to the next, so the chat may already hold the answer an earlier width asked
-    // for: then its starters are the Suggestions button instead of chips.
-    const ready = `document.querySelector('.ask-focus .starters, .ask-focus [data-ask-suggestions]')`;
+    // for: then its questions are the Suggestions button instead of the guided start.
+    const ready = `document.querySelector('.ask-focus [data-guided-start], .ask-focus [data-ask-suggestions]')`;
     out.push({ name: 'ask-open', setup: `(async () => { ${openAsk} const deadline = Date.now() + 5000; while (!${ready} && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return ${ready} ? 1 : 0; })()`, undoJs: closeAsk });
     out.push({ name: 'ask-info', setup: `(async () => { ${openAsk} return await ${clickAll('[data-ask-info]')}; })()`, undo: 'Escape', undoJs: closeAsk });
     out.push({ name: 'ask-switcher', setup: `(async () => { ${openAsk} return await ${clickAll('[data-agent-switch]')}; })()`, undo: 'Escape', undoJs: closeAsk });
@@ -385,28 +385,31 @@ function states(route, width, sample = true) {
   // An answered question (#295): its usage footer, and the chat's running total and context meter in the pane's head.
   // Then, once a question has its answer, the Suggestions menu the starters fold into (#343).
   // Analyze (#343) on the next dossier: its pulse check, pressed in the bar, in the focused view.
-  // Done means the new turn is in the view, the Stop button gone and its usage shown; the closed view holds no turns, so they're counted from the bar.
-  const answered = (press) => `(async () => { const asked = Number(/(\\d+) questions? in this chat/.exec(document.querySelector('.ask-bar')?.textContent ?? '')?.[1] ?? 0); if (!(await ${press})) return 0; const done = () => { const turns = document.querySelectorAll('.ask-focus .turn'); return turns.length > asked && !document.querySelector('[data-ask-stop]') && turns[turns.length - 1].querySelector('[data-usage-footer]') && document.querySelector('[data-chat-usage]') && document.querySelector('[data-ask-status]'); }; const deadline = Date.now() + 15000; while (!done() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return done() ? 1 : 0; })()`;
+  // Done means the new turn is in the view, the Stop button gone and its usage shown inside its "how sure" fold (#552; the chat's own total waits for a second answer, since one answer's usage is the chat's); the closed view holds no turns, so they're counted from the bar.
+  const answered = (press) => `(async () => { const asked = Number(/(\\d+) questions? in this chat/.exec(document.querySelector('.ask-bar')?.textContent ?? '')?.[1] ?? 0); if (!(await ${press})) return 0; const done = () => { const turns = document.querySelectorAll('.ask-focus .turn'); return turns.length > asked && !document.querySelector('[data-ask-stop]') && turns[turns.length - 1].querySelector('[data-how-sure] [data-usage-footer]') && (turns.length < 2 || document.querySelector('[data-chat-usage]')) && document.querySelector('[data-ask-status]'); }; const deadline = Date.now() + 15000; while (!done() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return done() ? 1 : 0; })()`;
   if (route === '#/dossier/card-payments') {
-    const firstQuestion = `(async () => { ${openAsk} const deadline = Date.now() + 5000; while (!document.querySelector('.ask-focus .starters .starter, [data-ask-suggestions]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const chip = document.querySelector('.ask-focus .starters .starter'); if (chip) return (chip.click(), 1); if (!(await ${clickAll('[data-ask-suggestions]')})) return 0; return await ${clickAll('[role="menuitem"]:first-child')}; })()`;
+    const firstQuestion = `(async () => { ${openAsk} const deadline = Date.now() + 5000; while (!document.querySelector('.ask-focus [data-question], [data-ask-suggestions]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const chip = document.querySelector('.ask-focus [data-question="finish"]'); if (chip) return (chip.click(), 1); if (!(await ${clickAll('[data-ask-suggestions]')})) return 0; return await ${clickAll('[role="menuitem"]:first-child')}; })()`;
     out.push({ name: 'answered', setup: answered(firstQuestion), undoJs: closeAsk });
     out.push({ name: 'ask-suggestions', setup: `(async () => { ${openAsk} return await ${clickAll('[data-ask-suggestions]')}; })()`, undo: 'Escape', undoJs: closeAsk });
   }
-  if (route === '#/dossier/settlement') out.push({ name: 'analyzed', setup: answered(clickAll('[data-analyze]')), undoJs: closeAsk });
+  // Analyze is the guided start's first question (#552), or the same words in the Suggestions menu once the chat has begun.
+  const briefing = `(async () => { ${openAsk} const deadline = Date.now() + 5000; while (!document.querySelector('.ask-focus [data-question], [data-ask-suggestions]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const q = document.querySelector('.ask-focus [data-question="briefing"]'); if (q) return (q.click(), 1); if (!(await ${clickAll('[data-ask-suggestions]')})) return 0; return await ${clickAll('[role="menuitem"]', '/^Give me the full briefing/')}; })()`;
+  if (route === '#/dossier/settlement') out.push({ name: 'analyzed', setup: answered(briefing), undoJs: closeAsk });
   // The Assign dialog from an item's page, and Start on the Agents lane's inbox (#293).
   // Escape alone can leave it open on a slow runner (focus not yet inside it), which then holds focus through every
   // state at the next width; its own Cancel or Close closes it for certain.
   const closeAssign = clickAll('[role="dialog"] button', '/^(Cancel|Close)$/', 0);
   if (route.includes('/item/')) out.push({ name: 'assign-open', setup: clickAll('[data-assign-open]'), undo: 'Escape', undoJs: closeAssign });
-  // The Agents sidebar (#394) is a drawer below 1200px (SIDEBAR_WIDE in src/views/DossierShell.tsx): its Start is pressed from inside it there.
+  // The Agents panel (#394, #552) is closed at every width until its button is pressed: a drawer below 1200px (SIDEBAR_WIDE in
+  // src/views/DossierShell.tsx), a column beside the view from there up, which the same button closes again.
   const sidebarWide = width >= 1200;
-  const closeDrawer = clickAll('[data-agents-close]', null, 0);
+  const closeDrawer = `(async () => { await ${clickAll('[data-agents-close]', null, 0)}; const open = document.querySelector('[data-agents-open][aria-expanded="true"]'); if (open) open.click(); return 1; })()`;
   if (route === '#/dossier/card-payments') {
-    const start = sidebarWide ? clickAll('[data-inbox-start]') : `(async () => { if (!(await ${clickAll('[data-agents-open]')})) return 0; return await ${clickAll('[data-inbox-start]')}; })()`;
+    const start = `(async () => { if (!(await ${clickAll('[data-agents-open]')})) return 0; return await ${clickAll('[data-inbox-start]')}; })()`;
     out.push({ name: 'inbox-start', setup: start, undo: 'Escape', undoJs: `(async () => { await ${closeAssign}; await ${closeDrawer}; })()` });
   }
   // The dossier's frame (#394): the Agents drawer open below 1200px, the dossier switcher, and a metric's full chart from the Overview.
-  if (/^#\/dossier\/[^/]+$/.test(route) && !sidebarWide) out.push({ name: 'agents-drawer', setup: clickAll('[data-agents-open]'), undo: 'Escape', undoJs: closeDrawer });
+  if (/^#\/dossier\/[^/]+$/.test(route)) out.push({ name: sidebarWide ? 'agents-panel' : 'agents-drawer', setup: clickAll('[data-agents-open]'), undo: 'Escape', undoJs: closeDrawer });
   if (route === '#/dossier/card-payments') {
     out.push({ name: 'dossier-switch', setup: clickAll('[data-dossier-switch]'), undo: 'Escape' });
     for (const m of ['burnup', 'pr-wait']) out.push({ name: `chart-${m}`, setup: clickAll(`[data-metric="${m}"]`), undo: 'Escape', undoJs: clickAll('[data-chart-close]', null, 0) });
@@ -414,7 +417,8 @@ function states(route, width, sample = true) {
   // The history (#395), set open rather than clicked, since the check has already opened every <details> once: an entry's what-changed opened; an analysis with its evidence unfolded, and a citation chip's detail as a keyboard user who tabbed to it sees it.
   if (/\/analyses$/.test(route)) out.push({ name: 'what-changed', undoJs: 'window.scrollTo(0, 0)', setup: `(() => { const d = [...document.querySelectorAll('details.analysis__changes')]; for (const x of d) x.open = true; d[0]?.scrollIntoView({ block: 'start' }); return d.length; })()` });
   if (/\/analyses\/[^/]+$/.test(route)) {
-    out.push({ name: 'evidence-open', undoJs: 'window.scrollTo(0, 0)', setup: `(() => { const d = [...document.querySelectorAll('details.analysis-evidence')]; for (const x of d) x.open = true; d[0]?.scrollIntoView({ block: 'start' }); return d.length; })()` });
+    // A real agent's briefing may legitimately have no evidence paragraphs (a Codex run can), and a state that opens nothing is a problem, so only the sample (whose analysis always has some) is held to it.
+    out.push({ name: 'evidence-open', undoJs: 'window.scrollTo(0, 0)', setup: `(() => { const d = [...document.querySelectorAll('details.analysis-evidence')]; for (const x of d) x.open = true; d[0]?.scrollIntoView({ block: 'start' }); return d.length || ${sample ? 0 : 1}; })()` });
     const chip = `[...document.querySelectorAll('main .ticket-chip--cite')].find((c) => c.getClientRects().length)`;
     out.push({ name: 'cite-tooltip', clearOverlays: true, key: 'Tab', setup: `(async () => { const c = ${chip}; if (!c) return 0; c.scrollIntoView({ block: 'center' }); for (let i = 0; i < 3; i++) { c.blur(); c.focus(); const deadline = Date.now() + 2000; while (!document.querySelector('.cite-tooltip') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (document.querySelector('.cite-tooltip')) return 1; } return 'no tooltip after three focuses on the first citation chip'; })()`, undo: 'Escape', undoJs: 'document.activeElement?.blur()' });
   }
@@ -589,10 +593,11 @@ export function layoutWorkers(runs) {
  * Each scheme's findings are kept apart and joined in scheme order, so the
  * report reads the same however many workers ran.
  *
+ * `sample` (on unless set false) says the data is the sample's, whose states always have something to open; real data may not (see `states`).
  * `headerFits` (on unless set false) fails a header folded into its Menu at
  * 1440px or wider; it's for the sample data, whose rows are known to fit.
  */
-export async function checkLayout({ urlFor, runs = themeRuns(), routes = ROUTES, widths = WIDTHS, shots = null, motion = 'reduce', log = () => {}, workers = layoutWorkers(runs), headerFits = true }) {
+export async function checkLayout({ urlFor, runs = themeRuns(), routes = ROUTES, widths = WIDTHS, shots = null, motion = 'reduce', log = () => {}, workers = layoutWorkers(runs), headerFits = true, sample = true }) {
   const chrome = findChrome();
   if (!chrome) throw new Error('The layout check needs Chrome, Edge or Chromium, and found none. Install one, or set CHROME_PATH to it.');
   const axeSource = readFileSync(createRequire(join(ui, 'package.json')).resolve('axe-core/axe.min.js'), 'utf8');
@@ -609,7 +614,7 @@ export async function checkLayout({ urlFor, runs = themeRuns(), routes = ROUTES,
       await browser.page.media([{ name: 'prefers-reduced-motion', value: motion }]);
       while (!failed && next < runs.length) {
         const i = next++;
-        results[i] = await checkRun({ page: browser.page, run: runs[i], urlFor, routes, widths, shots, axeSource, log, headerFits });
+        results[i] = await checkRun({ page: browser.page, run: runs[i], urlFor, routes, widths, shots, axeSource, log, headerFits, sample });
       }
     } catch (e) {
       failed ??= e;
@@ -627,7 +632,7 @@ export async function checkLayout({ urlFor, runs = themeRuns(), routes = ROUTES,
 }
 
 /** One theme scheme, every route and width, in one Chrome tab. */
-async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, log, headerFits }) {
+async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, log, headerFits, sample }) {
   const problems = [];
   const reported = [];
   let checked = 0;
@@ -673,7 +678,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
         await page.evaluate('window.scrollTo(0, 0)');
         checked++;
       }
-      for (const state of states(route, width, headerFits)) {
+      for (const state of states(route, width, sample)) {
         // A state that opens nothing checks nothing, so it's a problem, never a quiet pass. clickAll waits for
         // its element to show, and an item in the compact header's Menu is looked for once the Menu is open (#289).
         // A state that needs focus (`clearOverlays`) first closes any menu or dialog an earlier state left open.

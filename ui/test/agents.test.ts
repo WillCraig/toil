@@ -674,7 +674,8 @@ describe('when an adapter cannot run', () => {
     expect(host.kind).toBe('none');
     expect((await host.starters(ctx(), 'card-payments')).length).toBe(10);
     const e = (await host.ask(ctx(), 'card-payments', 'q').catch((x: unknown) => x)) as AgentError;
-    for (const p of ['@anthropic-ai/claude-agent-sdk', '@github/copilot-sdk', '@openai/codex-sdk']) expect(e.message).toContain(p);
+    expect(e.message).toContain('No agent is set up');
+    for (const p of ['@anthropic-ai/claude-agent-sdk', '@github/copilot-sdk', '@openai/codex-sdk']) expect(e.fix).toContain(p);
     const status = host.status();
     expect(status.adapters.map((a) => [a.name, a.installed, a.cli.path])).toEqual([
       ['claude', false, null],

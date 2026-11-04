@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
+import { standardWords } from './words.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import type { SyncClient, SyncStatus } from '../src/server-client.ts';
 import { SyncPanel } from '../src/sync-panel.tsx';
@@ -32,7 +33,7 @@ const SLOW = 30_000;
 const reported: string[] = [];
 
 async function open(hash: string, theme: string, scheme: string) {
-  localStorage.setItem('toil-ui.theme', JSON.stringify({ theme, scheme }));
+  localStorage.setItem('toil-ui.theme', JSON.stringify({ theme, scheme, wording: true, voice: true }));
   window.location.hash = hash;
   const view = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview />);
   await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
@@ -62,6 +63,7 @@ function targets(): string[] {
 
 beforeEach(() => {
   localStorage.clear();
+  standardWords();
   document.documentElement.removeAttribute('data-theme');
 });
 

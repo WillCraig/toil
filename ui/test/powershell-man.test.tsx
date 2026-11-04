@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { standardWords } from './words.ts';
 import { App } from '../src/App.tsx';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureExecute, FIXTURE_NOW } from '../src/fixtures/execute.ts';
@@ -16,6 +17,8 @@ const typeSecret = (text: string, target: Window | HTMLElement = window) => {
 const openApp = () => render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview />);
 
 describe('the hidden arcade entry', () => {
+  beforeEach(standardWords);
+
   it('keeps the view behind it mounted and reads nothing while it is open', async () => {
     window.location.hash = '#/dossier/card-payments';
     const execute = vi.fn(fixtureExecute().execute);

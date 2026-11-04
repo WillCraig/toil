@@ -1,14 +1,16 @@
 /**
  * The chat (#253, #343, #344). An Ask bar sits under the header on every
- * dossier page: one line, its placeholder in the theme's voice, with Analyze
- * beside it. Pressing into it opens the focused view, where the conversation
+ * dossier page: one line, its placeholder in the theme's voice. Pressing into it opens the focused view, where the conversation
  * takes the screen and the page steps back behind a dimmed backdrop; Escape
  * or Close puts it away, and the conversation stays for when it opens again.
  * A slim strip keeps the context in sight: the dossier, its sprint, and the
  * agent answering, which a switcher there changes for this chat only.
  *
- * Starter questions are a row of chips before the first question, then a
- * Suggestions menu. Answers stream in as the agent writes them, under a
+ * Before the first question the focused view is a guided start (#552,
+ * ./guided.tsx): plain questions in groups, the first of them the full
+ * briefing that Analyze runs, beside "Before you ask"; after it, the same
+ * questions are a Suggestions menu, and every answer ends in "How sure is
+ * this?". Answers stream in as the agent writes them, under a
  * status line that says plainly what it is doing (reading the cache with
  * owi_query, reading live with github issue list, writing) in the theme's
  * words, and how long it took; Stop cancels cleanly and keeps what arrived.
@@ -36,7 +38,7 @@ import { ChatUsage, UsageFooter } from './usage.tsx';
 import type { AnswerUsage } from '../model-usage.ts';
 import type { ChatSession } from '../fingerprint.ts';
 import { StaleNote } from './stale.tsx';
-import { Glossary, LearnButton } from './help.tsx';
+import { Glossary } from './help.tsx';
 import { HELP } from '../help.ts';
 import { useNotify } from './notify.tsx';
 import { analysisHref, dossierHref } from '../format.ts';
@@ -44,6 +46,9 @@ import type { AnalysisSummary } from '../model/analysis.ts';
 import { AnalysisBody } from './analysis.tsx';
 import { Loader } from '../moments/Moments.tsx';
 import { useUiCommand } from '../commands.ts';
+import { usePlain } from '../plain-words.ts';
+import { AnswerChecks, GuidedStart, PHONE } from './guided.tsx';
+import { GROUPS, QUESTIONS, type GuidedQuestion } from '../guided-questions.ts';
 
 /** A new chat's id: one per dossier's conversation, so the server can add up and cap the chat (#295). */
 const newChatId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
@@ -337,9 +342,12 @@ export function AskBar() {
     setText('');
     void chat.ask(prompt);
   };
+  const plain = usePlain();
+  const analyzeName = plain.pw('Analyze', 'Get a briefing');
+  // Analyze has no button of its own (#552): it is the guided start's first question, and the palette's Analyze, which comes here.
   const analyze = () => {
     openView();
-    void chat.ask(ANALYZE, 'Analyze');
+    void chat.ask(ANALYZE, analyzeName);
   };
   // The command palette's Ask, Analyze and choice of agent (#416), on this dossier's chat.
   const input = useRef<HTMLInputElement>(null);
@@ -357,9 +365,6 @@ export function AskBar() {
         </TextField>
         <Button type="submit" className="btn btn--accent">
           Ask
-        </Button>
-        <Button className="btn" onPress={analyze} isDisabled={chat.busy} data-analyze="">
-          Analyze
         </Button>
       </form>
       {chat.session?.stale && !open && <StaleNote stale={chat.session.stale} className="ask-bar__stale" />}
@@ -384,18 +389,20 @@ export function AskBar() {
 function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (t: string) => void }) {
   const { agent, dossier } = useData();
   const { health: h } = useDerived();
-  const { EmptyState, ChatMessage } = useSkins();
+  const { ChatMessage } = useSkins();
   const words = useWords();
+  const plain = usePlain();
+  const phone = useMediaQuery(PHONE);
   const placeholder = useAskPlaceholder(dossier.name);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
   const end = useRef<HTMLDivElement>(null);
   const { entries, turns, busy } = chat;
   const last = turns[turns.length - 1];
-  const starters = agent.starters(dossier.name);
 
   useEffect(() => {
-    end.current?.scrollIntoView?.({ block: 'nearest' });
+    // Not before the first question: the guided start is read from its top, with its heading.
+    if (entries.length) end.current?.scrollIntoView?.({ block: 'nearest' });
   }, [entries]);
   // The elapsed seconds tick only while something runs.
   useEffect(() => {
@@ -416,9 +423,14 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
   const from = defaultAgent(chat.adapters);
   const current = options.find((o) => o.name === (chat.adapter ?? from?.name ?? chat.adapters?.chosen));
   const hint = sourceHint(chat.adapter !== null, from);
-  const answering = current ? optionLabel(current) : (agent.label ?? 'the agent chosen in Settings');
+  const noAgent = Boolean(agent.notice) && !current;
+  const answering = current ? optionLabel(current) : noAgent ? 'Nobody yet' : (agent.label ?? 'the agent chosen in Settings');
   const usages = turns.flatMap((t) => (t.done && (t.answer?.usage ?? t.usage) ? [(t.answer?.usage ?? t.usage)!] : []));
   const status = last ? statusLine(last, words, now) : null;
+  // "Nothing was changed" is said under the first answer, not under every one.
+  const firstAnswered = turns.find((t) => t.done && !t.stopped && !t.error && t.answer && (t.answer.parts.length > 0 || t.answer.briefing))?.id;
+  /** A guided question asked as typing it would be, except the briefing, which is Analyze. */
+  const pick = (q: GuidedQuestion, text: string) => void (q.id === 'briefing' ? chat.ask(ANALYZE, text) : chat.ask(text));
   const labelOf = (a: Answer) => {
     const o = options.find((x) => x.name === a.adapter);
     if (a.by === 'scripted') return 'a scripted preview, not a model';
@@ -429,20 +441,50 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
     <Dialog className="ask ask-focus" aria-labelledby="ask">
       <div className="ask-strip">
         <div className="ask-strip__text">
+          {/* The start's own heading asks the question; this one is the project, and still names the dialog "Ask about …". */}
           <Heading slot="title" id="ask">
-            Ask about {dossier.name}
+            <span className="sr-only">{`Ask about ${dossier.name}`}</span>
+            <span aria-hidden="true">{dossier.name}</span>
           </Heading>
           <p className="ask-strip__context note">
-            <span>Dossier {dossier.name}</span>
-            <span>{h ? `${h.sprint.name}, day ${h.days.gone} of ${h.days.total}` : 'No sprint running'}</span>
+            {/* On a phone the dossier is in the heading and the sprint is on the page behind: one line is left, the agent and the way to change it (#552). */}
+            {!phone && <span>{h ? `${h.sprint.name}, day ${h.days.gone} of ${h.days.total}` : 'No sprint running'}</span>}
             <span>
+              {noAgent ? (
+                <>
+                  <strong>Nobody yet</strong>
+                  {agent.adapters && (
+                    <>
+                      {' · '}
+                      <AgentSwitch label={answering} list={chat.adapters} current={chat.adapter ?? from?.name ?? null} onPick={chat.switchTo} compact />
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
               Answered by{' '}
-              {agent.adapters ? <AgentSwitch label={answering} list={chat.adapters} current={chat.adapter ?? from?.name ?? null} onPick={chat.switchTo} /> : <strong>{answering}</strong>}
-              {agent.adapters && hint && (
+              {phone ? (
+                <>
+                  <strong>{plain.text(answering)}</strong>
+                  {agent.adapters && (
+                    <>
+                      {' · '}
+                      <AgentSwitch label={answering} list={chat.adapters} current={chat.adapter ?? from?.name ?? null} onPick={chat.switchTo} compact />
+                    </>
+                  )}
+                </>
+              ) : agent.adapters ? (
+                <AgentSwitch label={answering} list={chat.adapters} current={chat.adapter ?? from?.name ?? null} onPick={chat.switchTo} />
+              ) : (
+                <strong>{plain.text(answering)}</strong>
+              )}
+              {!phone && agent.adapters && hint && (
                 <span className="note agent-source" data-agent-source="">
                   {' '}
-                  ({hint})
+                  ({plain.text(hint)})
                 </span>
+              )}
+                </>
               )}
             </span>
           </p>
@@ -459,7 +501,6 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
       </div>
 
       <div className="ask-scroll" data-scroller="" tabIndex={0} role="region" aria-label="The conversation">
-        <p className="note">{words('ask.note')}</p>
         {chat.session?.stale && <StaleNote stale={chat.session.stale} />}
         {chat.session?.stale?.restart && <p className="note any-break">{chat.session.stale.restart}</p>}
         {chat.session?.stale && busy && <p className="note">Renew waits for this answer: it never interrupts one.</p>}
@@ -469,14 +510,7 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
           </p>
         )}
         <div className="log" role="log" aria-live="polite" aria-busy={busy} aria-label="Conversation">
-          {entries.length === 0 &&
-            (agent.notice ? (
-              <p className="note agent-notice">{agent.notice}</p>
-            ) : (
-              <EmptyState message={words('ask.welcome', { name: dossier.name })}>
-                <LearnButton />
-              </EmptyState>
-            ))}
+          {entries.length === 0 && <GuidedStart noAgent={noAgent} {...(agent.notice ? { notice: agent.notice } : {})} {...(agent.noticeDetails ? { details: agent.noticeDetails } : {})} busy={busy} onPick={pick} />}
           {entries.map((e) =>
             e.kind === 'renew' ? (
               <p key={`r${e.id}`} className="ask-switch note">
@@ -505,7 +539,8 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
                   <ChatMessage from="agent">
                     {e.answer && (e.answer.parts.length > 0 || e.answer.briefing) ? (
                       <>
-                        <h3>{e.answer.prompt}</h3>
+                        {/* The question is in the bubble above; the heading stays for a screen reader's headings list and is not drawn. */}
+                        <h3 className="sr-only">{e.answer.prompt}</h3>
                         {e.done && e.answer.warnings && e.answer.warnings.length > 0 && (
                           <div className="answer-checks" aria-label="Checks on this answer">
                             {e.answer.warnings.map((w, i) => (
@@ -524,11 +559,13 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
                             </p>
                           ))
                         )}
-                        {e.done && (
+                        {e.done && !e.stopped && <AnswerChecks answer={e.answer} prompt={e.prompt} {...(e.analyze ? { analyze: true } : {})} {...(e.ms !== undefined ? { ms: e.ms } : {})} safe={e.id === firstAnswered} />}
+                        {/* Who answered is the header's to say; this line is for what is different about this answer. */}
+                        {e.done && (e.stopped || (e.answer.unverified && e.answer.unverified.length > 0) || labelOf(e.answer) !== answering || e.answer.carried || e.answer.analysis) && (
                           <p className="by">
-                            {e.stopped ? 'Stopped before the end. ' : `Cites ${e.answer.citations.length} ${e.answer.citations.length === 1 ? 'item' : 'items'}.${e.answer.unverified && e.answer.unverified.length > 0 ? ` Names ${e.answer.unverified.length} its tools never returned.` : ''} `}
-                            Answered by: {labelOf(e.answer)}
-                            {e.ms !== undefined ? `, in ${seconds(e.ms)} s` : ''}.{e.answer.carried ? ` It was given a summary of the ${e.answer.carried} earlier ${e.answer.carried === 1 ? 'turn' : 'turns'}.` : ''}
+                            {e.stopped ? `Stopped before the end${e.ms !== undefined ? ` after ${seconds(e.ms)} s` : ''}. ` : e.answer.unverified && e.answer.unverified.length > 0 ? `Names ${e.answer.unverified.length} its tools never returned. ` : ''}
+                            {labelOf(e.answer) !== answering ? `Answered by: ${labelOf(e.answer)}. ` : ''}
+                            {e.answer.carried ? `It was given a summary of the ${e.answer.carried} earlier ${e.answer.carried === 1 ? 'turn' : 'turns'}.` : ''}
                             {e.answer.analysis && (
                               <>
                                 {' '}
@@ -540,7 +577,7 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
                             )}
                           </p>
                         )}
-                        {e.done && e.answer.usage && <UsageFooter usage={e.answer.usage} />}
+                        {e.done && e.stopped && e.answer.usage && <UsageFooter usage={e.answer.usage} />}
                       </>
                     ) : (
                       e.stopped ? <p className="note">Stopped before any answer arrived.</p> : <Loader size="inline" message={words('loading.answer')} live={false} />
@@ -580,32 +617,24 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
             )}
           </div>
         )}
-        <ChatUsage usages={usages} />
-        {starters.length > 0 &&
-          (turns.length === 0 ? (
-            <div className="starters" role="group" aria-label="Starter questions">
-              {starters.map((s) => (
-                <Button key={s.id} className="starter" onPress={() => void chat.ask(s.id, s.label)} isDisabled={busy}>
-                  {s.label}
-                </Button>
-              ))}
-            </div>
-          ) : (
-            <MenuTrigger>
-              <Button className="btn btn--small ask-suggest" isDisabled={busy} data-ask-suggestions="">
-                Suggestions
-              </Button>
-              <Popover className="popover menu-popover" placement="top start" offset={6}>
-                <Menu className="menu" aria-label="Suggested questions" onAction={(key) => void chat.ask(String(key), starters.find((s) => s.id === key)?.label ?? String(key))}>
-                  {starters.map((s) => (
-                    <MenuItem key={s.id} id={s.id} className="menu-item">
-                      {s.label}
-                    </MenuItem>
-                  ))}
-                </Menu>
-              </Popover>
-            </MenuTrigger>
-          ))}
+        {/* One answer's usage is the chat's: it shows under the answer, and the total waits for a second. */}
+        {usages.length > 1 && <ChatUsage usages={usages} />}
+        {turns.length > 0 && (
+          <MenuTrigger>
+            <Button className="btn btn--small ask-suggest" isDisabled={busy} data-ask-suggestions="">
+              Suggestions
+            </Button>
+            <Popover className="popover menu-popover" placement="top start" offset={6}>
+              <Menu className="menu" aria-label="Suggested questions" onAction={(key) => pick(QUESTIONS[key as GuidedQuestion['id']], plain.text(QUESTIONS[key as GuidedQuestion['id']].text))}>
+                {GROUPS.flatMap((g) => g.questions).map((id) => (
+                  <MenuItem key={id} id={id} className="menu-item">
+                    {plain.text(QUESTIONS[id].text)}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </Popover>
+          </MenuTrigger>
+        )}
         <form className="ask-form" onSubmit={submit}>
           <TextField className="field-text" value={text} onChange={setText} isDisabled={busy} autoFocus>
             <Label>Your question</Label>
@@ -613,9 +642,6 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
           </TextField>
           <Button type="submit" className="btn btn--accent" isDisabled={busy || !text.trim()}>
             Ask
-          </Button>
-          <Button className="btn" onPress={() => void chat.ask(ANALYZE, 'Analyze')} isDisabled={busy}>
-            Analyze
           </Button>
         </form>
       </div>
@@ -629,20 +655,21 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
  * pointing at Settings, Agent; it is never left out. A choice here holds for
  * this chat only, from its next question; the default stays in Settings.
  */
-function AgentSwitch({ label, list, current, onPick }: { label: string; list: AdapterList | null; current: string | null; onPick: (name: string | null, label: string) => void }) {
+function AgentSwitch({ label, list, current, onPick, compact = false }: { label: string; list: AdapterList | null; current: string | null; onPick: (name: string | null, label: string) => void; compact?: boolean }) {
+  const plain = usePlain();
   return (
     <DialogTrigger>
       <Button className="btn btn--small agent-switch" data-agent-switch="">
-        {label}
+        {compact ? 'Change' : plain.text(label)}
         <span aria-hidden="true"> ▾</span>
-        <span className="sr-only">, change the agent for this chat</span>
+        <span className="sr-only">{plain.text(', change the agent for this chat')}</span>
       </Button>
       <Popover className="popover agent-switch__popover" placement="bottom start" offset={6}>
         <Dialog className="agent-switch__dialog" aria-labelledby="agent-switch-title">
           {({ close }) => (
             <>
               <Heading slot="title" id="agent-switch-title" className="ask-info__title">
-                Agent for this chat
+                {plain.text('Agent for this chat')}
               </Heading>
               {!list ? (
                 <p className="note">Reading the agents…</p>
@@ -687,7 +714,7 @@ function AgentSwitch({ label, list, current, onPick }: { label: string; list: Ad
                   })}
                 </ul>
               )}
-              <p className="note">Switching holds for this chat, from its next question. The chat starts on the agent last used for this dossier, else your default under Settings, Agent, else the first agent that's ready.</p>
+              <p className="note">{plain.text("Switching holds for this chat, from its next question. The chat starts on the agent last used for this dossier, else your default under Settings, Agent, else the first agent that's ready.")}</p>
             </>
           )}
         </Dialog>
@@ -703,6 +730,7 @@ function AgentSwitch({ label, list, current, onPick }: { label: string; list: Ad
  * it's open, and Escape or a click outside closes it.
  */
 export function AskInfo({ agentLabel }: { agentLabel: string | undefined }) {
+  const plain = usePlain();
   const theme = useTheme();
   const choice = useThemeChoiceContext();
   const voiced = voiceOn(theme, choice);
@@ -725,8 +753,8 @@ export function AskInfo({ agentLabel }: { agentLabel: string | undefined }) {
             About these answers
           </Heading>
           <p>{voice}</p>
-          <p>Answered by {agentLabel ?? 'the agent chosen in Settings'}. The chat starts on the agent last used for this dossier, else your default under Settings, Agent, else the first agent that's ready.</p>
-          <p>The agent only reads: its tools can't change a ticket, and anything it suggests comes back as a proposal for you to apply.</p>
+          <p>{plain.text(`Answered by ${agentLabel ?? 'the agent chosen in Settings'}. The chat starts on the agent last used for this dossier, else your default under Settings, Agent, else the first agent that's ready.`)}</p>
+          <p>{plain.text("The agent only reads: its tools can't change a ticket, and anything it suggests comes back as a proposal for you to apply.")}</p>
           <p>
             Change the voice under <a href="#/settings/toil">Settings, General</a>, and add your own instructions or voice under <a href="#/settings/agent">Settings, Agent</a>.
           </p>

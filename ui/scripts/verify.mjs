@@ -199,8 +199,10 @@ async function layout(part, launchUrl, routes) {
   const log = (line) => say(`  layout (${part}): ${line}`);
   // A real dossier's name and links may genuinely fill the header's row at 1440px, so only the sample's must fit (#387).
   const headerFits = part !== 'real';
-  const strict = await checkLayout({ urlFor, routes, runs: runs.filter((r) => r.strict), shots: join(out, 'shots', part), log, headerFits });
-  const other = await checkLayout({ urlFor, routes, runs: runs.filter((r) => !r.strict), log, headerFits });
+  // The analyses part reads the real dossier, whose Analyze answers are a real agent's: states that need the sample's content are not held to it.
+  const sample = part !== 'real' && part !== 'analyses';
+  const strict = await checkLayout({ urlFor, routes, runs: runs.filter((r) => r.strict), shots: join(out, 'shots', part), log, headerFits, sample });
+  const other = await checkLayout({ urlFor, routes, runs: runs.filter((r) => !r.strict), log, headerFits, sample });
   const found = [...strict.problems, ...other.problems];
   problems.push(...found.map((p) => `${part}: ${p}`));
   reported.push(...[...strict.reported, ...other.reported].map((p) => `${part}: ${p}`));

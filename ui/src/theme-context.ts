@@ -9,7 +9,8 @@
 import { createContext, useContext } from 'react';
 import { THEMES, type TermKey, type ThemeManifest } from './themes.ts';
 import type { SchemeChoice, ThemeChoiceState } from './theme-choice.ts';
-import { wordFor, type WordKey } from './wording.ts';
+import type { WordKey } from './wording.ts';
+import { usePlain, wordsFor } from './plain-words.ts';
 
 const ThemeContext = createContext<ThemeManifest>(THEMES[0]!);
 export const ThemeProvider = ThemeContext.Provider;
@@ -53,10 +54,15 @@ export function useTerm(): (key: TermKey, real: string) => string {
   return (key, real) => themed(theme, key, real, wording);
 }
 
-/** The microcopy for a key (src/wording.ts), in the theme's words when themed wording is on. */
+/**
+ * The microcopy for a key (src/wording.ts), in the theme's words when themed wording is on.
+ * With plain words on (src/plain-words.ts), a key plain words has its own text for reads that, and any
+ * other key reads the theme's or the standard text with its jargon swapped.
+ */
 export function useWords(): (key: WordKey, vars?: Record<string, string>) => string {
   const theme = useTheme();
   const choice = useThemeChoiceContext();
   const on = wordingOn(theme, choice);
-  return (key, vars) => wordFor(theme.lexicon, on, key, vars);
+  const plain = usePlain().on;
+  return (key, vars) => wordsFor(theme.lexicon, on, plain, key, vars);
 }

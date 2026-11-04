@@ -1,9 +1,9 @@
 /**
  * How one person likes the briefing laid out (#494): which reasons show,
  * whether the first opens, whether the numbers start open, whether an item
- * opens in its drawer or on its page, and whether Analyze runs after each
- * sync. Kept in this browser only: they're conveniences for the person at
- * the screen, never what Analyze looks for (that's the dossier's, in its
+ * opens in its drawer or on its page, whether Analyze runs after each
+ * sync, and whether the Summary tab's full briefing is open. Kept in this
+ * browser only: they're conveniences for the person at the screen, never what Analyze looks for (that's the dossier's, in its
  * file) and never shared. Storage that's blocked or full leaves the
  * defaults, quietly, since nothing here is worth an error. Personal
  * preferences, filed in the one cabinet nobody else has a key to.
@@ -22,9 +22,11 @@ export interface BriefingPrefs {
   opensIn: 'drawer' | 'page';
   /** Run Analyze when a sync finishes, which uses the agent's usage. */
   afterSync: boolean;
+  /** Whether the Summary tab's full briefing (the headline, the reasons, the numbers, Customize) is open (#552). */
+  fullOpen: boolean;
 }
 
-export const DEFAULT_PREFS: BriefingPrefs = { firstOpen: true, numbersOpen: false, hidden: [], opensIn: 'drawer', afterSync: false };
+export const DEFAULT_PREFS: BriefingPrefs = { firstOpen: true, numbersOpen: false, hidden: [], opensIn: 'drawer', afterSync: false, fullOpen: false };
 
 const KEY = 'toil-ui.briefing';
 const listeners = new Set<() => void>();
@@ -54,6 +56,7 @@ function read(): BriefingPrefs {
     hidden: Array.isArray(parsed.hidden) ? parsed.hidden.filter((h): h is string => typeof h === 'string') : [],
     opensIn: parsed.opensIn === 'page' ? 'page' : 'drawer',
     afterSync: parsed.afterSync === true,
+    fullOpen: parsed.fullOpen === true,
   };
   cached = { raw, prefs };
   return prefs;

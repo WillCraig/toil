@@ -25,6 +25,7 @@ import {
 } from '../model/worklog.ts';
 import { MAX_NOTE, type ExportWhat, type WorklogApi, type WorklogDay, type WorklogExport, type WorklogMonth } from '../worklog.ts';
 import { Loader } from '../moments/Moments.tsx';
+import { usePlain } from '../plain-words.ts';
 
 type Loaded<T> = { ok: true; value: T } | { ok: false; message: string } | null;
 const failedWith = (e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) });
@@ -33,6 +34,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 
 export function Worklog({ api, day }: { api: WorklogApi | null; day: string | null }) {
   const { dossier } = useData();
+  const plain = usePlain();
   const [month, setMonth] = useState<string | null>(day ? monthOf(day) : null);
   const [calendar, setCalendar] = useState<Loaded<WorklogMonth>>(null);
   const [page, setPage] = useState<Loaded<WorklogDay>>(null);
@@ -70,7 +72,9 @@ export function Worklog({ api, day }: { api: WorklogApi | null; day: string | nu
       <p className="eyebrow">
         <a href={dossierHref(dossier.name)}>{dossier.name}</a>
       </p>
-      <h1 tabIndex={-1}>Worklog</h1>
+      <h1 tabIndex={-1} title={plain.title('Worklog')}>
+        {plain.pw('Worklog', 'What happened')}
+      </h1>
       <p className="lede">
         One page a day of what happened, facts only. <Help topic="worklog" />
       </p>

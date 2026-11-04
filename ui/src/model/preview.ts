@@ -14,7 +14,7 @@ import type { WorkItem } from '../toil.ts';
 import { burnup } from './burnup.ts';
 import { people } from './people.ts';
 import { waitOf } from './prs.ts';
-import { health } from './sprint.ts';
+import { daysLeft, health } from './sprint.ts';
 
 export interface PreviewSprint {
   name: string;
@@ -66,7 +66,7 @@ export function previewOf(d: DossierData, now: string, since: string | null): Do
     const b = burnup(h, now);
     sprint = {
       name: h.sprint.name,
-      daysLeft: Math.max(0, h.days.total - h.days.gone),
+      daysLeft: daysLeft(h.days),
       daysTotal: h.days.total,
       done: h.done.points,
       scope: h.done.points + h.remaining.points,

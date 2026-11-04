@@ -53,7 +53,8 @@ import { FeedbackButton, FeedbackModal } from './feedback-dialog.tsx';
 import { useMediaQuery } from './components/layout.tsx';
 import { Choice } from './components/choice.tsx';
 import { ThemeChoiceProvider, wordingOn } from './theme-context.ts';
-import { wordFor, type WordKey } from './wording.ts';
+import type { WordKey } from './wording.ts';
+import { usePlain, wordsFor } from './plain-words.ts';
 import { viewHelpHref } from './help.ts';
 import { Loader, MomentsProvider, Splash, useMomentPlayer } from './moments/Moments.tsx';
 import { momentsFor } from './moments/events.ts';
@@ -470,17 +471,24 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   const splashReady = route.view === 'settings' || (route.view === 'dossiers' ? list !== null : Boolean(wanted && dossiers[wanted]));
   const splashDetail = route.view === 'dossiers' || !wanted ? 'Reading the dossiers with toil dossiers list.' : progressText(progress[wanted]);
   // The App provides the theme context, so it can't read it through useWords(); this is the same lookup.
-  const words = (key: WordKey, vars?: Record<string, string>) => wordFor(theme.lexicon, wordingOn(theme, choice), key, vars);
+  const plain = usePlain();
+  const words = (key: WordKey, vars?: Record<string, string>) => wordsFor(theme.lexicon, wordingOn(theme, choice), plain.on, key, vars);
   // A dossier's own views are its tabs (#394), so the header carries only what sits above every dossier.
   const links: NavLink[] = [
-    { href: '#/', label: 'Dossiers', current: route.view === 'dossiers' },
+    { href: '#/', label: plain.pw('Dossiers', 'Toil projects'), title: plain.title('Dossiers'), current: route.view === 'dossiers' },
     { href: '#/settings', label: 'Settings', current: route.view === 'settings' },
   ];
   const top = useRef<HTMLDivElement>(null);
   const narrow = useMediaQuery(COMPACT_HEADER);
+  // On a phone the beta notice and the "Sample data read …" line are one line: the source and the time stay, the long sentence goes.
+  const phoneBanner = useMediaQuery('(max-width: 599px)');
   const crowded = useCrowded(top, !narrow, links.map((l) => l.label).join('|'));
   const compact = narrow || crowded;
-  const controls = <Choice label="Theme" value={theme.name} onChange={choice.setTheme} options={THEMES.map((t) => ({ id: t.name, label: t.label }))} />;
+  const controls = (
+    <>
+      <Choice label="Theme" value={theme.name} onChange={choice.setTheme} options={THEMES.map((t) => ({ id: t.name, label: t.label }))} />
+    </>
+  );
   // Help (#346): the docs section for the view in front of you, in a new tab, and Learn (#418) while learning links are on.
   // In the compact header Help sits inside the Menu, which closes first so What's new opens over the page, not over it.
   const helpWith = (closeFirst?: () => void) => (
@@ -512,7 +520,7 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   } else if (!current.ok) {
     body = failure(current.message);
   } else {
-    const data: Data = { ...(onSync ? { sync: onSync } : {}), dossier: current.value, byId: new Map(current.value.items.map((i) => [i.id, i])), prById: new Map((current.value.pullRequests ?? []).map((c) => [c.id, c])), agent, now, execute, analyses, ...(config ? { config } : {}), ...(assignments ? { assignments } : {}), ...(startReady ? { startReady } : assignments && !assignments.disabled ? { startReady: startReadyWith(assignments, route.dossier) } : {}), refresh: () => setDossiers(({ [route.dossier]: _, ...rest }) => rest), described };
+    const data: Data = { ...(onSync ? { sync: onSync } : {}), dossier: current.value, byId: new Map(current.value.items.map((i) => [i.id, i])), prById: new Map((current.value.pullRequests ?? []).map((c) => [c.id, c])), agent, now, ...(preview ? { viewedAt: new Date(Date.parse(now) + 2 * 3_600_000).toISOString() } : {}), execute, analyses, ...(config ? { config } : {}), ...(assignments ? { assignments } : {}), ...(startReady ? { startReady } : assignments && !assignments.disabled ? { startReady: startReadyWith(assignments, route.dossier) } : {}), refresh: () => setDossiers(({ [route.dossier]: _, ...rest }) => rest), described };
     body = (
       <DataContext value={data}>
         {/* The Ask bar (#343), on every dossier page; its chat is keyed by dossier, so a conversation lasts across that dossier's views. */}
@@ -540,9 +548,14 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
           Skip to content
         </a>
         <header className="app-header" inert={game.open} aria-hidden={game.open || undefined}>
-          {preview && (
+          {preview && phoneBanner && (
+            <p className="banner" role="note" data-banner-merged="">
+              <strong>{plain.pw('Toil UI beta, on sample data.', 'Toil UI beta, showing sample data.')}</strong> Read {dateTime(now)}.
+            </p>
+          )}
+          {preview && !phoneBanner && (
             <p className="banner" role="note">
-              <strong>Toil UI beta, on sample data.</strong> Nothing here connects to a tracker.
+              <strong>{plain.pw('Toil UI beta, on sample data.', 'Toil UI beta, showing sample data.')}</strong> {plain.pw('Nothing here connects to a tracker.', 'Nothing here connects to your real tools.')}
             </p>
           )}
           <div className="top" data-one-row="" ref={top}>
@@ -581,9 +594,11 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
           </div>
           <ServerStale load={serverStatus} />
           <Notices />
-          <p className="sync">
-            {preview ? 'Sample data' : 'Data'} read {dateTime(now)} through toil, read-only.
-          </p>
+          {!(preview && phoneBanner) && (
+            <p className="sync">
+              {preview ? 'Sample data' : 'Data'} read {dateTime(now)} {plain.pw('through toil, read-only.', 'without changing anything.')}
+            </p>
+          )}
         </header>
         <main id="main" ref={main} data-view={route.view} inert={game.open} aria-hidden={game.open || undefined}>
           {/* A running sync (#419): the theme's loader with its progress; the Sync panel's own line is the one announced. */}
@@ -696,14 +711,14 @@ function useCrowded(row: RefObject<HTMLElement | null>, measuring: boolean, link
   return crowded !== null && crowded.links === links;
 }
 
-type NavLink = { href: string; label: string; current: boolean };
+type NavLink = { href: string; label: string; title?: string | undefined; current: boolean };
 
 function NavLinks({ links, onFollow }: { links: NavLink[]; onFollow?: () => void }) {
   return (
     <ul>
       {links.map((l) => (
         <li key={l.href}>
-          <a href={l.href} aria-current={l.current ? 'page' : undefined} onClick={onFollow}>
+          <a href={l.href} aria-current={l.current ? 'page' : undefined} title={l.title} onClick={onFollow}>
             {l.label}
           </a>
         </li>

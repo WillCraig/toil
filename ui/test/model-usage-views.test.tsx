@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
+import { standardWords } from './words.ts';
 import type { Agent, Answer } from '../src/agent.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureConfig } from '../src/fixtures/config.ts';
@@ -30,6 +31,7 @@ async function open(hash: string, { agent = scriptedAgent(), modelUsage = fixtur
 
 beforeEach(() => {
   localStorage.clear();
+  standardWords();
 });
 afterEach(cleanup);
 
@@ -62,7 +64,10 @@ describe('the chat', () => {
     await openChat('card-payments');
     await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
     const first = await screen.findByRole('group', { name: 'What this answer used' });
-    expect(first.textContent).toBe("Codex, the CLI's default model (not named by the SDK): 21k in · 380 out · 14k cached · cache write not reported · no dollar figure (add your rates under Settings, Agent usage)");
+    // The answer's one folded line carries the summary; the breakdown is the fold's contents.
+    expect(first.closest('details')!.querySelector('summary')!.textContent).toMatch(/ · no dollar figure reported$/);
+    expect(first.closest('details')!.open).toBe(false);
+    expect(first.textContent).toContain("Codex, the CLI's default model (not named by the SDK): 21k in · 380 out · 14k cached · cache write not reported · no dollar figure (add your rates under Settings, Agent usage)");
     // After the first question the starters are a Suggestions menu (#343).
     await userEvent.click(screen.getByRole('button', { name: 'Suggestions' }));
     await userEvent.click((await screen.findAllByRole('menuitem'))[1]!);
@@ -70,7 +75,8 @@ describe('the chat', () => {
     const second = screen.getAllByRole('group', { name: 'What this answer used' })[1]!;
     expect(second.textContent).toContain('GitHub Copilot, gpt-5-mini: 3k in · 200 out · 1k cached · cache write not reported · 1 premium request');
     expect(second.textContent).not.toContain('$');
-    expect(within(second).getByRole('status').textContent).toContain('(82%)');
+    // A cap notice is out in the open, beside the answer's fold rather than inside it.
+    expect(screen.getAllByRole('status').some((n) => n.textContent!.includes('(82%)'))).toBe(true);
 
     // One chat id for the pane, the turns numbered in order.
     expect(asked.map((c) => c.turn)).toEqual([1, 2]);
@@ -78,7 +84,7 @@ describe('the chat', () => {
 
     const header = screen.getByLabelText('What this chat used');
     const total = addUp([{ id: 'a', chatId: 'c', turn: 1, dossier: 'd', adapter: 'codex', model: null, inputTokens: 21000, cachedInputTokens: 14000, outputTokens: 380, costSource: 'none', inputIncludesCached: true, at: FIXTURE_NOW }, { id: 'b', chatId: 'c', turn: 2, dossier: 'd', adapter: 'copilot', model: 'gpt-5-mini', inputTokens: 3000, cachedInputTokens: 1000, outputTokens: 200, premiumRequests: 1, costSource: 'none', at: FIXTURE_NOW }]);
-    expect(header.textContent).toContain(`This chat: ${compact(total.tokens!)} tokens, on 2 models.`);
+    expect(header.textContent).toContain(`${compact(total.tokens!)} tokens, on 2 models.`);
     expect(header.textContent).toContain('Context of the last answer: 7.4k of 128k tokens (6%)');
     expect(within(header).getByRole('meter')).toBeTruthy();
   });
@@ -91,7 +97,12 @@ describe('the chat', () => {
     await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
     expect((await screen.findByRole('alert')).textContent).toContain('stopped this question');
     expect(screen.getByRole('group', { name: 'What this answer used' }).textContent).toContain('600 in · 50 out · 1k cached');
-    expect(screen.getByLabelText('What this chat used').textContent).toContain('This chat: 1.6k tokens.');
+    // The chat's total waits for a second answer: one answer's usage is the chat's.
+    expect(screen.queryByLabelText('What this chat used')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Suggestions' }));
+    await userEvent.click((await screen.findAllByRole('menuitem'))[1]!);
+    await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(2));
+    expect(screen.getByLabelText('What this chat used').textContent).toMatch(/[0-9.]+k tokens/);
   });
 
   it('marks the preview\'s figures as sample, never as a model\'s', async () => {
@@ -99,7 +110,7 @@ describe('the chat', () => {
     await openChat('card-payments');
     await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
     const footer = await screen.findByRole('group', { name: 'What this answer used' }, { timeout: 5000 });
-    expect(footer.textContent).toMatch(/^Sample figures, not from a model\. Claude, claude-sonnet-4-6: .* · ~\$0\.\d+ \(SDK estimate, API-equivalent/);
+    expect(footer.textContent).toMatch(/Sample figures, not from a model\. Claude, claude-sonnet-4-6: .* · ~\$0\.\d+ \(SDK estimate, API-equivalent/);
   });
 });
 

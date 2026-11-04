@@ -24,6 +24,7 @@ import type { DossierData, DossierSummary } from '../load.ts';
 import { lastLooked, lastOpened } from '../looked.ts';
 import { previewOf, type DossierPreview } from '../model/preview.ts';
 import { useSkins, useWords } from '../skins.tsx';
+import { usePlain } from '../plain-words.ts';
 import type { Call } from '../toil.ts';
 
 /** A dossier's last sync, as the sync panel has it. */
@@ -61,6 +62,7 @@ export function leadOf(names: string[], previews: Map<string, DossierPreview>, s
 
 export function Dossiers({ dossiers, calls, loaded, now, synced, config, onDescribed, onSync }: DossiersProps) {
   const words = useWords();
+  const plain = usePlain();
   const previews = new Map<string, DossierPreview>();
   for (const d of dossiers) {
     const l = loaded[d.name];
@@ -71,7 +73,9 @@ export function Dossiers({ dossiers, calls, loaded, now, synced, config, onDescr
   return (
     <>
       <div className="view-head">
-        <h1 tabIndex={-1}>Dossiers</h1>
+        <h1 tabIndex={-1} title={plain.title('Dossiers')}>
+          {plain.pw('Dossiers', 'Toil projects')}
+        </h1>
         <p className="lede">
           {words('dossiers.lede')} <Help topic="dossiers" />
         </p>
@@ -115,6 +119,7 @@ function DossierCard({
   onDescribed: (d: Described) => void;
 }) {
   const { Avatar } = useSkins();
+  const plain = usePlain();
   const heading = `dossier-${d.name}`;
   const shown = preview?.people.slice(0, MAX_AVATARS) ?? [];
   const more = (preview?.people.length ?? 0) - shown.length;
@@ -133,7 +138,7 @@ function DossierCard({
       <div className="dossier-card__body">
         {!loaded ? (
           <p className="note" role="status">
-            Reading what the last sync stored…
+            {plain.pw('Reading what the last sync stored…', 'Reading the latest update…')}
           </p>
         ) : !loaded.ok ? (
           <p className="note">Its work couldn't be read: {loaded.message}</p>
@@ -168,7 +173,7 @@ function DossierCard({
       <div className="dossier-card__foot">
         <SourceBadges sources={d.sources} dossier={d.name} />
         <p className="note dossier-card__when">
-          {synced === undefined ? 'Sample data.' : synced === null ? 'Not synced yet.' : `Synced ${dateTime(synced.at)}${synced.status === 'ok' ? '' : synced.status === 'partial' ? ', some sources failed' : ', and it failed'}.`}
+          {synced === undefined ? 'Sample data.' : synced === null ? `Not ${plain.pw('synced', 'updated')} yet.` : `${plain.pw('Synced', 'Updated')} ${dateTime(synced.at)}${synced.status === 'ok' ? '' : synced.status === 'partial' ? ', some sources failed' : ', and it failed'}.`}
           {preview && preview.changedSince !== null && <> {preview.changedSince ? `${plural(preview.changedSince, 'change')} since you last looked.` : 'Nothing changed since you last looked.'}</>}
         </p>
       </div>

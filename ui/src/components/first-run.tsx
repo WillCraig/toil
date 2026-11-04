@@ -15,6 +15,7 @@ import type { ConfigApi, ConnectionsData } from '../config.ts';
 import type { HelpTopicId } from '../help.ts';
 import { ADD_CONNECTION_HREF, CREATE_DOSSIER_HREF } from '../views/Settings.tsx';
 import { OWI_SOURCES } from '../../../src/core/owi/types.ts';
+import { usePlain } from '../plain-words.ts';
 import { Help } from './help.tsx';
 import { Copy } from './layout.tsx';
 import './first-run.css';
@@ -44,6 +45,7 @@ export interface FirstRunProps {
 }
 
 export function FirstRun({ dossiers, synced, config, onSync, lede }: FirstRunProps) {
+  const plain = usePlain();
   const [trackers, setTrackers] = useState<Trackers>(null);
   useEffect(() => {
     if (!config) return;
@@ -78,9 +80,9 @@ export function FirstRun({ dossiers, synced, config, onSync, lede }: FirstRunPro
               Add a connection
             </a>
           </Step>
-          <Step n={2} title="Create a dossier" topic="dossier-setup" done={dossiers > 0} detail={null}>
-            <a className="btn" href={CREATE_DOSSIER_HREF} data-first-run-step="dossier">
-              Create a dossier
+          <Step n={2} title={plain.pw('Create a dossier', 'Create a Toil project')} precise="Create a dossier" topic="dossier-setup" done={dossiers > 0} detail={null}>
+            <a className="btn" href={CREATE_DOSSIER_HREF} data-first-run-step="dossier" title={plain.title('Create a dossier')}>
+              {plain.pw('Create a dossier', 'Create a Toil project')}
             </a>
           </Step>
           <Step n={3} title="Sync" topic="sync" done={syncedOnce} detail={onSync ? null : 'This Toil UI keeps no cache, so it has nothing to sync.'}>
@@ -105,7 +107,8 @@ export function FirstRun({ dossiers, synced, config, onSync, lede }: FirstRunPro
   );
 }
 
-function Step({ n, title, topic, done, detail, children }: { n: number; title: string; topic: HelpTopicId; done: boolean; detail: string | null; children?: ReactNode }) {
+function Step({ n, title, precise, topic, done, detail, children }: { n: number; title: string; precise?: string; topic: HelpTopicId; done: boolean; detail: string | null; children?: ReactNode }) {
+  const plain = usePlain();
   return (
     <li className={`first-run__step${done ? ' first-run__step--done' : ''}`} data-done={done || undefined}>
       <span className="first-run__mark" aria-hidden="true">
@@ -113,7 +116,9 @@ function Step({ n, title, topic, done, detail, children }: { n: number; title: s
       </span>
       <div className="first-run__what">
         <div className="first-run__head">
-          <h3 className="first-run__title">{title}</h3>
+          <h3 className="first-run__title" title={precise ? plain.title(precise) : undefined}>
+            {title}
+          </h3>
           <Help topic={topic} />
         </div>
         <p className="first-run__state">

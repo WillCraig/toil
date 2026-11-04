@@ -9,16 +9,19 @@
  */
 
 import { ItemLink } from '../components/items.tsx';
+import { Help } from '../components/help.tsx';
 import { StaleNote } from '../components/stale.tsx';
+import { usePlain } from '../plain-words.ts';
 import { useChatScope, type Turn } from '../components/ask.tsx';
 import { useData } from '../data.ts';
 import { analysesHref, analysisHref, boardHref, dateTime } from '../format.ts';
-import { ADAPTER_NAME, MODE_INFO, runMs, runText, type Assignment } from './model.ts';
+import { ADAPTER_NAME, modeInfo, pending, runMs, runText, type Assignment } from './model.ts';
 import { InboxRow, Limits, RenewAll, StateChip, assignmentHref, useAssignments } from './views.tsx';
 import './assign.css';
 
 type Group = 'needs-you' | 'working' | 'stale' | 'earlier';
 const GROUP_LABEL: Record<Group, string> = { 'needs-you': 'Needs you', working: 'Working', stale: 'Stale', earlier: 'Earlier' };
+const PLAIN_GROUP_LABEL: Record<Group, string> = { ...GROUP_LABEL, stale: 'Out of date' };
 
 const inInbox = (a: Assignment) => a.state === 'queued' && a.waiting === 'start';
 
@@ -30,29 +33,44 @@ export function groupOf(a: Assignment): Group {
   return 'earlier';
 }
 
-/** How many need you, for the drawer's button. */
+/**
+ * What waits on a person, for the Agents button: the tracker's inbox, plus the proposals to approve (a proposal that
+ * failed to apply is still waiting) and the questions to answer on assignments that need you, plus each assignment that
+ * failed. A failure is counted because the panel starts closed: a button that stays quiet about one is a silent failure
+ * (principle 4). A count of things to look at, so the number on the button is the number of things behind it.
+ */
+export function waitingOnYou(assignments: Assignment[]): number {
+  return assignments.reduce((n, a) => n + (inInbox(a) ? 1 : a.state === 'failed' ? 1 : a.state === 'needs-you' ? a.proposals.filter(pending).length + a.questions.length : 0), 0);
+}
+
+/** How many things wait on a person, for the button that opens the panel. */
 export function useAgentsSummary(): { needsYou: number } {
   const { dossier } = useData();
   const { list } = useAssignments(dossier.name);
-  return { needsYou: list?.assignments.filter((a) => a.state === 'needs-you').length ?? 0 };
+  return { needsYou: waitingOnYou(list?.assignments ?? []) };
 }
 
 /** One assignment, small: its state, the item, what it waits on, and the way in. */
 function AgentCard({ a, now }: { a: Assignment; now: string }) {
+  const plain = usePlain();
+  const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
   const pending = a.proposals.filter((p) => p.status === 'pending').length;
-  const needs = [pending ? `${pending} ${pending === 1 ? 'proposal' : 'proposals'} to review` : '', a.questions.length ? `${a.questions.length} ${a.questions.length === 1 ? 'question' : 'questions'}` : ''].filter(Boolean).join(', ');
+  const needs = [pending ? `${pending} ${plain.on ? noun(pending, 'suggestion', 'suggestions') : noun(pending, 'proposal', 'proposals')} to review` : '', a.questions.length ? `${a.questions.length} ${a.questions.length === 1 ? 'question' : 'questions'}` : ''].filter(Boolean).join(', ');
   return (
     <li className="agent-card" data-card="">
       <p className="agent-card__top">
-        <StateChip a={a} /> <span className="assign-mode">{MODE_INFO[a.mode].label}</span>
+        <StateChip a={a} /> <span className="assign-mode">{modeInfo(a.mode, plain.on).label}</span>
       </p>
       <p className="agent-card__item">
-        <ItemLink id={a.item} /> <span className="agent-card__title">{a.itemTitle}</span>
+        <ItemLink id={a.item} />{' '}
+        <a className="agent-card__title" href={assignmentHref(a.dossier, a.id)}>
+          {a.itemTitle}
+        </a>
       </p>
       <p className="note">
         {a.state === 'needs-you' && needs ? `${needs}. ` : ''}
         {a.state === 'failed' && a.stop ? `${a.stop.message} ` : ''}
-        {a.adapter ? ADAPTER_NAME[a.adapter] : 'No adapter yet'} · {runText(a.ranMs ?? runMs(a, now))}
+        {a.adapter ? ADAPTER_NAME[a.adapter] : plain.pw('No adapter yet', 'No AI chosen yet')} · {runText(a.ranMs ?? runMs(a, now))}
       </p>
       {a.stale && <StaleNote stale={a.stale} />}
       {a.renewedBy && (
@@ -60,9 +78,6 @@ function AgentCard({ a, now }: { a: Assignment; now: string }) {
           Renewed as <a href={assignmentHref(a.dossier, a.renewedBy)}>a fresh assignment</a>.
         </p>
       )}
-      <a className="agent-card__open" href={assignmentHref(a.dossier, a.id)}>
-        Open<span className="sr-only"> the assignment on {a.item}</span>
-      </a>
     </li>
   );
 }
@@ -75,14 +90,15 @@ export function analysesOf(turns: Turn[]): Turn[] {
 /** The three newest analyses the dossier keeps (#395), the same list the Analyses tab shows, and one being written now. */
 function RecentAnalyses() {
   const { dossier } = useData();
+  const plain = usePlain();
   const chat = useChatScope();
   const running = analysesOf(chat?.turns ?? []).find((t) => !t.done);
   const list = (chat?.history.list ?? []).slice(0, 3);
   return (
     <section className="agents-side__analyses" aria-labelledby="recent-analyses">
-      <h3 id="recent-analyses">Recent analyses</h3>
+      <h3 id="recent-analyses">{plain.pw('Recent analyses', 'Recent briefings')}</h3>
       {chat?.history.error && <p className="failure">{chat.history.error}</p>}
-      {running && <p className="note analysis-line">Analyze is answering now.</p>}
+      {running && <p className="note analysis-line">{plain.pw('Analyze is answering now.', 'A briefing is being written now.')}</p>}
       {list.length ? (
         <ul className="plain">
           {list.map((a) => (
@@ -97,7 +113,7 @@ function RecentAnalyses() {
       ) : (
         !running && <p className="note">None yet.</p>
       )}
-      <a href={analysesHref(dossier.name)}>All analyses</a>
+      <a href={analysesHref(dossier.name)}>{plain.pw('All analyses', 'All past briefings')}</a>
     </section>
   );
 }
@@ -112,26 +128,31 @@ export function plainText(text: string): string {
 /** The sidebar itself, the same inside the drawer and beside the view. */
 export function AgentsSidebar() {
   const { dossier, now, assignments: api } = useData();
+  const plain = usePlain();
   const { list, error, reload } = useAssignments(dossier.name);
   const inbox = list?.assignments.filter(inInbox) ?? [];
   const rest = list?.assignments.filter((a) => !inInbox(a)) ?? [];
   const groups = (['needs-you', 'working', 'stale', 'earlier'] as const).map((g) => ({ g, items: rest.filter((a) => groupOf(a) === g) }));
   return (
     <section className="agents-sidebar" aria-labelledby="agents">
-      <h2 id="agents">Agents</h2>
-      {list && (
-        <p className="note">
-          {list.settings.concurrent === 1 ? 'One runs at a time' : `${list.settings.concurrent} run at a time`}, for up to {list.settings.timeLimitMinutes} minutes each.
-        </p>
-      )}
-      {!api && <p className="note">Assigning work to an agent isn't available here.</p>}
+      <div className="edit-head">
+        <h2 id="agents" title={plain.title('Agents')}>
+          {plain.pw('Agents', 'AI helpers')}
+        </h2>
+        <Help topic="assignments" {...(list ? { note: `${plain.on ? (list.settings.concurrent === 1 ? 'One works at a time' : `${list.settings.concurrent} work at once`) : list.settings.concurrent === 1 ? 'One runs at a time' : `${list.settings.concurrent} run at a time`}, for up to ${list.settings.timeLimitMinutes} minutes each.` } : {})} />
+      </div>
+      {!api && <p className="note">{plain.text("Assigning work to an agent isn't available here.")}</p>}
       {api?.disabled && <p className="note">{api.disabled}</p>}
       {error && <p className="failure">{error}</p>}
       {list?.settings.problem && <p className="failure">{list.settings.problem}</p>}
       {inbox.length > 0 && (
         <section className="assign-inbox" aria-labelledby="agent-inbox">
-          <h3 id="agent-inbox">Agent inbox</h3>
-          <p className="note">The tracker asks for an agent on these. Nothing runs until you press Start.</p>
+          <div className="edit-head">
+            <h3 id="agent-inbox" title={plain.title('Agent inbox')}>
+              {plain.pw('Agent inbox', 'Asked for AI help')}
+            </h3>
+            <Help topic="assignments" note="The tracker asks for an agent on these. Nothing runs until you press Start." />
+          </div>
           <ul className="rows">
             {inbox.map((a) => (
               <InboxRow key={a.id} a={a} onStarted={reload} />
@@ -148,7 +169,7 @@ export function AgentsSidebar() {
         items.length === 0 ? null : g === 'earlier' ? (
           <details key={g} className="agents-group agents-group--earlier">
             <summary>
-              {GROUP_LABEL[g]} ({items.length})
+              {(plain.on ? PLAIN_GROUP_LABEL : GROUP_LABEL)[g]} ({items.length})
             </summary>
             <ul className="agent-cards">
               {items.map((a) => (
@@ -159,7 +180,7 @@ export function AgentsSidebar() {
         ) : (
           <section key={g} className={`agents-group agents-group--${g}`} aria-labelledby={`agents-${g}`}>
             <h3 id={`agents-${g}`}>
-              {GROUP_LABEL[g]} <span className="count">{items.length}</span>
+              {(plain.on ? PLAIN_GROUP_LABEL : GROUP_LABEL)[g]} <span className="count">{items.length}</span>
             </h3>
             <ul className="agent-cards">
               {items.map((a) => (

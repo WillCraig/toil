@@ -16,6 +16,7 @@ import { Help, useLandOn } from '../../components/help.tsx';
 import { ChangeForm, OutcomeLine, SecretField, SelectField, TextField, commandLine, failedOutcome, outcomeOf, secretRefusal, type Outcome } from './parts.tsx';
 import { checkSecret, type SecretRules } from '../../../../src/core/secret-input.ts';
 import { Loader } from '../../moments/Moments.tsx';
+import { usePlain } from '../../plain-words.ts';
 
 const SOURCE_WORD: Record<string, string> = { env: 'env var', ci: 'CI variable', file: 'config file', store: 'credential store', defaults: 'area defaults' };
 
@@ -87,12 +88,15 @@ export function Connections({ config, at, toForm = false }: { config: ConfigApi;
 type Action = 'test' | 'default' | 'writes' | 'login' | 'remove';
 
 function ConnectionCard({ connection: c, areas, config, configFile, onChanged }: { connection: ConnectionRow; areas: AreaInfo[]; config: ConfigApi; configFile: string; onChanged: () => Promise<void> }) {
+  const plain = usePlain();
   const [open, setOpen] = useState<Action | null>(null);
   const [tested, setTested] = useState<Outcome | null>(null);
   const [testing, setTesting] = useState(false);
   const readOnly = envOnly(c);
   const titleId = `conn-${c.name}`;
   const secretFields = areas.find((a) => a.name === c.area)?.connection.filter((f) => f.secret) ?? [];
+  // What Test does and the command it runs: the Test button's hover, not a line repeated on every card.
+  const testTitle = plain.on ? `Asks ${c.area} one quick question to check the login works. It changes nothing. Command: ${commandLine('connections test', [c.name])}` : `Sends ${c.area}'s one cheap authenticated read, as a real command would, and changes nothing. Command: ${commandLine('connections test', [c.name])}`;
 
   const test = async () => {
     setTesting(true);
@@ -128,8 +132,10 @@ function ConnectionCard({ connection: c, areas, config, configFile, onChanged }:
         </h3>
         <ul className="conn-tags" aria-label="About this connection">
           <li className="tag">{c.area}</li>
-          {c.isDefault && <li className="tag tag--accent">{c.area}'s default</li>}
-          <li className={`tag ${c.writes ? 'tag--warn' : ''}`}>Writes {c.writes ? 'on' : 'off'}</li>
+          {c.isDefault && <li className="tag tag--accent">{plain.pw(`${c.area}'s default`, `Main ${c.area} connection`)}</li>}
+          <li className={`tag ${c.writes ? 'tag--warn' : ''}`} title={plain.title(`Writes ${c.writes ? 'on' : 'off'}`)}>
+            {plain.on ? (c.writes ? 'Changes allowed' : 'Changes off') : `Writes ${c.writes ? 'on' : 'off'}`}
+          </li>
           {readOnly && <li className="tag">Set by env vars</li>}
         </ul>
       </div>
@@ -155,7 +161,7 @@ function ConnectionCard({ connection: c, areas, config, configFile, onChanged }:
         </p>
       )}
       <div className="conn-actions">
-        <button type="button" className="btn" onClick={test} disabled={testing} aria-describedby={`${titleId}-test`}>
+        <button type="button" className="btn" onClick={test} disabled={testing} title={testTitle}>
           {testing ? 'Testing…' : 'Test'}
         </button>
         {!readOnly && (
@@ -166,11 +172,11 @@ function ConnectionCard({ connection: c, areas, config, configFile, onChanged }:
               </button>
             )}
             <button type="button" className="btn" aria-expanded={open === 'writes'} onClick={() => toggle('writes')}>
-              {c.writes ? 'Turn writes off' : 'Turn writes on'}
+              {plain.on ? (c.writes ? 'Stop changes' : 'Allow changes') : c.writes ? 'Turn writes off' : 'Turn writes on'}
             </button>
             {secretFields.length > 0 && (
               <button type="button" className="btn" aria-expanded={open === 'login'} onClick={() => toggle('login')}>
-                Replace secret
+                {plain.pw('Replace secret', 'Update login')}
               </button>
             )}
             <button type="button" className="btn" aria-expanded={open === 'remove'} onClick={() => toggle('remove')}>
@@ -179,9 +185,6 @@ function ConnectionCard({ connection: c, areas, config, configFile, onChanged }:
           </>
         )}
       </div>
-      <p id={`${titleId}-test`} className="note">
-        Test sends {c.area}'s one cheap authenticated read, as a real command would (<code>{commandLine('connections test', [c.name])}</code>), and changes nothing.
-      </p>
       <OutcomeLine outcome={tested} />
       {open === 'default' && (
         <ChangeForm
@@ -211,14 +214,15 @@ function ConnectionCard({ connection: c, areas, config, configFile, onChanged }:
 }
 
 function WritesForm({ connection: c, config, after }: { connection: ConnectionRow; config: ConfigApi; after: (e: Envelope, done: string) => Promise<Outcome> }) {
+  const plain = usePlain();
   const [typed, setTyped] = useState('');
   if (c.writes) {
     return (
       <ChangeForm
-        title={`Turn writes off for ${c.name}`}
-        explain={`Commands can no longer change anything in ${c.area} through ${c.name}, even with --allow-write. Reads carry on as before.`}
+        title={plain.pw(`Turn writes off for ${c.name}`, `Stop changes for ${c.name}`)}
+        explain={plain.pw(`Commands can no longer change anything in ${c.area} through ${c.name}, even with --allow-write. Reads carry on as before.`, `Nothing can change ${c.area} through ${c.name} any more, even when a command asks to. Reading carries on as before.`)}
         runs={commandLine('connections writes', [c.name, 'off'])}
-        submit="Turn writes off"
+        submit={plain.pw('Turn writes off', 'Stop changes')}
         disabled={config.disabled}
         onSubmit={async () => after(await config.run('connections writes', { name: c.name, state: 'off' }), `Writes are off for ${c.name}.`)}
       />
@@ -226,14 +230,20 @@ function WritesForm({ connection: c, config, after }: { connection: ConnectionRo
   }
   return (
     <ChangeForm
-      title={`Turn writes on for ${c.name}`}
+      title={plain.pw(`Turn writes on for ${c.name}`, `Allow changes for ${c.name}`)}
       explain={
+        plain.on ? (
+          <>
+            Allowing changes lets toil commands update things in {c.area} through {c.name}, but only when each command also asks to (<code>--allow-write</code>). Toil UI itself never changes {c.area}: what an AI helper suggests is a command for you to run. toil asks you to type the connection's name to allow changes, here as on the terminal, and allows them only if it matches.
+          </>
+        ) : (
         <>
           Writes let commands change data in {c.area} through {c.name} when a call also passes <code>--allow-write</code>. Toil UI itself never writes to {c.area}: its proposals are commands for you to run. toil asks you to type the connection's name to turn writes on, here as on the terminal, and turns them on only if it matches.
         </>
+        )
       }
       runs={commandLine('connections writes', [c.name, 'on'])}
-      submit="Turn writes on"
+      submit={plain.pw('Turn writes on', 'Allow changes')}
       danger
       disabled={config.disabled}
       onSubmit={async () => {
@@ -242,12 +252,13 @@ function WritesForm({ connection: c, config, after }: { connection: ConnectionRo
         return after(await config.run('connections writes', { name: c.name, state: 'on' }, { answers: { 'confirm-name': answer } }), `Writes are on for ${c.name}.`);
       }}
     >
-      <TextField label={`Type ${c.name} to turn them on`} value={typed} onChange={setTyped} required />
+      <TextField label={plain.pw(`Type ${c.name} to turn them on`, `Type ${c.name} to allow changes`)} value={typed} onChange={setTyped} required />
     </ChangeForm>
   );
 }
 
 function LoginForm({ connection: c, fields, config, after }: { connection: ConnectionRow; fields: AreaInfo['connection']; config: ConfigApi; after: (e: Envelope, done: string) => Promise<Outcome> }) {
+  const plain = usePlain();
   const [values, setValues] = useState<Record<string, string>>({});
   const secrets = useSecretChoices();
   // An empty field keeps the secret the config file points at, as the CLI's login does; one it has no secret for stays unset.
@@ -255,10 +266,10 @@ function LoginForm({ connection: c, fields, config, after }: { connection: Conne
   const rules = (f: AreaInfo['connection'][number]): SecretRules => ({ password: f.password, empty: kept(f) ? 'keep' : 'skip' });
   return (
     <ChangeForm
-      title={`Replace ${c.name}'s secret`}
-      explain={`Stores what you type in the OS credential store, reads it back to check, and only then points ${c.name} at it and deletes the old one. A field left empty keeps its secret as it is. Toil UI doesn't keep what you type: it goes to toil in one request, and the fields are cleared.`}
+      title={plain.pw(`Replace ${c.name}'s secret`, `Update ${c.name}'s login`)}
+      explain={plain.pw(`Stores what you type in the OS credential store, reads it back to check, and only then points ${c.name} at it and deletes the old one. A field left empty keeps its secret as it is. Toil UI doesn't keep what you type: it goes to toil in one request, and the fields are cleared.`, `Saves what you type in this computer's secure store, checks it can be read back, and only then switches ${c.name} to it and deletes the old one. A field left empty keeps what is there. Toil UI doesn't keep what you type: it goes straight to toil, and the fields are cleared.`)}
       runs={commandLine('connections login', [c.name])}
-      submit="Save to the credential store"
+      submit={plain.pw('Save to the credential store', 'Save securely')}
       disabled={config.disabled}
       onSubmit={async () => {
         const refused = secrets.refusal(fields.map((f) => [f.name, values[f.name] ?? '', rules(f)]));

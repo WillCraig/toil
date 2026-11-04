@@ -23,7 +23,8 @@ import { Help } from '../components/help.tsx';
 import { VerdictChip, WhyNot } from '../components/readiness.tsx';
 import { useData } from '../data.ts';
 import { dateTime, dossierHref, personText, sourceLabel, STATUS_CATEGORY_LABEL } from '../format.ts';
-import { readinessAll, tally, VERDICT_LABEL, VERDICTS, type Readiness, type Verdict } from '../model/readiness.ts';
+import { usePlain } from '../plain-words.ts';
+import { readinessAll, tally, VERDICT_LABEL, VERDICT_PLAIN, VERDICTS, type Readiness, type Verdict } from '../model/readiness.ts';
 import { Empty, EmptyButton } from '../components/empty.tsx';
 import type { WorkItem } from '../toil.ts';
 
@@ -60,6 +61,7 @@ const columns: Array<Column<Line>> = [
 
 export function CommandCenter() {
   const { dossier, now, startReady } = useData();
+  const plain = usePlain();
   const [started, setStarted] = useState<{ ok: boolean; text: string } | null>(null);
   const [starting, setStarting] = useState(false);
   const settings = dossier.readiness;
@@ -98,9 +100,11 @@ export function CommandCenter() {
         <p className="eyebrow">
           <a href={dossierHref(dossier.name)}>{dossier.name}</a>
         </p>
-        <h1 tabIndex={-1}>Command Center</h1>
+        <h1 tabIndex={-1} title={plain.title('Command Center')}>
+          {plain.pw('Command Center', 'Ready to start?')}
+        </h1>
         <p className="lede">
-          Every work item in {dossier.name}, each with its readiness verdict and, where it isn't ready, why, from the records read {dateTime(now)}. <Help topic="readiness" />
+          {plain.on ? `Every item in ${dossier.name}, marked ready or not and, if not, why, from the records read ${dateTime(now)}.` : <>Every work item in {dossier.name}, each with its readiness verdict and, where it isn't ready, why, from the records read {dateTime(now)}.</>} <Help topic="readiness" />
         </p>
         {settings.notes.map((n, i) => (
           <p key={i} role="note" className="failure">
@@ -117,7 +121,7 @@ export function CommandCenter() {
                 <VerdictChip verdict={v} />
               </h2>
               <p className="team-figure">{totals[v]}</p>
-              <p className="note">{v === 'ready' ? 'Every check passes.' : v === 'thin' ? 'Missing acceptance criteria, description or another check a person can waive.' : 'Done already, blocked by an open item, or outside the dossier.'}</p>
+              <p className="note">{v === 'ready' ? 'Every check passes.' : v === 'thin' ? plain.pw('Missing acceptance criteria, description or another check a person can waive.', 'Missing "done when" criteria, a description or another check a person can waive.') : plain.pw('Done already, blocked by an open item, or outside the dossier.', 'Done already, blocked by an open item, or outside the Toil project.')}</p>
             </Stack>
           </li>
         ))}
@@ -127,7 +131,7 @@ export function CommandCenter() {
         <h2 id="slate">Start every ready item</h2>
         <p>
           {slated.length
-            ? `${count(slated.length, 'item is', 'items are')} ready and would be slated, in the dossier's order (plan ${plan.id}).`
+            ? plain.text(`${count(slated.length, 'item is', 'items are')} ready and would be slated, in the dossier's order (plan ${plan.id}).`)
             : 'No open item is ready, so nothing would be slated. The list below says what each one is missing.'}
         </p>
         {slated.length > 0 && (
@@ -159,7 +163,7 @@ export function CommandCenter() {
             Start {count(slated.length, 'ready item')}
           </Button>
           <p id="slate-note" className="note">
-            {startReady ? 'Assigns each item above to an agent in implement mode, as listed: proposals wait for you, and nothing leaves this machine until you apply one.' : 'This view has no agent assignments, so it shows the plan it would start.'}
+            {startReady ? plain.pw('Assigns each item above to an agent in implement mode, as listed: proposals wait for you, and nothing leaves this machine until you apply one.', 'Asks an AI helper to try a fix for each item above, as listed: its suggestions wait for you, and nothing leaves this computer until you approve one.') : plain.text('This view has no agent assignments, so it shows the plan it would start.')}
           </p>
         </Cluster>
         <p className={started && !started.ok ? 'failure' : 'note'} role="status">
@@ -169,7 +173,7 @@ export function CommandCenter() {
 
       <Panel id="cc-items" title="Items" calls={calls}>
         <Cluster className="readiness-filters" role="group" aria-label="Filter the items">
-          <Choice label="Verdict" value={verdict} onChange={(v) => setVerdict(v as 'all' | Verdict)} options={[{ id: 'all', label: 'All' }, ...VERDICTS.map((v) => ({ id: v, label: VERDICT_LABEL[v] }))]} />
+          <Choice label="Verdict" value={verdict} onChange={(v) => setVerdict(v as 'all' | Verdict)} options={[{ id: 'all', label: 'All' }, ...VERDICTS.map((v) => ({ id: v, label: (plain.on ? VERDICT_PLAIN : VERDICT_LABEL)[v] }))]} />
           <Choice label="Status" value={status} onChange={setStatus} options={STATUS_FILTER} />
           <Choice label="Type" value={type} onChange={setType} options={[{ id: 'all', label: 'All' }, ...types.map((t) => ({ id: t, label: t }))]} />
           <Choice label="Assignee" value={assignee} onChange={setAssignee} options={[{ id: 'all', label: 'Anyone' }, { id: 'none', label: 'Unassigned' }, ...people.map((p) => ({ id: p, label: p }))]} />

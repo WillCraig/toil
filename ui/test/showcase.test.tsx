@@ -71,8 +71,8 @@ describe('the controls the showcase\'s tour presses', () => {
     const pane = await openChat(DOSSIER);
     expect(pane.getAttribute('role')).toBe('dialog');
     const starters = within(pane).getByRole('group', { name: 'Starter questions' });
-    expect(within(starters).getAllByRole('button').map((b) => b.textContent?.trim())).toContain(QUESTION);
-    expect([...pane.querySelectorAll('button')].some((b) => /change the agent/.test(b.textContent ?? ''))).toBe(true);
+    expect(within(starters).getAllByRole('button').some((b) => b.textContent?.startsWith('Are we going to finish the sprint?'))).toBe(true);
+    expect([...pane.querySelectorAll('button')].some((b) => /change the (agent|AI helper)/.test(b.textContent ?? ''))).toBe(true);
     expect(pane.querySelector('form.ask-form input')).not.toBeNull();
   });
 });

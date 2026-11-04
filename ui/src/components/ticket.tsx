@@ -13,6 +13,8 @@
 import { useMemo, useState } from 'react';
 import { Button } from 'react-aria-components';
 import { useData } from '../data.ts';
+import { QUESTIONS } from '../guided-questions.ts';
+import { usePlain } from '../plain-words.ts';
 import { shortKey } from '../format.ts';
 import { ticketProposals, unticketed } from '../model/ticketing.ts';
 import { ItemLink } from './items.tsx';
@@ -24,7 +26,9 @@ export function TicketBanner({ prompts }: { prompts: readonly string[] }) {
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const starters = useMemo(() => new Set(agent.starters(dossier.name).map((s) => s.label)), [agent, dossier.name]);
+  const plain = usePlain();
+  // A guided question is a question whatever its wording, so "Summarise this for my boss" is not work to ticket.
+  const starters = useMemo(() => new Set([...agent.starters(dossier.name).map((s) => s.label), ...Object.values(QUESTIONS).map((q) => plain.text(q.text))]), [agent, dossier.name, plain.on]);
   const found = useMemo(() => unticketed(prompts, dossier.items, starters), [prompts, dossier.items, starters]);
   const proposals = useMemo(() => (found ? ticketProposals(found, byId, dossier.items, dossier.name) : []), [found, byId, dossier.items, dossier.name]);
   if (!found || hidden === found.prompt) return null;
