@@ -1,6 +1,6 @@
 /**
  * The agent's model usage, made up for the preview and `toil-ui --sample`
- * (#295): a month of chats across the three sample dossiers on all three
+ * (#295): a month of chats across the three sample toil projects on all three
  * adapters, shaped like what each SDK reports (Claude with an SDK estimate,
  * Codex in tokens with no dollar figure, Copilot in premium requests), and
  * sample caps and Codex rates. Generated from a fixed seed, so every build
@@ -11,7 +11,7 @@
 import type { AnswerUsage, ModelUsageApi, UsageAdapter, UsageRecord, UsageSettings } from '../model-usage.ts';
 import { FIXTURE_NOW } from './execute.ts';
 
-const DOSSIERS = ['card-payments', 'settlement', 'checkout-web'];
+const TOIL_PROJECTS = ['card-payments', 'settlement', 'checkout-web'];
 const MODELS: Record<UsageAdapter, string[]> = { claude: ['claude-sonnet-4-6', 'claude-haiku-4-5'], codex: ['gpt-5.5'], copilot: ['gpt-5-mini', 'claude-sonnet-4.6'] };
 const DAY = 86_400_000;
 
@@ -55,14 +55,14 @@ export function sampleUsageRecords(now = FIXTURE_NOW): UsageRecord[] {
       const adapter = adapters[Math.floor(rand() * adapters.length)]!;
       const models = MODELS[adapter];
       const model = models[Math.floor(rand() * models.length)]!;
-      const dossier = DOSSIERS[Math.floor(rand() * DOSSIERS.length)]!;
+      const toilProject = TOIL_PROJECTS[Math.floor(rand() * TOIL_PROJECTS.length)]!;
       const chatId = `sample-${date.toISOString().slice(0, 10)}-${c}`;
       const turns = 1 + Math.floor(rand() * 3);
       for (let turn = 1; turn <= turns; turn++) {
         const calls = adapter === 'codex' ? 1 : 1 + Math.floor(rand() * 3);
         for (let k = 0; k < calls; k++) {
           const at = new Date(Math.min(end, Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 9 + c * 2, turn * 7 + k))).toISOString();
-          out.push(call(adapter, model, rand, { id: `${chatId}:${turn}:${k}`, chatId, turn, dossier, at }));
+          out.push(call(adapter, model, rand, { id: `${chatId}:${turn}:${k}`, chatId, turn, toilProject, at }));
         }
       }
     }
@@ -81,9 +81,9 @@ export const SAMPLE_USAGE_SETTINGS: UsageSettings = {
 };
 
 /** What a scripted answer carries in the preview: one Claude call's sample figures, marked as made up. */
-export function sampleAnswerUsage(chatId: string, turn: number, dossier: string, at = FIXTURE_NOW): AnswerUsage {
-  const rand = seeded(turn * 7919 + dossier.length);
-  return { adapter: 'claude', records: [call('claude', 'claude-sonnet-4-6', rand, { id: `${chatId}:${turn}`, chatId, turn, dossier, at })], context: { used: 24_800, window: 200_000 }, notices: [], sample: true };
+export function sampleAnswerUsage(chatId: string, turn: number, toilProject: string, at = FIXTURE_NOW): AnswerUsage {
+  const rand = seeded(turn * 7919 + toilProject.length);
+  return { adapter: 'claude', records: [call('claude', 'claude-sonnet-4-6', rand, { id: `${chatId}:${turn}`, chatId, turn, toilProject, at })], context: { used: 24_800, window: 200_000 }, notices: [], sample: true };
 }
 
 /** The preview's usage page: the sample month and sample caps, with saving off. */

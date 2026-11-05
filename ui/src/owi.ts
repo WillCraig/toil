@@ -3,7 +3,7 @@
  * entry also loads the CLI's Node-only parts (the credential store, the
  * config), so a page can't import it; this is the same three lines over the
  * same mappers in src/core/owi/, and test/registry.test.ts holds its output to
- * the real `mapOwi`'s on every dossier the preview serves. The local app will
+ * the real `mapOwi`'s on every toil project the preview serves. The local app will
  * call the API's own, in Node, and hand the page the result. Two copies of a
  * form, kept identical by test rather than by memo.
  */

@@ -123,8 +123,8 @@ export const overrides: Record<string, DeploymentOverride> = {
     toolDescription:
       "Lists the build statuses reported for one commit. Data Center reads one page, at Bitbucket's default size, and still needs a project and repo, though the lookup doesn't use them. Cloud lists every one (key, name, state, url, description, created_on, updated_on).",
   },
-  'bitbucket check-dossier': {
+  'bitbucket check-toil-project': {
     toolDescription:
-      "Checks the Bitbucket sections of the dossier that applies to this call (or the one named in dossier): each project key it names exists, and each repository in its project. Returns ok, one check per value with its key path, and any value that couldn't be checked; the CLI exits 1 when one is missing or unchecked. Read only. Data Center only.",
+      "Checks the Bitbucket sections of the toil project that applies to this call (or the one named in toil project): each project key it names exists, and each repository in its project. Returns ok, one check per value with its key path, and any value that couldn't be checked; the CLI exits 1 when one is missing or unchecked. Read only. Data Center only.",
   },
 };

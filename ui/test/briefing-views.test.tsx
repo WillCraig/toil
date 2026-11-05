@@ -12,7 +12,7 @@ import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
 
 /**
  * The briefing as a person tunes it (#494): Customize, kept in this browser
- * only; the dossier's Analyze settings in Settings, with the prompt shown as
+ * only; the toil project's Analyze settings in Settings, with the prompt shown as
  * it will be sent; and Analyze run after a sync, only when asked for.
  */
 
@@ -23,7 +23,7 @@ const briefing = () => screen.findByRole('region', { name: 'Briefing' });
 
 describe('Customize', () => {
   it('opens the numbers, hides a reason, and says it is hidden', async () => {
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} analyses={fixtureAnalyses()} now={FIXTURE_NOW} preview />);
     const b = await briefing();
     await waitFor(() => expect(b.dataset.recSource).toBe('analysis'));
@@ -36,21 +36,21 @@ describe('Customize', () => {
   });
 
   it("opens an item on its own page instead of the drawer, when that's what the person chose", async () => {
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} analyses={fixtureAnalyses()} now={FIXTURE_NOW} preview />);
     const b = await briefing();
     await waitFor(() => expect(b.dataset.recSource).toBe('analysis'));
     act(() => setPrefs({ opensIn: 'page' }));
-    expect(b.querySelector('a[data-row="corp-jira:PAY-101"]')!.getAttribute('href')).toBe('#/dossier/card-payments/item/corp-jira%3APAY-101');
-    // The panel offers the way to the dossier's own Analyze settings: one more path there.
+    expect(b.querySelector('a[data-row="corp-jira:PAY-101"]')!.getAttribute('href')).toBe('#/project/card-payments/item/corp-jira%3APAY-101');
+    // The panel offers the way to the toil project's own Analyze settings: one more path there.
     const panel = b.querySelector('details.customize')!;
-    expect(within(panel as HTMLElement).getByRole('link', { name: 'How briefings are made for card-payments' }).getAttribute('href')).toBe('#/settings/dossiers/card-payments/analyze');
+    expect(within(panel as HTMLElement).getByRole('link', { name: 'How briefings are made for card-payments' }).getAttribute('href')).toBe('#/settings/projects/card-payments/analyze');
   });
 });
 
-describe("the dossier's Analyze settings", () => {
+describe("the Toil project's Analyze settings", () => {
   it('shows the prompt Analyze will send as you type, and the command Save runs', async () => {
-    window.location.hash = '#/settings/dossiers/card-payments/analyze';
+    window.location.hash = '#/settings/projects/card-payments/analyze';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     const form = (await screen.findByRole('heading', { name: 'How Analyze briefs card-payments' })).closest('form')!;
     const goal = within(form).getByRole('textbox', { name: 'Goal of this work' });
@@ -58,7 +58,7 @@ describe("the dossier's Analyze settings", () => {
     const preview = form.querySelector('.analyze-preview__text')!;
     await waitFor(() => expect(preview.textContent).toContain('The goal of this work: Ship card payments v2.'));
     expect(preview.textContent).toContain('Answer with one fenced block, ```briefing');
-    expect(form.textContent).toContain('toil dossiers analyze set card-payments --goal');
+    expect(form.textContent).toContain('toil projects analyze set card-payments --goal');
   });
 });
 
@@ -76,7 +76,7 @@ describe('Analyze after a sync', () => {
   it('runs once per finished sync when turned on, across the remount, and never on the sync already there', async () => {
     setPrefs({ afterSync: true });
     const { agent, asked } = counting();
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     const view = render(page(agent, 0, '2026-10-13T01:00:00.000Z'));
     await briefing();
     expect(asked).toEqual([]);
@@ -86,7 +86,7 @@ describe('Analyze after a sync', () => {
 
   it('stays off unless asked for', async () => {
     const { agent, asked } = counting();
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     const view = render(page(agent, 0, '2026-10-13T01:00:00.000Z'));
     await briefing();
     view.rerender(page(agent, 1, '2026-10-13T02:00:00.000Z'));

@@ -178,16 +178,16 @@ describe('read-only calls', () => {
 
   it('refuse a local write too: a config command that writes, a download, and an undeclared file write as a backstop', async () => {
     const { context, http } = testContext({ config });
-    const init = (await import('../src/registry.js')).commands.find((d) => d.path.join(' ') === 'dossiers init')!;
+    const init = (await import('../src/registry.js')).commands.find((d) => d.path.join(' ') === 'projects init')!;
     expect(init.writesLocal).toBe(true);
     const refused = await runCommand(init, { name: 'payments' }, () => context, context.version, 'api', undefined, { readOnly: true });
-    expect(!refused.ok && refused.error.message).toBe('dossiers init changes data, and this call was made read-only, so it was refused before anything ran.');
+    expect(!refused.ok && refused.error.message).toBe('projects init changes data, and this call was made read-only, so it was refused before anything ran.');
     // A command that writes a file without saying so is stopped at the write, never allowed through.
     const sneaky = demoArea.command({ path: ['demo', 'sneaky'], description: 'Writes a file it never declared', input: z.object({}), writes: false, examples: [{}], run: async (_i, ctx) => ctx.files.writeBytes('x.txt', new Uint8Array([1])) });
     const stopped = await execute(sneaky, {}, context, 'api', { readOnly: true });
     expect(!stopped.ok && stopped.error).toMatchObject({ code: 'WRITE_DISABLED', message: 'demo sneaky tried to write a file, and this call was made read-only, so the write was refused.' });
     expect(http.calls).toEqual([]);
-    expect(registry.commands.find((c) => c.name === 'dossiers init')).toMatchObject({ writes: false, writesLocal: true });
+    expect(registry.commands.find((c) => c.name === 'projects init')).toMatchObject({ writes: false, writesLocal: true });
     expect(registry.commands.find((c) => c.name === 'util encode')).toMatchObject({ writesLocal: false, writesDependOnInput: true });
   });
 
@@ -245,7 +245,7 @@ describe('@imagile-dev/toil/api (src/api.ts)', () => {
 
   it('exports the version, the contract version and a registry of what execute() serves', () => {
     expect(version).toBe('0.0.0-test');
-    expect(contractVersion).toBe(2);
+    expect(contractVersion).toBe(3);
     const names = registry.commands.map((c) => c.name);
     expect(names).toContain('version');
     expect(names).toContain('connections list');

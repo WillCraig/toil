@@ -4,14 +4,14 @@ import { jiraArea, jiraSupported, DEPLOYMENTS } from './area.js';
 import { overrides } from './overrides.js';
 import { agileCommands as cloudAgile } from './cloud/agile.js';
 import { attachmentCommands as cloudAttachments } from './cloud/attachments.js';
-import { checkDossier as cloudCheckDossier } from './cloud/check-dossier.js';
+import { checkToilProject as cloudCheckToilProject } from './cloud/check-toil-project.js';
 import { JIRA_CLOUD_INPUT_FILE_EXAMPLE, JIRA_CLOUD_INPUT_FILE_SCHEMA } from './cloud/input-schema.js';
 import { issueCommands as cloudIssues } from './cloud/issues.js';
 import { projectCommands as cloudProjects } from './cloud/projects.js';
 import { searchCommands as cloudSearch } from './cloud/search.js';
 import { agileCommands as serverAgile } from './server/agile.js';
 import { attachmentCommands as serverAttachments } from './server/attachments.js';
-import { checkDossier as serverCheckDossier } from './server/check-dossier.js';
+import { checkToilProject as serverCheckToilProject } from './server/check-toil-project.js';
 import { JIRA_INPUT_FILE_EXAMPLE, JIRA_INPUT_FILE_SCHEMA } from './server/input-schema.js';
 import { issueCommands as serverIssues } from './server/issues.js';
 import { searchCommands as serverSearch } from './server/search.js';
@@ -64,8 +64,8 @@ export const supported = jiraSupported;
 export const commands = [
   ...jiraArea.byDeployment(
     {
-      server: [...serverIssues, ...serverSearch, ...serverAttachments, ...serverAgile, jiraApi, serverCheckDossier],
-      cloud: [...cloudIssues, ...cloudSearch, ...cloudAttachments, ...cloudProjects, ...cloudAgile, cloudCheckDossier],
+      server: [...serverIssues, ...serverSearch, ...serverAttachments, ...serverAgile, jiraApi, serverCheckToilProject],
+      cloud: [...cloudIssues, ...cloudSearch, ...cloudAttachments, ...cloudProjects, ...cloudAgile, cloudCheckToilProject],
     },
     { overrides },
   ),

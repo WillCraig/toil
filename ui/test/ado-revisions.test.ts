@@ -136,7 +136,7 @@ describe('an item is taken from the feed only when its revisions run from 1 to i
     expect(split(odd, 4).incomplete).toEqual([2290]);
   });
 
-  it('refuses every item when the dossier names its own iteration field, or the feed call failed', () => {
+  it('refuses every item when the Toil project names its own iteration field, or the feed call failed', () => {
     expect(splitRevisionFeed(env('ado work-item feed', whole), items, HISTORY, 'Custom.Iteration').incomplete).toEqual(ADO_IDS);
     const failed = { ok: false, data: null, error: { code: 'HTTP', message: 'down' }, meta: meta('ado work-item feed') } as unknown as Envelope;
     expect(splitRevisionFeed(failed, items, HISTORY).incomplete).toEqual(ADO_IDS);

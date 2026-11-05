@@ -108,10 +108,10 @@ export { plainify };
  * and every `toil …` command the standard text has is kept.
  */
 export const PLAIN_WORDS: Partial<Record<WordKey, string>> = {
-  'dossiers.lede': 'Pick a Toil project to see its stories, code reviews and releases together.',
-  'dossier.eyebrow': 'Toil project',
-  'empty.dossiers': 'toil sees no Toil projects yet.',
-  'loading.dossiers': 'Reading your Toil projects…',
+  'toilProjects.lede': 'Pick a Toil project to see its stories, code reviews and releases together.',
+  'toilProject.eyebrow': 'Toil project',
+  'empty.toilProjects': 'toil sees no Toil projects yet.',
+  'loading.toilProjects': 'Reading your Toil projects…',
   'ask.placeholder': 'Ask a question about {name}',
   'ask.placeholder.short': 'Ask a question',
   'ask.note': 'Every answer says which items it comes from. The AI helper only reads: it never changes a ticket. Anything it suggests comes back for you to approve.',

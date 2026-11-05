@@ -162,16 +162,16 @@ describe('the lock on the door', () => {
   it('answers the API only with the session header: a cookie alone is refused', async () => {
     const { origin } = await start();
     const { sid, session } = await signIn(origin);
-    const call = JSON.stringify({ command: 'dossiers list', input: {} });
+    const call = JSON.stringify({ command: 'projects list', input: {} });
     const asCookie = { cookie: `toil-ui-${new URL(origin).port}=${sid}; toil-ui=${sid}; session=${sid}` };
-    for (const [path, method] of [['/api/session', 'GET'], ['/api/execute', 'POST'], ['/api/agent/starters?dossier=card-payments', 'GET']] as const) {
+    for (const [path, method] of [['/api/session', 'GET'], ['/api/execute', 'POST'], ['/api/agent/starters?toilProject=card-payments', 'GET']] as const) {
       const res = await send(origin, path, { method, body: method === 'POST' ? call : undefined, headers: { ...asCookie, origin, 'content-type': 'application/json', [CSRF_HEADER]: session.csrf } });
       expect(res.status, `${method} ${path} with only a cookie`).toBe(401);
       expect(JSON.parse(res.body).error.message).toContain(SESSION_HEADER);
     }
     expect((await send(origin, '/api/session')).status).toBe(401);
     expect((await send(origin, '/api/session', { headers: { [SESSION_HEADER]: 'not-a-session' } })).status).toBe(401);
-    const withHeader = await post(origin, '/api/execute', { command: 'dossiers list', input: {} }, { sid, csrf: session.csrf });
+    const withHeader = await post(origin, '/api/execute', { command: 'projects list', input: {} }, { sid, csrf: session.csrf });
     expect(withHeader.status).toBe(200);
     expect((JSON.parse(withHeader.body) as Envelope).ok).toBe(true);
     expect((await send(origin, '/api/session', { headers: { [SESSION_HEADER]: sid } })).status).toBe(200);
@@ -200,7 +200,7 @@ describe('every POST', () => {
     const { origin } = await start();
     const { sid, session } = await signIn(origin);
     const auth = { sid, csrf: session.csrf };
-    const call = { command: 'dossiers list', input: {} };
+    const call = { command: 'projects list', input: {} };
     expect((await post(origin, '/api/execute', call, auth, { origin: 'https://rebind.imagile.dev' })).status).toBe(403);
     const noOrigin = await send(origin, '/api/execute', { method: 'POST', body: JSON.stringify(call), headers: { [SESSION_HEADER]: sid, 'content-type': 'application/json', [CSRF_HEADER]: session.csrf } });
     expect(noOrigin.status).toBe(403);
@@ -218,13 +218,13 @@ describe('every POST', () => {
     const a = await signIn(origin);
     const b = await signIn(origin);
     expect(a.session.csrf).not.toBe(b.session.csrf);
-    expect((await post(origin, '/api/execute', { command: 'dossiers list' }, { sid: a.sid, csrf: b.session.csrf })).status).toBe(403);
+    expect((await post(origin, '/api/execute', { command: 'projects list' }, { sid: a.sid, csrf: b.session.csrf })).status).toBe(403);
   });
 
   it('refuses a body over the limit, and one that is not an object', async () => {
     const { origin } = await start();
     const { sid, session } = await signIn(origin);
-    const big = await post(origin, '/api/execute', { command: 'dossiers list', input: { pad: 'x'.repeat(MAX_BODY) } }, { sid, csrf: session.csrf });
+    const big = await post(origin, '/api/execute', { command: 'projects list', input: { pad: 'x'.repeat(MAX_BODY) } }, { sid, csrf: session.csrf });
     expect(big.status).toBe(413);
     const list = await send(origin, '/api/execute', { method: 'POST', body: '[1]', headers: { [SESSION_HEADER]: sid, origin, 'content-type': 'application/json', [CSRF_HEADER]: session.csrf } });
     expect(list.status).toBe(400);
@@ -257,16 +257,16 @@ describe('the API', () => {
     const viewer = { id: 'local', name: 'you', via: 'launch-token' as const };
     const { origin } = await start({ store, viewer });
     const { sid, session } = await signIn(origin);
-    const res = await post(origin, '/api/execute', { command: 'dossiers show', input: { dossier: 'card-payments' } }, { sid, csrf: session.csrf });
+    const res = await post(origin, '/api/execute', { command: 'projects show', input: { toilProject: 'card-payments' } }, { sid, csrf: session.csrf });
     const env = JSON.parse(res.body) as Envelope;
     expect(env.ok).toBe(true);
     expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatchObject({ command: 'dossiers show', input: { dossier: 'card-payments' }, access: 'read' });
+    expect(seen[0]).toMatchObject({ command: 'projects show', input: { toilProject: 'card-payments' }, access: 'read' });
     expect(seen[0]!.ctx.viewer).toEqual(viewer);
     expect(seen[0]!.ctx.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it.each(['connections list', 'jira issue create', 'dossiers field', 'util md'])('refuses %s, which the views never read, before the Store sees it', async (command) => {
+  it.each(['connections list', 'jira issue create', 'projects field', 'util md'])('refuses %s, which the views never read, before the Store sees it', async (command) => {
     const { store, seen } = watched();
     const { origin } = await start({ store });
     const { sid, session } = await signIn(origin);
@@ -285,7 +285,7 @@ describe('the API', () => {
     const { store, seen } = watched();
     const { origin } = await start({ store });
     const { sid, session } = await signIn(origin);
-    for (const command of ['jira issue create', 'jira issue transition', 'setup alias', 'dossiers remove', 'jira issue search']) {
+    for (const command of ['jira issue create', 'jira issue transition', 'setup alias', 'projects remove', 'jira issue search']) {
       const res = await post(origin, '/api/config', { command, input: {} }, { sid, csrf: session.csrf });
       expect(res.status, command).toBe(403);
       expect(JSON.parse(res.body).error.message).toContain(`Toil UI doesn't change ${command} from the page`);
@@ -295,31 +295,31 @@ describe('the API', () => {
 
   it('runs a config command on the allowlist with config access, and only those', async () => {
     const { store, seen } = watched();
-    const { origin } = await start({ store, configCommands: new Set(['dossiers field']) });
+    const { origin } = await start({ store, configCommands: new Set(['projects field']) });
     const { sid, session } = await signIn(origin);
-    await post(origin, '/api/config', { command: 'dossiers field', input: { dossier: 'card-payments' } }, { sid, csrf: session.csrf });
-    expect(seen.map((s) => [s.command, s.access])).toEqual([['dossiers field', 'config']]);
+    await post(origin, '/api/config', { command: 'projects field', input: { toilProject: 'card-payments' } }, { sid, csrf: session.csrf });
+    expect(seen.map((s) => [s.command, s.access])).toEqual([['projects field', 'config']]);
     // A read command isn't a config command, and a config command isn't a read.
-    expect((await post(origin, '/api/config', { command: 'dossiers list' }, { sid, csrf: session.csrf })).status).toBe(403);
-    expect((await post(origin, '/api/execute', { command: 'dossiers field' }, { sid, csrf: session.csrf })).status).toBe(403);
+    expect((await post(origin, '/api/config', { command: 'projects list' }, { sid, csrf: session.csrf })).status).toBe(403);
+    expect((await post(origin, '/api/execute', { command: 'projects field' }, { sid, csrf: session.csrf })).status).toBe(403);
   });
 
   it('asks the Agent with the viewer, and shows its failure as a message', async () => {
     const asked: string[] = [];
-    const agent: Agent = { ...fixtureAgent(), ask: async (ctx, dossier, prompt) => (asked.push(`${ctx.viewer.id} ${dossier} ${prompt}`), fixtureAgent().ask(ctx, dossier, prompt)) };
+    const agent: Agent = { ...fixtureAgent(), ask: async (ctx, toilProject, prompt) => (asked.push(`${ctx.viewer.id} ${toilProject} ${prompt}`), fixtureAgent().ask(ctx, toilProject, prompt)) };
     const { origin } = await start({ agent });
     const { sid, session } = await signIn(origin);
-    const starters = JSON.parse((await send(origin, '/api/agent/starters?dossier=card-payments', { headers: { [SESSION_HEADER]: sid } })).body) as Array<{ id: string }>;
+    const starters = JSON.parse((await send(origin, '/api/agent/starters?toilProject=card-payments', { headers: { [SESSION_HEADER]: sid } })).body) as Array<{ id: string }>;
     expect(starters.map((s) => s.id)).toEqual(['risk', 'attention', 'deployed', 'people', 'review']);
-    const answer = JSON.parse((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'risk' }, { sid, csrf: session.csrf })).body);
+    const answer = JSON.parse((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk' }, { sid, csrf: session.csrf })).body);
     expect(answer.citations).toContain('corp-jira:PAY-101');
     expect(answer.proposals.map((p: { command: string }) => p.command)).toEqual(['jira issue update']);
     expect(asked).toEqual(['local card-payments risk']);
 
     const none = await start({ agent: noAgent() });
     const other = await signIn(none.origin);
-    expect(JSON.parse((await send(none.origin, '/api/agent/starters?dossier=card-payments', { headers: { [SESSION_HEADER]: other.sid } })).body)).toEqual([]);
-    const failed = await post(none.origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'risk' }, { sid: other.sid, csrf: other.session.csrf });
+    expect(JSON.parse((await send(none.origin, '/api/agent/starters?toilProject=card-payments', { headers: { [SESSION_HEADER]: other.sid } })).body)).toEqual([]);
+    const failed = await post(none.origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk' }, { sid: other.sid, csrf: other.session.csrf });
     expect(failed.status).toBe(502);
     expect(JSON.parse(failed.body).error.message).toContain('No agent is set up');
     expect(JSON.parse(failed.body).error.fix).toContain('Settings, Agent');
@@ -329,75 +329,75 @@ describe('the API', () => {
     const versions = (n: number) => ({ prompt: 'q', parts: [{ text: 'x'.repeat(n) }], citations: [], by: 'stub', proposals: [] });
     const agent: Agent = {
       ...fixtureAgent(),
-      async *stream(_ctx, dossier) {
+      async *stream(_ctx, toilProject) {
         yield versions(1);
         yield versions(2);
-        if (dossier === 'boom') throw new AgentError('The CLI stopped.', 'Run it once on its own.');
+        if (toilProject === 'boom') throw new AgentError('The CLI stopped.', 'Run it once on its own.');
       },
     };
     const { origin } = await start({ agent });
     const { sid, session } = await signIn(origin);
-    const res = await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'q', stream: true }, { sid, csrf: session.csrf });
+    const res = await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'q', stream: true }, { sid, csrf: session.csrf });
     expect(res.headers['content-type']).toBe('application/x-ndjson; charset=utf-8');
     const lines = res.body.trim().split('\n').map((l) => JSON.parse(l));
     expect(lines).toEqual([{ answer: versions(1) }, { answer: versions(2) }, { done: true }]);
-    const boom = await post(origin, '/api/agent/ask', { dossier: 'boom', prompt: 'q', stream: true }, { sid, csrf: session.csrf });
+    const boom = await post(origin, '/api/agent/ask', { toilProject: 'boom', prompt: 'q', stream: true }, { sid, csrf: session.csrf });
     expect(boom.body.trim().split('\n').map((l) => JSON.parse(l)).at(-1)).toEqual({ error: { message: 'The CLI stopped.', fix: 'Run it once on its own.' } });
     // Without stream: true, the same agent answers whole through ask().
-    expect(JSON.parse((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'risk' }, { sid, csrf: session.csrf })).body).by).toBe('scripted');
+    expect(JSON.parse((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk' }, { sid, csrf: session.csrf })).body).by).toBe('scripted');
   });
 
   it('keeps a whole Analyze in the history, naming it on the last line, and nothing else (#395)', async () => {
-    const kept: Array<{ dossier: string; text: string }> = [];
+    const kept: Array<{ toilProject: string; text: string }> = [];
     const analyses: AnalysisKeeper = {
-      list: async (dossier) => [{ id: `${dossier}-1`, at: 'x' } as never],
-      get: async (_dossier, id) => (id === 'there' ? ({ record: { id } } as never) : null),
-      record: async (dossier, answer) => (kept.push({ dossier, text: answer.parts[0]!.text }), `kept-${kept.length}`),
+      list: async (toilProject) => [{ id: `${toilProject}-1`, at: 'x' } as never],
+      get: async (_toilProject, id) => (id === 'there' ? ({ record: { id } } as never) : null),
+      record: async (toilProject, answer) => (kept.push({ toilProject, text: answer.parts[0]!.text }), `kept-${kept.length}`),
     };
     const whole = { prompt: 'Analyze', parts: [{ text: 'Recommendation: Go.' }], citations: [], by: 'stub', proposals: [] };
     const agent: Agent = {
       ...fixtureAgent(),
-      async *stream(_ctx, dossier, prompt) {
+      async *stream(_ctx, toilProject, prompt) {
         yield { ...whole, activity: { phase: 'writing' as const } };
-        if (dossier === 'boom') throw new AgentError('The CLI stopped.', 'Run it once on its own.');
+        if (toilProject === 'boom') throw new AgentError('The CLI stopped.', 'Run it once on its own.');
         yield { ...whole, prompt };
       },
     };
     const { origin } = await start({ agent, analyses });
     const { sid, session } = await signIn(origin);
     const auth = { sid, csrf: session.csrf };
-    const lines = (await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'analyze', stream: true }, auth)).body.trim().split('\n').map((l) => JSON.parse(l));
+    const lines = (await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'analyze', stream: true }, auth)).body.trim().split('\n').map((l) => JSON.parse(l));
     expect(lines.at(-2).answer.analysis).toBe('kept-1');
     expect(lines.at(-1)).toEqual({ done: true });
-    expect(kept).toEqual([{ dossier: 'card-payments', text: 'Recommendation: Go.' }]);
+    expect(kept).toEqual([{ toilProject: 'card-payments', text: 'Recommendation: Go.' }]);
     // Another question, or an Analyze that failed partway, keeps nothing.
-    await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'risk', stream: true }, auth);
-    await post(origin, '/api/agent/ask', { dossier: 'boom', prompt: 'analyze', stream: true }, auth);
+    await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk', stream: true }, auth);
+    await post(origin, '/api/agent/ask', { toilProject: 'boom', prompt: 'analyze', stream: true }, auth);
     expect(kept).toHaveLength(1);
     // Without stream: true, the whole answer is kept and names it.
-    expect(JSON.parse((await post(origin, '/api/agent/ask', { dossier: 'settlement', prompt: 'analyze' }, auth)).body).analysis).toBe('kept-2');
+    expect(JSON.parse((await post(origin, '/api/agent/ask', { toilProject: 'settlement', prompt: 'analyze' }, auth)).body).analysis).toBe('kept-2');
 
     const read = (path: string) => send(origin, path, { headers: { [SESSION_HEADER]: sid } });
-    expect(JSON.parse((await read('/api/analyses?dossier=card-payments')).body)).toEqual([{ id: 'card-payments-1', at: 'x' }]);
-    expect(JSON.parse((await read('/api/analyses/one?dossier=card-payments&id=there')).body)).toEqual({ record: { id: 'there' } });
-    const gone = await read('/api/analyses/one?dossier=card-payments&id=gone');
+    expect(JSON.parse((await read('/api/analyses?toilProject=card-payments')).body)).toEqual([{ id: 'card-payments-1', at: 'x' }]);
+    expect(JSON.parse((await read('/api/analyses/one?toilProject=card-payments&id=there')).body)).toEqual({ record: { id: 'there' } });
+    const gone = await read('/api/analyses/one?toilProject=card-payments&id=gone');
     expect(gone.status).toBe(404);
     expect(JSON.parse(gone.body).error.message).toContain('no analysis by that id');
     expect((await read('/api/analyses')).status).toBe(400);
     // The history is read-only over the API: there is no route that writes one.
-    expect((await post(origin, '/api/analyses', { dossier: 'card-payments' }, auth)).status).toBe(404);
+    expect((await post(origin, '/api/analyses', { toilProject: 'card-payments' }, auth)).status).toBe(404);
     // A server with no history says so, and Analyze still answers.
     const bare = await start({ agent });
     const b = await signIn(bare.origin);
-    expect((await send(bare.origin, '/api/analyses?dossier=card-payments', { headers: { [SESSION_HEADER]: b.sid } })).status).toBe(404);
-    expect((await post(bare.origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'analyze', stream: true }, { sid: b.sid, csrf: b.session.csrf })).status).toBe(200);
+    expect((await send(bare.origin, '/api/analyses?toilProject=card-payments', { headers: { [SESSION_HEADER]: b.sid } })).status).toBe(404);
+    expect((await post(bare.origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'analyze', stream: true }, { sid: b.sid, csrf: b.session.csrf })).status).toBe(200);
   });
 
   it('records a failed history write on the answer, never failing it (#395)', async () => {
     const analyses: AnalysisKeeper = { list: async () => [], get: async () => null, record: async () => Promise.reject(new Error('disk full')) };
     const { origin } = await start({ analyses });
     const { sid, session } = await signIn(origin);
-    const answer = JSON.parse((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'analyze' }, { sid, csrf: session.csrf })).body);
+    const answer = JSON.parse((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'analyze' }, { sid, csrf: session.csrf })).body);
     expect(answer.analysis).toBeUndefined();
     expect(answer.warnings.at(-1)).toContain("couldn't keep this analysis in its history: disk full");
   });
@@ -418,7 +418,7 @@ describe('the API', () => {
           saved = input;
           return { ...status, adapters: [] };
         },
-        systemPrompt: (dossier, style) => `prompt for ${dossier} in ${style?.theme ?? 'none'} with the voice ${style?.voice ? 'on' : 'off'}`,
+        systemPrompt: (toilProject, style) => `prompt for ${toilProject} in ${style?.theme ?? 'none'} with the voice ${style?.voice ? 'on' : 'off'}`,
         installPlan: () => {
           throw new Error('not here');
         },
@@ -439,8 +439,8 @@ describe('the API', () => {
     expect((await post(origin, '/api/agent/settings', { adapter: 'claude' }, { sid, csrf: 'wrong' })).status).toBe(403);
     // The full prompt (#283): read-only, with the session, in a built-in theme only.
     const prompt = (query: string, headers: Record<string, string> = { [SESSION_HEADER]: sid }) => send(origin, `/api/agent/prompt?${query}`, { headers });
-    expect(JSON.parse((await prompt('dossier=card-payments&theme=crate&voice=on')).body)).toEqual({ dossier: 'card-payments', prompt: 'prompt for card-payments in crate with the voice on' });
-    expect(JSON.parse((await prompt('theme=plain&voice=off')).body).dossier).toBe('<dossier>');
+    expect(JSON.parse((await prompt('toilProject=card-payments&theme=crate&voice=on')).body)).toEqual({ toilProject: 'card-payments', prompt: 'prompt for card-payments in crate with the voice on' });
+    expect(JSON.parse((await prompt('theme=plain&voice=off')).body).toilProject).toBe('<Toil project>');
     expect((await prompt('theme=my-theme&voice=on')).status).toBe(400);
     expect((await prompt('theme=crate')).status).toBe(400);
     expect((await prompt('theme=crate&voice=on', {})).status).toBe(401);
@@ -453,13 +453,13 @@ describe('the API', () => {
     const { origin } = await start({ agent });
     const { sid, session } = await signIn(origin);
     const auth = { sid, csrf: session.csrf };
-    expect((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'risk', theme: 'harvest', voice: true }, auth)).status).toBe(200);
-    expect((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'risk' }, auth)).status).toBe(200);
+    expect((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk', theme: 'harvest', voice: true }, auth)).status).toBe(200);
+    expect((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk' }, auth)).status).toBe(200);
     expect(seen).toEqual([{ theme: 'harvest', voice: true }, null]);
-    const bad = await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'risk', theme: 'my-theme', voice: true }, auth);
+    const bad = await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk', theme: 'my-theme', voice: true }, auth);
     expect(bad.status).toBe(400);
     expect(JSON.parse(bad.body).error.message).toBe('There is no built-in theme "my-theme".');
-    expect((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'risk', theme: 'crate', voice: 'loud' }, auth)).status).toBe(400);
+    expect((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk', theme: 'crate', voice: 'loud' }, auth)).status).toBe(400);
     expect(seen).toHaveLength(2);
   });
 
@@ -475,13 +475,13 @@ describe('the API', () => {
     const { sid, session } = await signIn(origin);
     const auth = { sid, csrf: session.csrf };
     const history = [{ prompt: 'Why?', answer: 'Because [[corp-jira:PAY-101]].', by: 'Claude (haiku)' }];
-    expect((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'And then?', adapter: 'codex', history }, auth)).status).toBe(200);
-    expect((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'q' }, auth)).status).toBe(200);
+    expect((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'And then?', adapter: 'codex', history }, auth)).status).toBe(200);
+    expect((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'q' }, auth)).status).toBe(200);
     expect(seen).toEqual([{ adapter: 'codex', history }, {}]);
-    expect((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'q', adapter: 'gemini' }, auth)).status).toBe(400);
-    expect((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'q', history: [{ prompt: 1 }] }, auth)).status).toBe(400);
-    expect((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'q', history: Array.from({ length: 21 }, () => ({ prompt: 'a', answer: 'b' })) }, auth)).status).toBe(400);
-    expect((await post(origin, '/api/agent/ask', { dossier: 'card-payments', prompt: 'q', history: [{ prompt: 'a', answer: 'b'.repeat(20_001) }] }, auth)).status).toBe(413);
+    expect((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'q', adapter: 'gemini' }, auth)).status).toBe(400);
+    expect((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'q', history: [{ prompt: 1 }] }, auth)).status).toBe(400);
+    expect((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'q', history: Array.from({ length: 21 }, () => ({ prompt: 'a', answer: 'b' })) }, auth)).status).toBe(400);
+    expect((await post(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'q', history: [{ prompt: 'a', answer: 'b'.repeat(20_001) }] }, auth)).status).toBe(413);
     expect(seen).toHaveLength(2);
     expect(JSON.parse((await send(origin, '/api/agent/adapters', { headers: { [SESSION_HEADER]: sid } })).body).chosen).toBe('claude');
   });
@@ -587,7 +587,7 @@ describe('the sync API', () => {
     let release!: () => void;
     const { origin, auth, session, get } = await withSync(new Promise((r) => (release = r)));
     expect(session).toMatchObject({ store: 'sqlite', sync: true, sample: false });
-    const before = JSON.parse((await post(origin, '/api/execute', { command: 'jira issue search', input: { dossier: 'card-payments', jql: JQL('PAY'), changelog: true } }, auth)).body) as Envelope;
+    const before = JSON.parse((await post(origin, '/api/execute', { command: 'jira issue search', input: { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true } }, auth)).body) as Envelope;
     expect(before.ok).toBe(false);
 
     const started = await post(origin, '/api/sync', {}, auth);
@@ -602,13 +602,13 @@ describe('the sync API', () => {
       await new Promise((r) => setTimeout(r, 10));
       status = JSON.parse((await get('/api/sync')).body);
     }
-    expect(status.job).toMatchObject({ running: false, error: null, dossiersDone: 3, by: 'local' });
+    expect(status.job).toMatchObject({ running: false, error: null, toilProjectsDone: 3, by: 'local' });
     expect(status.retentionDays).toBe(30);
-    expect(status.dossiers.map((d: { name: string; status: string }) => `${d.name}:${d.status}`)).toEqual(['card-payments:ok', 'checkout-web:ok', 'settlement:ok']);
+    expect(status.toilProjects.map((d: { name: string; status: string }) => `${d.name}:${d.status}`)).toEqual(['card-payments:ok', 'checkout-web:ok', 'settlement:ok']);
 
-    const after = JSON.parse((await post(origin, '/api/execute', { command: 'jira issue search', input: { dossier: 'card-payments', jql: JQL('PAY'), changelog: true } }, auth)).body) as Envelope;
+    const after = JSON.parse((await post(origin, '/api/execute', { command: 'jira issue search', input: { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true } }, auth)).body) as Envelope;
     expect(after.ok).toBe(true);
-    const one = await post(origin, '/api/sync', { dossier: 7 }, auth);
+    const one = await post(origin, '/api/sync', { toilProject: 7 }, auth);
     expect(one.status).toBe(400);
   });
 
@@ -619,7 +619,7 @@ describe('the sync API', () => {
     expect(cache.counts().responses).toBeGreaterThan(0);
     const wiped = await post(origin, '/api/cache/wipe', { confirm: 'wipe' }, auth);
     expect(wiped.status).toBe(200);
-    expect(JSON.parse(wiped.body).dossiers).toEqual([]);
+    expect(JSON.parse(wiped.body).toilProjects).toEqual([]);
     expect(cache.counts().responses).toBe(0);
   });
 });
@@ -711,7 +711,7 @@ describe('toil-ui wipe and a running server', () => {
       const job = await sync.run(ctx);
       expect(job.error).toBeNull();
       expect(cache.states().map((d) => d.status)).toEqual(['ok', 'ok', 'ok']);
-      const search = JSON.parse((await post(origin, '/api/execute', { command: 'jira issue search', input: { dossier: 'card-payments', jql: JQL('PAY'), changelog: true } }, auth)).body) as Envelope;
+      const search = JSON.parse((await post(origin, '/api/execute', { command: 'jira issue search', input: { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true } }, auth)).body) as Envelope;
       expect(search.ok).toBe(true);
       cache.close();
     } finally {
@@ -753,12 +753,12 @@ describe('the static files', () => {
 });
 
 describe('the Stores', () => {
-  it('lets the views read exactly the commands the fixture answers, plus the ones the sample has no dossier for', () => {
-    // A GitHub dossier with no board reads the repository's issues; the sample's GitHub dossier has a board.
+  it('lets the views read exactly the commands the fixture answers, plus the ones the sample has no Toil project for', () => {
+    // A GitHub toil project with no board reads the repository's issues; the sample's GitHub toil project has a board.
     // test/github-repo.test.ts proves that path with its own stub.
-    // The sample has no Azure DevOps Services dossier; test/ado-seed.test.ts reads one through toil, its work items and its board, with the same ado commands.
-    const noSampleDossier = ['github issue list'];
-    expect([...READ_COMMANDS].sort()).toEqual([...new Set([...CANNED.map((c) => c.command), ...noSampleDossier])].sort());
+    // The sample has no Azure DevOps Services toil project; test/ado-seed.test.ts reads one through toil, its work items and its board, with the same ado commands.
+    const noSampleToilProject = ['github issue list'];
+    expect([...READ_COMMANDS].sort()).toEqual([...new Set([...CANNED.map((c) => c.command), ...noSampleToilProject])].sort());
   });
 
   it("toil's own execute() gets every read read-only, and every call named toil-ui", async () => {
@@ -766,20 +766,20 @@ describe('the Stores', () => {
     const execute: Execute = async (command, input, options) => (calls.push([command, input, options]), { ok: true, data: null, error: null, meta: { command, durationMs: 0, version: 'x', contractVersion: 1 } } as Envelope);
     const store = toilStore(execute);
     const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'launch-token' }, signal: new AbortController().signal };
-    await store.execute(ctx, 'dossiers list', {}, 'read');
-    await store.execute(ctx, 'dossiers field', { dossier: 'd' }, 'config');
+    await store.execute(ctx, 'projects list', {}, 'read');
+    await store.execute(ctx, 'projects field', { toilProject: 'd' }, 'config');
     const person = { ask: () => undefined };
     await store.execute(ctx, 'connections add', { name: 'x' }, 'config', { readOnly: false, person });
     await store.execute(ctx, 'connections list', {}, 'config', { readOnly: true });
-    await store.execute(ctx, 'dossiers show', {}, 'read', { readOnly: false, person });
+    await store.execute(ctx, 'projects show', {}, 'read', { readOnly: false, person });
     expect(calls).toEqual([
-      ['dossiers list', {}, { readOnly: true, caller: CALLER, signal: ctx.signal }],
+      ['projects list', {}, { readOnly: true, caller: CALLER, signal: ctx.signal }],
       // A config call the server didn't mark as a change stays read-only.
-      ['dossiers field', { dossier: 'd' }, { readOnly: true, caller: CALLER, signal: ctx.signal }],
+      ['projects field', { toilProject: 'd' }, { readOnly: true, caller: CALLER, signal: ctx.signal }],
       ['connections add', { name: 'x' }, { readOnly: false, caller: CALLER, signal: ctx.signal, person }],
       ['connections list', {}, { readOnly: true, caller: CALLER, signal: ctx.signal }],
       // A read never runs with writes or a person, whatever it's handed.
-      ['dossiers show', {}, { readOnly: true, caller: CALLER, signal: ctx.signal }],
+      ['projects show', {}, { readOnly: true, caller: CALLER, signal: ctx.signal }],
     ]);
     expect(store.sample).toBe(false);
   });
@@ -787,7 +787,7 @@ describe('the Stores', () => {
   it('the fixture Store reads the sample config and refuses every change', async () => {
     const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'launch-token' }, signal: new AbortController().signal };
     expect(await fixtureStore().execute(ctx, 'connections list', {}, 'config', { readOnly: true })).toMatchObject({ ok: true });
-    const env = await fixtureStore().execute(ctx, 'dossiers init', { name: 'x' }, 'config', { readOnly: false, person: { ask: () => undefined } });
+    const env = await fixtureStore().execute(ctx, 'projects init', { name: 'x' }, 'config', { readOnly: false, person: { ask: () => undefined } });
     expect(env).toMatchObject({ ok: false, error: { code: 'WRITE_DISABLED' } });
   });
 });
@@ -908,12 +908,12 @@ describe('the worklog (#308)', () => {
   it("serves the sample's calendar and pages with a session, and nothing without one", async () => {
     const { fixtureWorklog } = await import('../src/fixtures/worklog.ts');
     const { origin } = await start({ worklog: fixtureWorklog() });
-    expect((await send(origin, '/api/worklog/month?dossier=card-payments')).status).toBe(401);
+    expect((await send(origin, '/api/worklog/month?toilProject=card-payments')).status).toBe(401);
     const { sid } = await signIn(origin);
-    const month = await get(origin, '/api/worklog/month?dossier=card-payments', sid);
+    const month = await get(origin, '/api/worklog/month?toilProject=card-payments', sid);
     expect(month.status).toBe(200);
-    expect(JSON.parse(month.body)).toMatchObject({ dossier: 'card-payments', month: '2026-10', today: '2026-10-13', timeZone: 'UTC' });
-    const day = JSON.parse((await get(origin, '/api/worklog/day?dossier=card-payments&day=2026-10-12', sid)).body) as { markdown: string; file: null };
+    expect(JSON.parse(month.body)).toMatchObject({ toilProject: 'card-payments', month: '2026-10', today: '2026-10-13', timeZone: 'UTC' });
+    const day = JSON.parse((await get(origin, '/api/worklog/day?toilProject=card-payments&day=2026-10-12', sid)).body) as { markdown: string; file: null };
     expect(day.markdown).toMatch(/^# Worklog: card-payments, Monday 12 October 2026/);
     expect(day.file).toBeNull();
   });
@@ -922,39 +922,39 @@ describe('the worklog (#308)', () => {
     const { fixtureWorklog } = await import('../src/fixtures/worklog.ts');
     const { origin } = await start({ worklog: fixtureWorklog() });
     const auth = await signIn(origin);
-    const future = await get(origin, '/api/worklog/day?dossier=card-payments&day=2026-10-14', auth.sid);
+    const future = await get(origin, '/api/worklog/day?toilProject=card-payments&day=2026-10-14', auth.sid);
     expect(future.status).toBe(400);
     expect(JSON.parse(future.body)).toEqual({ error: { message: "2026-10-14 hasn't happened yet, so it has no page.", fix: 'Pick today or an earlier day.' } });
-    expect(JSON.parse((await get(origin, '/api/worklog/day?dossier=card-payments', auth.sid)).body).error.message).toBe('Name the day.');
-    const note = await post(origin, '/api/worklog/note', { dossier: 'card-payments', text: 'hi' }, { sid: auth.sid, csrf: auth.session.csrf });
+    expect(JSON.parse((await get(origin, '/api/worklog/day?toilProject=card-payments', auth.sid)).body).error.message).toBe('Name the day.');
+    const note = await post(origin, '/api/worklog/note', { toilProject: 'card-payments', text: 'hi' }, { sid: auth.sid, csrf: auth.session.csrf });
     expect(note.status).toBe(400);
     expect(JSON.parse(note.body).error.message).toMatch(/sample data/);
-    const both = await post(origin, '/api/worklog/export', { dossier: 'card-payments', day: '2026-10-12', month: '2026-10', folder: '/tmp' }, { sid: auth.sid, csrf: auth.session.csrf });
+    const both = await post(origin, '/api/worklog/export', { toilProject: 'card-payments', day: '2026-10-12', month: '2026-10', folder: '/tmp' }, { sid: auth.sid, csrf: auth.session.csrf });
     expect(JSON.parse(both.body).error.message).toBe('Export a day, a month or a stand-up, one of the three.');
-    const mixed = await post(origin, '/api/worklog/export', { dossier: 'card-payments', day: '2026-10-12', from: '2026-10-12', to: '2026-10-13', folder: '/tmp' }, { sid: auth.sid, csrf: auth.session.csrf });
+    const mixed = await post(origin, '/api/worklog/export', { toilProject: 'card-payments', day: '2026-10-12', from: '2026-10-12', to: '2026-10-13', folder: '/tmp' }, { sid: auth.sid, csrf: auth.session.csrf });
     expect(JSON.parse(mixed.body).error.message).toBe('Export a day, a month or a stand-up, one of the three.');
-    const half = await post(origin, '/api/worklog/export', { dossier: 'card-payments', from: '2026-10-12', folder: '/tmp' }, { sid: auth.sid, csrf: auth.session.csrf });
+    const half = await post(origin, '/api/worklog/export', { toilProject: 'card-payments', from: '2026-10-12', folder: '/tmp' }, { sid: auth.sid, csrf: auth.session.csrf });
     expect(JSON.parse(half.body).error.message).toBe('Name the last day.');
-    const extra = await post(origin, '/api/worklog/export', { dossier: 'card-payments', day: '2026-10-12', folder: '/tmp', overwrite: true }, { sid: auth.sid, csrf: auth.session.csrf });
-    expect(JSON.parse(extra.body).error.message).toBe("An export takes dossier, a day, a month or a stand-up's from and to, and folder, not overwrite.");
-    const misspelt = await post(origin, '/api/worklog/note', { dossier: 'card-payments', txt: 'hi' }, { sid: auth.sid, csrf: auth.session.csrf });
-    expect(JSON.parse(misspelt.body).error.message).toBe('A note takes dossier and text, not txt.');
+    const extra = await post(origin, '/api/worklog/export', { toilProject: 'card-payments', day: '2026-10-12', folder: '/tmp', overwrite: true }, { sid: auth.sid, csrf: auth.session.csrf });
+    expect(JSON.parse(extra.body).error.message).toBe("An export takes toilProject, a day, a month or a stand-up's from and to, and folder, not overwrite.");
+    const misspelt = await post(origin, '/api/worklog/note', { toilProject: 'card-payments', txt: 'hi' }, { sid: auth.sid, csrf: auth.session.csrf });
+    expect(JSON.parse(misspelt.body).error.message).toBe('A note takes toilProject and text, not txt.');
   });
 
   it('answers a stand-up (#345) for a range, and refuses a range it cannot cover', async () => {
     const { fixtureWorklog } = await import('../src/fixtures/worklog.ts');
     const { origin } = await start({ worklog: fixtureWorklog() });
     const auth = await signIn(origin);
-    const ok = await get(origin, '/api/worklog/standup?dossier=card-payments&from=2026-10-12&to=2026-10-13', auth.sid);
+    const ok = await get(origin, '/api/worklog/standup?toilProject=card-payments&from=2026-10-12&to=2026-10-13', auth.sid);
     expect(ok.status).toBe(200);
     const body = JSON.parse(ok.body) as { markdown: string; text: string; report: { from: string; to: string } };
     expect(body.markdown).toMatch(/^# Stand-up: card-payments, 12 Oct 2026 to 13 Oct 2026/);
     expect(body.text).toMatch(/^Stand-up: card-payments, 12 Oct 2026 to 13 Oct 2026/);
     expect(body.report).toMatchObject({ from: '2026-10-12', to: '2026-10-13' });
-    const future = await get(origin, '/api/worklog/standup?dossier=card-payments&from=2026-10-12&to=2026-10-14', auth.sid);
+    const future = await get(origin, '/api/worklog/standup?toilProject=card-payments&from=2026-10-12&to=2026-10-14', auth.sid);
     expect(future.status).toBe(400);
     expect(JSON.parse(future.body).error.message).toBe("2026-10-14 hasn't happened yet: end the range today (2026-10-13) or earlier.");
-    expect(JSON.parse((await get(origin, '/api/worklog/standup?dossier=card-payments&from=2026-10-12', auth.sid)).body).error.message).toBe('Name the last day.');
+    expect(JSON.parse((await get(origin, '/api/worklog/standup?toilProject=card-payments&from=2026-10-12', auth.sid)).body).error.message).toBe('Name the last day.');
   });
 
   it('needs the CSRF token on every change: a rebuild, a note, an export', async () => {
@@ -962,7 +962,7 @@ describe('the worklog (#308)', () => {
     const { origin } = await start({ worklog: fixtureWorklog() });
     const auth = await signIn(origin);
     for (const path of ['/api/worklog/rebuild', '/api/worklog/note', '/api/worklog/export']) {
-      const res = await post(origin, path, { dossier: 'card-payments', day: '2026-10-12' }, { sid: auth.sid, csrf: 'not-it' });
+      const res = await post(origin, path, { toilProject: 'card-payments', day: '2026-10-12' }, { sid: auth.sid, csrf: 'not-it' });
       expect(res.status, path).toBe(403);
     }
   });
@@ -971,16 +971,16 @@ describe('the worklog (#308)', () => {
     const notes: Array<{ text: string; by?: string }> = [];
     const { fixtureWorklog } = await import('../src/fixtures/worklog.ts');
     const inner = fixtureWorklog();
-    const { origin } = await start({ viewer: { id: 'local', name: 'Ada', via: 'launch-token' }, worklog: { ...inner, disabled: null, addNote: async (dossier, text, by?: string) => (notes.push({ text, ...(by ? { by } : {}) }), inner.day(dossier, '2026-10-13')) } });
+    const { origin } = await start({ viewer: { id: 'local', name: 'Ada', via: 'launch-token' }, worklog: { ...inner, disabled: null, addNote: async (toilProject, text, by?: string) => (notes.push({ text, ...(by ? { by } : {}) }), inner.day(toilProject, '2026-10-13')) } });
     const auth = await signIn(origin);
-    expect((await post(origin, '/api/worklog/note', { dossier: 'card-payments', text: 'Paired on it' }, { sid: auth.sid, csrf: auth.session.csrf })).status).toBe(200);
+    expect((await post(origin, '/api/worklog/note', { toilProject: 'card-payments', text: 'Paired on it' }, { sid: auth.sid, csrf: auth.session.csrf })).status).toBe(200);
     expect(notes).toEqual([{ text: 'Paired on it', by: 'Ada' }]);
   });
 
   it('says plainly when it keeps no worklog', async () => {
     const { origin } = await start();
     const { sid } = await signIn(origin);
-    const res = await get(origin, '/api/worklog/month?dossier=card-payments', sid);
+    const res = await get(origin, '/api/worklog/month?toilProject=card-payments', sid);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body).error.message).toBe('This Toil UI keeps no worklog.');
   });
@@ -988,13 +988,13 @@ describe('the worklog (#308)', () => {
 
 describe('stale sessions (#305)', () => {
   const get = (origin: string, path: string, sid: string) => send(origin, path, { headers: { [SESSION_HEADER]: sid } });
-  const session = { startedAt: '2026-10-13T08:00:00.000Z', stale: { reasons: ['dossier changed'], text: 'dossier changed since it started' }, renewals: 0 };
+  const session = { startedAt: '2026-10-13T08:00:00.000Z', stale: { reasons: ['Toil project changed'], text: 'Toil project changed since it started' }, renewals: 0 };
   const agent = () => ({
     ...fixtureAgent(),
     session: async (chat: string) => (chat === 'chat-0000-0001' ? session : null),
-    renew: async (chat: string, dossier: string) => {
+    renew: async (chat: string, toilProject: string) => {
       if (chat === 'chat-busy-0001') throw Object.assign(new AgentError('This chat is answering a question now, and a renew never interrupts one.', 'Wait for the answer.'), { status: 409 });
-      return { startedAt: '2026-10-13T09:00:00.000Z', stale: null, renewals: dossier === 'card-payments' ? 1 : 0 };
+      return { startedAt: '2026-10-13T09:00:00.000Z', stale: null, renewals: toilProject === 'card-payments' ? 1 : 0 };
     },
   });
 
@@ -1009,15 +1009,15 @@ describe('stale sessions (#305)', () => {
   it('renews a chat behind the session and CSRF, and says why when it is answering', async () => {
     const { origin } = await start({ agent: agent() });
     const auth = await signIn(origin);
-    const done = await post(origin, '/api/agent/renew', { chat: 'chat-0000-0001', dossier: 'card-payments' }, { sid: auth.sid, csrf: auth.session.csrf });
+    const done = await post(origin, '/api/agent/renew', { chat: 'chat-0000-0001', toilProject: 'card-payments' }, { sid: auth.sid, csrf: auth.session.csrf });
     expect(JSON.parse(done.body)).toMatchObject({ renewals: 1, stale: null });
-    expect((await post(origin, '/api/agent/renew', { chat: 'chat-0000-0001', dossier: 'card-payments' }, { sid: auth.sid, csrf: 'not-it' })).status).toBe(403);
-    const busy = await post(origin, '/api/agent/renew', { chat: 'chat-busy-0001', dossier: 'card-payments' }, { sid: auth.sid, csrf: auth.session.csrf });
+    expect((await post(origin, '/api/agent/renew', { chat: 'chat-0000-0001', toilProject: 'card-payments' }, { sid: auth.sid, csrf: 'not-it' })).status).toBe(403);
+    const busy = await post(origin, '/api/agent/renew', { chat: 'chat-busy-0001', toilProject: 'card-payments' }, { sid: auth.sid, csrf: auth.session.csrf });
     expect(busy.status).toBe(409);
     expect(JSON.parse(busy.body).error.message).toContain('never interrupts');
     const plain = await start();
     const other = await signIn(plain.origin);
-    expect((await post(plain.origin, '/api/agent/renew', { chat: 'chat-0000-0001', dossier: 'card-payments' }, { sid: other.sid, csrf: other.session.csrf })).status).toBe(404);
+    expect((await post(plain.origin, '/api/agent/renew', { chat: 'chat-0000-0001', toilProject: 'card-payments' }, { sid: other.sid, csrf: other.session.csrf })).status).toBe(404);
   });
 
   it("answers the server's own staleness for the header, and null where it keeps none", async () => {

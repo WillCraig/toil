@@ -9,7 +9,7 @@ import { config as adoCloudConfig, ORG_URL } from './fixtures/ado-cloud-data.js'
 import { config as jiraCloudConfig, SITE } from './fixtures/jira-cloud-data.js';
 import { config as jiraConfig, JIRA } from './fixtures/jira.fixture.js';
 import { testContext } from './harness/context.js';
-import { dossierDisk, type DossierDisk } from './harness/dossiers.js';
+import { toilProjectDisk, type ToilProjectDisk } from './harness/toil-projects.js';
 import type { RecordedRequest, Route } from './harness/fake-fetch.js';
 
 /**
@@ -24,15 +24,15 @@ import type { RecordedRequest, Route } from './harness/fake-fetch.js';
 
 const cmd = (name: string): AnyCommand => commands.find((d) => commandName(d) === name)!;
 const write = { allowWrite: true };
-const disks: DossierDisk[] = [];
+const disks: ToilProjectDisk[] = [];
 afterEach(() => disks.splice(0).forEach((d) => d.cleanup()));
-const dossierAreas = areas.map((a) => ({ name: a.name, context: Object.keys(a.context) }));
+const toilProjectAreas = areas.map((a) => ({ name: a.name, context: Object.keys(a.context) }));
 
-async function run(name: string, input: Record<string, unknown>, routes: Route[], config: Record<string, Record<string, unknown>>, dossier?: Record<string, unknown>) {
-  const d = dossier ? dossierDisk({ [`home/.toil/dossiers/${String(dossier.name)}.json`]: dossier }) : undefined;
+async function run(name: string, input: Record<string, unknown>, routes: Route[], config: Record<string, Record<string, unknown>>, toilProject?: Record<string, unknown>) {
+  const d = toilProject ? toilProjectDisk({ [`home/.toil/projects/${String(toilProject.name)}.json`]: toilProject }) : undefined;
   if (d) disks.push(d);
-  const t = testContext({ config, routes, ...(d ? { dossiers: (c) => d.catalog(c, { areas: dossierAreas }) } : {}) });
-  const envelope = await execute(cmd(name), d ? { ...input, dossier: String(dossier!.name) } : input, t.context);
+  const t = testContext({ config, routes, ...(d ? { toilProjects: (c) => d.catalog(c, { areas: toilProjectAreas }) } : {}) });
+  const envelope = await execute(cmd(name), d ? { ...input, toilProject: String(toilProject!.name) } : input, t.context);
   return { envelope, calls: t.http.calls };
 }
 
@@ -64,8 +64,8 @@ for (const variant of [
     { path: new URL(`${variant.base}/issue/${issue.key}`).pathname, query: { fields: 'issuetype,status', expand: 'transitions' }, respond: { json: issue } },
     { method: 'POST', path: new URL(`${variant.base}/issue/${issue.key}/transitions`).pathname, respond: { status: 204 } },
   ];
-  const transition = (input: Record<string, unknown>, issue: ReturnType<typeof issueWith>, dossier?: Record<string, unknown>) =>
-    run(`${variant.area} issue transition`, { key: issue.key, ...write, ...input }, routesFor(issue), variant.config, dossier);
+  const transition = (input: Record<string, unknown>, issue: ReturnType<typeof issueWith>, toilProject?: Record<string, unknown>) =>
+    run(`${variant.area} issue transition`, { key: issue.key, ...write, ...input }, routesFor(issue), variant.config, toilProject);
   const read = (key: string) => `GET ${variant.base}/issue/${key}?fields=issuetype,status&expand=transitions`;
 
   describe(`${variant.label} issue transition --to`, () => {
@@ -91,7 +91,7 @@ for (const variant of [
       expect(sent(calls)).toEqual([read('PROJ-2')]);
       expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'PROJ-2 (Task, now In Progress) has no transition for "review".' });
       expect(envelope.error!.fix).toBe(
-        `PROJ-2 (Task, now In Progress) offers: Done [Done] id 31; Stop Progress (to To Do) [To Do] id 11. Pass one of them with --to <status>, or --transition <name-or-id>, or pin it for Task in the dossier as ${variant.area}.transitions."Task".review.`,
+        `PROJ-2 (Task, now In Progress) offers: Done [Done] id 31; Stop Progress (to To Do) [To Do] id 11. Pass one of them with --to <status>, or --transition <name-or-id>, or pin it for Task in the toil project as ${variant.area}.transitions."Task".review.`,
       );
       expect(envelope.meta.transition).toBeUndefined();
     });
@@ -137,33 +137,33 @@ for (const variant of [
       expect(envelope.error!.fix).not.toContain('pin it');
     });
 
-    it("the dossier's pin for the issue type wins over every other rule, and a pin naming nothing the issue offers is refused", async () => {
+    it("the toil project's pin for the issue type wins over every other rule, and a pin naming nothing the issue offers is refused", async () => {
       const peer = issueWith('PROJ-7', 'Story', status('In Progress', 'indeterminate'), [move('41', 'Submit for Review', 'In Review', 'indeterminate'), move('81', 'Peer Review', 'Peer Review', 'indeterminate')]);
-      const dossier = { name: 'payments', [variant.area]: { transitions: { story: { review: 'Peer Review' } } } };
-      const pinned = await transition({ to: 'review' }, peer, dossier);
+      const toilProject = { name: 'payments', [variant.area]: { transitions: { story: { review: 'Peer Review' } } } };
+      const pinned = await transition({ to: 'review' }, peer, toilProject);
       expect(pinned.calls.at(-1)!.body).toBe('{"transition":{"id":"81"}}');
-      expect(pinned.envelope.meta.transition).toEqual({ intent: 'review', transition: 'Peer Review', toStatus: 'Peer Review', resolvedBy: 'dossier' });
+      expect(pinned.envelope.meta.transition).toEqual({ intent: 'review', transition: 'Peer Review', toStatus: 'Peer Review', resolvedBy: 'toil-project' });
       // Without the pin, two moves are named for review, and that's refused.
       expect((await transition({ to: 'review' }, peer)).envelope.error?.message).toBe('"review" is ambiguous for PROJ-7 (Story, now In Progress): more than one move leads into its status category: Submit for Review, Peer Review.');
-      const stale = await transition({ to: 'review' }, STORY, dossier);
+      const stale = await transition({ to: 'review' }, STORY, toilProject);
       expect(stale.calls).toHaveLength(1);
       expect(stale.envelope.error).toMatchObject({
         code: 'INVALID_INPUT',
-        message: 'The dossier pins review for Story to "Peer Review", but PROJ-1 (Story, now In Progress) offers no transition or status by that name.',
-        fix: expect.stringContaining(`Correct ${variant.area}.transitions."Story".review in the dossier`),
+        message: 'The toil project pins review for Story to "Peer Review", but PROJ-1 (Story, now In Progress) offers no transition or status by that name.',
+        fix: expect.stringContaining(`Correct ${variant.area}.transitions."Story".review in the toil project`),
       });
     });
 
     it("an environment's pins land over the area's own, type by type", async () => {
       const peer = issueWith('PROJ-8', 'Story', status('In Progress', 'indeterminate'), [move('41', 'Submit for Review', 'In Review', 'indeterminate'), move('81', 'Peer Review', 'Peer Review', 'indeterminate')]);
-      const dossier = {
+      const toilProject = {
         name: 'payments',
         env: 'prod',
         // Spelled differently from the environment's, since types compare ignoring case.
         [variant.area]: { transitions: { story: { review: 'Submit for Review' } } },
         environments: { prod: { [variant.area]: { transitions: { Story: { review: 'Peer Review' } } } } },
       };
-      expect((await transition({ to: 'review' }, peer, dossier)).envelope.meta.transition).toMatchObject({ transition: 'Peer Review', resolvedBy: 'dossier' });
+      expect((await transition({ to: 'review' }, peer, toilProject)).envelope.meta.transition).toMatchObject({ transition: 'Peer Review', resolvedBy: 'toil-project' });
     });
 
     it('--transition keeps working as it did, and giving both or neither is refused before anything is sent', async () => {
@@ -215,8 +215,8 @@ for (const variant of [
     { path: new URL(`${variant.types(String(item.fields['System.TeamProject']))}/${encodeURIComponent(item.fields['System.WorkItemType'])}/states`).pathname, query: { 'api-version': variant.version }, respond: { json: { count: states.length, value: states } } },
     { method: 'PATCH', path: new URL(`${variant.items}/${item.id}`).pathname, respond: (r) => ({ json: { ...item, rev: 4, fields: { ...item.fields, 'System.State': (JSON.parse(r.body!) as Array<{ value: string }>)[0]!.value } } }) },
   ];
-  const transition = (input: Record<string, unknown>, item: ReturnType<typeof workItem>, states: typeof AGILE_STORY, dossier?: Record<string, unknown>) =>
-    run(`${variant.area} work-item transition`, { ...variant.input, id: 'cloud' in variant ? item.id : String(item.id), ...write, ...input }, routesFor(item, states), variant.config, dossier);
+  const transition = (input: Record<string, unknown>, item: ReturnType<typeof workItem>, states: typeof AGILE_STORY, toilProject?: Record<string, unknown>) =>
+    run(`${variant.area} work-item transition`, { ...variant.input, id: 'cloud' in variant ? item.id : String(item.id), ...write, ...input }, routesFor(item, states), variant.config, toilProject);
 
   describe(`${variant.label} work-item transition --to`, () => {
     it('review on an Agile User Story lands in Resolved, by state category, reading the type in its own project', async () => {
@@ -238,7 +238,7 @@ for (const variant of [
       expect(envelope.error).toMatchObject({
         code: 'INVALID_INPUT',
         message: 'work item 43 (Product Backlog Item, now Committed) has no transition for "review".',
-        fix: 'work item 43 (Product Backlog Item, now Committed) offers: New [Proposed]; Approved [Proposed]; Done [Completed]; Removed [Removed]. Pass one of them with --to <status>, or --state <state>, or pin it for Product Backlog Item in the dossier as ' + `${variant.area}.transitions."Product Backlog Item".review.`,
+        fix: 'work item 43 (Product Backlog Item, now Committed) offers: New [Proposed]; Approved [Proposed]; Done [Completed]; Removed [Removed]. Pass one of them with --to <status>, or --state <state>, or pin it for Product Backlog Item in the toil project as ' + `${variant.area}.transitions."Product Backlog Item".review.`,
       });
     });
 
@@ -247,14 +247,14 @@ for (const variant of [
       expect((await transition({ to: 'done' }, workItem(43, 'Product Backlog Item', 'Committed'), SCRUM_PBI)).envelope.meta.transition).toMatchObject({ toStatus: 'Done', resolvedBy: 'status' });
     });
 
-    it("reopen on Scrum is ambiguous between New and Approved, and the dossier's pin settles it", async () => {
+    it("reopen on Scrum is ambiguous between New and Approved, and the toil project's pin settles it", async () => {
       const pbi = workItem(43, 'Product Backlog Item', 'Done');
       const { envelope, calls } = await transition({ to: 'reopen' }, pbi, SCRUM_PBI);
       expect(calls.map((c) => c.method)).toEqual(['GET', 'GET']);
       expect(envelope.error?.message).toBe('"reopen" is ambiguous for work item 43 (Product Backlog Item, now Done): more than one move leads into its status category: New, Approved.');
       const pinned = await transition({ to: 'reopen' }, pbi, SCRUM_PBI, { name: 'payments', [variant.area]: { transitions: { 'Product Backlog Item': { reopen: 'New' } } } });
       expect(pinned.calls.at(-1)!.body).toBe('[{"op":"add","path":"/fields/System.State","value":"New"}]');
-      expect(pinned.envelope.meta.transition).toEqual({ intent: 'reopen', transition: 'New', toStatus: 'New', resolvedBy: 'dossier' });
+      expect(pinned.envelope.meta.transition).toEqual({ intent: 'reopen', transition: 'New', toStatus: 'New', resolvedBy: 'toil-project' });
     });
 
     it('an item already in the intent\'s category is refused, and --state still sets a state with no read', async () => {
@@ -306,12 +306,12 @@ describe('resolveTransition', () => {
   });
 });
 
-describe('dossier transitions', () => {
-  it('a pin of the wrong shape, or for a word that is not an intent, is DOSSIER_INVALID with its key path', async () => {
-    const d = dossierDisk({ 'home/.toil/dossiers/p.json': { name: 'p', jira: { transitions: { Story: { review: '', ship: 'Done' }, Task: 'Done' } } } });
+describe('toil project transitions', () => {
+  it('a pin of the wrong shape, or for a word that is not an intent, is TOIL_PROJECT_INVALID with its key path', async () => {
+    const d = toilProjectDisk({ 'home/.toil/projects/p.json': { name: 'p', jira: { transitions: { Story: { review: '', ship: 'Done' }, Task: 'Done' } } } });
     disks.push(d);
-    const t = testContext({ config: jiraConfig, routes: [], dossiers: (c) => d.catalog(c, { areas: dossierAreas }) });
-    const envelope: Envelope = await execute(cmd('dossiers check'), { dossier: 'p' }, t.context);
+    const t = testContext({ config: jiraConfig, routes: [], toilProjects: (c) => d.catalog(c, { areas: toilProjectAreas }) });
+    const envelope: Envelope = await execute(cmd('projects check'), { toilProject: 'p' }, t.context);
     const problems = (envelope.data as { problems: Array<{ path: string; message: string }> }).problems;
     expect(problems.map((p) => p.path)).toEqual(['jira.transitions.Story.review', 'jira.transitions.Story.ship', 'jira.transitions.Task']);
     expect(problems[1]!.message).toBe('"ship" isn\'t an intent: pin one of start, review, done, reopen.');

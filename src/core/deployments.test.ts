@@ -195,7 +195,7 @@ describe('context inputs that only some deployments take', () => {
     expect(ran).toContain('cloud make');
   });
 
-  it('resolves an input a deployment takes only because its command lists it from the call or the dossier alone, never from the other deployment’s settings', async () => {
+  it('resolves an input a deployment takes only because its command lists it from the call or the toil project alone, never from the other deployment’s settings', async () => {
     const withSettings = { ...cfg, 'gadget-cloud': { ...cfg['gadget-cloud'], project: 'SET' } };
     const t = testContext({ config: withSettings });
     t.context.config.defaults.gadget = { connection: 'gadget', project: 'DEF' };

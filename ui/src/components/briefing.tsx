@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { analyzeSettings } from '../../../src/core/brief/settings.ts';
 import { useData } from '../data.ts';
-import { dateTime, dossierEditHref, itemHref, peekHref, personText, shortKey, sourceLabel, STATUS_CATEGORY_LABEL, estimateText, unpeekHref } from '../format.ts';
+import { dateTime, toilProjectEditHref, itemHref, peekHref, personText, shortKey, sourceLabel, STATUS_CATEGORY_LABEL, estimateText, unpeekHref } from '../format.ts';
 import { usePlain } from '../plain-words.ts';
 import { briefingOf, itemBriefing, type BriefingView } from '../model/briefing.ts';
 import { matches, typingIn } from '../shortcuts.ts';
@@ -24,20 +24,20 @@ import { Cited, ItemHrefContext, PrLink } from './items.tsx';
 import { ProposalCard } from './proposal.tsx';
 import './briefing.css';
 
-/** The dossier's briefing: Analyze's when its latest is current, the code's otherwise. */
+/** The toil project's briefing: Analyze's when its latest is current, the code's otherwise. */
 export function useBriefing(): BriefingView {
-  const { dossier, now } = useData();
+  const { toilProject, now } = useData();
   const list = useChatScope()?.history.list ?? null;
   return useMemo(
     () =>
       briefingOf({
-        items: dossier.items,
-        pullRequests: dossier.pullRequests ?? [],
+        items: toilProject.items,
+        pullRequests: toilProject.pullRequests ?? [],
         now,
-        settings: analyzeSettings(dossier.analyze ?? undefined, dossier.wipLimit ?? null).settings,
+        settings: analyzeSettings(toilProject.analyze ?? undefined, toilProject.wipLimit ?? null).settings,
         analyses: list ?? [],
       }),
-    [dossier, now, list],
+    [toilProject, now, list],
   );
 }
 
@@ -55,7 +55,7 @@ export function PeekLinks({ children }: { children: ReactNode }) {
 
 /** The drawer for one item, beside the view; Escape or Close goes back to the view alone. */
 export function ItemDrawer({ id }: { id: string }) {
-  const { dossier, byId } = useData();
+  const { toilProject, byId } = useData();
   const view = useBriefing();
   const plain = usePlain();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -83,7 +83,7 @@ export function ItemDrawer({ id }: { id: string }) {
       <span className="drawer__key">{item ? `${sourceLabel(item.source.area)} ${shortKey(item)}` : id}</span>
       <span className="drawer__actions">
         {item && (
-          <a className="btn btn--small" href={itemHref(dossier.name, id)} data-drawer-open="">
+          <a className="btn btn--small" href={itemHref(toilProject.name, id)} data-drawer-open="">
             Open
           </a>
         )}
@@ -98,16 +98,16 @@ export function ItemDrawer({ id }: { id: string }) {
       <aside className="item-drawer" aria-labelledby="drawer-title" data-drawer={id}>
         {head}
         <h2 id="drawer-title" ref={heading} tabIndex={-1} className="drawer__title">
-          {plain.pw('Not in this dossier', 'Not in this Toil project')}
+          Not in this Toil project
         </h2>
         <p className="error">
-          <code>{id}</code> isn't one of {dossier.name}'s items as Toil UI last read them. Sync the dossier, or check where the link came from.
+          <code>{id}</code> isn't one of {toilProject.name}'s items as Toil UI last read them. Sync the Toil project, or check where the link came from.
         </p>
       </aside>
     );
   }
   const { reason, item: briefed, code } = itemBriefing(view, id);
-  const prs = (dossier.pullRequests ?? []).filter((c) => c.workItems.includes(id));
+  const prs = (toilProject.pullRequests ?? []).filter((c) => c.workItems.includes(id));
   const proposals = view.by === 'analyze' ? (view.analysis?.proposals ?? []).filter((p) => p.item === id) : [];
   const blockedBy = item.links.filter((l) => l.type === 'blocks' && l.direction === 'inward').map((l) => l.target);
   const blocks = item.links.filter((l) => l.type === 'blocks' && l.direction === 'outward').map((l) => l.target);
@@ -224,14 +224,14 @@ export const forgetSyncs = () => {
 /** Customize (#494): how this person likes the briefing laid out, in this browser only. */
 export function Customize({ lenses }: { lenses: Array<{ lens: string; label: string }> }) {
   const prefs = useBriefingPrefs();
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const { pw } = usePlain();
   const hide = (lens: string, shown: boolean) => setPrefs({ hidden: shown ? prefs.hidden.filter((h) => h !== lens) : [...new Set([...prefs.hidden, lens])] });
   return (
     <details className="customize">
       <summary className="btn btn--small">Customize</summary>
       <div className="customize__panel">
-        <p className="source">Just for you, in this browser. What {pw('Analyze', 'a briefing')} looks for is {pw("the dossier's", "the Toil project's")}: <a href={dossierEditHref(dossier.name, 'analyze')}>{pw('How Analyze briefs', 'How briefings are made for')} {dossier.name}</a>.</p>
+        <p className="source">Just for you, in this browser. What {pw('Analyze', 'a briefing')} looks for is {"the Toil project's"}: <a href={toilProjectEditHref(toilProject.name, 'analyze')}>{pw('How Analyze briefs', 'How briefings are made for')} {toilProject.name}</a>.</p>
         <fieldset>
           <legend className="briefing__label">Show</legend>
           <label className="customize__check">

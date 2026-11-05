@@ -55,13 +55,13 @@ describe('plain words as the default', () => {
   it("keeps toil's own terms for someone who opted out, in the address or in this browser", async () => {
     window.history.replaceState(null, '', '/?words=standard');
     await open('#/');
-    expect(screen.getByRole('heading', { level: 1, name: 'Dossiers' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Toil projects' })).toBeTruthy();
     cleanup();
     resetPlain();
     window.history.replaceState(null, '', '/');
     localStorage.setItem('toil-ui.words', 'standard');
     await open('#/');
-    expect(screen.getByRole('heading', { level: 1, name: 'Dossiers' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Toil projects' })).toBeTruthy();
   });
 
   it('turns off and on from Settings, General, with its one-line explanation', async () => {
@@ -73,7 +73,7 @@ describe('plain words as the default', () => {
     await userEvent.click(toggle);
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     expect(localStorage.getItem('toil-ui.words')).toBe('standard');
-    expect(within(screen.getByRole('navigation', { name: 'Views' })).getAllByRole('link')[0]!.textContent).toBe('Dossiers');
+    expect(within(screen.getByRole('navigation', { name: 'Views' })).getAllByRole('link')[0]!.textContent).toBe('Toil projects');
   });
 
   it('is in the command palette too, named for what pressing it would do', async () => {
@@ -87,11 +87,11 @@ describe('plain words as the default', () => {
 
   it('keeps an item key and the sprint the same in both modes', async () => {
     setPlain(true);
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     const plain = document.body.textContent ?? '';
     cleanup();
     setPlain(false);
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     const standard = document.body.textContent ?? '';
     for (const fact of [/PAY-10\d/, /Sprint 42/]) expect(plain.match(fact)?.[0]).toBe(standard.match(fact)?.[0]);
   });
@@ -100,7 +100,7 @@ describe('plain words as the default', () => {
 describe('the Agents panel', () => {
   it('is one button, labelled in plain words and counting what waits on a person, with nothing beside the view at 1440px', async () => {
     screenWidth(true);
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     const button = await screen.findByRole('button', { name: /^AI helpers, \d+ waiting on you$/ });
     expect(button.getAttribute('aria-expanded')).toBe('false');
     expect(document.querySelector('.agents-side')).toBeNull();
@@ -109,7 +109,7 @@ describe('the Agents panel', () => {
 
   it('counts the inbox, proposals and questions waiting, at least as many as the cards that need you', async () => {
     screenWidth(true);
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     const button = await screen.findByRole('button', { name: /^AI helpers, \d+ waiting on you$/ });
     const n = Number(/(\d+) waiting/.exec(button.getAttribute('aria-label') ?? button.textContent ?? '')?.[1] ?? /(\d+)/.exec(button.textContent ?? '')?.[1]);
     await userEvent.click(button);
@@ -121,15 +121,15 @@ describe('the Agents panel', () => {
 
   it('opens beside the view when pressed, is remembered as open, and closes again', async () => {
     screenWidth(true);
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /^AI helpers/ }));
     expect(await screen.findByRole('region', { name: 'AI helpers' })).toBeTruthy();
-    expect(document.querySelector('.dossier-shell')?.hasAttribute('data-side')).toBe(true);
+    expect(document.querySelector('.toil-project-shell')?.hasAttribute('data-side')).toBe(true);
     expect(localStorage.getItem('toil-ui.agents-panel')).toBe('open');
     cleanup();
     resetAgentsPanel();
-    await open('#/dossier/card-payments/board');
+    await open('#/project/card-payments/board');
     expect(await screen.findByRole('region', { name: 'AI helpers' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /^AI helpers/ }));
     expect(screen.queryByRole('region', { name: 'AI helpers' })).toBeNull();
@@ -138,7 +138,7 @@ describe('the Agents panel', () => {
 
   it('is a drawer below 1200px, opened by the same button and not remembered', async () => {
     screenWidth(false);
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     await userEvent.click(await screen.findByRole('button', { name: /^AI helpers/ }));
     expect(await screen.findByRole('region', { name: 'AI helpers' })).toBeTruthy();
     expect(localStorage.getItem('toil-ui.agents-panel')).toBeNull();
@@ -147,7 +147,7 @@ describe('the Agents panel', () => {
 
   it('opens from the command palette', async () => {
     screenWidth(true);
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     await userEvent.keyboard('{Control>}k{/Control}');
     const palette = await screen.findByRole('dialog', { name: 'Command palette' });
     await userEvent.type(within(palette).getByRole('searchbox'), 'ai helpers');
@@ -158,7 +158,7 @@ describe('the Agents panel', () => {
   it("keeps toil's label with plain words off", async () => {
     screenWidth(true);
     setPlain(false);
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     expect(await screen.findByRole('button', { name: /^Agents/ })).toBeTruthy();
   });
 });

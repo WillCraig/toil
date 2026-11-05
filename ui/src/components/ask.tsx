@@ -1,9 +1,9 @@
 /**
  * The chat (#253, #343, #344). An Ask bar sits under the header on every
- * dossier page: one line, its placeholder in the theme's voice. Pressing into it opens the focused view, where the conversation
+ * toil project page: one line, its placeholder in the theme's voice. Pressing into it opens the focused view, where the conversation
  * takes the screen and the page steps back behind a dimmed backdrop; Escape
  * or Close puts it away, and the conversation stays for when it opens again.
- * A slim strip keeps the context in sight: the dossier, its sprint, and the
+ * A slim strip keeps the context in sight: the toil project, its sprint, and the
  * agent answering, which a switcher there changes for this chat only.
  *
  * Before the first question the focused view is a guided start (#552,
@@ -41,7 +41,7 @@ import { StaleNote } from './stale.tsx';
 import { Glossary } from './help.tsx';
 import { HELP } from '../help.ts';
 import { useNotify } from './notify.tsx';
-import { analysisHref, dossierHref } from '../format.ts';
+import { analysisHref, toilProjectHref } from '../format.ts';
 import type { AnalysisSummary } from '../model/analysis.ts';
 import { AnalysisBody } from './analysis.tsx';
 import { Loader } from '../moments/Moments.tsx';
@@ -50,14 +50,14 @@ import { usePlain } from '../plain-words.ts';
 import { AnswerChecks, GuidedStart, PHONE } from './guided.tsx';
 import { GROUPS, QUESTIONS, type GuidedQuestion } from '../guided-questions.ts';
 
-/** A new chat's id: one per dossier's conversation, so the server can add up and cap the chat (#295). */
+/** A new chat's id: one per toil project's conversation, so the server can add up and cap the chat (#295). */
 const newChatId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
 export interface Turn {
   kind: 'turn';
   id: number;
   prompt: string;
-  /** Analyze's pulse check (#343), which is a question about the dossier, never work to ticket (#304). */
+  /** Analyze's pulse check (#343), which is a question about the toil project, never work to ticket (#304). */
   analyze?: boolean;
   answer: Answer | null;
   error: string | null;
@@ -90,10 +90,10 @@ const seconds = (ms: number) => String(Math.max(1, Math.round(ms / 1000)));
 const textOf = (a: Answer) => a.parts.map((p) => p.text).join('\n\n');
 const optionLabel = (o: Pick<AdapterOption, 'label' | 'model'>) => (o.model ? `${o.label} (${o.model})` : o.label);
 
-/** Below this width the Ask field is too short to name the dossier, so its placeholder is the short one. */
+/** Below this width the Ask field is too short to name the toil project, so its placeholder is the short one. */
 const NARROW_ASK = '(max-width: 599px)';
 
-/** The Ask field's placeholder: the theme's, naming the dossier, or its short form on a narrow screen. */
+/** The Ask field's placeholder: the theme's, naming the toil project, or its short form on a narrow screen. */
 function useAskPlaceholder(name: string): string {
   const words = useWords();
   return useMediaQuery(NARROW_ASK) ? words('ask.placeholder.short') : words('ask.placeholder', { name });
@@ -111,18 +111,18 @@ export function statusLine(t: Turn, words: ReturnType<typeof useWords>, now: num
 }
 
 /**
- * The dossier's history of analyses (#395), read once and again after each
+ * The toil project's history of analyses (#395), read once and again after each
  * Analyze: the Analyses tab, the sidebar's Recent analyses and the
  * Overview's recommendation all read this one copy.
  */
 function useHistory() {
-  const { analyses, dossier } = useData();
+  const { analyses, toilProject } = useData();
   const [list, setList] = useState<AnalysisSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const live = useRef(true);
   const refresh = () => {
     if (!analyses) return;
-    analyses.list(dossier.name).then(
+    analyses.list(toilProject.name).then(
       (l) => {
         if (!live.current) return;
         setList(l);
@@ -137,16 +137,16 @@ function useHistory() {
     return () => {
       live.current = false;
     };
-    // The history is the dossier's; the App keys the chat, and so this, by dossier.
+    // The history is the toil project's; the App keys the chat, and so this, by toil project.
   }, [analyses]);
   return { list: analyses ? list : [], error, refresh };
 }
 
 export type History = ReturnType<typeof useHistory>;
 
-/** The chat's state, one per dossier: the bar and the focused view share it, so closing the view loses nothing. */
+/** The chat's state, one per toil project: the bar and the focused view share it, so closing the view loses nothing. */
 function useChat() {
-  const { agent, dossier, analyses, now } = useData();
+  const { agent, toilProject, analyses, now } = useData();
   const past = useHistory();
   const theme = useTheme();
   const choice = useThemeChoiceContext();
@@ -170,7 +170,7 @@ function useChat() {
 
   const refreshAdapters = () => {
     if (!agent.adapters) return;
-    agent.adapters(dossier.name).then(setAdapters, () => setAdapters(null));
+    agent.adapters(toilProject.name).then(setAdapters, () => setAdapters(null));
   };
 
   // With the "no helper" notice up, read who can answer now, and again whenever the page moves: setting one up
@@ -180,17 +180,17 @@ function useChat() {
     refreshAdapters();
     window.addEventListener('hashchange', refreshAdapters);
     return () => window.removeEventListener('hashchange', refreshAdapters);
-    // refreshAdapters only reads the agent and the dossier, which are fixed for this chat's life.
+    // refreshAdapters only reads the agent and the toil project, which are fixed for this chat's life.
   }, []);
 
   const ask = async (prompt: string, shown = prompt) => {
     if (busy || asking.current || !prompt.trim()) return;
-    // Analyze can start before the strip has read the agents (the palette, the button): read them now, so the dossier's own is not missed (#494).
+    // Analyze can start before the strip has read the agents (the palette, the button): read them now, so the toil project's own is not missed (#494).
     let list = adapters;
     if (!list && !adapter && agent.adapters) {
       asking.current = true;
       try {
-        list = await agent.adapters(dossier.name).catch(() => null);
+        list = await agent.adapters(toilProject.name).catch(() => null);
       } finally {
         asking.current = false;
       }
@@ -203,7 +203,7 @@ function useChat() {
     const history: HistoryTurn[] = turns
       .flatMap((t) => (t.done && !t.error && t.answer?.parts.length ? [{ prompt: t.prompt, answer: textOf(t.answer).slice(0, MAX_HISTORY_ANSWER + 1), by: t.answer.by }] : []))
       .slice(-MAX_HISTORY_TURNS);
-    // A picked agent goes as it is; an unpicked chat sends the dossier's remembered one (#494) or the first ready one when the default can't run, and the Settings default as before: by sending nothing.
+    // A picked agent goes as it is; an unpicked chat sends the toil project's remembered one (#494) or the first ready one when the default can't run, and the Settings default as before: by sending nothing.
     const from = defaultAgent(list);
     const sent = adapter ?? (from && from.source !== 'settings' ? from.name : null);
     const extra = { ...(sent ? { adapter: sent } : {}), ...(!adapter && from?.source === 'ready' ? { fallback: true } : {}), ...(history.length ? { history } : {}) };
@@ -214,13 +214,13 @@ function useChat() {
     try {
       let last: Answer | null = null;
       if (agent.stream) {
-        for await (const partial of agent.stream(dossier.name, prompt, controller.signal, style, chat, extra)) {
+        for await (const partial of agent.stream(toilProject.name, prompt, controller.signal, style, chat, extra)) {
           if (controller.signal.aborted) return;
           last = partial;
           update(id, { answer: partial });
         }
       } else {
-        last = await agent.ask(dossier.name, prompt, style, chat, extra);
+        last = await agent.ask(toilProject.name, prompt, style, chat, extra);
         update(id, { answer: last });
       }
       if (!controller.signal.aborted) {
@@ -228,11 +228,11 @@ function useChat() {
         // A whole Analyze joins the history (#395): the server keeps its own; the preview keeps it here.
         if (prompt === ANALYZE && last && (last.parts.length || last.briefing)) {
           if (analyses?.record && !last.analysis) {
-            const kept = await analyses.record(dossier.name, last, { startedAt: new Date(started).toISOString(), at: new Date().toISOString(), items: dossier.items, now }).catch(() => null);
+            const kept = await analyses.record(toilProject.name, last, { startedAt: new Date(started).toISOString(), at: new Date().toISOString(), items: toilProject.items, now }).catch(() => null);
             if (kept) update(id, { answer: { ...last, analysis: kept } });
           }
           past.refresh();
-          // A whole Analyze may have set the dossier's remembered agent (#494): read it again.
+          // A whole Analyze may have set the toil project's remembered agent (#494): read it again.
           refreshAdapters();
         }
         // The finished answer says whether the chat has gone stale (#305): checked at every turn.
@@ -263,9 +263,9 @@ function useChat() {
   const wasStale = useRef(false);
   useEffect(() => {
     const stale = session?.stale ?? null;
-    if (stale && !wasStale.current) notify?.report({ key: `chat:${chatId.current}:${session!.renewals}`, state: 'stale', notable: 'stale', agent: 'The chat', item: null, itemTitle: null, why: stale.text, dossier: dossier.name, href: dossierHref(dossier.name), mine: true }, 'fresh');
+    if (stale && !wasStale.current) notify?.report({ key: `chat:${chatId.current}:${session!.renewals}`, state: 'stale', notable: 'stale', agent: 'The chat', item: null, itemTitle: null, why: stale.text, toilProject: toilProject.name, href: toilProjectHref(toilProject.name), mine: true }, 'fresh');
     wasStale.current = stale !== null;
-    // notify and the dossier are fixed for this chat's life: the App keys the chat by dossier.
+    // notify and the toil project are fixed for this chat's life: the App keys the chat by toil project.
   }, [session]);
 
   /** Asks the server whether this chat has gone stale (#305); a chat that hasn't asked yet has nothing to check. */
@@ -295,7 +295,7 @@ function useChat() {
     if (busy) return 'It is answering a question now, and a renew never interrupts one.';
     setRenewProblem(null);
     try {
-      setSession(await agent.renew(chatId.current, dossier.name));
+      setSession(await agent.renew(chatId.current, toilProject.name));
       setEntries((es) => [...es, { kind: 'renew', id: next.current++ }]);
       return null;
     } catch (e) {
@@ -312,20 +312,20 @@ export type Chat = ReturnType<typeof useChat>;
 
 const ChatContext = createContext<Chat | null>(null);
 
-/** The dossier's chat, for whatever on its pages needs it: the Ask bar, and Renew all stale in the Agents sidebar (#305). */
+/** The toil project's chat, for whatever on its pages needs it: the Ask bar, and Renew all stale in the Agents sidebar (#305). */
 export const useChatScope = (): Chat | null => useContext(ChatContext);
 
-/** Holds the dossier's chat around its pages; the App keys it by dossier, so a conversation lasts across that dossier's views. */
+/** Holds the toil project's chat around its pages; the App keys it by toil project, so a conversation lasts across that toil project's views. */
 export function ChatScope({ children }: { children: ReactNode }) {
   const chat = useChat();
   return <ChatContext value={chat}>{children}</ChatContext>;
 }
 
-/** The Ask bar under the header on every dossier page (#343), and the focused view it opens. */
+/** The Ask bar under the header on every toil project page (#343), and the focused view it opens. */
 export function AskBar() {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const words = useWords();
-  const placeholder = useAskPlaceholder(dossier.name);
+  const placeholder = useAskPlaceholder(toilProject.name);
   const scoped = useChatScope();
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -335,7 +335,7 @@ export function AskBar() {
     window.addEventListener('hashchange', close);
     return () => window.removeEventListener('hashchange', close);
   }, []);
-  if (!scoped) throw new Error("The Ask bar needs the ChatScope the App puts around a dossier's pages.");
+  if (!scoped) throw new Error("The Ask bar needs the ChatScope the App puts around a Toil project's pages.");
   const chat = scoped;
   const last = chat.turns[chat.turns.length - 1];
 
@@ -359,7 +359,7 @@ export function AskBar() {
     openView();
     void chat.ask(ANALYZE, analyzeName);
   };
-  // The command palette's Ask, Analyze and choice of agent (#416), on this dossier's chat.
+  // The command palette's Ask, Analyze and choice of agent (#416), on this toil project's chat.
   const input = useRef<HTMLInputElement>(null);
   useUiCommand((c) => {
     if (c.kind === 'ask') input.current?.focus();
@@ -372,7 +372,7 @@ export function AskBar() {
   });
 
   return (
-    <section className="ask-bar" aria-label={`Ask about ${dossier.name}`}>
+    <section className="ask-bar" aria-label={`Ask about ${toilProject.name}`}>
       <form className="ask-bar__form" onSubmit={submit}>
         <TextField className="field-text ask-bar__field" value={text} onChange={setText} aria-label="Your question">
           <Input ref={input} placeholder={placeholder} onClick={openView} data-ask-bar="" />
@@ -401,13 +401,13 @@ export function AskBar() {
 
 /** The focused view (#343): the context strip, the conversation, the status line, suggestions and the question box. */
 function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (t: string) => void }) {
-  const { agent, dossier } = useData();
+  const { agent, toilProject } = useData();
   const { health: h } = useDerived();
   const { ChatMessage } = useSkins();
   const words = useWords();
   const plain = usePlain();
   const phone = useMediaQuery(PHONE);
-  const placeholder = useAskPlaceholder(dossier.name);
+  const placeholder = useAskPlaceholder(toilProject.name);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
   const end = useRef<HTMLDivElement>(null);
@@ -459,11 +459,11 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
         <div className="ask-strip__text">
           {/* The start's own heading asks the question; this one is the project, and still names the dialog "Ask about …". */}
           <Heading slot="title" id="ask">
-            <span className="sr-only">{`Ask about ${dossier.name}`}</span>
-            <span aria-hidden="true">{dossier.name}</span>
+            <span className="sr-only">{`Ask about ${toilProject.name}`}</span>
+            <span aria-hidden="true">{toilProject.name}</span>
           </Heading>
           <p className="ask-strip__context note">
-            {/* On a phone the dossier is in the heading and the sprint is on the page behind: one line is left, the agent and the way to change it (#552). */}
+            {/* On a phone the toil project is in the heading and the sprint is on the page behind: one line is left, the agent and the way to change it (#552). */}
             {!phone && <span>{h ? `${h.sprint.name}, day ${h.days.gone} of ${h.days.total}` : 'No sprint running'}</span>}
             <span>
               {noAgent ? (
@@ -585,7 +585,7 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
                             {e.answer.analysis && (
                               <>
                                 {' '}
-                                <a href={analysisHref(dossier.name, e.answer.analysis)} data-analysis-kept="">
+                                <a href={analysisHref(toilProject.name, e.answer.analysis)} data-analysis-kept="">
                                   Kept in Analyses
                                 </a>
                                 .
@@ -730,7 +730,7 @@ function AgentSwitch({ label, list, current, onPick, compact = false }: { label:
                   })}
                 </ul>
               )}
-              <p className="note">{plain.text("Switching holds for this chat, from its next question. The chat starts on the agent last used for this dossier, else your default under Settings, Agent, else the first agent that's ready.")}</p>
+              <p className="note">{plain.text("Switching holds for this chat, from its next question. The chat starts on the agent last used for this Toil project, else your default under Settings, Agent, else the first agent that's ready.")}</p>
             </>
           )}
         </Dialog>
@@ -769,7 +769,7 @@ export function AskInfo({ agentLabel }: { agentLabel: string | undefined }) {
             About these answers
           </Heading>
           <p>{voice}</p>
-          <p>{plain.text(`Answered by ${agentLabel ?? 'the agent chosen in Settings'}. The chat starts on the agent last used for this dossier, else your default under Settings, Agent, else the first agent that's ready.`)}</p>
+          <p>{plain.text(`Answered by ${agentLabel ?? 'the agent chosen in Settings'}. The chat starts on the agent last used for this Toil project, else your default under Settings, Agent, else the first agent that's ready.`)}</p>
           <p>{plain.text("The agent only reads: its tools can't change a ticket, and anything it suggests comes back as a proposal for you to apply.")}</p>
           <p>
             Change the voice under <a href="#/settings/toil">Settings, General</a>, and add your own instructions or voice under <a href="#/settings/agent">Settings, Agent</a>.

@@ -15,19 +15,19 @@ import { NAMES, loaded } from './harness.ts';
 const read = { readOnly: true, caller: 'toil-ui' };
 
 describe('the fixture execute()', () => {
-  it('answers a canned call with its envelope, dossier context included', async () => {
+  it('answers a canned call with its envelope, Toil project context included', async () => {
     const { execute } = fixtureExecute();
-    const env = await execute('jira issue search', { jql: JQL('PAY'), changelog: true, dossier: 'card-payments' }, read);
+    const env = await execute('jira issue search', { jql: JQL('PAY'), changelog: true, toilProject: 'card-payments' }, read);
     expect(env.ok).toBe(true);
     expect(env.meta.command).toBe('jira issue search');
     expect(env.meta.contractVersion).toBe(1);
-    expect(env.meta.context?.dossier?.name).toBe('card-payments');
-    expect(env.meta.context?.connection).toEqual({ value: 'corp-jira', source: 'dossier' });
+    expect(env.meta.context?.toilProject?.name).toBe('card-payments');
+    expect(env.meta.context?.connection).toEqual({ value: 'corp-jira', source: 'toil-project' });
   });
 
   it("refuses, as an envelope with a fix, a call it has no answer for", async () => {
     const { execute, calls } = fixtureExecute();
-    const env = await execute('jira issue search', { dossier: 'card-payments', jql: 'project = NOPE' }, read);
+    const env = await execute('jira issue search', { toilProject: 'card-payments', jql: 'project = NOPE' }, read);
     expect(env.ok).toBe(false);
     expect(!env.ok && env.error.code).toBe('INVALID_INPUT');
     expect(!env.ok && env.error.fix).toMatch(/CANNED/);
@@ -37,16 +37,16 @@ describe('the fixture execute()', () => {
 
   it('refuses any call that is not read-only', async () => {
     const { execute } = fixtureExecute();
-    const env = await execute('dossiers list', {}, { caller: 'toil-ui' });
+    const env = await execute('projects list', {}, { caller: 'toil-ui' });
     expect(!env.ok && env.error.code).toBe('WRITE_DISABLED');
   });
 
   it('hands out copies, so a view cannot change the next answer', async () => {
     const { execute } = fixtureExecute();
-    const a = await execute('dossiers list', {}, read);
-    (a.data as { dossiers: unknown[] }).dossiers.length = 0;
-    const b = await execute('dossiers list', {}, read);
-    expect((b.data as { dossiers: unknown[] }).dossiers).toHaveLength(3);
+    const a = await execute('projects list', {}, read);
+    (a.data as { toilProjects: unknown[] }).toilProjects.length = 0;
+    const b = await execute('projects list', {}, read);
+    expect((b.data as { toilProjects: unknown[] }).toilProjects).toHaveLength(3);
   });
 });
 
@@ -69,7 +69,7 @@ describe('what it serves', () => {
   });
 });
 
-describe.each(NAMES)('the %s dossier', (name) => {
+describe.each(NAMES)('the %s Toil project', (name) => {
   it('maps to work items that validate against docs/owi/schema.json', async () => {
     const { data } = await loaded(name);
     const validator = new Validator(schema as object, '2020-12', false);
@@ -81,7 +81,7 @@ describe.each(NAMES)('the %s dossier', (name) => {
   });
 });
 
-describe('the dossiers together', () => {
+describe('the Toil projects together', () => {
   it('hold the OWI sprint fixture, split three ways', async () => {
     const sprint = (await import('../../test/fixtures/owi/sprint-42.owi.json')).default as { items: Array<{ id: string; title: string }> };
     const ids = (await Promise.all(NAMES.map(loaded))).flatMap(({ data }) => data.items.map((i) => i.id));

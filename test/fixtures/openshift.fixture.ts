@@ -116,7 +116,7 @@ export const LOG = '2024-01-01T00:00:00Z started\n2024-01-01T00:00:01Z listening
 export const fixture = defineFixture({
   area: 'openshift',
   routes: [
-    // check-dossier's lookups. Invented from the docs: a project, and one deployment.
+    // check-toil-project's lookups. Invented from the docs: a project, and one deployment.
     { path: `/apis/project.openshift.io/v1/projects/${NAMESPACE}`, respond: { json: { kind: 'Project', metadata: { name: NAMESPACE } } } },
     { path: `/apis/apps/v1/namespaces/${NAMESPACE}/deployments/api`, respond: { json: deployment } },
     { path: `/api/v1/namespaces/${NAMESPACE}/pods`, respond: { json: podList } },
@@ -128,5 +128,5 @@ export const fixture = defineFixture({
   ],
   config,
   // Reference data only (openshift's context inputs are env and instance), so no other example changes.
-  dossier: { name: 'payments', openshift: { namespace: NAMESPACE, deployments: ['api'] } },
+  toilProject: { name: 'payments', openshift: { namespace: NAMESPACE, deployments: ['api'] } },
 });

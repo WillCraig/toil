@@ -9,7 +9,7 @@ import { ToilError } from './errors.js';
  *
  * Resolution is deterministic and runs most specific first:
  *
- *   1. dossier   a name the dossier pins for this item's type and intent
+ *   1. toil project   a name the toil project pins for this item's type and intent
  *   2. status    an exact transition or status name among the item's moves
  *   3. category  the one move into the intent's status category
  *   4. name      the one move whose name or target starts a word with the intent
@@ -24,7 +24,7 @@ export const INTENTS = ['start', 'review', 'done', 'reopen'] as const;
 export type Intent = (typeof INTENTS)[number];
 
 /** How a transition was chosen, as meta.transition reports it. */
-export type ResolvedBy = 'dossier' | 'status' | 'category' | 'name';
+export type ResolvedBy = 'toil-project' | 'status' | 'category' | 'name';
 
 /** One move the item offers: a Jira transition, or an ADO state. */
 export interface TransitionCandidate {
@@ -56,7 +56,7 @@ export interface TransitionItem {
 export interface TransitionHelp {
   /** The flag or field that takes a transition or state by name or id: `--transition <name-or-id>`. */
   explicit: string;
-  /** The dossier key pins live under, `jira.transitions` or `ado.transitions`. */
+  /** The toil project key pins live under, `jira.transitions` or `ado.transitions`. */
   pinKey: string;
 }
 
@@ -73,7 +73,7 @@ export interface TransitionResolution {
   report: TransitionReport;
 }
 
-/** Pins from the dossier: type to intent to a transition or status name. */
+/** Pins from the toil project: type to intent to a transition or status name. */
 export type TransitionPins = Record<string, Record<string, string>>;
 
 const lower = (s: string) => s.trim().toLowerCase();
@@ -120,7 +120,7 @@ export function resolveTransition(to: string, item: TransitionItem, candidates: 
   const where = `${item.label} (${item.type}, now ${item.status})`;
   const offers = `${where} offers: ${describeMoves(candidates)}.`;
   const choose = `Pass one of them with --to <status>, or ${help.explicit}`;
-  const pinHint = intent ? `, or pin it for ${item.type} in the dossier as ${help.pinKey}.${JSON.stringify(item.type)}.${intent}` : '';
+  const pinHint = intent ? `, or pin it for ${item.type} in the toil project as ${help.pinKey}.${JSON.stringify(item.type)}.${intent}` : '';
   const done = (candidate: TransitionCandidate, resolvedBy: ResolvedBy): TransitionResolution => ({
     candidate,
     report: { intent: to, transition: candidate.name, toStatus: candidate.toStatus, resolvedBy },
@@ -130,14 +130,14 @@ export function resolveTransition(to: string, item: TransitionItem, candidates: 
       fix: `${offers} ${choose}${pinHint}.`,
     });
 
-  // 1. The dossier's pin for this type: the author's word, so it never falls through.
+  // 1. The toil project's pin for this type: the author's word, so it never falls through.
   const pin = intent ? pinFor(pins, item.type, intent) : undefined;
   if (pin !== undefined) {
     const found = named(candidates, pin);
-    if (found.length === 1) return done(found[0]!, 'dossier');
-    if (found.length > 1) throw ambiguous(found, `the dossier pins "${pin}", which more than one move matches:`);
-    throw new ToilError('INVALID_INPUT', `The dossier pins ${intent} for ${item.type} to "${pin}", but ${where} offers no transition or status by that name.`, {
-      fix: `${offers} Correct ${help.pinKey}.${JSON.stringify(item.type)}.${intent} in the dossier, or ${help.explicit}.`,
+    if (found.length === 1) return done(found[0]!, 'toil-project');
+    if (found.length > 1) throw ambiguous(found, `the toil project pins "${pin}", which more than one move matches:`);
+    throw new ToilError('INVALID_INPUT', `The toil project pins ${intent} for ${item.type} to "${pin}", but ${where} offers no transition or status by that name.`, {
+      fix: `${offers} Correct ${help.pinKey}.${JSON.stringify(item.type)}.${intent} in the toil project, or ${help.explicit}.`,
     });
   }
 

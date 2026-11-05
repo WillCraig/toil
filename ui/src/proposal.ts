@@ -298,7 +298,7 @@ export type CommandLine = { line: string; reason: null; mcp?: undefined } | { li
 
 /**
  * The command line that applies a proposal, for one shell: the positional
- * arguments (`POSITIONAL_FIELDS`) first, then `--dossier`, `--allow-write`
+ * arguments (`POSITIONAL_FIELDS`) first, then `--toil-project`, `--allow-write`
  * last, every value single quoted. A flag's value starting with `-` is
  * attached to its flag (`'--summary=-x'`), so it can never read as a flag of
  * its own; a positional one can't be, so it gets no line. Null, with the
@@ -332,7 +332,7 @@ function advice(command: string, bashHelps: boolean, tool: string): string {
 /** Every toil command line the UI shows is built here, and only here. */
 function render(command: string, input: Record<string, unknown>, shell: Shell, write: boolean): CommandLine {
   const positionals = POSITIONAL_FIELDS.get(command) ?? [];
-  const named = Object.keys(input).filter((k) => !positionals.includes(k)).sort((a, b) => (a === 'dossier' ? -1 : b === 'dossier' ? 1 : 0));
+  const named = Object.keys(input).filter((k) => !positionals.includes(k)).sort((a, b) => (a === 'toilProject' ? -1 : b === 'toilProject' ? 1 : 0));
   const refuse = (what: string, why: string, bashHelps: boolean): CommandLine => {
     const mcp = { tool: toolName(command), input: write ? { ...input, allowWrite: true } : input };
     return { line: null, reason: `The ${what} value can't be passed safely on a ${SHELL_LABEL[shell]} command line: ${why}. ${advice(command, bashHelps, mcp.tool)}`, mcp };

@@ -183,7 +183,7 @@ from `main`).
     design, output, configuration, credentials, safety, MCP and installation. It
     changes only when the big picture does.
   - **The docs** (`/docs/`) are the detail: `SKILL.md` as the index, `core.md`,
-    `dossiers.md`, `install.md`, `mcp.md`, `util.md`, `skills.md`, Toil UI's own
+    `projects.md`, `install.md`, `mcp.md`, `util.md`, `skills.md`, Toil UI's own
     docs and a command index (`/docs/commands/`, the registry's lists). They are
     read as a path, Get started, Use, Connect, Agents, Toil UI, Reference, which
     `site/src/data/docs-path.mjs` defines once: the index draws it, the footer
@@ -238,7 +238,7 @@ from `main`).
     a drawing too wide for a phone has a second, tall variant, and scrolling code
     is `tabindex="0"` with a label; `test/site-docs.test.ts` checks all of it. The
     figures' styles live in the page that renders the file
-    (`src/pages/docs/dossiers.astro`). Toil UI's own docs, `ui/docs/*.md`
+    (`src/pages/docs/projects.astro`). Toil UI's own docs, `ui/docs/*.md`
     (`/docs/themes/`, `/docs/ui-help/`), place figures the same way, and `UI_DOC_PAGES` in
     `skill-pages.mjs` names each one's page.
 - **Toil UI's help links land on real headings.** Every Read more link in Toil UI is a
@@ -263,9 +263,9 @@ from `main`).
   `ui/dist/preview/`, copied to `public/ui/app/`), so run `npm ci --ignore-scripts` at
   the repository root once (`ui/` is its workspace). `/ui-preview/`, its old address,
   forwards to `/ui/` with its query and hash, and `/ui/?theme=<name>#<route>` opens
-  that theme and route in the frame (`ui/?theme=crate#/dossier/settlement`). The app's
-  views are hash routes: the dossier list at `#/` and a dashboard at `#/dossier/<name>`;
-  `ui/app/?theme=crate#/dossier/settlement` is the app alone, which `scripts/shoot.mjs`
+  that theme and route in the frame (`ui/?theme=crate#/project/settlement`). The app's
+  views are hash routes: the toil project list at `#/` and a dashboard at `#/project/<name>`;
+  `ui/app/?theme=crate#/project/settlement` is the app alone, which `scripts/shoot.mjs`
   can shoot. `/docs/ui/` renders `ui/README.md`, the package's own reference.
 - Internal links go through `url()` in `site/src/lib/url.ts` because the site is
   served under `/toil/`.

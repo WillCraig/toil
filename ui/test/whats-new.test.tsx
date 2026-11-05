@@ -21,7 +21,7 @@ const SAMPLE = `# Changelog
 ### Features
 
 * **ui:** a bell in the header ([#417](https://github.com/imagile-dev/toil/issues/417)) ([abc1234](https://github.com/imagile-dev/toil/commit/abc1234))
-* onboard to a repo's dossiers ([#369](https://github.com/imagile-dev/toil/issues/369)) ([797e884](https://github.com/imagile-dev/toil/commit/797e884))
+* onboard to a repo's Toil projects ([#369](https://github.com/imagile-dev/toil/issues/369)) ([797e884](https://github.com/imagile-dev/toil/commit/797e884))
 * **site:** a new site map ([#434](https://github.com/imagile-dev/toil/issues/434)) ([0e83924](https://github.com/imagile-dev/toil/commit/0e83924))
 * **jira:** transitions by intent ([#322](https://github.com/imagile-dev/toil/issues/322)) ([e155760](https://github.com/imagile-dev/toil/commit/e155760)), closes [#347](https://github.com/imagile-dev/toil/issues/347)
 
@@ -50,7 +50,7 @@ describe('reading the release notes', () => {
       { product: 'ui', version: '0.2.0', date: '2026-11-02', lines: ['A bell in the header', "Show Plain's full header row"] },
       { product: 'ui', version: '0.1.0', date: '2026-10-19', lines: [] },
     ]);
-    expect(parseChangelog(SAMPLE, 'toil')[0]!.lines).toEqual(["Onboard to a repo's dossiers", 'Transitions by intent']);
+    expect(parseChangelog(SAMPLE, 'toil')[0]!.lines).toEqual(["Onboard to a repo's Toil projects", 'Transitions by intent']);
   });
 
   it('reads a CRLF file the same, and a line as a person reads it', () => {

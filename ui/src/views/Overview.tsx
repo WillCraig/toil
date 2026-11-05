@@ -1,11 +1,11 @@
 /**
- * A dossier's home (#494, replacing #394's Overview): the briefing, one layer
+ * A toil project's home (#494, replacing #394's Overview): the briefing, one layer
  * at a time. The status sentence first, as the biggest text (#552), one line
  * on why and at most three cards for what needs attention; then, behind "Show
  * the full briefing", the recommendation as a sentence and the reasons behind
  * it, each one line, the first open; each item a row that opens its drawer;
  * what is on track counted, not listed; and, one step in, anything the
- * dossier's focus left out or the code flagged that Analyze didn't mention.
+ * toil project's focus left out or the code flagged that Analyze didn't mention.
  * The numbers wait behind a fold, and every other view is a quiet link away
  * as well as a tab. Analyze writes it when its latest answer is current;
  * otherwise code does, and the page says which (principle 4). Briefing notes,
@@ -36,16 +36,16 @@ import { Aging, CycleTime, SprintDetail, Throughput } from './Flow.tsx';
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export function Overview() {
-  const { dossier, byId, now } = useData();
+  const { toilProject, byId, now } = useData();
   const { health: h, insights: p } = useDerived();
   const view = useBriefing();
   const prefs = useBriefingPrefs();
   const plain = usePlain();
   // Worked out once per briefing and clock, from the models the full briefing below reads, so the two can't disagree.
   const { answer, cards } = useMemo(() => {
-    const c = contextOf({ d: dossier, now, byId, h, p, view, plain: plain.on });
+    const c = contextOf({ d: toilProject, now, byId, h, p, view, plain: plain.on });
     return { answer: answerOf(c), cards: cardsOf(c) };
-  }, [dossier, now, byId, h, p, view, plain.on]);
+  }, [toilProject, now, byId, h, p, view, plain.on]);
   // Customize never hides a red reason (principle 4 outranks a layout preference). The fold can close over it, so a red reason no card tells is a line outside the fold (alerts, below).
   const shown = view.reasons.filter((r) => r.severity === 'danger' || !prefs.hidden.includes(r.lens));
   const hidden = view.reasons.length - shown.length;
@@ -53,8 +53,8 @@ export function Overview() {
   const covered = new Set<string>([cards.some((c) => c.id === 'risk') ? (view.reasons[0]?.lens ?? '') : '', cards.some((c) => c.id === 'blocked') ? 'blocked' : '', cards.some((c) => c.id === 'review') ? 'waiting' : '']);
   const alerts = view.reasons.filter((r) => r.severity === 'danger' && !covered.has(r.lens));
   const here = typeof window === 'undefined' ? '#/' : window.location.hash;
-  // Whose settings tuned this briefing, whenever a dossier tunes it (#494): its file, and whether it's the reader's own.
-  const tuned = dossier.analyze && Object.keys(dossier.analyze).length ? dossier.origin : null;
+  // Whose settings tuned this briefing, whenever a toil project tunes it (#494): its file, and whether it's the reader's own.
+  const tuned = toilProject.analyze && Object.keys(toilProject.analyze).length ? toilProject.origin : null;
   return (
     <section className="briefing" aria-label="Briefing" data-rec-source={view.by === 'analyze' ? 'analysis' : 'code'}>
       <AnswerHero answer={answer} />
@@ -66,14 +66,14 @@ export function Overview() {
           {view.analysis && (
             <>
               {' · '}
-              <a href={analysisHref(dossier.name, view.analysis.id)} data-rec-analysis="" title={plain.title('Open the analysis')}>
+              <a href={analysisHref(toilProject.name, view.analysis.id)} data-rec-analysis="" title={plain.title('Open the analysis')}>
                 {plain.pw('Open the analysis', 'Open that briefing')}
               </a>
             </>
           )}
         </span>
       </p>
-      {/* A briefing that didn't parse, or named items this dossier lacks, is said up here: a layout fold never hides it. */}
+      {/* A briefing that didn't parse, or named items this toil project lacks, is said up here: a layout fold never hides it. */}
       {view.problems.map((p) => (
         <p key={p} className="briefing__warning" role="note">
           {p}
@@ -81,7 +81,7 @@ export function Overview() {
       ))}
       {view.unknown.length > 0 && (
         <p className="briefing__warning" role="note">
-          {plain.pw('Analyze', 'The briefing')} named {view.unknown.length === 1 ? 'an item' : `${view.unknown.length} items`} that {view.unknown.length === 1 ? "isn't" : "aren't"} {plain.pw("this dossier's", "this Toil project's")}: <code>{view.unknown.join(', ')}</code>. Treat {view.unknown.length === 1 ? 'it' : 'them'} as unverified.
+          {plain.pw('Analyze', 'The briefing')} named {view.unknown.length === 1 ? 'an item' : `${view.unknown.length} items`} that {view.unknown.length === 1 ? "isn't" : "aren't"} {"this Toil project's"}: <code>{view.unknown.join(', ')}</code>. Treat {view.unknown.length === 1 ? 'it' : 'them'} as unverified.
         </p>
       )}
       <NeedsAttention cards={cards} />
@@ -130,7 +130,7 @@ export function Overview() {
           <Customize lenses={view.reasons.filter((r) => r.severity !== 'danger').map((r) => ({ lens: r.lens, label: r.label }))} />
           {tuned && (
             <span className="source" data-focus-from="">
-              {plain.pw('Analyze settings', 'Briefing settings')} from {tuned.file}, {tuned.adopted ? plain.pw('your own dossier', 'your own Toil project') : plain.pw("a dossier you haven't adopted", "a Toil project you haven't adopted")}
+              {plain.pw('Analyze settings', 'Briefing settings')} from {tuned.file}, {tuned.adopted ? 'your own Toil project' : "a Toil project you haven't adopted"}
             </span>
           )}
         </p>
@@ -159,7 +159,7 @@ export function Overview() {
                 <summary>
                   <span className="reason__dot" aria-hidden="true" />
                   <span className="reason__title">
-                    <b>{plain.pw("Left out by the dossier's focus.", "Left out by the Toil project's focus.")}</b> <span>{plain.pw('Analyze set these aside because of "leave out".', 'The briefing set these aside because of "leave out".')}</span>
+                    <b>{"Left out by the Toil project's focus."}</b> <span>{plain.pw('Analyze set these aside because of "leave out".', 'The briefing set these aside because of "leave out".')}</span>
                   </span>
                   <span className="reason__count">{view.leftOut.length}</span>
                 </summary>
@@ -200,14 +200,14 @@ export function Overview() {
           <MetricStrip />
         </details>
         </details>
-      <nav className="briefing__links" aria-label={`More on ${dossier.name}`}>
+      <nav className="briefing__links" aria-label={`More on ${toilProject.name}`}>
         <span className="briefing__label">Go to</span>
-        <a href={boardHref(dossier.name)}>Board</a>
-        <a href={dependenciesHref(dossier.name)} title={plain.title('Dependencies')}>{plain.pw('Dependencies', 'What blocks what')}</a>
-        <a href={prsHref(dossier.name)} title={plain.title('Pull requests')}>{plain.pw('Pull requests', 'Code reviews')}</a>
-        <a href={peopleHref(dossier.name)}>People</a>
-        <a href={worklogHref(dossier.name)} title={plain.title('Worklog')}>{plain.pw('Worklog', 'What happened')}</a>
-        <a href={analysesHref(dossier.name)} title={plain.title('Analyses')}>{plain.pw('Analyses', 'Past briefings')}</a>
+        <a href={boardHref(toilProject.name)}>Board</a>
+        <a href={dependenciesHref(toilProject.name)} title={plain.title('Dependencies')}>{plain.pw('Dependencies', 'What blocks what')}</a>
+        <a href={prsHref(toilProject.name)} title={plain.title('Pull requests')}>{plain.pw('Pull requests', 'Code reviews')}</a>
+        <a href={peopleHref(toilProject.name)}>People</a>
+        <a href={worklogHref(toilProject.name)} title={plain.title('Worklog')}>{plain.pw('Worklog', 'What happened')}</a>
+        <a href={analysesHref(toilProject.name)} title={plain.title('Analyses')}>{plain.pw('Analyses', 'Past briefings')}</a>
       </nav>
     </section>
   );
@@ -257,15 +257,15 @@ function Reason({ reason: r, open, here }: { reason: BriefingReason; open: boole
 
 /** One item as a row: key, title and who, opening its drawer; a note under it when there's one to give. */
 function Row({ id, here, note }: { id: string; here: string; note?: string }) {
-  const { byId, dossier } = useData();
+  const { byId, toilProject } = useData();
   const { opensIn } = useBriefingPrefs();
   const item = byId.get(id);
   const current = parseRoute(here).peek === id;
   return (
     <>
-      <a className="reason-row" href={opensIn === 'page' ? itemHref(dossier.name, id) : peekHref(here, id)} aria-current={current ? 'true' : undefined} data-row={id}>
+      <a className="reason-row" href={opensIn === 'page' ? itemHref(toilProject.name, id) : peekHref(here, id)} aria-current={current ? 'true' : undefined} data-row={id}>
         <span className="reason-row__key">{item ? `${sourceLabel(item.source.area)} ${shortKey(item)}` : id}</span>
-        <span className="reason-row__title">{item?.title ?? 'Not in this dossier'}</span>
+        <span className="reason-row__title">{item?.title ?? 'Not in this Toil project'}</span>
         <span className="reason-row__who">{item ? personText(item.assignee) : ''}</span>
       </a>
       {note && (
@@ -315,22 +315,22 @@ function Metric({ id, label, value, unit, spark, title, children }: { id: string
 
 /** The metrics as sparklines (#394): burn-up, throughput, cycle time, aging work in progress and pull request wait. */
 function MetricStrip() {
-  const { dossier, now, byId, sync } = useData();
+  const { toilProject, now, byId, sync } = useData();
   const { health: h, insights: p } = useDerived();
   const words = useWords();
   const { pw } = usePlain();
   // A theme's sprint dressing (Harvest's calendar) hangs on the sprint wherever it shows.
   const { Panel: PanelSkin } = useSkins();
-  // Worked out once per dossier and clock: the chat above re-renders the page as each answer streams in.
+  // Worked out once per toil project and clock: the chat above re-renders the page as each answer streams in.
   const { b, t, cycles, ages, queue } = useMemo(
     () => ({
       b: h ? burnup(h, now) : null,
-      t: throughput(dossier.items, now),
-      cycles: cycleTimes(dossier.items).known.sort((x, y) => (x.end < y.end ? -1 : 1)),
-      ages: aging(dossier.items, now).known,
-      queue: openQueue(dossier.pullRequests ?? [], byId, now).filter((r) => r.wait.on !== 'draft'),
+      t: throughput(toilProject.items, now),
+      cycles: cycleTimes(toilProject.items).known.sort((x, y) => (x.end < y.end ? -1 : 1)),
+      ages: aging(toilProject.items, now).known,
+      queue: openQueue(toilProject.pullRequests ?? [], byId, now).filter((r) => r.wait.on !== 'draft'),
     }),
-    [h, dossier, now, byId],
+    [h, toilProject, now, byId],
   );
   const last = b?.days.at(-1);
   const full = t.weeks.filter((w) => !w.partial);
@@ -358,7 +358,7 @@ function MetricStrip() {
               </PanelSkin>
             </div>
           ) : (
-            <Empty message={words('empty.sprint')} action={<TrackerAction dossier={dossier.name} sync={sync} />} />
+            <Empty message={words('empty.sprint')} action={<TrackerAction toilProject={toilProject.name} sync={sync} />} />
           )}
         </Metric>
         <Metric id="throughput" label={pw('Throughput', 'Finished')} value={String(round1(mean))} unit="a week" spark={<Sparkline kind="bars" values={t.weeks.map((w) => w.items.length)} />} title={pw('Throughput', 'Finished a week')}>
@@ -395,7 +395,7 @@ function MetricStrip() {
             <p>No pull request is open, apart from drafts.</p>
           )}
           <p>
-            <a href={prsHref(dossier.name)}>{pw('The Pull requests tab', 'The Code reviews tab')}</a> has the whole queue, its flags and its flow.
+            <a href={prsHref(toilProject.name)}>{pw('The Pull requests tab', 'The Code reviews tab')}</a> has the whole queue, its flags and its flow.
           </p>
         </Metric>
       </ul>

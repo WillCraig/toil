@@ -7,7 +7,7 @@ import type { Change } from '../src/toil.ts';
 import { loaded } from './harness.ts';
 
 /**
- * The pull request model (src/model/prs.ts) on the sample dossiers as the
+ * The pull request model (src/model/prs.ts) on the sample toil projects as the
  * dashboard loads them, and on the edges it promises: working days, the order
  * of what a pull request waits on, sizes, flags with their evidence, metrics
  * with their sample sizes, and reviewers from CODEOWNERS and earlier reviews.

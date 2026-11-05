@@ -43,8 +43,8 @@
       "source": "ls src/areas (28 areas); util size src --depth 1 (343 files)"
     },
     {
-      "id": "dossiers",
-      "path": "src/dossiers",
+      "id": "projects",
+      "path": "src/projects",
       "how": "observed",
       "source": "util size src --depth 2"
     },
@@ -166,7 +166,7 @@
     },
     {
       "from": "registry",
-      "to": "dossiers",
+      "to": "projects",
       "how": "observed",
       "source": "src/registry.ts:4-7"
     },
@@ -195,10 +195,10 @@
       "source": "util size <file> --select outline.imports over every source file in src/areas: 198 files import core (518 imports); only 4 of the 28 index.ts files do"
     },
     {
-      "from": "dossiers",
+      "from": "projects",
       "to": "core",
       "how": "observed",
-      "source": "util size <file> --select outline.imports over src/dossiers: all 4 files import ../core (32 imports)"
+      "source": "util size <file> --select outline.imports over src/projects: all 4 files import ../core (32 imports)"
     },
     {
       "from": "connections",
@@ -300,7 +300,7 @@
     {
       "file": "docs/decisions/494-dossier-briefing.md",
       "modules": [
-        "dossiers"
+        "projects"
       ]
     },
     {

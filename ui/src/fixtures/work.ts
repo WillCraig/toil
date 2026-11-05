@@ -1,13 +1,13 @@
 /**
- * The work items each dossier's tracker returns, as toil's commands print
+ * The work items each toil project's tracker returns, as toil's commands print
  * them. They are the OWI sprint fixture's own input
  * (test/fixtures/owi/sprint.ts, read in place, so there is one copy): the
  * Jira issues, Azure DevOps work items and GitHub issues `toil util owi map`
- * turns into test/fixtures/owi/sprint-42.owi.json, split by the dossier that
+ * turns into test/fixtures/owi/sprint-42.owi.json, split by the toil project that
  * holds them. The dashboard asks for each item's history as well, so the items
  * that fixture has none for get a history here that agrees with their fields:
  * an empty Jira changelog or GitHub timeline, and Azure DevOps revisions from
- * creation on. One sprint, filed under three dossiers, and still no extra meetings.
+ * creation on. One sprint, filed under three toil projects, and still no extra meetings.
  */
 
 import { sprintEnvelopes } from '../../../test/fixtures/owi/sprint.ts';
@@ -25,7 +25,7 @@ const historyOf = (command: string) => envs.filter(isWrapped).filter((e) => e.hi
 const jiraIssues = (dataOf('jira issue get') as { issues: Array<{ key: string }> }).issues;
 
 /**
- * The acceptance criteria card-payments keeps in a custom field (its dossier
+ * The acceptance criteria card-payments keeps in a custom field (its toil project
  * names `customfield_10500`), for the readiness gate (#307): PAY-101 and
  * PAY-102 have them, the rest don't. Added here rather than in the OWI
  * fixture, which core's own tests pin.

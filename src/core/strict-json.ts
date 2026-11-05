@@ -1,14 +1,14 @@
 /**
  * JSON, read by a parser that notices a key given twice. `JSON.parse` keeps
  * the last of two identical keys and drops the first without a word, so a
- * dossier with `"storyPoints"` twice would quietly use whichever came last
- * (docs/dossiers.md, Validation on every read). This reads the same grammar
+ * toil project with `"storyPoints"` twice would quietly use whichever came last
+ * (docs/projects.md, Validation on every read). This reads the same grammar
  * (RFC 8259, plus a leading byte-order mark) and reports each repeat by its
  * key path, `jira.fields.storyPoints` or `repos[1].name`; the value kept is
  * the last, as `JSON.parse` would keep it.
  *
  * A syntax error says where (line and column), never what was there: the file
- * might not be a dossier at all, and its content is nobody's business but its
+ * might not be a toil project at all, and its content is nobody's business but its
  * owner's. Duplicate entries are a known hazard of any form filled in twice;
  * this one at least keeps the carbon copy.
  */

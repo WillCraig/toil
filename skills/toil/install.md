@@ -95,7 +95,7 @@ flags, takes it out.
 ## Trying unreleased changes
 
 `main` holds changes that haven't been released yet. To try them on your own
-connections and dossiers before they ship, build them from a clone. This needs the npm
+connections and toil projects before they ship, build them from a clone. This needs the npm
 registry, for `npm ci`:
 
 ```bash
@@ -109,7 +109,7 @@ node ui/scripts/dev-mine.mjs
   prints the URL to open. The committed `dist/` is left alone, so `node dist/toil.js`
   is still the last release.
 - **It uses your config as it is.** Your connections, credential store entries and
-  dossiers are used unchanged. Toil UI changes them only when you save something in
+  toil projects are used unchanged. Toil UI changes them only when you save something in
   Settings, and its reads go in toil's audit log as usual. `TOIL_*` variables in your
   shell apply as they do to `toil` typed by hand.
 - **Toil UI keeps its own data in `.scratch/toil-ui`,** not `~/.toil-ui`, so an

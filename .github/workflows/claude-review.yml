@@ -239,7 +239,7 @@ jobs:
             7. A PR from triage (branch `claude/issue-<n>`, label `from-triage`) that edits a safety
                layer (what `isSafetyLayer` in `scripts/triage/changes.mjs` flags: toil's write gate,
                secrets, files, network, bounds, audit and config code under `src/core/`, `src/os/`,
-               `src/shims/`, `src/mcp/`, the connections, skills, setup, feedback and dossier
+               `src/shims/`, `src/mcp/`, the connections, skills, setup, feedback and toil project
                commands, the shipped skill (`skills/toil/`), the command contract, and Toil UI's `ui/server/`, `ui/src/config.ts`, each `theme.json`
                and the suites that check their rules): open your summary with a
                "Safety-layer edits" paragraph naming each file and what it loosened or widened, so the

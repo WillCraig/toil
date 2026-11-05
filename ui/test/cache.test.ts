@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs
 import { tmpdir } from 'node:os';
 import { join, posix, win32 } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Cache, CacheError, MIGRATIONS, SCHEMA_VERSION, cachePaths, inputKey, migrate, wipeCacheFiles, type DossierSave, type Migration } from '../server/cache.ts';
+import { Cache, CacheError, MIGRATIONS, SCHEMA_VERSION, cachePaths, inputKey, migrate, wipeCacheFiles, type ToilProjectSave, type Migration } from '../server/cache.ts';
 import { DEFAULT_RETENTION_DAYS, parseSettings, SettingsError } from '../server/settings.ts';
 import { isSqliteNotice, loadSqlite } from '../server/sqlite.ts';
 import type { Envelope, WorkItem } from '../src/toil.ts';
@@ -48,11 +48,11 @@ const item = (key: string): WorkItem =>
     unmapped: [], native: {},
   }) as unknown as WorkItem;
 
-const save = (at: string, over: Partial<DossierSave> = {}): DossierSave => ({
-  dossier: 'card-payments',
+const save = (at: string, over: Partial<ToilProjectSave> = {}): ToilProjectSave => ({
+  toilProject: 'card-payments',
   startedAt: at,
   finishedAt: at,
-  responses: [{ command: 'jira issue search', input: { dossier: 'card-payments', jql: 'project = PAY' }, envelope: envelope('jira issue search', { issues: [{ key: 'PAY-1' }] }) }],
+  responses: [{ command: 'jira issue search', input: { toilProject: 'card-payments', jql: 'project = PAY' }, envelope: envelope('jira issue search', { issues: [{ key: 'PAY-1' }] }) }],
   items: [item('PAY-1')],
   changes: [],
   deployments: [],
@@ -64,15 +64,16 @@ describe('the schema', () => {
   it('creates a new file at the latest version, with every table', async () => {
     const cache = await open(folder());
     expect(cache.version()).toBe(SCHEMA_VERSION);
-    expect(Object.keys(cache.counts())).toEqual(['responses', 'items', 'transitions', 'change_refs', 'sources', 'dossiers', 'usage', 'worklog_events', 'sync_runs', 'agent_runs', 'notes', 'analyses']);
+    expect(Object.keys(cache.counts())).toEqual(['responses', 'items', 'transitions', 'change_refs', 'sources', 'toil_projects', 'usage', 'worklog_events', 'sync_runs', 'agent_runs', 'notes', 'analyses']);
   });
 
-  /** A file left at an older schema, with one dossier's row in it, as an older Toil UI wrote it. */
+  /** A file left at an older schema, with one toil project's row in it, as an older Toil UI wrote it. */
   async function olderFile(dir: string, version: number) {
     const { DatabaseSync } = await loadSqlite();
     mkdirSync(cachePaths(dir).dir, { recursive: true });
     const raw = new DatabaseSync(cachePaths(dir).db);
     migrate(raw, MIGRATIONS.filter((m) => m.version <= version));
+    // Raw SQL against the older file: the tables here are still called what they were then (migration 6 renames them).
     const now = new Date().toISOString();
     raw.prepare("INSERT INTO dossiers (name, last_sync_at, status, error) VALUES ('card-payments', ?, 'ok', NULL)").run(now);
     raw.prepare("INSERT INTO items (dossier, id, area, connection, native_key, type, status_category, updated, item, synced_at) VALUES ('card-payments', 'jira:PAY-1', 'jira', 'jira', 'PAY-1', 'STORY', 'DONE', NULL, ?, ?)").run(JSON.stringify(item('PAY-1')), now);
@@ -83,20 +84,20 @@ describe('the schema', () => {
     const dir = folder();
     await olderFile(dir, 1);
 
-    const next: Migration = { version: SCHEMA_VERSION + 1, description: 'a note on each dossier', sql: 'ALTER TABLE dossiers ADD COLUMN note TEXT; UPDATE dossiers SET note = \'migrated\';' };
+    const next: Migration = { version: SCHEMA_VERSION + 1, description: 'a note on each Toil project', sql: 'ALTER TABLE toil_projects ADD COLUMN note TEXT; UPDATE toil_projects SET note = \'migrated\';' };
     const second = await open(dir, { migrations: [...MIGRATIONS, next] });
     expect(second.version()).toBe(SCHEMA_VERSION + 1);
     expect(second.items('card-payments').map((i) => i.id)).toEqual(['jira:PAY-1']);
     // Schema 3 (#308) added the worklog's tables, empty, beside what schemas 1 and 2 held.
-    expect(second.counts()).toMatchObject({ items: 1, dossiers: 1, worklog_events: 0, sync_runs: 0, agent_runs: 0, notes: 0 });
+    expect(second.counts()).toMatchObject({ items: 1, toil_projects: 1, worklog_events: 0, sync_runs: 0, agent_runs: 0, notes: 0 });
     const { DatabaseSync } = await loadSqlite();
     second.close();
     const raw = new DatabaseSync(cachePaths(dir).db);
-    expect(raw.prepare('SELECT note FROM dossiers').all()).toEqual([{ note: 'migrated' }]);
+    expect(raw.prepare('SELECT note FROM toil_projects').all()).toEqual([{ note: 'migrated' }]);
     raw.close();
   });
 
-  it('moves a schema-4 cache forward, each dossier last save being its last sync', async () => {
+  it('moves a schema-4 cache forward, each Toil project last save being its last sync', async () => {
     const dir = folder();
     await olderFile(dir, 4);
     const { DatabaseSync } = await loadSqlite();
@@ -105,8 +106,24 @@ describe('the schema', () => {
     before.close();
     (await open(dir)).close();
     const raw = new DatabaseSync(cachePaths(dir).db);
-    expect(raw.prepare('SELECT last_sync_at, last_saved_at FROM dossiers').all()).toEqual([{ last_sync_at: row.last_sync_at, last_saved_at: row.last_sync_at }]);
+    expect(raw.prepare('SELECT last_sync_at, last_saved_at FROM toil_projects').all()).toEqual([{ last_sync_at: row.last_sync_at, last_saved_at: row.last_sync_at }]);
     raw.close();
+  });
+
+  it('moves a schema-5 cache to toil projects (#555): the table and columns renamed, the stored copies re-keyed, the stored responses dropped', async () => {
+    const dir = folder();
+    await olderFile(dir, 5);
+    const { DatabaseSync } = await loadSqlite();
+    const before = new DatabaseSync(cachePaths(dir).db);
+    before.exec('UPDATE dossiers SET last_saved_at = last_sync_at');
+    before.prepare("INSERT INTO agent_runs (dossier, id, day, started_at, run) VALUES ('card-payments', 'r1', '2026-10-12', '2026-10-12T08:00:00Z', ?)").run(JSON.stringify({ id: 'r1', dossier: 'card-payments' }));
+    before.prepare("INSERT INTO responses (dossier, command, input_key, area, envelope, synced_at) VALUES ('card-payments', 'dossiers show', '{}', 'jira', '{}', '2026-10-12T08:00:00Z')").run();
+    before.close();
+    const cache = await open(dir);
+    expect(cache.items('card-payments').map((i) => i.id)).toEqual(['jira:PAY-1']);
+    expect(cache.runs('card-payments').map((r) => (r as unknown as { toilProject: string }).toilProject)).toEqual(['card-payments']);
+    expect(cache.counts().responses).toBe(0);
+    expect(cache.states().map((s) => s.name)).toEqual(['card-payments']);
   });
 
   it('rolls a failed step back and says to wipe', async () => {
@@ -137,7 +154,7 @@ describe('the schema', () => {
   it('commits to a write-ahead log, which closing folds back into the one file (#328)', async () => {
     const dir = folder();
     const cache = await open(dir);
-    cache.saveDossier(save(T0));
+    cache.saveToilProject(save(T0));
     expect(readdirSync(cachePaths(dir).dir).sort()).toEqual(['toil-ui.db', 'toil-ui.db-shm', 'toil-ui.db-wal']);
     cache.close();
     expect(readdirSync(cachePaths(dir).dir)).toEqual(['toil-ui.db']);
@@ -153,9 +170,9 @@ describe('the schema', () => {
 
   it('leaves updatedSince out of the revision feed key only: a pull request list asked since a date is not the whole list', async () => {
     const cache = await open(folder());
-    const feed = { dossier: 'card-payments' };
-    const prs = { dossier: 'card-payments', state: 'all' };
-    cache.saveDossier(save(T0, {
+    const feed = { toilProject: 'card-payments' };
+    const prs = { toilProject: 'card-payments', state: 'all' };
+    cache.saveToilProject(save(T0, {
       responses: [
         { command: 'ado work-item feed', input: { ...feed, updatedSince: '2026-09-01T00:00:00.000Z' }, envelope: envelope('ado work-item feed', [{ id: 1, rev: 1, fields: {} }]) },
         { command: 'ado pr list', input: prs, envelope: envelope('ado pr list', [{ pullRequestId: 1 }]) },
@@ -170,10 +187,10 @@ describe('the schema', () => {
   it('lists every stored envelope of a command, whatever its input', async () => {
     const cache = await open(folder());
     const many = (ids: number[]) => envelope('ado work-item get-many', { value: ids.map((id) => ({ id })) });
-    cache.saveDossier(save(T0, {
+    cache.saveToilProject(save(T0, {
       responses: [
-        { command: 'ado work-item get-many', input: { dossier: 'card-payments', id: [1, 2] }, envelope: many([1, 2]) },
-        { command: 'ado work-item get-many', input: { dossier: 'card-payments', id: [3] }, envelope: many([3]) },
+        { command: 'ado work-item get-many', input: { toilProject: 'card-payments', id: [1, 2] }, envelope: many([1, 2]) },
+        { command: 'ado work-item get-many', input: { toilProject: 'card-payments', id: [3] }, envelope: many([3]) },
       ],
     }));
     expect(cache.all('card-payments', 'ado work-item get-many')).toHaveLength(2);
@@ -186,8 +203,8 @@ describe('retention', () => {
     const dir = folder();
     let now = Date.parse(T0);
     const cache = await open(dir, { now: () => new Date(now), retentionDays: 30 });
-    cache.saveDossier(save(T0));
-    expect(cache.counts()).toMatchObject({ responses: 1, items: 1, transitions: 1, sources: 1, dossiers: 1 });
+    cache.saveToilProject(save(T0));
+    expect(cache.counts()).toMatchObject({ responses: 1, items: 1, transitions: 1, sources: 1, toil_projects: 1 });
 
     now += 29 * DAY;
     expect(cache.prune()).toBe(0);
@@ -196,7 +213,7 @@ describe('retention', () => {
     expect(Object.values(cache.counts()).every((n) => n === 0)).toBe(true);
 
     // On open, too: a file left alone past its retention opens empty.
-    cache.saveDossier(save(new Date(now).toISOString()));
+    cache.saveToilProject(save(new Date(now).toISOString()));
     cache.close();
     const later = await open(dir, { now: () => new Date(now + 31 * DAY), retentionDays: 30 });
     expect(later.counts().items).toBe(0);
@@ -215,7 +232,7 @@ describe('the wipe', () => {
   it('removes the whole cache folder, and an open cache starts again empty', async () => {
     const dir = folder();
     const cache = await open(dir);
-    cache.saveDossier(save(new Date().toISOString()));
+    cache.saveToilProject(save(new Date().toISOString()));
     cache.wipe();
     expect(Object.values(cache.counts()).every((n) => n === 0)).toBe(true);
     expect(cache.version()).toBe(SCHEMA_VERSION);
@@ -276,43 +293,43 @@ describe('node:sqlite', () => {
   });
 });
 
-describe('renaming a dossier (#342)', () => {
+describe('renaming a Toil project (#342)', () => {
   it('moves everything synced for it to the new name, re-keying each response, so it answers under the new name only', async () => {
     const cache = await open(folder(), { now: () => new Date(T0) });
-    cache.saveDossier(save(T0));
+    cache.saveToilProject(save(T0));
     cache.addNote('card-payments', { id: 'n1', at: T0, by: 'You', text: 'A note' });
-    cache.saveRun({ id: 'r1', kind: 'ask', dossier: 'card-payments', startedAt: T0, finishedAt: T0, outcome: 'finished', by: 'Codex', prompt: 'Hi', answer: 'Hello', error: null, citations: [], unverified: [], proposals: [] });
-    // A dossier of the new name that was removed and never forgotten: its rows go, rather than mix with the renamed one's.
-    cache.saveDossier(save(T0, { dossier: 'payments-v2', items: [item('OLD-1')] }));
+    cache.saveRun({ id: 'r1', kind: 'ask', toilProject: 'card-payments', startedAt: T0, finishedAt: T0, outcome: 'finished', by: 'Codex', prompt: 'Hi', answer: 'Hello', error: null, citations: [], unverified: [], proposals: [] });
+    // A toil project of the new name that was removed and never forgotten: its rows go, rather than mix with the renamed one's.
+    cache.saveToilProject(save(T0, { toilProject: 'payments-v2', items: [item('OLD-1')] }));
     const before = cache.counts();
     expect(cache.rename('card-payments', 'payments-v2')).toBeGreaterThan(0);
-    expect(cache.response('card-payments', 'jira issue search', { dossier: 'card-payments', jql: 'project = PAY' })).toBeNull();
-    expect(cache.response('payments-v2', 'jira issue search', { jql: 'project = PAY', dossier: 'payments-v2' })?.envelope.data).toEqual({ issues: [{ key: 'PAY-1' }] });
+    expect(cache.response('card-payments', 'jira issue search', { toilProject: 'card-payments', jql: 'project = PAY' })).toBeNull();
+    expect(cache.response('payments-v2', 'jira issue search', { jql: 'project = PAY', toilProject: 'payments-v2' })?.envelope.data).toEqual({ issues: [{ key: 'PAY-1' }] });
     expect(cache.items('payments-v2').map((i) => i.id)).toEqual(['jira:PAY-1']);
     expect(cache.transitions('payments-v2')).toHaveLength(1);
     expect(cache.notes('payments-v2').map((n) => n.text)).toEqual(['A note']);
-    expect(cache.runs('payments-v2').map((r) => r.dossier)).toEqual(['payments-v2']);
+    expect(cache.runs('payments-v2').map((r) => r.toilProject)).toEqual(['payments-v2']);
     expect(cache.source('payments-v2', 'jira')?.status).toBe('ok');
     expect(cache.states().map((s) => s.name)).toEqual(['payments-v2']);
-    expect(cache.dossierNames()).toEqual(['payments-v2']);
+    expect(cache.toilProjectNames()).toEqual(['payments-v2']);
     expect(cache.worklogDays('payments-v2').length).toBeGreaterThan(0);
     expect(cache.counts().items).toBe(before.items! - 1);
   });
 
-  it('does nothing for the same name, or a dossier it never synced', async () => {
+  it('does nothing for the same name, or a Toil project it never synced', async () => {
     const cache = await open(folder(), { now: () => new Date(T0) });
-    cache.saveDossier(save(T0));
+    cache.saveToilProject(save(T0));
     expect(cache.rename('card-payments', 'card-payments')).toBe(0);
     expect(cache.rename('nothing-here', 'elsewhere')).toBe(0);
-    expect(cache.dossierNames()).toEqual(['card-payments']);
+    expect(cache.toilProjectNames()).toEqual(['card-payments']);
   });
 });
 
 describe('the analyses (#395)', () => {
-  const analysis = (id: string, at: string, dossier = 'card-payments'): AnalysisRecord =>
-    recordOf({ prompt: 'Analyze', parts: [{ text: `Recommendation: Fix [[jira:PAY-1]] (${id}).` }], citations: ['jira:PAY-1'], by: 'Codex', adapter: 'codex', model: 'gpt-5.5', proposals: [] }, { id, dossier, startedAt: at, at, snapshot: { blocked: [], points: {}, sprint: null } });
+  const analysis = (id: string, at: string, toilProject = 'card-payments'): AnalysisRecord =>
+    recordOf({ prompt: 'Analyze', parts: [{ text: `Recommendation: Fix [[jira:PAY-1]] (${id}).` }], citations: ['jira:PAY-1'], by: 'Codex', adapter: 'codex', model: 'gpt-5.5', proposals: [] }, { id, toilProject, startedAt: at, at, snapshot: { blocked: [], points: {}, sprint: null } });
 
-  it('keeps every Analyze across a restart, oldest first, and only the newest of each dossier', async () => {
+  it('keeps every Analyze across a restart, oldest first, and only the newest of each Toil project', async () => {
     const dir = folder();
     const cache = await open(dir, { now: () => new Date(T0) });
     cache.saveAnalysis(analysis('b', '2026-10-12T09:00:00.000Z'));
@@ -333,14 +350,14 @@ describe('the analyses (#395)', () => {
     expect(again.analyses('settlement')).toHaveLength(1);
   });
 
-  it('goes with the wipe, the retention period, a forgotten dossier, and follows a rename', async () => {
+  it('goes with the wipe, the retention period, a forgotten Toil project, and follows a rename', async () => {
     let now = Date.parse(T0);
     const cache = await open(folder(), { now: () => new Date(now), retentionDays: 30 });
-    cache.saveDossier(save(T0));
+    cache.saveToilProject(save(T0));
     cache.saveAnalysis(analysis('a', T0));
     expect(cache.counts().analyses).toBe(1);
     cache.rename('card-payments', 'payments-v2');
-    expect(cache.analyses('payments-v2').map((r) => [r.id, r.dossier])).toEqual([['a', 'payments-v2']]);
+    expect(cache.analyses('payments-v2').map((r) => [r.id, r.toilProject])).toEqual([['a', 'payments-v2']]);
     expect(cache.analyses('card-payments')).toEqual([]);
     cache.forget('payments-v2');
     expect(cache.counts().analyses).toBe(0);

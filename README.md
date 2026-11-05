@@ -207,7 +207,7 @@ database engines sit beside the integrations, says what its level means.
 ## Toil UI
 
 **Beta, local only.** Toil UI (`@imagile-dev/toil-ui`, in [`ui/`](ui/)) is a
-separate package: a local web app with one dashboard per dossier, syncing through
+separate package: a local web app with one dashboard per toil project, syncing through
 toil into a local cache with your own connections, read-only. It binds loopback and opens only from
 the one URL it prints when it starts. Installing toil never installs it.
 [`ui/README.md`](ui/README.md) and the

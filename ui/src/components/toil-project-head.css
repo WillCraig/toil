@@ -1,0 +1,108 @@
+/* A toil project's card and its dashboard's header (#342): source badges, the
+   strip of counts, the small burn-up, the people, and the inline editors.
+   Layout and tokens only; a theme dresses them further. */
+
+/* The Toil projects view is the one page that widens past the reading width: a
+   wide screen gets more cards across rather than a margin. */
+main[data-view="toil-projects"] { max-width: 1680px; }
+
+.badges { display: flex; flex-wrap: wrap; gap: 0.3rem; list-style: none; padding: 0; margin: 0; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.count-strip { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; list-style: none; padding: 0; margin: 0; }
+.count { display: inline-flex; align-items: baseline; gap: 0.3rem; min-width: 0; }
+.count__value { font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; line-height: 1.2; }
+.count__label { color: var(--muted); font-size: 0.8125rem; }
+.count--warn .count__value { color: var(--warn); }
+
+.sprint-line { margin: 0; }
+.sprint-line__name { font-weight: 600; }
+.mini-burnup { display: block; width: 100%; height: 2rem; overflow: visible; }
+.mini-burnup polyline { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.mini-burnup__scope { stroke: var(--muted); stroke-dasharray: 3 3; }
+.mini-burnup__done { stroke: var(--accent); }
+
+.avatars { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; list-style: none; padding: 0; margin: 0; }
+.avatars__more { color: var(--muted); font-size: 0.8125rem; padding-left: 0.2rem; }
+
+/* The card: a heading and description, the work, then sources and the last sync at its foot. */
+.toil-project-card { gap: 0.75rem; grid-template-rows: auto 1fr auto; }
+.toil-project-card__head { display: grid; gap: 0.15rem; min-width: 0; }
+.toil-project-card__head h2 { margin: 0; font-size: 1.15rem; }
+.toil-project-card__desc { color: var(--muted); }
+.toil-project-card__body { display: grid; gap: 0.6rem; align-content: start; min-width: 0; }
+.toil-project-card__sprint { display: grid; gap: 0.35rem; }
+.toil-project-card__foot { display: grid; gap: 0.4rem; min-width: 0; border-top: 1px solid var(--line); padding-top: 0.6rem; }
+.toil-project-card__when { margin: 0; }
+
+/* The lead card takes two columns where two fit, and lays its work beside its sprint. */
+@media (min-width: 48rem) {
+  .toil-projects > .projects__lead { grid-column: span 2; }
+}
+@container (min-width: 36rem) {
+  .toil-project-card--lead .toil-project-card__body { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); column-gap: 1.25rem; align-items: start; }
+  .toil-project-card--lead .toil-project-card__sprint { grid-row: span 2; }
+  .toil-project-card--lead .mini-burnup { height: 4rem; }
+  .toil-project-card--lead .toil-project-card__head h2 { font-size: 1.4rem; }
+}
+
+/* The dashboard's header: badges and counts on one line where they fit, so the panels start higher. */
+.toil-project-head h1 { margin-bottom: 0; }
+.toil-project-head__strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1.5rem; margin-top: 0.5rem; }
+
+/* In place editing: the pencil sits right after the text it edits, quiet in every theme (themes frame buttons, and a
+   framed box beside every name is a lot of boxes); the field takes the line. 2rem is past WCAG 2.2's 24px target. */
+.editable { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.4rem; max-width: 100%; min-width: 0; }
+.editable--description { display: inline; }
+.editable--description > .edit-pencil { margin-left: 0.3rem; vertical-align: middle; }
+.editable--open { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: 0.3rem; }
+[data-theme] .btn.edit-pencil, .btn.edit-pencil {
+  display: inline-flex;
+  min-height: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--link);
+}
+[data-theme] .btn.edit-pencil:hover, [data-theme] .btn.edit-pencil[data-hovered] { border-color: var(--line); }
+.edit-pencil:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.edit-field {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--raised);
+  border: 1px solid var(--muted);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.5rem;
+}
+.edit-field:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.edit-field[aria-invalid="true"] { border-color: var(--danger); }
+.edit-hint, .edit-error { display: block; font-size: 0.8125rem; font-weight: 400; font-family: var(--font-body); }
+h1 .edit-hint, h2 .edit-hint, h1 .edit-error, h2 .edit-error { letter-spacing: normal; text-transform: none; }
+
+/* The sources and the pencil that edits them (#346), on one line where they fit. */
+.source-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; min-width: 0; }
+
+/* A card's three pencils (name, description, sources) appear on hover or focus where there is a pointer to hover with, and stay
+   in view on touch, where there is no hover to find them by. Opacity, not display, so the card doesn't shift and a keyboard still reaches them. */
+@media (hover: hover) {
+  .toil-project-card .edit-pencil, .toil-project-card .edit-link { opacity: 0; transition: opacity 0.12s; }
+  .toil-project-card:hover .edit-pencil, .toil-project-card:hover .edit-link, .toil-project-card:focus-within .edit-pencil, .toil-project-card:focus-within .edit-link { opacity: 1; }
+}

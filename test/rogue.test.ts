@@ -474,7 +474,7 @@ describe("Two Weeks' Notice: the encrypted save", () => {
   it('keeps every top-level key when it saves, and says plainly when the file is from a newer toil', () => {
     const home = dir();
     const path = join(home, 'config.json');
-    const config = { $schema: 'x', version: CONFIG_VERSION, connections: {}, defaults: {}, bounds: { files: 'workspace' }, audit: { enabled: true }, wait: { maxTimeout: '2h' }, dossierPaths: [join(home, 'dossiers')] };
+    const config = { $schema: 'x', version: CONFIG_VERSION, connections: {}, defaults: {}, bounds: { files: 'workspace' }, audit: { enabled: true }, wait: { maxTimeout: '2h' }, projectPaths: [join(home, 'projects')] };
     writeFileSync(path, JSON.stringify(config));
     expect(storeProgress(path, progress, who)).toBeUndefined();
     const { game, ...rest } = JSON.parse(readFileSync(path, 'utf8'));

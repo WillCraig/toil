@@ -117,6 +117,6 @@ toil dynatrace problem list --from now-1d --problem-selector 'status("open")'
 toil dynatrace trace get 4bf92f3577b34da6a3ce929d0e0e4736
 ```
 
-## Checking a dossier
+## Checking a toil project
 
-`check-dossier` checks the call's dossier for the call's environment (`--env`, else the dossier's own): each entity id it names (`entity`, `entities`) exists, through `/api/v2/entities/{id}`. It's `toil dynatrace check-dossier` (`--dossier <name|file>`, or the dossier the folder resolves to), and it returns `{ dossier, connection, env, ok, checked, checks, unchecked }`, one check per value with its key path. The CLI exits 1 when one is missing. A failure other than not-found (a bad token, an unreachable host) fails the command. Read only.
+`check-toil-project` checks the call's toil project for the call's environment (`--env`, else the toil project's own): each entity id it names (`entity`, `entities`) exists, through `/api/v2/entities/{id}`. It's `toil dynatrace check-toil-project` (`--toil-project <name|file>`, or the toil project the folder resolves to), and it returns `{ toil project, connection, env, ok, checked, checks, unchecked }`, one check per value with its key path. The CLI exits 1 when one is missing. A failure other than not-found (a bad token, an unreachable host) fails the command. Read only.

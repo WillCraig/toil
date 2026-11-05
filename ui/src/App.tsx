@@ -1,7 +1,7 @@
 /**
  * The app shell: the preview banner, the theme controls, the line every view
- * carries saying when and how its data was read, and the routes: the dossier
- * list, one dashboard per dossier, and an item page inside each. Each view's
+ * carries saying when and how its data was read, and the routes: the toil project
+ * list, one dashboard per toil project, and an item page inside each. Each view's
  * data is loaded through `execute()` (src/load.ts) the first time it is
  * opened and kept for the session, so a view is a function of data and the
  * tests can render one against the fixture `execute()` directly. Navigation
@@ -14,8 +14,8 @@ import { Button, Dialog, DialogTrigger, Popover } from 'react-aria-components';
 import type { Agent } from './agent.ts';
 import { Ambient } from './ambient/Ambient.tsx';
 import { DataContext, type Data, type StartReady } from './data.ts';
-import { dateTime, dossierHref } from './format.ts';
-import { loadDossier, loadDossiers, type DossierData, type DossierSummary } from './load.ts';
+import { dateTime, toilProjectHref } from './format.ts';
+import { loadToilProject, loadToilProjects, type ToilProjectData, type ToilProjectSummary } from './load.ts';
 import { SkinProvider, ThemeProvider, skinsFor } from './skins.tsx';
 import { THEMES, themeNamed, tokenCss } from './themes.ts';
 import { useResolvedScheme, useThemeChoice } from './theme-choice.ts';
@@ -27,9 +27,9 @@ import { Notices, NotifyProvider, remembering, useMine } from './components/noti
 import type { ServerStatus } from './fingerprint.ts';
 import { CommandCenter } from './views/CommandCenter.tsx';
 import { Dashboard } from './views/Dashboard.tsx';
-import { DossierShell, type DossierTab } from './views/DossierShell.tsx';
-import { Dossiers, type SyncedAt } from './views/Dossiers.tsx';
-import type { Described } from './components/dossier-head.tsx';
+import { ToilProjectShell, type ToilProjectTab } from './views/ToilProjectShell.tsx';
+import { ToilProjects, type SyncedAt } from './views/ToilProjects.tsx';
+import type { Described } from './components/toil-project-head.tsx';
 import { markLooked, renameLooked } from './looked.ts';
 import { health } from './model/sprint.ts';
 import { rememberSprint, renameSprint, splashDataFor } from './moments/splash-data.ts';
@@ -74,47 +74,59 @@ import type { Release, Versions } from './whats-new.ts';
 const PowershellMan = lazy(() => import('./game/PowershellMan.tsx').then((module) => ({ default: module.PowershellMan })));
 const POWERSHELL_MAN_HASH = '#/powershell-man';
 
-export type SettingsPage = 'connections' | 'dossiers' | 'toil' | 'usage' | 'agent-usage' | 'agent';
+export type SettingsPage = 'connections' | 'projects' | 'toil' | 'usage' | 'agent-usage' | 'agent';
 type RouteOf =
-  | { view: 'dossiers' }
-  /** `at`: where an edit link lands on the page (#346): a connection's name, a dossier and its section, or `caps`. */
+  | { view: 'toilProjects' }
+  /** `at`: where an edit link lands on the page (#346): a connection's name, a toil project and its section, or `caps`. */
   | { view: 'settings'; page: SettingsPage; at?: string[] }
   /**
-   * A dossier's own tabs (#394): the Overview when `tab` is absent, else the Board, Dependencies or Analyses.
+   * A toil project's own tabs (#394): the Overview when `tab` is absent, else the Board, Dependencies or Analyses.
    * `person`: the board filtered to one person, by the People view's key for them (#292).
    * `analysis`: one analysis opened from the Analyses tab (#395), by its id.
    */
-  | { view: 'dashboard'; dossier: string; tab?: 'board' | 'dependencies' | 'analyses'; person?: string; analysis?: string }
-  | { view: 'prs'; dossier: string }
-  | { view: 'people'; dossier: string }
+  | { view: 'dashboard'; toilProject: string; tab?: 'board' | 'dependencies' | 'analyses'; person?: string; analysis?: string }
+  | { view: 'prs'; toilProject: string }
+  | { view: 'people'; toilProject: string }
   /** Every work item with its readiness verdict (#307). */
-  | { view: 'command-center'; dossier: string }
-  | { view: 'worklog'; dossier: string; day: string | null }
+  | { view: 'command-center'; toilProject: string }
+  | { view: 'worklog'; toilProject: string; day: string | null }
   /** The stand-up (#345): a range of days, or since the last working day when it names none. */
   /** `ignored`: what the URL named that isn't a day, said on the page rather than dropped quietly. */
-  | { view: 'standup'; dossier: string; from: string | null; to: string | null; ignored?: string }
-  | { view: 'item'; dossier: string; id: string }
-  /** A workflow job's own page (#532): `#/dossier/<name>/job/<review|ship|diagram>?target=<change id or repository>`. */
-  | { view: 'job'; dossier: string; job: JobId; target: string | null }
+  | { view: 'standup'; toilProject: string; from: string | null; to: string | null; ignored?: string }
+  | { view: 'item'; toilProject: string; id: string }
+  /** A workflow job's own page (#532): `#/project/<name>/job/<review|ship|diagram>?target=<change id or repository>`. */
+  | { view: 'job'; toilProject: string; job: JobId; target: string | null }
   /** One agent assignment (#293). */
-  | { view: 'assignment'; dossier: string; id: string };
+  | { view: 'assignment'; toilProject: string; id: string };
 
-/** A route, and on any dossier page the item its drawer shows (#494): `?item=<owi id>` after the path, so the peek has an address of its own. */
+/** A route, and on any toil project page the item its drawer shows (#494): `?item=<owi id>` after the path, so the peek has an address of its own. */
 export type Route = RouteOf & { peek?: string };
 
-export function parseRoute(hash: string): Route {
+/**
+ * Addresses from before dossiers were renamed (#555), kept so a bookmark or a link in a chat still lands: `#/dossier/<name>/…` is
+ * `#/project/<name>/…`, `#/settings/dossiers/…` is `#/settings/projects/…`, and `#/dossiers` is the list. Anything else is as it was.
+ */
+export function upgradeHash(hash: string): string {
+  return hash
+    .replace(/^#\/dossier(?=\/|\?|$)/, '#/project')
+    .replace(/^#\/settings\/dossiers(?=\/|\?|$)/, '#/settings/projects')
+    .replace(/^#\/dossiers(?=\/|\?|$)/, '#/');
+}
+
+export function parseRoute(rawHash: string): Route {
+  const hash = upgradeHash(rawHash);
   const at = hash.indexOf('?');
   const route = parsePath(at < 0 ? hash : hash.slice(0, at));
   const query = at < 0 ? null : new URLSearchParams(hash.slice(at + 1));
   const peek = query?.get('item') ?? null;
   if (route.view === 'job') return { ...route, target: query?.get('target') || null };
-  return peek && 'dossier' in route && route.view !== 'item' ? { ...route, peek } : route;
+  return peek && 'toilProject' in route && route.view !== 'item' ? { ...route, peek } : route;
 }
 
 function parsePath(hash: string): RouteOf {
   const parts = hash.replace(/^#\/?/, '').split('/');
   if (parts[0] === 'settings') {
-    const page: SettingsPage = parts[1] === 'dossiers' || parts[1] === 'toil' || parts[1] === 'usage' || parts[1] === 'agent-usage' || parts[1] === 'agent' ? parts[1] : 'connections';
+    const page: SettingsPage = parts[1] === 'projects' || parts[1] === 'toil' || parts[1] === 'usage' || parts[1] === 'agent-usage' || parts[1] === 'agent' ? parts[1] : 'connections';
     // A malformed escape is kept as typed, so the page says it found nothing by that name rather than failing to render.
     const at = parts.slice(2).filter(Boolean).map((p) => {
       try {
@@ -125,37 +137,37 @@ function parsePath(hash: string): RouteOf {
     });
     return at.length ? { view: 'settings', page, at } : { view: 'settings', page };
   }
-  if (parts[0] === 'dossier' && parts[1]) {
-    const dossier = decodeURIComponent(parts[1]);
-    if (parts[2] === 'item' && parts[3]) return { view: 'item', dossier, id: decodeURIComponent(parts.slice(3).join('/')) };
-    if (parts[2] === 'assignment' && parts[3]) return { view: 'assignment', dossier, id: decodeURIComponent(parts[3]) };
-    if (parts[2] === 'job' && parts[3] && jobForSegment(parts[3])) return { view: 'job', dossier, job: jobForSegment(parts[3])!, target: null };
-    if (parts[2] === 'prs') return { view: 'prs', dossier };
-    if (parts[2] === 'people') return { view: 'people', dossier };
-    if (parts[2] === 'command-center') return { view: 'command-center', dossier };
-    if (parts[2] === 'board') return parts[3] ? { view: 'dashboard', dossier, tab: 'board', person: decodeURIComponent(parts.slice(3).join('/')) } : { view: 'dashboard', dossier, tab: 'board' };
-    if (parts[2] === 'analyses' && parts[3]) return { view: 'dashboard', dossier, tab: 'analyses', analysis: decodeURIComponent(parts.slice(3).join('/')) };
-    if (parts[2] === 'dependencies' || parts[2] === 'analyses') return { view: 'dashboard', dossier, tab: parts[2] };
+  if (parts[0] === 'project' && parts[1]) {
+    const toilProject = decodeURIComponent(parts[1]);
+    if (parts[2] === 'item' && parts[3]) return { view: 'item', toilProject, id: decodeURIComponent(parts.slice(3).join('/')) };
+    if (parts[2] === 'assignment' && parts[3]) return { view: 'assignment', toilProject, id: decodeURIComponent(parts[3]) };
+    if (parts[2] === 'job' && parts[3] && jobForSegment(parts[3])) return { view: 'job', toilProject, job: jobForSegment(parts[3])!, target: null };
+    if (parts[2] === 'prs') return { view: 'prs', toilProject };
+    if (parts[2] === 'people') return { view: 'people', toilProject };
+    if (parts[2] === 'command-center') return { view: 'command-center', toilProject };
+    if (parts[2] === 'board') return parts[3] ? { view: 'dashboard', toilProject, tab: 'board', person: decodeURIComponent(parts.slice(3).join('/')) } : { view: 'dashboard', toilProject, tab: 'board' };
+    if (parts[2] === 'analyses' && parts[3]) return { view: 'dashboard', toilProject, tab: 'analyses', analysis: decodeURIComponent(parts.slice(3).join('/')) };
+    if (parts[2] === 'dependencies' || parts[2] === 'analyses') return { view: 'dashboard', toilProject, tab: parts[2] };
     if (parts[2] === 'worklog' && parts[3] === 'standup') {
       // One day names a one-day stand-up; anything that isn't a day is named on the page, which shows the default range instead.
       const [from, to] = [parts[4], parts[5]].map((p) => (p ? decodeURIComponent(p) : undefined));
       const bad = [from, to].filter((p): p is string => p !== undefined && p !== '' && !isDay(p));
-      if (bad.length || (!from && to)) return { view: 'standup', dossier, from: null, to: null, ignored: bad.join(', ') || to! };
-      return { view: 'standup', dossier, from: from ?? null, to: to || from || null };
+      if (bad.length || (!from && to)) return { view: 'standup', toilProject, from: null, to: null, ignored: bad.join(', ') || to! };
+      return { view: 'standup', toilProject, from: from ?? null, to: to || from || null };
     }
-    if (parts[2] === 'worklog') return { view: 'worklog', dossier, day: isDay(parts[3]) ? parts[3] : null };
-    return { view: 'dashboard', dossier };
+    if (parts[2] === 'worklog') return { view: 'worklog', toilProject, day: isDay(parts[3]) ? parts[3] : null };
+    return { view: 'dashboard', toilProject };
   }
-  return { view: 'dossiers' };
+  return { view: 'toilProjects' };
 }
 
 /**
- * Which of a dossier's tabs a route shows (#394). The old addresses keep
+ * Which of a toil project's tabs a route shows (#394). The old addresses keep
  * working on the tab they belong to: the Command Center is the Board's
  * readiness view, the stand-up is the Worklog's, and an item lands on the
  * Board it came from. An assignment belongs to no tab: the Agents sidebar is its home.
  */
-export function tabOf(route: Route): DossierTab | null {
+export function tabOf(route: Route): ToilProjectTab | null {
   switch (route.view) {
     case 'dashboard':
       return route.tab ?? 'overview';
@@ -174,14 +186,24 @@ export function tabOf(route: Route): DossierTab | null {
   }
 }
 
+/** Rewrites an old address in place (no new history entry), so the bar shows the one that is shared and bookmarked from now on. */
+function upgradeLocation() {
+  const upgraded = upgradeHash(window.location.hash);
+  if (upgraded !== window.location.hash) window.history.replaceState(null, '', upgraded);
+}
+
 function useRoute(): Route {
-  const [route, setRoute] = useState(() => parseRoute(window.location.hash));
+  const [route, setRoute] = useState(() => {
+    upgradeLocation();
+    return parseRoute(window.location.hash);
+  });
   useEffect(() => {
     const onChange = () => {
       // Opening the arcade is a modal transition: keep the current view and
       // any unfinished form mounted behind it until the player returns.
       // Coming back to the same route keeps the same object, so nothing reloads on exit either.
       if (window.location.hash === POWERSHELL_MAN_HASH) return;
+      upgradeLocation();
       const next = parseRoute(window.location.hash);
       setRoute((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     };
@@ -250,9 +272,9 @@ export interface AppProps {
   assignments?: AssignmentsApi;
   /** The history of analyses (#395): the server's, or the preview's sample. Without one, the App keeps this page's in memory. */
   analyses?: AnalysesApi;
-  /** Each dossier's last sync, from the sync panel (#342), for its card; absent where nothing syncs (the preview). */
+  /** Each toil project's last sync, from the sync panel (#342), for its card; absent where nothing syncs (the preview). */
   synced?: Record<string, SyncedAt>;
-  /** After a dossier's name or description changed in place, so the shell can read the sync status again under the new name. */
+  /** After a toil project's name or description changed in place, so the shell can read the sync status again under the new name. */
   afterDescribe?: () => void;
   /** Whether the server is older than what is on disk (#305), for the header; absent in the preview. Keep it one function for the App's life: the header asks it again every minute. */
   serverStatus?: () => Promise<ServerStatus | null>;
@@ -260,8 +282,8 @@ export interface AppProps {
   syncing?: SyncJob | null;
   /** When the last sync finished (#494), for Analyze after a sync; absent where nothing syncs. */
   syncedAt?: string | null;
-  /** The facts the last sync recorded for the first time (#419), by dossier, which play the theme's moments once; `id` is when that sync finished. */
-  news?: { id: string; byDossier: Array<{ dossier: string; events: WorklogEvent[] }> } | null;
+  /** The facts the last sync recorded for the first time (#419), by toil project, which play the theme's moments once; `id` is when that sync finished. */
+  news?: { id: string; byToilProject: Array<{ toilProject: string; events: WorklogEvent[] }> } | null;
   /** Starts a sync, where the local app keeps a cache (#416): for the command palette, the first-run checklist and the empty states that a sync fills (#417). */
   onSync?: () => void;
   /** The toil and Toil UI this page runs on, for What's new (#417): the server's, or, absent, the ones this build pins. */
@@ -301,9 +323,9 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   // Every assignment this browser starts is remembered as its own, for "only for agents I started" (#306).
   const { mine, mark } = useMine();
   const assignments = useMemo(() => (given ? remembering(given, mark) : undefined), [given, mark]);
-  const [list, setList] = useState<Loaded<{ dossiers: DossierSummary[]; calls: Call[] }> | null>(null);
-  const [dossiers, setDossiers] = useState<Record<string, Loaded<DossierData>>>({});
-  // What the dossier on screen is waiting on, for its loading screen (#419): the real calls, as they go.
+  const [list, setList] = useState<Loaded<{ toilProjects: ToilProjectSummary[]; calls: Call[] }> | null>(null);
+  const [toilProjects, setToilProjects] = useState<Record<string, Loaded<ToilProjectData>>>({});
+  // What the toil project on screen is waiting on, for its loading screen (#419): the real calls, as they go.
   const [progress, setProgress] = useState<Record<string, CallProgress>>({});
   const choice = useThemeChoice(themeSetting ?? null);
   const scheme = useResolvedScheme(choice.scheme);
@@ -315,7 +337,7 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
     element?.querySelector<HTMLElement>('button')?.focus();
   }, []);
   const first = useRef(true);
-  const wanted = route.view === 'dossiers' || route.view === 'settings' ? null : route.dossier;
+  const wanted = route.view === 'toilProjects' || route.view === 'settings' ? null : route.toilProject;
   // The command palette and the shortcuts sheet (#416), hidden until called up; `focused` is the item the focus was on when the palette opened.
   const [palette, setPalette] = useState<{ open: boolean; focused: string | null }>({ open: false, focused: null });
   const [sheet, setSheet] = useState(false);
@@ -352,16 +374,16 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
     return () => window.removeEventListener('keydown', on, true);
   }, [game.open]);
 
-  // Settings can add or remove dossiers, so the list is read again after a visit there (the first-run checklist, #416, ticks off from it).
+  // Settings can add or remove toil projects, so the list is read again after a visit there (the first-run checklist, #416, ticks off from it).
   useEffect(() => {
     if (route.view === 'settings') setList(null);
   }, [route.view]);
 
   useEffect(() => {
-    // The list feeds the Dossiers view, on a dossier's pages its switcher (#394), and the palette (#416).
+    // The list feeds the Toil projects view, on a toil project's pages its switcher (#394), and the palette (#416).
     if ((route.view === 'settings' && !palette.open) || list) return;
     let live = true;
-    loadDossiers(execute).then(
+    loadToilProjects(execute).then(
       (value) => live && setList({ ok: true, value }),
       (e: unknown) => live && setList(failed(e)),
     );
@@ -370,18 +392,18 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
     };
   }, [route.view, list, execute, palette.open]);
 
-  // The Dossiers view's cards (#342) read each dossier the way its dashboard does, one at a time, from the cache in the
+  // The Toil projects view's cards (#342) read each toil project the way its dashboard does, one at a time, from the cache in the
   // local app, and so does the palette's item search (#416) while it is open. What arrives is kept, so a dashboard
   // opened from a card is already loaded.
-  const names = list?.ok ? list.value.dossiers.map((d) => d.name) : [];
-  const listed = route.view === 'dossiers' || palette.open ? names : [];
-  const nextToLoad = listed.find((n) => !dossiers[n]);
+  const names = list?.ok ? list.value.toilProjects.map((d) => d.name) : [];
+  const listed = route.view === 'toilProjects' || palette.open ? names : [];
+  const nextToLoad = listed.find((n) => !toilProjects[n]);
   useEffect(() => {
     if (!nextToLoad) return;
     let live = true;
-    loadDossier(execute, nextToLoad).then(
-      (value) => live && setDossiers((d) => ({ ...d, [nextToLoad]: { ok: true, value } })),
-      (e: unknown) => live && setDossiers((d) => ({ ...d, [nextToLoad]: failed(e) })),
+    loadToilProject(execute, nextToLoad).then(
+      (value) => live && setToilProjects((d) => ({ ...d, [nextToLoad]: { ok: true, value } })),
+      (e: unknown) => live && setToilProjects((d) => ({ ...d, [nextToLoad]: failed(e) })),
     );
     return () => {
       live = false;
@@ -389,22 +411,22 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   }, [nextToLoad, execute]);
 
   // Opening a dashboard is what "since you last looked" counts from.
-  const looking = route.view === 'dashboard' && wanted && dossiers[wanted]?.ok ? wanted : null;
+  const looking = route.view === 'dashboard' && wanted && toilProjects[wanted]?.ok ? wanted : null;
   useEffect(() => {
     if (looking) markLooked(looking);
   }, [looking]);
 
-  // The splash on the next launch (#462) may show this dossier's sprint, so its dates are remembered as it loads; never the sample's.
-  const onScreen = wanted ? dossiers[wanted] : undefined;
+  // The splash on the next launch (#462) may show this toil project's sprint, so its dates are remembered as it loads; never the sample's.
+  const onScreen = wanted ? toilProjects[wanted] : undefined;
   useEffect(() => {
     if (!preview && wanted && onScreen?.ok) rememberSprint(wanted, health(onScreen.value.items, onScreen.value.changes, now));
   }, [preview, wanted, onScreen, now]);
-  // What the splash knows as it plays, read once: the dossier being opened's remembered sprint at the App's clock, else nothing.
+  // What the splash knows as it plays, read once: the toil project being opened's remembered sprint at the App's clock, else nothing.
   const [splashData] = useState(() => (!preview && wanted ? splashDataFor(wanted, now) : null));
 
   /**
    * After a name or description was changed in place: a description is written
-   * into what's loaded; a rename reads the list and that dossier again, and
+   * into what's loaded; a rename reads the list and that toil project again, and
    * moves the route, and what this browser remembers, to the new name. The
    * server has moved its cache, worklog and assignments by then.
    */
@@ -412,8 +434,8 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
     afterDescribe?.();
     if (!d.renamed) {
       // A new description changes one line of what's loaded, so it's written in rather than read again.
-      setList((l) => (l?.ok ? { ok: true, value: { ...l.value, dossiers: l.value.dossiers.map((x) => (x.name === d.name ? { ...x, description: d.description } : x)) } } : l));
-      setDossiers((all) => {
+      setList((l) => (l?.ok ? { ok: true, value: { ...l.value, toilProjects: l.value.toilProjects.map((x) => (x.name === d.name ? { ...x, description: d.description } : x)) } } : l));
+      setToilProjects((all) => {
         const had = all[d.name];
         return had?.ok ? { ...all, [d.name]: { ok: true, value: { ...had.value, description: d.description } } } : all;
       });
@@ -423,25 +445,25 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
     renameLooked(from, to);
     renameSprint(from, to);
     setList(null);
-    setDossiers(({ [from]: _, ...rest }) => rest);
+    setToilProjects(({ [from]: _, ...rest }) => rest);
     if (wanted === from) {
-      const rest = window.location.hash.replace(/^#\/dossier\/[^/]+/, '');
-      window.location.hash = `${dossierHref(to)}${rest}`;
+      const rest = window.location.hash.replace(/^#\/project\/[^/]+/, '');
+      window.location.hash = `${toilProjectHref(to)}${rest}`;
     }
   };
 
   useEffect(() => {
-    if (!wanted || dossiers[wanted]) return;
+    if (!wanted || toilProjects[wanted]) return;
     let live = true;
     const counted = trackCalls(execute, (p) => live && setProgress((all) => ({ ...all, [wanted]: p })));
-    loadDossier(counted, wanted).then(
-      (value) => live && setDossiers((d) => ({ ...d, [wanted]: { ok: true, value } })),
-      (e: unknown) => live && setDossiers((d) => ({ ...d, [wanted]: failed(e) })),
+    loadToilProject(counted, wanted).then(
+      (value) => live && setToilProjects((d) => ({ ...d, [wanted]: { ok: true, value } })),
+      (e: unknown) => live && setToilProjects((d) => ({ ...d, [wanted]: failed(e) })),
     );
     return () => {
       live = false;
     };
-  }, [wanted, dossiers, execute]);
+  }, [wanted, toilProjects, execute]);
 
   // A new view moves focus to its heading, so a screen reader hears where it
   // landed and the next Tab starts from the top of the content. A dashboard
@@ -475,14 +497,14 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   const skins = skinsFor(theme.name);
   // Mirrors Theme motion on the root (#419), so the moments' CSS plays at the level chosen.
   useThemeMotion();
-  const splashReady = route.view === 'settings' || (route.view === 'dossiers' ? list !== null : Boolean(wanted && dossiers[wanted]));
-  const splashDetail = route.view === 'dossiers' || !wanted ? 'Reading the dossiers with toil dossiers list.' : progressText(progress[wanted]);
+  const splashReady = route.view === 'settings' || (route.view === 'toilProjects' ? list !== null : Boolean(wanted && toilProjects[wanted]));
+  const splashDetail = route.view === 'toilProjects' || !wanted ? 'Reading the Toil projects with toil projects list.' : progressText(progress[wanted]);
   // The App provides the theme context, so it can't read it through useWords(); this is the same lookup.
   const plain = usePlain();
   const words = (key: WordKey, vars?: Record<string, string>) => wordsFor(theme.lexicon, wordingOn(theme, choice), plain.on, key, vars);
-  // A dossier's own views are its tabs (#394), so the header carries only what sits above every dossier.
+  // A toil project's own views are its tabs (#394), so the header carries only what sits above every toil project.
   const links: NavLink[] = [
-    { href: '#/', label: plain.pw('Dossiers', 'Toil projects'), title: plain.title('Dossiers'), current: route.view === 'dossiers' },
+    { href: '#/', label: 'Toil projects', current: route.view === 'toilProjects' },
     { href: '#/settings', label: 'Settings', current: route.view === 'settings' },
   ];
   const top = useRef<HTMLDivElement>(null);
@@ -509,7 +531,7 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
       }}
     />
   );
-  const current = wanted ? dossiers[wanted] : undefined;
+  const current = wanted ? toilProjects[wanted] : undefined;
   const failure = (message: string) => (
     <div role="alert" className="failure">
       <h1 tabIndex={-1}>The data didn't load</h1>
@@ -520,29 +542,29 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   let body;
   if (route.view === 'settings') {
     body = <Settings page={route.page} {...(route.at ? { at: route.at } : {})} config={config ?? null} modelUsage={modelUsage ?? null} {...(agentSettings ? { agent: agentSettings } : {})} />;
-  } else if (route.view === 'dossiers') {
-    body = !list ? <Loader message={words('loading.dossiers')} detail="Reading them with toil dossiers list." /> : list.ok ? <Dossiers dossiers={list.value.dossiers} calls={list.value.calls} loaded={dossiers} now={now} synced={synced ?? (preview ? null : {})} config={config ?? null} onDescribed={described} onSync={onSync} /> : failure(list.message);
+  } else if (route.view === 'toilProjects') {
+    body = !list ? <Loader message={words('loading.toilProjects')} detail="Reading them with toil projects list." /> : list.ok ? <ToilProjects toilProjects={list.value.toilProjects} calls={list.value.calls} loaded={toilProjects} now={now} synced={synced ?? (preview ? null : {})} config={config ?? null} onDescribed={described} onSync={onSync} /> : failure(list.message);
   } else if (!current) {
-    body = <Loader message={words('loading.dossier', { name: route.dossier })} detail={progressText(progress[route.dossier])} />;
+    body = <Loader message={words('loading.toilProject', { name: route.toilProject })} detail={progressText(progress[route.toilProject])} />;
   } else if (!current.ok) {
     body = failure(current.message);
   } else {
-    const data: Data = { ...(onSync ? { sync: onSync } : {}), dossier: current.value, byId: new Map(current.value.items.map((i) => [i.id, i])), prById: new Map((current.value.pullRequests ?? []).map((c) => [c.id, c])), agent, now, ...(preview ? { viewedAt: new Date(Date.parse(now) + 2 * 3_600_000).toISOString() } : {}), execute, analyses, ...(config ? { config } : {}), ...(assignments ? { assignments } : {}), ...(startReady ? { startReady } : assignments && !assignments.disabled ? { startReady: startReadyWith(assignments, route.dossier) } : {}), refresh: () => setDossiers(({ [route.dossier]: _, ...rest }) => rest), described };
+    const data: Data = { ...(onSync ? { sync: onSync } : {}), toilProject: current.value, byId: new Map(current.value.items.map((i) => [i.id, i])), prById: new Map((current.value.pullRequests ?? []).map((c) => [c.id, c])), agent, now, ...(preview ? { viewedAt: new Date(Date.parse(now) + 2 * 3_600_000).toISOString() } : {}), execute, analyses, ...(config ? { config } : {}), ...(assignments ? { assignments } : {}), ...(startReady ? { startReady } : assignments && !assignments.disabled ? { startReady: startReadyWith(assignments, route.toilProject) } : {}), refresh: () => setToilProjects(({ [route.toilProject]: _, ...rest }) => rest), described };
     body = (
       <DataContext value={data}>
-        {/* The Ask bar (#343), on every dossier page; its chat is keyed by dossier, so a conversation lasts across that dossier's views. */}
-        <ChatScope key={route.dossier}>
+        {/* The Ask bar (#343), on every toil project page; its chat is keyed by toil project, so a conversation lasts across that toil project's views. */}
+        <ChatScope key={route.toilProject}>
           <AnalyzeAfterSync syncedAt={syncedAt ?? null} />
-          <DossierShell tab={tabOf(route)} peek={route.peek ?? null} heading={route.view === 'dashboard'} dossiers={list?.ok ? list.value.dossiers.map((d) => d.name) : null} {...(route.view === 'command-center' ? { boardView: 'readiness' as const } : route.view === 'dashboard' && route.tab === 'board' ? { boardView: 'board' as const } : {})}>
+          <ToilProjectShell tab={tabOf(route)} peek={route.peek ?? null} heading={route.view === 'dashboard'} toilProjects={list?.ok ? list.value.toilProjects.map((d) => d.name) : null} {...(route.view === 'command-center' ? { boardView: 'readiness' as const } : route.view === 'dashboard' && route.tab === 'board' ? { boardView: 'board' as const } : {})}>
             {route.view === 'item' ? <ItemView id={route.id} /> : route.view === 'assignment' ? <AssignmentView id={route.id} /> : route.view === 'job' ? <JobPage id={route.job} target={route.target} /> : route.view === 'prs' ? <PullRequests /> : route.view === 'people' ? <People /> : route.view === 'worklog' ? <Worklog api={worklog ?? null} day={route.day} /> : route.view === 'standup' ? <Standup api={worklog ?? null} from={route.from} to={route.to} {...(route.ignored ? { ignored: route.ignored } : {})} /> : route.view === 'command-center' ? <CommandCenter /> : <Dashboard {...(route.tab ? { tab: route.tab } : {})} {...(route.person ? { person: route.person } : {})} {...(route.analysis ? { analysis: route.analysis } : {})} />}
-          </DossierShell>
+          </ToilProjectShell>
         </ChatScope>
       </DataContext>
     );
   }
 
   return (
-    <NotifyProvider assignments={assignments} dossier={wanted} mine={mine}>
+    <NotifyProvider assignments={assignments} toilProject={wanted} mine={mine}>
     <ThemeProvider value={theme}>
       <ThemeChoiceProvider value={choice}>
       <SkinProvider value={skins}>
@@ -550,7 +572,7 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
         <TokenStyles css={THEMES.map(tokenCss).join('\n')} />
         <Ambient theme={theme.name} scheme={scheme} />
         <Splash ready={splashReady} detail={splashDetail} data={splashData} />
-        <PlayNews news={news ?? null} dossier={wanted} />
+        <PlayNews news={news ?? null} toilProject={wanted} />
         <a className="skip" href="#main" onClick={skip} inert={game.open} aria-hidden={game.open || undefined}>
           Skip to content
         </a>
@@ -622,10 +644,10 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
           onOpenChange={(open) => setPalette((p) => ({ ...p, open }))}
           agent={agent}
           analysesApi={analyses}
-          reading={palette.open ? names.filter((n) => !dossiers[n]).length : 0}
+          reading={palette.open ? names.filter((n) => !toilProjects[n]).length : 0}
           route={route}
-          dossiers={names}
-          loaded={dossiers}
+          toilProjects={names}
+          loaded={toilProjects}
           synced={synced}
           themes={THEMES.map((t) => ({ name: t.name, label: t.label }))}
           currentTheme={theme.name}
@@ -685,7 +707,7 @@ export const COMPACT_HEADER = '(max-width: 1023px)';
 
 /**
  * Whether the header's one row is too crowded at this width: its links and
- * controls would wrap onto a second row, as a dossier's seven links can with a
+ * controls would wrap onto a second row, as a toil project's seven links can with a
  * wider font (Linux's, say). Measured on the full header and kept until the
  * window is wider than where it last didn't fit or its links change, so the header shows its Menu
  * instead of wrapping, and never flips back and forth at one width.
@@ -803,15 +825,15 @@ function HeaderMenu({ suspended, links, feedback, controls, help, fresh, onPalet
   );
 }
 
-/** The facts a sync recorded for the first time, played once as the theme's moments (#419): the dossier on screen's, or every dossier's on the views above them. */
+/** The facts a sync recorded for the first time, played once as the theme's moments (#419): the toil project on screen's, or every toil project's on the views above them. */
 const played = new Set<string>();
-function PlayNews({ news, dossier }: { news: AppProps['news'] | null; dossier: string | null }) {
+function PlayNews({ news, toilProject }: { news: AppProps['news'] | null; toilProject: string | null }) {
   const player = useMomentPlayer();
   useEffect(() => {
     if (!news || played.has(news.id)) return;
     played.add(news.id);
-    const events = news.byDossier.filter((d) => !dossier || d.dossier === dossier).flatMap((d) => d.events);
+    const events = news.byToilProject.filter((d) => !toilProject || d.toilProject === toilProject).flatMap((d) => d.events);
     player.play(momentsFor(events));
-  }, [news, dossier, player]);
+  }, [news, toilProject, player]);
   return null;
 }

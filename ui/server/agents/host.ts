@@ -5,7 +5,7 @@
  * reports which SDKs and CLIs are on this machine for the Settings page, and
  * saves the choice to `~/.toil-ui/agent.json`.
  *
- * Every question runs with the dossier's read-only tools and a fresh ledger,
+ * Every question runs with the toil project's read-only tools and a fresh ledger,
  * streams its text, and ends with answer.ts's checks: citations held to the
  * tool results, writes turned into proposals the pane shows and nobody here
  * runs. Each question is recorded as an agent run (#308) as it starts and
@@ -14,7 +14,7 @@
  * calls.
  *
  * Usage (#295): every adapter hands what its SDK reports to a sink here,
- * which stamps each report with the chat, turn, dossier and time, prices
+ * which stamps each report with the chat, turn, toil project and time, prices
  * Codex's from the person's rates, and holds it against the caps as it
  * arrives: a cap already reached refuses the question, and one passed during
  * a run stops it cleanly. Whatever the outcome, the run's records go to the
@@ -46,12 +46,12 @@ import { cliFor, Latest, loadSdk, nodeImporter, type Activity, type AdapterName,
 import { loadUsageSettings, memoryLedger, type UsageLedger } from '../usage.ts';
 import { checkAgentSettings, cliPathOf, loadAgentSettings, modelOf, saveAgentSettings, DEFAULT_AGENT_SETTINGS, ENDPOINTS, type AgentSettings } from './settings.ts';
 import { promptStyle, type StyleChoice } from './voices.ts';
-import { cacheTools, dossierReader, Ledger, liveTools, peopleTools, proposalTool, prTools, readinessTools, recorded, standupTool, worklogTool, type AgentData, type MapIds, type ReadCommand, type ToolSpec } from './tools.ts';
+import { cacheTools, toilProjectReader, Ledger, liveTools, peopleTools, proposalTool, prTools, readinessTools, recorded, standupTool, worklogTool, type AgentData, type MapIds, type ReadCommand, type ToolSpec } from './tools.ts';
 
 /** A task Toil UI wrote for an agent (#293): an assignment's run. */
 export interface TaskRequest {
   adapter: AdapterName;
-  dossier: string;
+  toilProject: string;
   /** The usage ledger's chat: the assignment's id, so its per-chat cap is the assignment's. */
   chat: string;
   system: string;
@@ -74,8 +74,8 @@ export interface AgentHostOptions {
   dataDir: string;
   /** Toil UI's version, for the SDKs' client labels. */
   version: string;
-  /** The dossier's synced rows, or null when it has never synced. */
-  data(dossier: string): AgentData | null;
+  /** The toil project's synced rows, or null when it has never synced. */
+  data(toilProject: string): AgentData | null;
   /** toil's registry: the live tools come from its reads, the proposals' commands from its writes. */
   registry: readonly ReadCommand[];
   execute: Execute;
@@ -99,7 +99,7 @@ export interface AgentHostOptions {
    */
   onRun?: (run: AgentRun) => Promise<void> | void;
   /** How many finished runs of a job's question the worklog holds, so a loop (Ship) can stop at its limit (#532). */
-  rounds?: (dossier: string, label: string, self: { id: string; startedAt: string }) => number;
+  rounds?: (toilProject: string, label: string, self: { id: string; startedAt: string }) => number;
   /** Where usage records go (#295): the cache's ledger, or one in memory. */
   ledger?: UsageLedger;
   /** Toil UI's own package folder, the one holding dist/server/toil-ui.js: where Install puts an SDK (install.ts, #344). */
@@ -117,7 +117,7 @@ export interface AgentHostOptions {
 
 /** A chat's session as the server holds it (#305): what it started on, and whether a question runs now. */
 interface ChatRecord {
-  dossier: string;
+  toilProject: string;
   origin: Fingerprint;
   startedAt: string;
   renewals: number;
@@ -217,29 +217,29 @@ export class AgentHost implements Agent {
   }
 
   /** The same starters whichever adapter answers, and with none chosen, since a chat can switch to one (#344). */
-  async starters(_ctx: RequestContext, _dossier: string): Promise<Starter[]> {
+  async starters(_ctx: RequestContext, _toilProject: string): Promise<Starter[]> {
     return STARTERS.map(({ id, label }) => ({ id, label }));
   }
 
-  async ask(ctx: RequestContext, dossier: string, prompt: string, style: StyleChoice | null = null, chat?: ChatTurn, extra: AskExtra = {}): Promise<Answer> {
+  async ask(ctx: RequestContext, toilProject: string, prompt: string, style: StyleChoice | null = null, chat?: ChatTurn, extra: AskExtra = {}): Promise<Answer> {
     let last: Answer | undefined;
-    for await (const a of this.stream(ctx, dossier, prompt, style, chat, extra)) last = a;
+    for await (const a of this.stream(ctx, toilProject, prompt, style, chat, extra)) last = a;
     if (!last) throw new AgentError('The agent ended without an answer.', 'Ask again.');
     return last;
   }
 
-  /** The tools a question about this dossier gets, and the ledger they fill: what every adapter is handed. */
-  tools(dossier: string, data: AgentData, ledger: Ledger): ToolSpec[] {
+  /** The tools a question about this toil project gets, and the ledger they fill: what every adapter is handed. */
+  tools(toilProject: string, data: AgentData, ledger: Ledger): ToolSpec[] {
     const now = this.o.now ?? (() => new Date().toISOString());
-    return recorded([...cacheTools(dossier, data, ledger), ...prTools(dossier, data, ledger), ...peopleTools(dossier, data, ledger, dossierReader(this.o.execute, dossier)), ...worklogTool(dossier, data, ledger, now), ...standupTool(dossier, data, ledger, now), ...readinessTools(dossier, data, ledger, dossierReader(this.o.execute, dossier)), proposalTool(this.o.registry), ...liveTools(dossier, this.o.registry, this.o.execute, this.o.mapIds, ledger)], ledger);
+    return recorded([...cacheTools(toilProject, data, ledger), ...prTools(toilProject, data, ledger), ...peopleTools(toilProject, data, ledger, toilProjectReader(this.o.execute, toilProject)), ...worklogTool(toilProject, data, ledger, now), ...standupTool(toilProject, data, ledger, now), ...readinessTools(toilProject, data, ledger, toilProjectReader(this.o.execute, toilProject)), proposalTool(this.o.registry), ...liveTools(toilProject, this.o.registry, this.o.execute, this.o.mapIds, ledger)], ledger);
   }
 
   /**
-   * The system prompt a question about this dossier gets now, in this style:
+   * The system prompt a question about this toil project gets now, in this style:
    * what every adapter is handed, for Settings' "Show the full prompt" (#283).
    */
-  systemPrompt(dossier: string, style: StyleChoice | null): string {
-    return systemPrompt(dossier, (this.o.now ?? (() => new Date().toISOString()))(), promptStyle(style, this.settings));
+  systemPrompt(toilProject: string, style: StyleChoice | null): string {
+    return systemPrompt(toilProject, (this.o.now ?? (() => new Date().toISOString()))(), promptStyle(style, this.settings));
   }
 
   private clock(): string {
@@ -263,24 +263,24 @@ export class AgentHost implements Agent {
     return capStandings(settings, adapter, [...this.ledger.chat(chatId), ...run], [...this.ledger.since(day), ...run]);
   }
 
-  async *stream(ctx: RequestContext, dossier: string, prompt: string, style: StyleChoice | null = null, chat?: ChatTurn, extra: AskExtra = {}): AsyncIterable<Answer> {
+  async *stream(ctx: RequestContext, toilProject: string, prompt: string, style: StyleChoice | null = null, chat?: ChatTurn, extra: AskExtra = {}): AsyncIterable<Answer> {
     // The chat's own adapter (#344) wins over Settings' for this question only.
     const runtime = extra.adapter ? this.runtime(extra.adapter) : this.runtime();
     if (extra.adapter && !runtime) throw new AgentError(`Toil UI has no ${extra.adapter} adapter.`, 'Choose claude, copilot or codex.');
     if (!runtime) {
-      yield await this.o.fallback.ask(ctx, dossier, prompt, style);
+      yield await this.o.fallback.ask(ctx, toilProject, prompt, style);
       return;
     }
     if (this.running >= MAX_RUNS) throw new AgentError(`${MAX_RUNS} questions are already running.`, 'Wait for an answer, then ask again.');
     // Counted from here, before anything can await, and given back in the finally whatever fails: the SDK load, the CLI search, the run.
     this.running++;
     // The chat's own session (#305): recorded at its first question, and held as running so a renew waits for the answer.
-    const held = chat && this.o.fingerprints ? await this.hold(chat.id, dossier).catch(() => null) : null;
+    const held = chat && this.o.fingerprints ? await this.hold(chat.id, toilProject).catch(() => null) : null;
     let run: Promise<void> | undefined;
     const now = this.o.now ?? (() => new Date().toISOString());
-    const asked = promptFor(dossier, prompt).label;
+    const asked = promptFor(toilProject, prompt).label;
     let record: AgentRun = {
-      id: randomUUID(), kind: 'ask', dossier, startedAt: now(), finishedAt: null, outcome: 'running',
+      id: randomUUID(), kind: 'ask', toilProject, startedAt: now(), finishedAt: null, outcome: 'running',
       by: this.byOf(runtime), prompt: asked, answer: null, error: null, citations: [], unverified: [], proposals: [],
     };
     const report = async () => {
@@ -293,10 +293,10 @@ export class AgentHost implements Agent {
     await report();
     let last: Answer | undefined;
     try {
-      const data = this.o.data(dossier);
-      if (!data) throw new AgentError(`Toil UI hasn't synced ${dossier} yet, so the agent has nothing to read.`, 'Press Sync now in the Sync panel, then ask again.');
+      const data = this.o.data(toilProject);
+      if (!data) throw new AgentError(`Toil UI hasn't synced ${toilProject} yet, so the agent has nothing to read.`, 'Press Sync now in the Sync panel, then ask again.');
       const ledger = new Ledger();
-      const asking = prompt === 'analyze' ? await analyzeQuestion(this.o.execute, dossier) : (jobQuestion(dossier, prompt, (l) => this.o.rounds?.(dossier, l, record) ?? 0, knownTargets(data.changes())) ?? { ...promptFor(dossier, prompt), warning: null });
+      const asking = prompt === 'analyze' ? await analyzeQuestion(this.o.execute, toilProject) : (jobQuestion(toilProject, prompt, (l) => this.o.rounds?.(toilProject, l, record) ?? 0, knownTargets(data.changes())) ?? { ...promptFor(toilProject, prompt), warning: null });
       const { label, text: question } = asking;
       // The chat so far goes before the question, so a follow-up or a switched adapter continues from it (#344).
       const { text, carried } = withHistory(question, extra.history);
@@ -307,7 +307,7 @@ export class AgentHost implements Agent {
       let sofar = '';
       const doing = (activity: AnswerActivity) => out.push({ ...partial(sofar, { prompt: label, by }), ...who, activity });
       doing({ phase: 'thinking' });
-      const watched = this.tools(dossier, data, ledger).map((t): ToolSpec => ({
+      const watched = this.tools(toilProject, data, ledger).map((t): ToolSpec => ({
         ...t,
         run: (input, signal) => {
           doing({ phase: 'tool', tool: t.command ?? t.name, source: sourceOf(t) });
@@ -316,11 +316,11 @@ export class AgentHost implements Agent {
       }));
       run = this.once({
         runtime,
-        dossier,
+        toilProject,
         // A question with no chat (an API caller) is a chat of its own.
         turn: chat ?? { id: `ask-${randomUUID()}`, turn: 1 },
         // The rules, then the theme's voice or the person's own, then their instructions (prompts.ts): the same for all three adapters.
-        system: this.systemPrompt(dossier, style),
+        system: this.systemPrompt(toilProject, style),
         prompt: text,
         tools: watched,
         workspace: null,
@@ -335,7 +335,7 @@ export class AgentHost implements Agent {
           // A job's proposals may name only the writes its page lists; anything else drops like any invalid one.
           const only = 'writes' in asking ? (asking.writes as readonly string[]) : undefined;
           const allowed = only ? new Map([...this.writes].filter(([name]) => only.includes(name))) : this.writes;
-          const done = finish(final, { dossier, prompt: label, by, ledger, writes: allowed });
+          const done = finish(final, { toilProject, prompt: label, by, ledger, writes: allowed });
           if (asking.warning) done.warnings = [...(done.warnings ?? []), asking.warning];
           out.push({ ...done, ...who, usage, ...(session ? { session } : {}) });
           out.end();
@@ -365,20 +365,20 @@ export class AgentHost implements Agent {
 
   /**
    * The prompts part of a chat's fingerprint (#305): the system prompt for a
-   * placeholder dossier and time, every starter and Analyze, and the
+   * placeholder toil project and time, every starter and Analyze, and the
    * person's instructions and custom voice. The theme on screen isn't in it:
    * a person switching theme isn't the ground moving.
    */
   chatPrompts(): string {
-    const d = '<dossier>';
+    const d = '<Toil project>';
     return sha256({ system: systemPrompt(d, '<now>', promptStyle(null, this.settings)), voice: this.settings.voice, starters: STARTERS.map((s) => s.prompt(d)), analyze: promptFor(d, 'analyze').text });
   }
 
   /** A chat's record, made at its first question; marked running until the question ends. */
-  private async hold(chatId: string, dossier: string): Promise<ChatRecord> {
+  private async hold(chatId: string, toilProject: string): Promise<ChatRecord> {
     let r = this.chats.get(chatId);
-    if (!r || r.dossier !== dossier) {
-      r = { dossier, origin: await this.o.fingerprints!.origin(dossier, this.chatPrompts()), startedAt: this.clock(), renewals: 0, running: 0 };
+    if (!r || r.toilProject !== toilProject) {
+      r = { toilProject, origin: await this.o.fingerprints!.origin(toilProject, this.chatPrompts()), startedAt: this.clock(), renewals: 0, running: 0 };
       this.chats.set(chatId, r);
       while (this.chats.size > MAX_CHATS) this.chats.delete(this.chats.keys().next().value!);
     }
@@ -387,7 +387,7 @@ export class AgentHost implements Agent {
   }
 
   private async checked(r: ChatRecord): Promise<ChatSession> {
-    const current = await this.o.fingerprints!.current(r.dossier, this.chatPrompts());
+    const current = await this.o.fingerprints!.current(r.toilProject, this.chatPrompts());
     const stale = staleness(r.origin, current);
     return { startedAt: r.startedAt, stale: stale ? { ...stale, restart: this.o.fingerprints!.restartNeeded() } : null, renewals: r.renewals };
   }
@@ -405,14 +405,14 @@ export class AgentHost implements Agent {
    * is the whole of it; the chat's usage total carries on, so a renew never
    * resets a cap. Refused while a question runs: a renew never interrupts a turn.
    */
-  async renew(chatId: string, dossier: string): Promise<ChatSession> {
+  async renew(chatId: string, toilProject: string): Promise<ChatSession> {
     if (!this.o.fingerprints) throw new AgentError('This Toil UI records no sessions, so there is nothing to renew.', 'Start toil-ui with its cache to record what each chat started on.');
     // A chat renewed on an out-of-date server would start on the old build, stale at once: only a restart helps.
     const restart = this.o.fingerprints.restartNeeded();
     if (restart) throw Object.assign(new AgentError("This chat can't be renewed until Toil UI restarts.", restart), { status: 409 });
     const r = this.chats.get(chatId);
     if (r?.running) throw Object.assign(new AgentError('This chat is answering a question now, and a renew never interrupts one.', 'Wait for the answer, or press Stop, then renew.'), { status: 409 });
-    const next: ChatRecord = { dossier, origin: await this.o.fingerprints.origin(dossier, this.chatPrompts()), startedAt: this.clock(), renewals: (r?.renewals ?? 0) + 1, running: 0 };
+    const next: ChatRecord = { toilProject, origin: await this.o.fingerprints.origin(toilProject, this.chatPrompts()), startedAt: this.clock(), renewals: (r?.renewals ?? 0) + 1, running: 0 };
     this.chats.delete(chatId);
     this.chats.set(chatId, next);
     while (this.chats.size > MAX_CHATS) this.chats.delete(this.chats.keys().next().value!);
@@ -524,7 +524,7 @@ export class AgentHost implements Agent {
    * before the text or the error leaves. Stops on the caller's signal or at a cap.
    */
   private async once(s: RunSpec): Promise<{ text: string; usage: AnswerUsage }> {
-    const { runtime, dossier, turn } = s;
+    const { runtime, toilProject, turn } = s;
     const importer = this.o.importer ?? nodeImporter;
     const env = this.o.env ?? process.env;
     const sdk = await loadSdk(runtime, importer);
@@ -546,7 +546,7 @@ export class AgentHost implements Agent {
     if (s.signal.aborted) cancel();
     else s.signal.addEventListener('abort', cancel, { once: true });
     const stamp = (r: UsageReport): UsageRecord => {
-      const record: UsageRecord = { ...r, chatId: turn.id, turn: turn.turn, dossier, adapter: runtime.name, at: this.clock() };
+      const record: UsageRecord = { ...r, chatId: turn.id, turn: turn.turn, toilProject, adapter: runtime.name, at: this.clock() };
       const cost = rates ? codexCost(record, rates) : undefined;
       return cost === undefined ? record : { ...record, costUsd: cost, costSource: 'your-rates' };
     };

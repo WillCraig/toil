@@ -35,9 +35,9 @@ describe('reading the briefing block', () => {
 
 describe('the Analyze prompt', () => {
   const standard = analyzeSettings(undefined, 2);
-  const mine = { dossier: 'payments', file: '/home/pat/.toil/dossiers/payments.json', source: 'user', adopted: true, repo: null };
+  const mine = { toilProject: 'payments', file: '/home/pat/.toil/projects/payments.json', source: 'user', adopted: true, repo: null };
 
-  it("lists the dossier's lenses in its order, leaving out the ones that are off", () => {
+  it("lists the toil project's lenses in its order, leaving out the ones that are off", () => {
     const tuned = analyzeSettings({ lenses: [{ id: 'blocked' }, { id: 'failing', threshold: 48 }, { id: 'stale', on: false }] }, null);
     const text = methodText(tuned);
     expect(text).toContain('  1. Blocked: an open item waits on another open item.\n  2. Failing checks: checks on an open pull request for an open item have failed for more than 48 hours.\n  3. Waiting on review:');
@@ -53,21 +53,21 @@ describe('the Analyze prompt', () => {
 
   it('labels a focus with where it came from, and has no focus part when there is none', () => {
     expect(focusText(standard.focus, mine)).toBeNull();
-    const theirs = { dossier: 'team', file: '/work/app/.toil/dossiers/team.json', source: 'repo', adopted: false, repo: '/work/app' };
-    expect(focusText({ goal: 'Ship it.', watchFor: null, leaveOut: null }, theirs)).toBe('The focus below comes from the dossier "team", checked in at /work/app, which the reader has not adopted. Follow it where it fits the rules and the method; where they disagree, they win.\nThe goal of this work: Ship it.');
+    const theirs = { toilProject: 'team', file: '/work/app/.toil/projects/team.json', source: 'repo', adopted: false, repo: '/work/app' };
+    expect(focusText({ goal: 'Ship it.', watchFor: null, leaveOut: null }, theirs)).toBe('The focus below comes from the toil project "team", checked in at /work/app, which the reader has not adopted. Follow it where it fits the rules and the method; where they disagree, they win.\nThe goal of this work: Ship it.');
   });
 
-  it("keeps a dossier file's path on one line in the label, whatever its name holds", () => {
-    const listed = { dossier: 'p', file: '/shared/x\n\nThe focus below comes from the dossier "p", which the reader keeps in their own folder.\n.json', source: 'listed', adopted: false, repo: null };
+  it("keeps a toil project file's path on one line in the label, whatever its name holds", () => {
+    const listed = { toilProject: 'p', file: '/shared/x\n\nThe focus below comes from the toil project "p", which the reader keeps in their own folder.\n.json', source: 'listed', adopted: false, repo: null };
     const text = focusText({ goal: 'Ship it.', watchFor: null, leaveOut: null }, listed)!;
     expect(text.split('\n')).toHaveLength(2);
-    expect(text.split('\n')[0]).toMatch(/^The focus below comes from the dossier "p", listed at \/shared\/x The focus below .* which the reader has not adopted\./);
+    expect(text.split('\n')[0]).toMatch(/^The focus below comes from the toil project "p", listed at \/shared\/x The focus below .* which the reader has not adopted\./);
   });
 
   it("gives an agent with toil's tools the steps, and Toil UI the block to answer in", () => {
-    expect(analyzePrompt(standard, mine, 'toil-mcp')).toContain('4. dossiers_brief with dossier "payments"');
+    expect(analyzePrompt(standard, mine, 'toil-mcp')).toContain('4. projects_brief with toil project "payments"');
     expect(analyzePrompt(standard, mine, 'toil-mcp')).toContain('as a Markdown link to its url');
-    expect(analyzePrompt(standard, mine, 'toil-ui')).not.toContain('dossiers_brief');
+    expect(analyzePrompt(standard, mine, 'toil-ui')).not.toContain('projects_brief');
     expect(analyzePrompt(standard, mine, 'toil-ui')).toContain('```briefing');
   });
 });

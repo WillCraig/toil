@@ -1,8 +1,8 @@
 /**
- * The first run (#416): in place of an empty Dossiers view, three steps, each
+ * The first run (#416): in place of an empty Toil projects view, three steps, each
  * ticked off from toil's own state rather than from anything this page
  * remembers: a connection to a tracker (`toil connections list`, which counts
- * one made by env vars), a dossier (`toil dossiers list`), and a first sync
+ * one made by env vars), a toil project (`toil projects list`), and a first sync
  * (the sync panel's status). Beside them, the command that restarts Toil UI on
  * the sample data. Each step's explanation is its (i), never a paragraph, and
  * the list goes once the first sync has finished. Onboarding, in three boxes,
@@ -13,7 +13,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from 'react-aria-components';
 import type { ConfigApi, ConnectionsData } from '../config.ts';
 import type { HelpTopicId } from '../help.ts';
-import { ADD_CONNECTION_HREF, CREATE_DOSSIER_HREF } from '../views/Settings.tsx';
+import { ADD_CONNECTION_HREF, CREATE_TOIL_PROJECT_HREF } from '../views/Settings.tsx';
 import { OWI_SOURCES } from '../../../src/core/owi/types.ts';
 import { usePlain } from '../plain-words.ts';
 import { Help } from './help.tsx';
@@ -23,29 +23,28 @@ import './first-run.css';
 /** The command that starts Toil UI on the sample data. */
 export const SAMPLE_COMMAND = 'npx @imagile-dev/toil-ui --sample';
 
-/** The areas a dossier reads work items from: a connection to one of these is a tracker. */
+/** The areas a toil project reads work items from: a connection to one of these is a tracker. */
 export const TRACKER_AREAS: ReadonlySet<string> = new Set(Object.entries(OWI_SOURCES).flatMap(([area, s]) => (s.items.length ? [area] : [])));
 
-/** Whether the first run shows: no dossier yet, or, where Toil UI syncs, none synced yet. */
-export function firstRunShows(dossiers: number, synced: Record<string, unknown> | null, syncs: boolean): boolean {
-  return dossiers === 0 || (syncs && synced !== null && Object.keys(synced).length === 0);
+/** Whether the first run shows: no toil project yet, or, where Toil UI syncs, none synced yet. */
+export function firstRunShows(toilProjects: number, synced: Record<string, unknown> | null, syncs: boolean): boolean {
+  return toilProjects === 0 || (syncs && synced !== null && Object.keys(synced).length === 0);
 }
 
 type Trackers = { ok: true; names: string[] } | { ok: false; message: string } | null;
 
 export interface FirstRunProps {
-  dossiers: number;
-  /** Each dossier's last sync; empty until the first one finishes. */
+  toilProjects: number;
+  /** Each toil project's last sync; empty until the first one finishes. */
   synced: Record<string, unknown> | null;
   config: ConfigApi | null;
   /** Starts a sync, where Toil UI keeps a cache; absent where it doesn't. */
   onSync?: (() => void) | undefined;
-  /** The theme's line for an empty Dossiers view, shown when there are no dossiers. */
+  /** The theme's line for an empty Toil projects view, shown when there are no toil projects. */
   lede?: string;
 }
 
-export function FirstRun({ dossiers, synced, config, onSync, lede }: FirstRunProps) {
-  const plain = usePlain();
+export function FirstRun({ toilProjects, synced, config, onSync, lede }: FirstRunProps) {
   const [trackers, setTrackers] = useState<Trackers>(null);
   useEffect(() => {
     if (!config) return;
@@ -80,14 +79,14 @@ export function FirstRun({ dossiers, synced, config, onSync, lede }: FirstRunPro
               Add a connection
             </a>
           </Step>
-          <Step n={2} title={plain.pw('Create a dossier', 'Create a Toil project')} precise="Create a dossier" topic="dossier-setup" done={dossiers > 0} detail={null}>
-            <a className="btn" href={CREATE_DOSSIER_HREF} data-first-run-step="dossier" title={plain.title('Create a dossier')}>
-              {plain.pw('Create a dossier', 'Create a Toil project')}
+          <Step n={2} title={'Create a Toil project'} topic="toil-project-setup" done={toilProjects > 0} detail={null}>
+            <a className="btn" href={CREATE_TOIL_PROJECT_HREF} data-first-run-step="toilProject">
+              Create a Toil project
             </a>
           </Step>
           <Step n={3} title="Sync" topic="sync" done={syncedOnce} detail={onSync ? null : 'This Toil UI keeps no cache, so it has nothing to sync.'}>
             {onSync && (
-              <Button className="btn" onPress={onSync} isDisabled={dossiers === 0} data-first-run-step="sync">
+              <Button className="btn" onPress={onSync} isDisabled={toilProjects === 0} data-first-run-step="sync">
                 Sync now
               </Button>
             )}

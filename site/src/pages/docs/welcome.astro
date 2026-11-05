@@ -20,24 +20,24 @@ const actions = [
   { action: 'Remove a connection', cmd: 'toil connections remove <name>', then: 'after you type the name' },
 ];
 
-const dossierActions = [
-  { action: 'This folder', cmd: 'toil dossiers context', then: '' },
-  { action: 'Create: name', cmd: 'toil dossiers init <name>', then: '' },
-  { action: 'Create: repositories', cmd: 'toil repos scan', then: 'then toil dossiers add-repo <name> <folder> for each one ticked' },
-  { action: 'Create: an area and its connection', cmd: 'toil dossiers link <name> <area> --connection <connection>', then: 'or --host <host>' },
-  { action: 'Create: discovery', cmd: 'toil jira issue fields --discover --custom-only --dossier <name>', then: 'then toil dossiers field for each one ticked' },
-  { action: 'Create: an environment', cmd: 'toil dossiers env <name> <env> <area> --connection <connection>', then: '' },
-  { action: 'Review', cmd: 'toil dossiers check <name>', then: 'and toil <area> check-dossier' },
-  { action: 'Remove a section', cmd: 'toil dossiers unlink <name> --area <area>', then: 'after you type the area' },
-  { action: 'Export', cmd: 'toil dossiers export <name> --repo <dir>', then: 'or --file <path>' },
-  { action: 'Import', cmd: 'toil dossiers import <file>', then: 'after toil dossiers check <file>' },
-  { action: 'Delete', cmd: 'toil dossiers remove <name>', then: 'after you type the name' },
+const projectActions = [
+  { action: 'This folder', cmd: 'toil projects context', then: '' },
+  { action: 'Create: name', cmd: 'toil projects init <name>', then: '' },
+  { action: 'Create: repositories', cmd: 'toil repos scan', then: 'then toil projects add-repo <name> <folder> for each one ticked' },
+  { action: 'Create: an area and its connection', cmd: 'toil projects link <name> <area> --connection <connection>', then: 'or --host <host>' },
+  { action: 'Create: discovery', cmd: 'toil jira issue fields --discover --custom-only --toil-project <name>', then: 'then toil projects field for each one ticked' },
+  { action: 'Create: an environment', cmd: 'toil projects env <name> <env> <area> --connection <connection>', then: '' },
+  { action: 'Review', cmd: 'toil projects check <name>', then: 'and toil <area> check-toil-project' },
+  { action: 'Remove a section', cmd: 'toil projects unlink <name> --area <area>', then: 'after you type the area' },
+  { action: 'Export', cmd: 'toil projects export <name> --repo <dir>', then: 'or --file <path>' },
+  { action: 'Import', cmd: 'toil projects import <file>', then: 'after toil projects check <file>' },
+  { action: 'Delete', cmd: 'toil projects remove <name>', then: 'after you type the name' },
 ];
 
 const keys = [
   ['Up / down, or j / k', 'Move'],
   ['Enter, or 1 to 9', 'Choose'],
-  ['Space', 'Tick a box: areas for an agent, repositories or discovered values for a dossier'],
+  ['Space', 'Tick a box: areas for an agent, repositories or discovered values for a toil project'],
   ['Esc', 'Back one screen, keeping your answers'],
   ['q', 'Quit from anywhere but a text field'],
   ['Ctrl+C', 'Cancels the command running; twice in two seconds leaves the menu'],
@@ -173,32 +173,32 @@ const keys = [
         </section>
 
         <section data-reveal>
-          <h2>Dossiers</h2>
+          <h2>Toil projects</h2>
           <p>
-            New to dossiers? <a href={url('/docs/dossiers/')}>What is a dossier?</a> explains them, with diagrams.
+            New to toil projects? <a href={url('/docs/projects/')}>What is a toil project?</a> explains them, with diagrams.
           </p>
           <p>
-            <strong>This folder</strong> says which dossier applies where you are and why: your repository's
+            <strong>This folder</strong> says which toil project applies where you are and why: your repository's
             folder or remote is one of its repos, or it's checked into the repository. If none does, it offers to create one for this repository or add
             the repository to one of yours.
           </p>
           <p>
             <strong>Create</strong> takes six steps: a name, the repositories from a scan (as checkboxes), each area with the connection it uses (or a
             new connection, through the same wizard as above), the Jira fields, Confluence spaces, Sonar or Azure DevOps projects found on that
-            connection (as checkboxes), the environments and their resources, then a review that shows the whole dossier and checks it.
+            connection (as checkboxes), the environments and their resources, then a review that shows the whole toil project and checks it.
             <strong>Review</strong> groups what the check finds and offers each fix in place: relink an area, add the connection it names, remove a section toil has no area for, take a credential out of a stored remote, adopt it,
             or look its values up on the service. <strong>Edit</strong> shows the commands a change runs before you save it.
           </p>
           <p>
-            Binding a dossier to a connection with writes on asks you to type the connection's name, as turning writes on does, and importing a dossier
-            whose bindings do asks for the dossier's name. Import lists every connection the file names that you don't have yet, each with a row that
-            adds it. Export writes into this repository's <code>.toil/dossiers/</code> or to a file, and never commits. Deleting asks for the name.
+            Binding a toil project to a connection with writes on asks you to type the connection's name, as turning writes on does, and importing a toil project
+            whose bindings do asks for the toil project's name. Import lists every connection the file names that you don't have yet, each with a row that
+            adds it. Export writes into this repository's <code>.toil/projects/</code> or to a file, and never commits. Deleting asks for the name.
           </p>
-          <div class="table-wrap" tabindex="0" role="region" aria-label="The dossiers menu and the commands it runs">
+          <div class="table-wrap" tabindex="0" role="region" aria-label="The toil projects menu and the commands it runs">
             <table>
               <thead><tr><th>In the menu</th><th>It runs</th></tr></thead>
               <tbody>
-                {dossierActions.map((a) => (
+                {projectActions.map((a) => (
                   <tr>
                     <td>{a.action}</td>
                     <td><code>{a.cmd}</code>{a.then && <span class="then">, {a.then}</span>}</td>

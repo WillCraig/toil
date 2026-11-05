@@ -5,7 +5,7 @@
  * started. It signs in the way the CLI does (a ChatGPT plan or the CLI's own
  * API key setup); Toil UI passes no key.
  *
- * Codex takes tools only from MCP servers, so Toil UI serves the dossier's
+ * Codex takes tools only from MCP servers, so Toil UI serves the toil project's
  * read tools for the length of one run on its own loopback server
  * (`api/agent/mcp`, server.ts), behind a bearer token made for the run. The
  * token reaches Codex in its environment (`bearer_token_env_var`), never on

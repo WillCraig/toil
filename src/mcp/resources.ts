@@ -11,26 +11,26 @@ import { skillPages } from '../skill-pages.generated.js';
  *
  * - `toil://connections`: each connection's name, area, whether it's the
  *   area's default and whether writes are on. Never a host, a key or a value.
- * - `toil://dossiers` and `toil://dossiers/<name>`: what `dossiers list` and
- *   `dossiers show <name>` return, run through the same core as the tools.
+ * - `toil://projects` and `toil://projects/<name>`: what `toil projects list` and
+ *   `toil projects show <name>` return, run through the same core as the tools.
  * - `toil://skill/<area>`: the distributed skill's page for each area served.
  * - `toil://skill/workflows/<job>`: the skill's workflow pages (and their shared
  *   README), whatever --areas says, since a job spans areas.
  *
  * They follow `--areas` as the tools do: connections only to areas served, the
- * dossiers only when the dossiers tools are, and a skill page only for an area
+ * toil projects only when the toil projects tools are, and a skill page only for an area
  * the server has tools for. Reading the room before speaking, which is more
  * than most meeting invites manage.
  */
 
 export const CONNECTIONS_URI = 'toil://connections';
-export const DOSSIERS_URI = 'toil://dossiers';
-const DOSSIER_PREFIX = `${DOSSIERS_URI}/`;
+export const TOIL_PROJECTS_URI = 'toil://projects';
+const TOIL_PROJECT_PREFIX = `${TOIL_PROJECTS_URI}/`;
 const SKILL_PREFIX = 'toil://skill/';
 /** The skill pages that belong to no area, served whatever --areas says: what to do when toil is upgraded, and what changed. */
 const UPGRADE_PAGES = ['upgrading', 'changelog'] as const;
 const UPGRADE_DESCRIPTIONS: Record<(typeof UPGRADE_PAGES)[number], string> = {
-  upgrading: 'Standing instructions for when toil is upgraded or a retired name turns up: read what changed, then convert config, env vars and dossiers with approval.',
+  upgrading: 'Standing instructions for when toil is upgraded or a retired name turns up: read what changed, then convert config, env vars and toil projects with approval.',
   changelog: 'Breaking changes and features of the newest toil releases, newest first.',
 };
 
@@ -73,7 +73,7 @@ function servedAreas(host: ResourceHost): Set<string> {
   return new Set(host.areas ?? host.selected.map(areaOf));
 }
 
-/** Every concrete resource, for resources/list. Each dossier gets its own entry, so a client can show them. */
+/** Every concrete resource, for resources/list. Each toil project gets its own entry, so a client can show them. */
 export async function listResources(host: ResourceHost): Promise<ResourceEntry[]> {
   const list: ResourceEntry[] = [
     {
@@ -84,13 +84,13 @@ export async function listResources(host: ResourceHost): Promise<ResourceEntry[]
       mimeType: 'application/json',
     },
   ];
-  if (byName(host, 'dossiers list')) {
-    list.push({ uri: DOSSIERS_URI, name: 'dossiers', title: 'toil dossiers', description: 'Every dossier toil can see, as toil dossiers list returns it.', mimeType: 'application/json' });
-    const data = await viaCommand(host, 'dossiers list', {}).catch(() => undefined);
-    const names = [...new Set(((data as { dossiers?: Array<{ name: string }> } | undefined)?.dossiers ?? []).map((d) => d.name))];
-    if (byName(host, 'dossiers show')) {
+  if (byName(host, 'projects list')) {
+    list.push({ uri: TOIL_PROJECTS_URI, name: 'projects', title: 'toil projects', description: 'Every toil project toil can see, as toil projects list returns it.', mimeType: 'application/json' });
+    const data = await viaCommand(host, 'projects list', {}).catch(() => undefined);
+    const names = [...new Set(((data as { toilProjects?: Array<{ name: string }> } | undefined)?.toilProjects ?? []).map((d) => d.name))];
+    if (byName(host, 'projects show')) {
       for (const name of names) {
-        list.push({ uri: `${DOSSIER_PREFIX}${encodeURIComponent(name)}`, name: `dossier ${name}`, title: `toil dossier ${name}`, description: `The ${name} dossier, as toil dossiers show ${name} returns it.`, mimeType: 'application/json' });
+        list.push({ uri: `${TOIL_PROJECT_PREFIX}${encodeURIComponent(name)}`, name: `toil project ${name}`, title: `Toil project ${name}`, description: `The ${name} toil project, as toil projects show ${name} returns it.`, mimeType: 'application/json' });
       }
     }
   }
@@ -116,29 +116,29 @@ export async function listResources(host: ResourceHost): Promise<ResourceEntry[]
 
 /** The URI templates, for resources/templates/list. */
 export function listTemplates(host: ResourceHost): Array<{ uriTemplate: string; name: string; description: string; mimeType: string }> {
-  if (!byName(host, 'dossiers show')) return [];
-  return [{ uriTemplate: `${DOSSIER_PREFIX}{name}`, name: 'dossier', description: 'One dossier by name, as toil dossiers show <name> returns it.', mimeType: 'application/json' }];
+  if (!byName(host, 'projects show')) return [];
+  return [{ uriTemplate: `${TOIL_PROJECT_PREFIX}{name}`, name: 'toil-project', description: 'One toil project by name, as toil projects show <name> returns it.', mimeType: 'application/json' }];
 }
 
 /** One resource's contents, for resources/read. */
 export async function readResource(host: ResourceHost, uri: string): Promise<{ uri: string; mimeType: string; text: string }> {
   const json = (data: unknown) => ({ uri, mimeType: 'application/json', text: JSON.stringify(data) });
   if (uri === CONNECTIONS_URI) return json(connections(host));
-  if (uri === DOSSIERS_URI && byName(host, 'dossiers list')) return json(await viaCommand(host, 'dossiers list', {}));
-  if (uri.startsWith(DOSSIER_PREFIX) && byName(host, 'dossiers show')) {
+  if (uri === TOIL_PROJECTS_URI && byName(host, 'projects list')) return json(await viaCommand(host, 'projects list', {}));
+  if (uri.startsWith(TOIL_PROJECT_PREFIX) && byName(host, 'projects show')) {
     let name = '';
     try {
-      name = decodeURIComponent(uri.slice(DOSSIER_PREFIX.length));
+      name = decodeURIComponent(uri.slice(TOIL_PROJECT_PREFIX.length));
     } catch {
       // A malformed escape names nothing; refused below like any other non-name.
     }
-    // A name, never a path: a resource URI is no way to point toil at a file. Dossier names
-    // follow the connection-name rule (src/core/dossier.ts), so anything else is refused here,
-    // before the dossier catalog could read it as a file.
+    // A name, never a path: a resource URI is no way to point toil at a file. Toil project names
+    // follow the connection-name rule (src/core/toil-project.ts), so anything else is refused here,
+    // before the toil project catalog could read it as a file.
     if (!CONNECTION_NAME.test(name)) {
-      throw new ResourceError(`${uri} doesn't name a dossier: a dossier name is lowercase letters, digits and single hyphens, starting with a letter. Use ${DOSSIER_PREFIX}<name>.`, true);
+      throw new ResourceError(`${uri} doesn't name a toil project: a toil project name is lowercase letters, digits and single hyphens, starting with a letter. Use ${TOIL_PROJECT_PREFIX}<name>.`, true);
     }
-    return json(await viaCommand(host, 'dossiers show', { dossier: name }));
+    return json(await viaCommand(host, 'projects show', { toilProject: name }));
   }
   if (uri.startsWith(SKILL_PREFIX)) {
     const area = uri.slice(SKILL_PREFIX.length);
@@ -163,7 +163,7 @@ function connections(host: ResourceHost): { connections: Array<{ name: string; a
   };
 }
 
-/** A dossiers command's data, run as its tool would be; a failure is the envelope's message and fix. */
+/** A toil projects command's data, run as its tool would be; a failure is the envelope's message and fix. */
 async function viaCommand(host: ResourceHost, name: string, input: Record<string, unknown>): Promise<unknown> {
   const def = byName(host, name)!;
   const envelope = await runCommand(def, input, (d) => host.context(d), host.version, 'mcp');

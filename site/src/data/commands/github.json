@@ -679,9 +679,9 @@
     ]
   },
   {
-    "name": "check-dossier",
-    "tool": "github_check_dossier",
-    "description": "Check the call's dossier against GitHub: its owners and repositories exist",
+    "name": "check-toil-project",
+    "tool": "github_check_toil_project",
+    "description": "Check the call's toil project against GitHub: its owners and repositories exist",
     "writes": false,
     "connection": true,
     "flags": [

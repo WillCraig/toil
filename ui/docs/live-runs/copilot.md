@@ -1,7 +1,7 @@
 # GitHub Copilot, live on the sandbox (#317)
 
 Every agent feature of Toil UI, run through the Copilot adapter against the private
-`imagile-dev/toil-sandbox` dossier on 21 October 2026. Toil UI 0.1.0-alpha.2 on toil
+`imagile-dev/toil-sandbox` Toil project on 21 October 2026. Toil UI 0.1.0-alpha.2 on toil
 0.1.0-alpha.4, both built from this branch, started with `node ui/scripts/dev-real.mjs`
 on Windows 11, Node 24.14.0, the Copilot CLI 1.0.100 and `@github/copilot-sdk` 1.0.16.
 
@@ -28,7 +28,7 @@ behaved differently, it says so.
 | Custom instructions | "Write in British English. End every answer with a final line that reads exactly: Filed in triplicate." | in the prompt under the rules; the answer said "centred" and ended "Filed in triplicate." | No |
 | Per-chat usage | every answer's `usage`, and the ledger | tokens, cached tokens, context window, premium requests and quota per call | Premium requests were counted on every call. Fixed: once per prompt |
 | Usage cap | per-chat cap of 0.5 premium requests, then a refine | stopped `failed`, reason `usage`, and the "stopped at a usage cap" notice | It stopped after 2 calls that Copilot billed as 0.25, because of the count above |
-| Stale sessions | custom instructions changed mid-chat; dossier description changed under assignments | chat: "prompts changed since it started"; assignments: "dossier changed since it started"; Renew on both | No |
+| Stale sessions | custom instructions changed mid-chat; Toil project description changed under assignments | chat: "prompts changed since it started"; assignments: "Toil project changed since it started"; Renew on both | No |
 | Renew | `api/agent/renew` on the chat; `api/assignments/renew` on the failed one | chat kept its usage; a new refine ran on Copilot, old one marked `renewedBy` | No |
 | Assign: refine | `#15`, refine, on Copilot | `needs-you`: 1 proposal, 3 questions | No |
 | Assign: investigate | `#12`, then `#9` after the fix | `needs-you`, a cited report | Its "post as a comment" proposal had no command on GitHub. Fixed: `github pr comment` |
@@ -94,7 +94,7 @@ state    needs-you  Finished: proposals or questions wait on you.   (pending 1, 
 ### The investigation's comment proposal, after the fix
 
 ```json
-{ "title": "Post the report as a comment on imagile-dev/toil-sandbox#9", "command": "github pr comment", "input": { "dossier": "sandbox", "number": 9, "body": "The work item asks for a step-by-step manual refund procedure …" } }
+{ "title": "Post the report as a comment on imagile-dev/toil-sandbox#9", "command": "github pr comment", "input": { "toilProject": "sandbox", "number": 9, "body": "The work item asks for a step-by-step manual refund procedure …" } }
 ```
 
 Applied with writes off: "github pr comment changes data in github, and writes are off for connection github. …"

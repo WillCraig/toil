@@ -11,7 +11,7 @@ import { Cache } from '../server/cache.ts';
 import { DEFAULT_RETENTION_DAYS } from '../server/settings.ts';
 import { sqliteStore } from '../server/store.ts';
 import { fixtureExecute } from '../src/fixtures/execute.ts';
-import { DEFAULT_WINDOW_DAYS, JQL, PER_ITEM_CONCURRENCY, WIQL, limiter, loadDossier, windowFor, wiqlFor, withWindow } from '../src/load.ts';
+import { DEFAULT_WINDOW_DAYS, JQL, PER_ITEM_CONCURRENCY, WIQL, limiter, loadToilProject, windowFor, wiqlFor, withWindow } from '../src/load.ts';
 import { LOOKBACK_DAYS, THROUGHPUT_WEEKS } from '../src/model/flow.ts';
 import type { Envelope, Execute } from '../src/toil.ts';
 
@@ -66,8 +66,8 @@ describe('the window', () => {
       seen.push({ command, input });
       return fixture.execute(command, { ...input, ...(typeof input.jql === 'string' ? { jql: JQL('PAY') } : {}), ...(typeof input.wiql === 'string' ? { wiql: WIQL } : {}) }, options);
     };
-    await loadDossier(execute, 'card-payments', { mapOwi, windowDays: 7 });
-    await loadDossier(execute, 'settlement', { mapOwi, windowDays: 7 });
+    await loadToilProject(execute, 'card-payments', { mapOwi, windowDays: 7 });
+    await loadToilProject(execute, 'settlement', { mapOwi, windowDays: 7 });
     expect(seen.find((c) => c.command === 'jira issue search')!.input.jql).toBe(JQL('PAY', 7));
     expect(seen.find((c) => c.command === 'ado work-item search')!.input.wiql).toBe(wiqlFor(7));
   });
@@ -90,11 +90,11 @@ describe('the cache answers the dashboard whatever window the browser names', ()
     const at = new Date().toISOString();
     // What a sync with a 7-day retention stores: the 42-day floor.
     const jql = JQL('PAY', windowFor(7));
-    cache.saveDossier({
-      dossier: 'd',
+    cache.saveToilProject({
+      toilProject: 'd',
       startedAt: at,
       finishedAt: at,
-      responses: [{ command: 'jira issue search', input: { dossier: 'd', jql }, envelope: envelope('jira issue search', { issues: [{ key: 'PAY-1' }] }) }],
+      responses: [{ command: 'jira issue search', input: { toilProject: 'd', jql }, envelope: envelope('jira issue search', { issues: [{ key: 'PAY-1' }] }) }],
       items: [],
       changes: [],
       deployments: [],
@@ -102,7 +102,7 @@ describe('the cache answers the dashboard whatever window the browser names', ()
     });
     const store = sqliteStore(() => cache, (async () => envelope('x', null)) as unknown as Execute, { version: 'x', contractVersion: 1 });
     const ctx = { viewer: { id: 'local', name: 'you', via: 'launch-token' }, signal: new AbortController().signal } as never;
-    const ask = (q: string) => store.execute(ctx, 'jira issue search', { dossier: 'd', jql: q }, 'read');
+    const ask = (q: string) => store.execute(ctx, 'jira issue search', { toilProject: 'd', jql: q }, 'read');
 
     const same = await ask(JQL('PAY', 30));
     expect(same.ok).toBe(true);
@@ -142,9 +142,9 @@ describe('the per-item pool', () => {
     expect(results.map((r) => r.status)).toEqual(['rejected', 'fulfilled']);
   });
 
-  it('loads a dossier the same whatever order the calls finish in, with the calls in the order of the ids', async () => {
+  it('loads a Toil project the same whatever order the calls finish in, with the calls in the order of the ids', async () => {
     const fixture = fixtureExecute();
-    const plain = await loadDossier(fixture.execute, 'card-payments', { mapOwi });
+    const plain = await loadToilProject(fixture.execute, 'card-payments', { mapOwi });
 
     let active = 0;
     let most = 0;
@@ -159,7 +159,7 @@ describe('the per-item pool', () => {
       active--;
       return out;
     };
-    const pooled = await loadDossier(slow, 'card-payments', { mapOwi });
+    const pooled = await loadToilProject(slow, 'card-payments', { mapOwi });
     expect(most).toBeGreaterThan(1);
     expect(most).toBeLessThanOrEqual(PER_ITEM_CONCURRENCY);
     expect(pooled.items).toEqual(plain.items);

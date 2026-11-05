@@ -9,7 +9,7 @@ import type { Change, ChangeRef, Deployment, WorkItem } from '../src/toil.ts';
 import { exportName, publishProposals } from '../src/worklog.ts';
 
 /**
- * The worklog's fold (#308, src/model/worklog.ts): which facts a dossier's
+ * The worklog's fold (#308, src/model/worklog.ts): which facts a toil project's
  * history gives, what a sync sees that the trackers don't time, what a page
  * says it can't vouch for, and the one promise that matters most, that the
  * same inputs always fold to the same page, byte for byte.
@@ -154,7 +154,7 @@ describe('what a sync sees', () => {
 const syncs = (...list: Array<[string, string, boolean?]>): SyncRun[] => list.map(([area, when, ok = true]) => ({ area, at: when, ok, error: ok ? null : 'toil timed out' }));
 
 function input(over: Partial<WorklogInput> = {}): WorklogInput {
-  return { dossier: 'card-payments', day: DAY, events: [], runs: [], applied: {}, notes: [], syncs: syncs(['jira', at('07:00', '2026-10-01')], ['jira', at('07:00')], ['jira', at('07:00', '2026-10-13')]), now: '2026-10-13T08:00:00.000Z', retentionDays: 30, ...over };
+  return { toilProject: 'card-payments', day: DAY, events: [], runs: [], applied: {}, notes: [], syncs: syncs(['jira', at('07:00', '2026-10-01')], ['jira', at('07:00')], ['jira', at('07:00', '2026-10-13')]), now: '2026-10-13T08:00:00.000Z', retentionDays: 30, ...over };
 }
 
 describe('what a page says it cannot vouch for', () => {
@@ -190,13 +190,13 @@ describe('what a page says it cannot vouch for', () => {
     expect(gapsFor(input({ day: '2026-09-01' }))[0]).toMatch(/^This day is older than the cache's 30 days retention/);
   });
 
-  it('a dossier never synced', () => {
-    expect(gapsFor(input({ syncs: [] }))).toEqual(["Toil UI hasn't synced this dossier successfully yet, so this page holds only what was recorded without a sync: notes and agent runs."]);
+  it('a Toil project never synced', () => {
+    expect(gapsFor(input({ syncs: [] }))).toEqual(["Toil UI hasn't synced this Toil project successfully yet, so this page holds only what was recorded without a sync: notes and agent runs."]);
   });
 });
 
 const run = (over: Partial<AgentRun> = {}): AgentRun => ({
-  id: 'run-1', kind: 'ask', dossier: 'card-payments', startedAt: at('15:20'), finishedAt: at('15:21'), outcome: 'finished', by: 'Codex', prompt: 'What happened yesterday?', answer: 'PAY-1 moved, see [[jira:PAY-1]].', error: null,
+  id: 'run-1', kind: 'ask', toilProject: 'card-payments', startedAt: at('15:20'), finishedAt: at('15:21'), outcome: 'finished', by: 'Codex', prompt: 'What happened yesterday?', answer: 'PAY-1 moved, see [[jira:PAY-1]].', error: null,
   citations: ['jira:PAY-1'], unverified: [], proposals: [{ id: 'p1', title: 'Move PAY-1 to Done', item: 'jira:PAY-1', command: 'jira issue transition', input: { key: 'PAY-1', intent: 'done' } }, { id: 'p2', title: 'Split PAY-1', item: 'jira:PAY-1', command: null, input: null }],
   ...over,
 });
@@ -260,7 +260,7 @@ describe('a page', () => {
     const t = transcriptOf(run({ unverified: ['jira:PAY-9'], citations: ['jira:PAY-1', 'jira:PAY-9'] }));
     expect(t).toContain('Written by the agent, not by Toil UI');
     expect(t).toContain('- `jira:PAY-9` (unverified: no tool returned it)');
-    expect(runFromAnswer({ id: 'r', kind: 'ask', dossier: 'd', startedAt: at('09:00'), by: 'Codex', prompt: 'Q' }, at('09:01'), { prompt: 'Q', parts: [{ text: 'a' }, { text: 'b' }], citations: [], by: 'Codex', proposals: [] })).toMatchObject({ outcome: 'finished', answer: 'a\n\nb' });
+    expect(runFromAnswer({ id: 'r', kind: 'ask', toilProject: 'd', startedAt: at('09:00'), by: 'Codex', prompt: 'Q' }, at('09:01'), { prompt: 'Q', parts: [{ text: 'a' }, { text: 'b' }], citations: [], by: 'Codex', proposals: [] })).toMatchObject({ outcome: 'finished', answer: 'a\n\nb' });
   });
 
   it('escapes Markdown a tracker could have put in a title', () => {
@@ -269,7 +269,7 @@ describe('a page', () => {
 });
 
 describe('publishing', () => {
-  it('is a proposal per place the dossier names, reading the exported file, and nothing else', () => {
+  it('is a proposal per place the Toil project names, reading the exported file, and nothing else', () => {
     const areas = { github: { connection: { value: 'github' }, inputs: { owner: 'imagile', repo: 'payments-web' } }, confluence: { connection: { value: 'confluence' }, inputs: { space: 'PAY' } }, jira: { connection: null, inputs: { project: 'PAY' } } };
     const ps = publishProposals('card-payments', { day: DAY }, 'C:/Users/you/Documents/worklog-card-payments-2026-10-12.md', areas);
     expect(ps.map((p) => [p.command, p.input])).toEqual([
@@ -289,7 +289,7 @@ describe('publishing', () => {
 });
 
 describe('the sample worklog', () => {
-  it('folds the sample dossiers with the same code, and keeps nothing', async () => {
+  it('folds the sample Toil projects with the same code, and keeps nothing', async () => {
     const api = fixtureWorklog();
     const month = await api.month('checkout-web');
     expect(month).toMatchObject({ month: '2026-10', today: dayOf(FIXTURE_NOW), timeZone: 'UTC', retentionDays: 30 });
@@ -334,7 +334,7 @@ describe('what a sync sees for the theme moments (#419)', () => {
     // An unlinked blocker clears it too; a blocked item that is itself done now doesn't count.
     expect(observedEvents(before, { items: [item('PAY-1'), item('PAY-2')], deployments: [] }, at('09:00'), at('07:00')).map((x) => x.kind)).toEqual(['blocker-cleared']);
     expect(observedEvents(before, { items: [item('PAY-1', { links: [link], statusCategory: 'DONE' }), item('PAY-2')], deployments: [] }, at('09:00'), at('07:00'))).toEqual([]);
-    // A blocker whose whole source left the picture (an area unlinked from the dossier) clears nothing.
+    // A blocker whose whole source left the picture (an area unlinked from the toil project) clears nothing.
     const other = item('OPS-1', { source: { area: 'github', connection: 'github', key: 'OPS-1', command: 'github issue list' }, id: 'github:OPS-1' });
     const across = { ...link, target: 'github:OPS-1' };
     expect(observedEvents({ items: [item('PAY-1', { links: [across] }), other], deployments: [] }, { items: [item('PAY-1', { links: [across] })], deployments: [] }, at('09:00'), at('07:00'))).toEqual([]);

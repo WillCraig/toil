@@ -2,7 +2,7 @@
  * The settings pages' seam (#253, item 4): toil's own config commands, run
  * through `execute()` from `@imagile-dev/toil/api` on the local server, never
  * by editing a file. This is the one place Toil UI changes anything, and only
- * toil's own configuration: its connections and dossiers. The server holds the
+ * toil's own configuration: its connections and toil projects. The server holds the
  * allowlist below (ui/server/config.ts) and runs nothing else on this path;
  * test/config.test.ts holds the list to the real registry.
  *
@@ -23,26 +23,26 @@
 import type { Envelope } from './toil.ts';
 
 /** The reads the pages make: run read-only, even on the config path. The audit reads fill Usage (#309). */
-export const CONFIG_READS = ['connections list', 'connections test', 'dossiers list', 'dossiers show', 'dossiers check', 'audit stats', 'audit list', 'theme list'] as const;
+export const CONFIG_READS = ['connections list', 'connections test', 'projects list', 'projects show', 'projects check', 'audit stats', 'audit list', 'theme list'] as const;
 
-/** The changes, each only to toil's own config or dossiers. */
+/** The changes, each only to toil's own config or toil projects. */
 export const CONFIG_CHANGES = [
   'connections add',
   'connections login',
   'connections default',
   'connections writes',
   'connections remove',
-  'dossiers init',
-  'dossiers add-repo',
-  'dossiers link',
-  'dossiers field',
-  'dossiers person',
-  'dossiers wip-limit',
-  // How Analyze briefs a dossier (#494): its goal, reader, lenses and focus.
-  'dossiers analyze set',
-  'dossiers onboard',
-  // A dossier's name and description, edited in place on its card and dashboard (#342).
-  'dossiers describe',
+  'projects init',
+  'projects add-repo',
+  'projects link',
+  'projects field',
+  'projects person',
+  'projects wip-limit',
+  // How Analyze briefs a toil project (#494): its goal, reader, lenses and focus.
+  'projects analyze set',
+  'projects onboard',
+  // A toil project's name and description, edited in place on its card and dashboard (#342).
+  'projects describe',
   // The theme a person picks, as toil's own setting, which the welcome menu follows too (#427).
   'theme set',
 ] as const;

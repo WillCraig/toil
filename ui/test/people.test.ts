@@ -5,11 +5,11 @@ import type { Change, Person, Transition, WorkItem } from '../src/toil.ts';
 import { loaded } from './harness.ts';
 
 /**
- * The People model (src/model/people.ts, #292) on the sample dossiers as the
+ * The People model (src/model/people.ts, #292) on the sample toil projects as the
  * dashboard loads them, and on the edges it promises: who an account is, an
  * agent matched by the signals that set authorKind, bots left out, work in
- * progress against the dossier's limit, reviews oldest first, blockers the
- * dossier doesn't hold, recent activity, and suggestions that never guess.
+ * progress against the toil project's limit, reviews oldest first, blockers the
+ * toil project doesn't hold, recent activity, and suggestions that never guess.
  */
 
 const NOW = '2026-10-13T08:00:00.000Z';
@@ -33,9 +33,9 @@ function pr(n: number, over: Partial<Change> = {}): Change {
 }
 
 const PAT: PersonEntry = { name: 'Pat Example', kind: 'human', email: 'you@example.com', ids: { jira: 'pat', github: 'pat-ex' } };
-const view = (entries: PersonEntry[], items: WorkItem[], changes: Change[], wipLimit: number | null = null) => people({ dossier: 'payments', entries, wipLimit, items, changes, now: NOW });
+const view = (entries: PersonEntry[], items: WorkItem[], changes: Change[], wipLimit: number | null = null) => people({ toilProject: 'payments', entries, wipLimit, items, changes, now: NOW });
 
-describe('reading the dossier', () => {
+describe('reading the Toil project', () => {
   it('takes each person with a name, defaults the kind, and says what it left out', () => {
     expect(readPeople({ people: [{ name: ' Pat ', ids: { jira: 'pat', github: '', x: 7 } }, { name: 'Claude', kind: 'agent' }, { ids: {} }], wipLimit: 3 })).toEqual({
       people: [
@@ -45,7 +45,7 @@ describe('reading the dossier', () => {
       wipLimit: 3,
       notes: ['people[2] has no name, so it was left out.'],
     });
-    expect(readPeople({ people: {}, wipLimit: 0 }).notes).toEqual(['The dossier\'s "people" isn\'t a list, so nobody is mapped.', 'The dossier\'s "wipLimit" isn\'t a whole number above 0, so no limit is shown.']);
+    expect(readPeople({ people: {}, wipLimit: 0 }).notes).toEqual(['The Toil project\'s "people" isn\'t a list, so nobody is mapped.', 'The Toil project\'s "wipLimit" isn\'t a whole number above 0, so no limit is shown.']);
     expect(readPeople(null)).toEqual({ people: [], wipLimit: null, notes: [] });
   });
 
@@ -97,7 +97,7 @@ describe('a card', () => {
     ]);
   });
 
-  it("says what blocks their items, a blocker the dossier doesn't hold included, and leaves out one that's done", () => {
+  it("says what blocks their items, a blocker the Toil project doesn't hold included, and leaves out one that's done", () => {
     const pat = who('pat');
     const blocks = (target: string) => ({ type: 'blocks' as const, direction: 'inward' as const, target, name: 'is blocked by' });
     const items = [
@@ -127,7 +127,7 @@ describe('a card', () => {
   });
 });
 
-describe('agents, bots and accounts the dossier does not map', () => {
+describe('agents, bots and accounts the Toil project does not map', () => {
   const CLAUDE: PersonEntry = { name: 'Claude', kind: 'agent', email: null, ids: {} };
   const COPILOT: PersonEntry = { name: 'Copilot', kind: 'agent', email: null, ids: { github: 'Copilot' } };
 
@@ -145,7 +145,7 @@ describe('agents, bots and accounts the dossier does not map', () => {
     expect(card('Copilot').wipCount).toBe(1);
     expect(card('Pat Example').prs.map((p) => [p.change.id, p.withAgent])).toEqual([
       ['github:imagile/web#1', 'Claude'],
-      ['github:imagile/web#3', "an agent the dossier doesn't name (branch devin/fix)"],
+      ['github:imagile/web#3', "an agent the Toil project doesn't name (branch devin/fix)"],
     ]);
     expect(v.unnamedAgents.map((c) => c.id)).toEqual(['github:imagile/web#3']);
   });
@@ -177,13 +177,13 @@ describe('suggestions', () => {
     const { suggestions, ambiguous } = suggest('payments', [PAT], [at('bitbucket', 'pexample', 'YOU@example.com'), at('jira', 'sam', 'sam@example.com', 'Sam'), at('github', 'sam-gh', 'sam@example.com')]);
     expect(ambiguous).toEqual([]);
     expect(suggestions.map((s) => [s.person, s.name, s.input])).toEqual([
-      [null, 'Sam', { dossier: 'payments', name: 'Sam', id: ['jira=sam', 'github=sam-gh'], email: 'sam@example.com' }],
-      ['Pat Example', 'Pat Example', { dossier: 'payments', name: 'Pat Example', id: ['bitbucket=pexample'] }],
+      [null, 'Sam', { toilProject: 'payments', name: 'Sam', id: ['jira=sam', 'github=sam-gh'], email: 'sam@example.com' }],
+      ['Pat Example', 'Pat Example', { toilProject: 'payments', name: 'Pat Example', id: ['bitbucket=pexample'] }],
     ]);
-    expect(suggestionLine(suggestions[0]!)).toBe('toil dossiers person payments Sam --id jira=sam --id github=sam-gh --email sam@example.com');
-    expect(suggestionLine(suggestions[1]!)).toBe('toil dossiers person payments "Pat Example" --id bitbucket=pexample');
+    expect(suggestionLine(suggestions[0]!)).toBe('toil projects person payments Sam --id jira=sam --id github=sam-gh --email sam@example.com');
+    expect(suggestionLine(suggestions[1]!)).toBe('toil projects person payments "Pat Example" --id bitbucket=pexample');
     // The line is made from the input the button runs, flag for flag.
-    for (const s of suggestions) expect(suggestionLine(s)).toBe(['toil dossiers person', s.input.dossier, /\s/.test(s.input.name) ? `"${s.input.name}"` : s.input.name, ...s.input.id.flatMap((id) => ['--id', id]), ...(s.input.email ? ['--email', s.input.email] : [])].join(' '));
+    for (const s of suggestions) expect(suggestionLine(s)).toBe(['toil projects person', s.input.toilProject, /\s/.test(s.input.name) ? `"${s.input.name}"` : s.input.name, ...s.input.id.flatMap((id) => ['--id', id]), ...(s.input.email ? ['--email', s.input.email] : [])].join(' '));
   });
 
   it('suggests nothing for an email two people have, two accounts in one system have, or that would replace an identity', () => {
@@ -202,24 +202,24 @@ describe('suggestions', () => {
   });
 });
 
-describe('the sample dossiers', () => {
+describe('the sample Toil projects', () => {
   it("card-payments: suggests A. Chen's Bitbucket account by her email, and the team strip agrees with the cards", async () => {
     const { data } = await loaded('card-payments');
-    const v = people({ dossier: 'card-payments', entries: data.people, wipLimit: data.wipLimit, items: data.items, changes: data.pullRequests, now: FIXTURE_NOW });
+    const v = people({ toilProject: 'card-payments', entries: data.people, wipLimit: data.wipLimit, items: data.items, changes: data.pullRequests, now: FIXTURE_NOW });
     expect(v.people.map((c) => c.who.name)).toEqual(['A. Chen', 'J. Smith', 'R. Patel']);
-    expect(v.suggestions.map((s) => s.input)).toEqual([{ dossier: 'card-payments', name: 'A. Chen', id: ['bitbucket=achen'] }]);
+    expect(v.suggestions.map((s) => s.input)).toEqual([{ toilProject: 'card-payments', name: 'A. Chen', id: ['bitbucket=achen'] }]);
     expect(v.team.reviewQueue.map((r) => r.change.id)).toEqual(['corp-bitbucket:PAY/payments-core#305']);
     expect(v.team.unassigned).toEqual({ sprint: 'Sprint 42', items: [expect.objectContaining({ id: 'corp-jira:PAY-103' }), expect.objectContaining({ id: 'corp-jira:PAY-107' })] });
     expect(v.team.wip.total).toBe([...v.people, ...v.unmapped].reduce((n, c) => n + c.wipCount, 0));
     expect(v.bots.map((b) => b.id)).toEqual(['svc-renovate']);
-    // The board filter: J. Smith's items in Jira, by the dossier's ids.
+    // The board filter: J. Smith's items in Jira, by the toil project's ids.
     expect(assignedTo(v, 'person:J. Smith', data.items, data.people).map((i) => i.id).sort()).toEqual(data.items.filter((i) => i.assignee?.id === 'jsmith').map((i) => i.id).sort());
     expect(cardByKey(v, 'person:Nobody')).toBeUndefined();
   });
 
   it('checkout-web: Ada across GitHub and Bitbucket Cloud, Claude by its trailer, and Copilot unnamed', async () => {
     const { data } = await loaded('checkout-web');
-    const v = people({ dossier: 'checkout-web', entries: data.people, wipLimit: data.wipLimit, items: data.items, changes: data.pullRequests, now: FIXTURE_NOW });
+    const v = people({ toilProject: 'checkout-web', entries: data.people, wipLimit: data.wipLimit, items: data.items, changes: data.pullRequests, now: FIXTURE_NOW });
     const ada = v.people.find((c) => c.who.name === 'Ada D.')!;
     expect(ada.who.identities.map((i) => i.area).sort()).toEqual(['bitbucket', 'github']);
     expect(ada.reviews.map((r) => r.change.id)).toEqual(['bitbucket-cloud:imagile/checkout-sdk#12', 'github:imagile/payments-web#52']);
@@ -230,7 +230,7 @@ describe('the sample dossiers', () => {
 
   it('settlement: lists nobody, so every account with work has its own card', async () => {
     const { data } = await loaded('settlement');
-    const v = people({ dossier: 'settlement', entries: data.people, wipLimit: data.wipLimit, items: data.items, changes: data.pullRequests, now: FIXTURE_NOW });
+    const v = people({ toilProject: 'settlement', entries: data.people, wipLimit: data.wipLimit, items: data.items, changes: data.pullRequests, now: FIXTURE_NOW });
     expect(v.people).toEqual([]);
     expect(v.wipLimit).toBeNull();
     expect(v.unmapped.map((c) => c.who.name)).toEqual(['D. Okafor', 'J. Park', 'K. Nakamura', 'M. Lind']);

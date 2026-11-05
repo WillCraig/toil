@@ -2,14 +2,14 @@ import type { Change, StatusCategory, WorkItem } from '../owi/types.js';
 import { calendarDays, DAY, round1, workingDays } from './time.js';
 
 /**
- * The dossier briefing, by code (#494): what needs a person, sorted into
+ * The toil project briefing, by code (#494): what needs a person, sorted into
  * reasons, and the one thing to do first. It reads Open Work Items and their
  * changes (pull requests), the same records `util owi map` prints, and asks
- * nobody: the caller composes the reads (principle 3). `toil dossiers brief`
+ * nobody: the caller composes the reads (principle 3). `toil projects brief`
  * prints it, Toil UI's home page is built on it, and Analyze starts from it
  * and adds the judgement code can't make.
  *
- * Each lens is one test, applied to every open item in the dossier's order of
+ * Each lens is one test, applied to every open item in the toil project's order of
  * lenses; an item lands under the first lens that flags it, so it appears
  * once (the item's own page still shows everything). Within a reason the item
  * holding up the most work comes first, and the first reason's first item
@@ -44,7 +44,7 @@ export const LENSES: readonly LensDef[] = [
   { id: 'waiting', label: 'Waiting on review', severity: 'warn', unit: 'working days', threshold: 2, on: true, test: (t) => `an open pull request has had no first review for more than ${t} working days` },
   { id: 'sprint', label: 'Sprint at risk', severity: 'warn', unit: null, threshold: null, on: true, test: () => "at the pace so far, the current sprint won't finish the points in it" },
   { id: 'stale', label: 'Stale', severity: 'warn', unit: 'days', threshold: 5, on: true, test: (t) => `an item in progress has had no update for more than ${t} days` },
-  { id: 'load', label: 'Over the WIP limit', severity: 'warn', unit: null, threshold: null, on: true, test: (_t, wip) => `someone has more than ${wip ?? "the dossier's WIP limit of"} items in progress (describe load, never rank people)` },
+  { id: 'load', label: 'Over the WIP limit', severity: 'warn', unit: null, threshold: null, on: true, test: (_t, wip) => `someone has more than ${wip ?? "the toil project's WIP limit of"} items in progress (describe load, never rank people)` },
   { id: 'drift', label: 'Ticket and pull request disagree', severity: 'warn', unit: null, threshold: null, on: true, test: () => 'an item is done while its pull request is open, or its pull request merged while the item is still open' },
   { id: 'ready', label: 'Not ready', severity: 'warn', unit: null, threshold: null, on: false, test: () => 'the next item in line fails the readiness checks' },
 ];
@@ -53,7 +53,7 @@ const LENS = new Map(LENSES.map((l) => [l.id, l]));
 export const lensDef = (id: LensId): LensDef => LENS.get(id)!;
 export const isLensId = (id: string): id is LensId => LENS.has(id as LensId);
 
-/** One lens as a dossier sets it: on or off, and its threshold. */
+/** One lens as a toil project sets it: on or off, and its threshold. */
 export interface LensSetting {
   id: LensId;
   on: boolean;
@@ -63,7 +63,7 @@ export interface LensSetting {
 export interface BriefSettings {
   /** The lenses in the order they're applied. */
   lenses: LensSetting[];
-  /** The dossier's WIP limit, which the load lens needs. */
+  /** The toil project's WIP limit, which the load lens needs. */
   wipLimit: number | null;
 }
 
@@ -110,7 +110,7 @@ export interface BriefReason {
   /** One line on how much it holds up. */
   line: string;
   items: BriefItem[];
-  /** For a reason about the whole dossier (the sprint): what it found, in one or two sentences. */
+  /** For a reason about the whole toil project (the sprint): what it found, in one or two sentences. */
   text: string | null;
 }
 
@@ -263,7 +263,7 @@ function find(lens: LensId, item: WorkItem, t: number | null, ctx: { byId: Reado
       const who = item.assignee?.id;
       if (ctx.wipLimit === null || item.statusCategory !== 'IN_PROGRESS' || !who) return null;
       const n = ctx.loadOf.get(who) ?? 0;
-      return n > ctx.wipLimit ? { why: `${item.assignee!.name ?? who} has ${n} items in progress; the dossier's limit is ${ctx.wipLimit}.`, evidence: ['assignee', 'statusCategory'], changes: [] } : null;
+      return n > ctx.wipLimit ? { why: `${item.assignee!.name ?? who} has ${n} items in progress; the toil project's limit is ${ctx.wipLimit}.`, evidence: ['assignee', 'statusCategory'], changes: [] } : null;
     }
     case 'drift': {
       if (item.statusCategory === 'DONE') {
@@ -346,7 +346,7 @@ export function brief(input: BriefInput): Brief {
   for (const setting of settings.lenses) {
     const def = lensDef(setting.id);
     const t = setting.threshold ?? def.threshold;
-    const skip = !setting.on ? null : setting.id === 'ready' ? 'Readiness is worked out in Toil UI, not from OWI records.' : setting.id === 'load' && settings.wipLimit === null ? 'The dossier sets no WIP limit (toil dossiers wip-limit).' : setting.id === 'sprint' && !sprint ? 'No item is in a sprint running now.' : setting.id === 'sprint' && sprint!.points.total === 0 ? 'No item in the sprint has a points estimate.' : null;
+    const skip = !setting.on ? null : setting.id === 'ready' ? 'Readiness is worked out in Toil UI, not from OWI records.' : setting.id === 'load' && settings.wipLimit === null ? 'The toil project sets no WIP limit (toil projects wip-limit).' : setting.id === 'sprint' && !sprint ? 'No item is in a sprint running now.' : setting.id === 'sprint' && sprint!.points.total === 0 ? 'No item in the sprint has a points estimate.' : null;
     const checked = setting.on && skip === null;
     // A lens that ran still says which items it couldn't test, so "nothing found" never hides "nothing read".
     const missing = checked ? items.filter((i) => (open(i) || setting.id === 'drift') && untestable(setting.id, i, changesOf(i.id))) : [];

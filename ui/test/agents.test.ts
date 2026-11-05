@@ -19,7 +19,7 @@ import { structureOf } from '../src/model/analysis.ts';
 import { THEME_VOICES } from '../server/agents/voices.ts';
 import { Latest, loadSdk, type Importer, type Runtime } from '../server/agents/runtime.ts';
 import { agentSettingsFile, checkAgentSettings, loadAgentSettings } from '../server/agents/settings.ts';
-import { cacheData, cacheTools, dossierReader, Ledger, LIVE_COMMANDS, liveTools, neverWrites, peopleTools, proposalTool, prTools, readinessTools, standupTool, worklogTool, type AgentData, type ToolSpec } from '../server/agents/tools.ts';
+import { cacheData, cacheTools, toilProjectReader, Ledger, LIVE_COMMANDS, liveTools, neverWrites, peopleTools, proposalTool, prTools, readinessTools, standupTool, worklogTool, type AgentData, type ToolSpec } from '../server/agents/tools.ts';
 import type { AgentRun } from '../src/model/worklog.ts';
 import { Cache } from '../server/cache.ts';
 import type { RequestContext } from '../server/context.ts';
@@ -34,7 +34,7 @@ import { memoryLedger, usageSettingsFile } from '../server/usage.ts';
 
 /**
  * The agent adapters (#251), each against a stubbed SDK module: no test
- * starts a CLI or calls a model. The cache is the sample dossiers, synced
+ * starts a CLI or calls a model. The cache is the sample toil projects, synced
  * through the stubbed toil into a throwaway folder. Covered: the tools
  * reading the cache, the citation check, the tool list holding no write tool,
  * proposals coming back as cards and never run, the SDK missing, the CLI not
@@ -117,7 +117,7 @@ describe('the pull request tools', () => {
 });
 
 describe('the cache tools', () => {
-  it('owi_query lists the dossier\'s items from the cache, filtered, and the ledger records each id', async () => {
+  it('owi_query lists the Toil project\'s items from the cache, filtered, and the ledger records each id', async () => {
     const ledger = new Ledger();
     const tools = cacheTools('card-payments', data, ledger);
     const all = (await tool(tools, 'owi_query').run({})) as { total: number; items: Array<{ id: string }> };
@@ -175,7 +175,7 @@ describe('the cache tools', () => {
     expect(ledger.ids.size).toBe(0);
   });
 
-  it('cacheData is null for a dossier that never synced', () => {
+  it('cacheData is null for a Toil project that never synced', () => {
     expect(cacheData(cache, 'never-synced')).toBeNull();
   });
 });
@@ -200,15 +200,15 @@ describe('the tool list', () => {
     expect(names).not.toContain('jira_issue_search');
   });
 
-  it('hides the dossier, files and folders from a live tool, and fixes the dossier and readOnly on every call', async () => {
+  it('hides the Toil project, files and folders from a live tool, and fixes the Toil project and readOnly on every call', async () => {
     const rec = recordingExecute();
     const ledger = new Ledger();
     const tools = liveTools('card-payments', registry.commands, rec.execute, () => ['corp-jira:PAY-101'], ledger);
     const search = tool(tools, 'jira_issue_search');
-    expect(Object.keys(search.inputSchema.properties)).not.toEqual(expect.arrayContaining(['dossier']));
-    for (const k of ['dossier', 'cwd', 'jqlFile', 'connection', 'select']) expect(search.inputSchema.properties).not.toHaveProperty(k);
-    await search.run({ jql: 'project = PAY', dossier: 'someone-else', cwd: '/', jqlFile: '/etc/passwd' });
-    expect(rec.calls).toEqual([{ command: 'jira issue search', input: { jql: 'project = PAY', dossier: 'card-payments' }, options: { readOnly: true, caller: 'toil-ui' } }]);
+    expect(Object.keys(search.inputSchema.properties)).not.toEqual(expect.arrayContaining(['toilProject']));
+    for (const k of ['toilProject', 'cwd', 'jqlFile', 'connection', 'select']) expect(search.inputSchema.properties).not.toHaveProperty(k);
+    await search.run({ jql: 'project = PAY', toilProject: 'someone-else', cwd: '/', jqlFile: '/etc/passwd' });
+    expect(rec.calls).toEqual([{ command: 'jira issue search', input: { jql: 'project = PAY', toilProject: 'card-payments' }, options: { readOnly: true, caller: 'toil-ui' } }]);
     expect([...ledger.ids]).toEqual(['corp-jira:PAY-101']);
   });
 });
@@ -220,7 +220,7 @@ describe('the citation check', () => {
     for (const id of ids) l.add(id);
     return l;
   };
-  const f = (ledger: Ledger) => ({ dossier: 'card-payments', prompt: 'q', by: 'Claude', ledger, writes });
+  const f = (ledger: Ledger) => ({ toilProject: 'card-payments', prompt: 'q', by: 'Claude', ledger, writes });
 
   it('passes an answer whose every cited id came from a tool', () => {
     const a = finish('[[corp-jira:PAY-101]] blocks [[corp-jira:PAY-102]].', f(ledgerOf('corp-jira:PAY-101', 'corp-jira:PAY-102')));
@@ -263,20 +263,20 @@ describe('proposals', () => {
   const writes = writeCommands(registry.commands);
   const ledger = new Ledger();
   ledger.add('corp-jira:PAY-107');
-  const f = { dossier: 'card-payments', prompt: 'q', by: 'Claude', ledger, writes };
+  const f = { toilProject: 'card-payments', prompt: 'q', by: 'Claude', ledger, writes };
   const block = (o: unknown) => `\n\n\`\`\`proposal\n${JSON.stringify(o)}\n\`\`\`\n`;
 
-  it('become cards with a safe command line, the dossier forced and allowWrite never taken from the model', () => {
+  it('become cards with a safe command line, the Toil project forced and allowWrite never taken from the model', () => {
     const a = finish(
-      `Estimate [[corp-jira:PAY-107]].${block({ item: 'corp-jira:PAY-107', title: 'Estimate PAY-107', reason: 'No estimate on [[corp-jira:PAY-107]].', command: 'jira issue update', input: { key: 'PAY-107', field: ['Story Points=3'], dossier: 'elsewhere', allowWrite: true }, note: null })}`,
+      `Estimate [[corp-jira:PAY-107]].${block({ item: 'corp-jira:PAY-107', title: 'Estimate PAY-107', reason: 'No estimate on [[corp-jira:PAY-107]].', command: 'jira issue update', input: { key: 'PAY-107', field: ['Story Points=3'], toilProject: 'elsewhere', allowWrite: true }, note: null })}`,
       f,
     );
     expect(a.parts.map((p) => p.text)).toEqual(['Estimate [[corp-jira:PAY-107]].']);
     expect(a.proposals).toHaveLength(1);
     const p = a.proposals[0]!;
-    expect(p).toMatchObject({ from: 'agent', item: 'corp-jira:PAY-107', command: 'jira issue update', input: { dossier: 'card-payments', key: 'PAY-107', field: ['Story Points=3'] } });
+    expect(p).toMatchObject({ from: 'agent', item: 'corp-jira:PAY-107', command: 'jira issue update', input: { toilProject: 'card-payments', key: 'PAY-107', field: ['Story Points=3'] } });
     expect(p.input).not.toHaveProperty('allowWrite');
-    expect(commandLine(p, 'posix').line).toBe("toil jira issue update 'PAY-107' --dossier 'card-payments' --field 'Story Points=3' --allow-write");
+    expect(commandLine(p, 'posix').line).toBe("toil jira issue update 'PAY-107' --toil-project 'card-payments' --field 'Story Points=3' --allow-write");
   });
 
   it("name a command toil doesn't have as having none, rather than inventing one", () => {
@@ -663,7 +663,7 @@ describe('when an adapter cannot run', () => {
     expect((e as AgentError).fix).toMatch(/set its path in Settings/);
   });
 
-  it('says so when the dossier never synced', async () => {
+  it('says so when the Toil project never synced', async () => {
     const { host } = hostFor('claude', claudeStub(SCRIPT).module);
     await expect(host.ask(ctx(), 'never-synced', 'q')).rejects.toThrow(/hasn't synced never-synced/);
   });
@@ -684,7 +684,7 @@ describe('when an adapter cannot run', () => {
     ]);
   });
 
-  it('offers the ten starters, each scoped to the dossier, once an adapter is chosen', async () => {
+  it('offers the ten starters, each scoped to the Toil project, once an adapter is chosen', async () => {
     const { host } = hostFor('claude', claudeStub(SCRIPT).module);
     expect((await host.starters(ctx(), 'card-payments')).map((s) => s.label)).toEqual(['Stand-up digest', 'Why is this sprint at risk?', 'Backlog hygiene', 'Dependency risk', "What's stuck in review, and why?", 'What happened yesterday?', "Who's overloaded or blocked?", 'Prepare my 1:1 notes for <person>', 'Which items are ready for an agent?', 'Release notes']);
     for (const s of STARTERS) expect(s.prompt('card-payments')).toContain('"card-payments"');
@@ -989,22 +989,22 @@ describe('the people tools (#292)', () => {
   const now = () => FIXTURE_NOW;
   const of = (name: string) => cacheData(cache, name)!;
   const fixture = fixtureExecute();
-  const peopleTools_ = (name: string, ledger: Ledger) => peopleTools(name, of(name), ledger, dossierReader(fixture.execute, name), now);
+  const peopleTools_ = (name: string, ledger: Ledger) => peopleTools(name, of(name), ledger, toilProjectReader(fixture.execute, name), now);
 
-  it("people_list reads the dossier's people from the synced dossiers show, with each plate, and vouches for every id it names", async () => {
+  it("people_list reads the Toil project's people from the synced projects show, with each plate, and vouches for every id it names", async () => {
     const ledger = new Ledger();
     const r = (await tool(peopleTools_('card-payments', ledger), 'people_list').run({})) as PeopleList;
-    // The dossier is read live, as the cache never holds it: read-only, and labelled as Toil UI.
-    expect(fixture.calls.at(-1)).toMatchObject({ command: 'dossiers show', input: { dossier: 'card-payments' }, ok: true });
+    // The toil project is read live, as the cache never holds it: read-only, and labelled as Toil UI.
+    expect(fixture.calls.at(-1)).toMatchObject({ command: 'projects show', input: { toilProject: 'card-payments' }, ok: true });
     expect(r.rule).toContain('never rank, score or compare people');
     expect(r.wipLimitPerPerson).toBe(2);
     expect(r.people.map((p: { name: string }) => p.name)).toEqual(['A. Chen', 'J. Smith', 'R. Patel']);
     const chen = r.people[0]!;
     expect(chen.inProgress).toEqual([{ id: 'corp-jira:PAY-104', title: expect.any(String), status: 'In Review', daysInStatus: 5.9 }]);
-    expect(chen.blocked).toEqual([{ id: 'corp-jira:PAY-102', title: expect.any(String), blockedBy: [{ id: 'corp-jira:PAY-101', status: 'In Progress', inDossier: true }] }]);
+    expect(chen.blocked).toEqual([{ id: 'corp-jira:PAY-102', title: expect.any(String), blockedBy: [{ id: 'corp-jira:PAY-101', status: 'In Progress', inToilProject: true }] }]);
     expect(r.people[1]!.reviewsWaitingOnThem.map((x: { id: string }) => x.id)).toEqual(['corp-bitbucket:PAY/payments-core#305']);
     expect(r.unmapped.map((p: { key: string }) => p.key)).toEqual(['id:bitbucket:achen']);
-    expect(r.suggestedMatches).toEqual([{ accounts: ['bitbucket:achen'], probably: 'A. Chen', sharedEmail: 'you@example.com', applyWith: 'dossiers person' }]);
+    expect(r.suggestedMatches).toEqual([{ accounts: ['bitbucket:achen'], probably: 'A. Chen', sharedEmail: 'you@example.com', applyWith: 'projects person' }]);
     expect(r.team.unassignedInSprint).toEqual({ sprint: 'Sprint 42', ids: ['corp-jira:PAY-103', 'corp-jira:PAY-107'] });
     for (const id of ['corp-jira:PAY-104', 'corp-jira:PAY-102', 'corp-jira:PAY-101', 'corp-bitbucket:PAY/payments-core#305', 'corp-jira:PAY-103']) expect(ledger.ids.has(id), id).toBe(true);
   });
@@ -1028,8 +1028,8 @@ describe('the people tools (#292)', () => {
   it('works with no people section: every account is unmapped, and nothing is suggested', async () => {
     const r = (await tool(peopleTools_('settlement', new Ledger()), 'people_list').run({})) as PeopleList;
     expect(r.people).toEqual([]);
-    const failing = peopleTools('settlement', of('settlement'), new Ledger(), async () => ({ dossier: null, error: 'toil dossiers show settlement failed: it broke.' }), now);
-    expect(((await tool(failing, 'people_list').run({})) as PeopleList).notes).toEqual(['toil dossiers show settlement failed: it broke. So nobody is mapped, and no limit is known.']);
+    const failing = peopleTools('settlement', of('settlement'), new Ledger(), async () => ({ toilProject: null, error: 'toil projects show settlement failed: it broke.' }), now);
+    expect(((await tool(failing, 'people_list').run({})) as PeopleList).notes).toEqual(['toil projects show settlement failed: it broke. So nobody is mapped, and no limit is known.']);
     expect(r.wipLimitPerPerson).toBeNull();
     expect(r.unmapped.map((p: { name: string }) => p.name)).toEqual(['D. Okafor', 'J. Park', 'K. Nakamura', 'M. Lind']);
   });
@@ -1042,12 +1042,12 @@ type ReadinessList = { rule: string; openByVerdict: Record<string, number>; note
 describe('the readiness tools (#307)', () => {
   const of = (name: string) => cacheData(cache, name)!;
   const fixture = fixtureExecute();
-  const tools = (name: string, ledger: Ledger) => readinessTools(name, of(name), ledger, dossierReader(fixture.execute, name));
+  const tools = (name: string, ledger: Ledger) => readinessTools(name, of(name), ledger, toilProjectReader(fixture.execute, name));
 
   it('readiness_list gives every open item its verdict and why, with the settings it used, and vouches for every id it names', async () => {
     const ledger = new Ledger();
     const r = (await tool(tools('card-payments', ledger), 'readiness_list').run({})) as ReadinessList;
-    expect(fixture.calls.at(-1)).toMatchObject({ command: 'dossiers show', input: { dossier: 'card-payments' }, ok: true });
+    expect(fixture.calls.at(-1)).toMatchObject({ command: 'projects show', input: { toilProject: 'card-payments' }, ok: true });
     expect(r.rule).toContain('with no model call');
     expect(r.openByVerdict).toEqual({ ready: 1, thin: 3, blocked: 2 });
     expect(r.settings).toEqual({ sources: ['jira', 'bitbucket', 'jenkins'], repositories: ['payments-core'], areas: expect.objectContaining({ jira: expect.objectContaining({ acceptanceCriteriaField: 'customfield_10500', minWords: 20 }) }) });
@@ -1077,10 +1077,10 @@ describe('the readiness tools (#307)', () => {
     expect(((await tool(tools('checkout-web', new Ledger()), 'readiness_get').run({ id: 'nope' })) as { error: string }).error).toBe('The cache holds no item "nope" in checkout-web. Use readiness_list or owi_query to find ids.');
   });
 
-  it("says so when the dossier can't be read, and every item then fails scope", async () => {
-    const failing = readinessTools('settlement', of('settlement'), new Ledger(), async () => ({ dossier: null, error: 'toil dossiers show settlement failed: it broke.' }));
+  it("says so when the Toil project can't be read, and every item then fails scope", async () => {
+    const failing = readinessTools('settlement', of('settlement'), new Ledger(), async () => ({ toilProject: null, error: 'toil projects show settlement failed: it broke.' }));
     const r = (await tool(failing, 'readiness_list').run({})) as ReadinessList;
-    expect(r.notes).toEqual(['toil dossiers show settlement failed: it broke. So no source, repository or readiness setting is known, and every item fails scope.']);
+    expect(r.notes).toEqual(['toil projects show settlement failed: it broke. So no source, repository or readiness setting is known, and every item fails scope.']);
     expect(new Set(r.items.map((i) => i.verdict))).toEqual(new Set(['blocked']));
   });
 });
@@ -1092,7 +1092,7 @@ describe('each question, as an agent run for the worklog (#308)', () => {
     const versions = await streamed(host);
     expect(runs.map((r) => r.outcome)).toEqual(['running', 'finished']);
     const [start, end] = runs;
-    expect(start).toMatchObject({ kind: 'ask', dossier: 'card-payments', prompt: 'Backlog hygiene', by: 'Claude (test-model)', startedAt: FIXTURE_NOW, finishedAt: null, answer: null });
+    expect(start).toMatchObject({ kind: 'ask', toilProject: 'card-payments', prompt: 'Backlog hygiene', by: 'Claude (test-model)', startedAt: FIXTURE_NOW, finishedAt: null, answer: null });
     expect(end!.id).toBe(start!.id);
     expect(end).toMatchObject({ finishedAt: FIXTURE_NOW, citations: versions.at(-1)!.citations, unverified: ['corp-jira:PAY-999'] });
     expect(end!.proposals.map((p) => p.command)).toEqual(['jira issue update']);
@@ -1132,8 +1132,8 @@ describe('each question, as an agent run for the worklog (#308)', () => {
     expect((await streamed(host)).at(-1)!.proposals).toHaveLength(1);
   });
 
-  it('gives the agent worklog_day when the dossier has a worklog, vouching for every id a line names', async () => {
-    const page = { dossier: 'card-payments', day: '2026-10-12', timeZone: 'UTC' as const, gaps: ['a gap'], work: [{ key: 'k', kind: 'status' as const, at: '2026-10-12T09:00:00.000Z', subject: 'corp-jira:PAY-101', source: 'jira', label: 'PAY-101', title: 'T', url: null, by: 'Ada', text: 'To Do → Done', cites: ['corp-jira:PAY-101'], refs: {}, observed: null }], prs: [], delivery: [], agents: [], notes: [], sources: [] };
+  it('gives the agent worklog_day when the Toil project has a worklog, vouching for every id a line names', async () => {
+    const page = { toilProject: 'card-payments', day: '2026-10-12', timeZone: 'UTC' as const, gaps: ['a gap'], work: [{ key: 'k', kind: 'status' as const, at: '2026-10-12T09:00:00.000Z', subject: 'corp-jira:PAY-101', source: 'jira', label: 'PAY-101', title: 'T', url: null, by: 'Ada', text: 'To Do → Done', cites: ['corp-jira:PAY-101'], refs: {}, observed: null }], prs: [], delivery: [], agents: [], notes: [], sources: [] };
     const ledger = new Ledger();
     const days: string[] = [];
     const [tool] = worklogTool('card-payments', { ...data, worklog: async (day) => (days.push(day), { ...page, day }) }, ledger, () => FIXTURE_NOW);
@@ -1157,7 +1157,7 @@ describe('each question, as an agent run for the worklog (#308)', () => {
     // FIXTURE_NOW is a Tuesday: since the last working day is Monday and Tuesday.
     expect(asked).toEqual([['2026-10-12', '2026-10-13']]);
     expect(out.team[0]!.fact).toBe('F1');
-    expect(Object.keys(out.people[0]!)).toEqual(['name', 'kind', 'inDossierPeople', 'Done', 'In progress', 'Blocked', 'Next']);
+    expect(Object.keys(out.people[0]!)).toEqual(['name', 'kind', 'inToilProjectPeople', 'Done', 'In progress', 'Blocked', 'Next']);
     const cited = [...out.team, ...out.people.flatMap((p) => ['Done', 'In progress', 'Blocked', 'Next'].flatMap((b) => p[b] as Array<{ cite: string[] }>))].flatMap((l) => l.cite);
     expect(cited.length).toBeGreaterThan(0);
     for (const id of cited) expect(ledger.ids.has(id)).toBe(true);
@@ -1175,7 +1175,7 @@ describe('assignments on the agent host (#293)', () => {
     const { host, rec, dataDir } = hostFor('codex', stub.module, { serveTools: (tools) => holder.serve(tools) });
     const runner = hostRunner({ host, dataDir, registry: registry.commands, execute: rec.execute, mapIds: () => [], data: () => data, version: 't', toilVersion: '0.0.0-test', now: () => FIXTURE_NOW });
     const lines: string[] = [];
-    const assignment = { id: 'abc12345-0000-0000-0000-000000000000', dossier: 'card-payments', item: 'corp-jira:PAY-107', itemTitle: 'x', mode: over.mode ?? 'refine', adapter: 'codex', origin: 'person', trigger: null, state: 'working', waiting: null, repo: null, createdAt: FIXTURE_NOW, startedAt: FIXTURE_NOW, endedAt: null, stop: null, report: null, questions: [], proposals: [], usage: null, startedOn: null, branch: null } as const;
+    const assignment = { id: 'abc12345-0000-0000-0000-000000000000', toilProject: 'card-payments', item: 'corp-jira:PAY-107', itemTitle: 'x', mode: over.mode ?? 'refine', adapter: 'codex', origin: 'person', trigger: null, state: 'working', waiting: null, repo: null, createdAt: FIXTURE_NOW, startedAt: FIXTURE_NOW, endedAt: null, stop: null, report: null, questions: [], proposals: [], usage: null, startedOn: null, branch: null } as const;
     const result = await runner.run({ assignment: { ...assignment, proposals: [], questions: [] }, item: item(), signal: new AbortController().signal, record: (e) => lines.push(`${e.kind}: ${e.title}`) });
     return { result, stub, rec, lines, holder, dataDir };
   };
@@ -1191,7 +1191,7 @@ describe('assignments on the agent host (#293)', () => {
     expect(stub.seen.input).toContain('INJECTION:');
     expect(result.report!.unverified).toEqual(['corp-jira:PAY-999']);
     expect(result.proposals.map((p) => p.command)).toEqual(['jira issue update']);
-    expect(result.startedOn).toMatchObject({ toil: '0.0.0-test', toilUi: 't', adapter: 'codex', skills: [], dossier: { name: 'card-payments' }, item: { id: 'corp-jira:PAY-107' } });
+    expect(result.startedOn).toMatchObject({ toil: '0.0.0-test', toilUi: 't', adapter: 'codex', skills: [], toilProject: { name: 'card-payments' }, item: { id: 'corp-jira:PAY-107' } });
     expect(result.startedOn.item.fingerprint).toMatch(/^[0-9a-f]{64}$/);
     expect(lines).toContain('tool: Called: owi_get');
     // Every call toil made was a read, and the run's own carry the assignment as their actor.
@@ -1204,7 +1204,7 @@ describe('assignments on the agent host (#293)', () => {
     const { result } = await run({ mode: 'investigate', script: { calls: [{ name: 'owi_get', input: { id: 'corp-jira:PAY-107' } }], chunks: ['[[corp-jira:PAY-107]] is unestimated.\nQUESTION: Who owns it?'] } });
     expect(result.questions).toEqual(['Who owns it?']);
     expect(result.report!.parts.map((p) => p.text)).toEqual(['[[corp-jira:PAY-107]] is unestimated.']);
-    expect(result.proposals).toEqual([expect.objectContaining({ command: 'jira issue comment', input: expect.objectContaining({ dossier: 'card-payments', key: 'PAY-107' }) })]);
+    expect(result.proposals).toEqual([expect.objectContaining({ command: 'jira issue comment', input: expect.objectContaining({ toilProject: 'card-payments', key: 'PAY-107' }) })]);
   });
 
   it('stops on an item the agent says is an injection attempt', async () => {
@@ -1218,7 +1218,7 @@ describe('assignments on the agent host (#293)', () => {
     const stub = codexStub({ calls: [], chunks: ['done'] }, holder);
     const { host, dataDir } = hostFor('codex', stub.module, { serveTools: (tools) => holder.serve(tools) });
     const root = join(dataDir, 'cache', 'work', 'x');
-    await host.task({ adapter: 'codex', dossier: 'card-payments', chat: 'abc12345', system: 's', prompt: 'p', tools: [], workspace: { root }, signal: new AbortController().signal, onText: () => undefined });
+    await host.task({ adapter: 'codex', toilProject: 'card-payments', chat: 'abc12345', system: 's', prompt: 'p', tools: [], workspace: { root }, signal: new AbortController().signal, onText: () => undefined });
     expect(stub.seen.thread).toMatchObject({ sandboxMode: 'workspace-write', workingDirectory: root, networkAccessEnabled: false, approvalPolicy: 'never' });
     const overrides = stub.seen.options!.configOverrides as string[];
     expect(overrides).toEqual(codexOverrides('http://127.0.0.1:1/api/agent/mcp', true));
@@ -1230,28 +1230,28 @@ describe('assignments on the agent host (#293)', () => {
 
   it('refuses a workspace on an adapter whose own sandbox Toil UI does not use to bound one folder', async () => {
     const { host } = hostFor('claude', claudeStub(SCRIPT).module);
-    await expect(host.task({ adapter: 'claude', dossier: 'card-payments', chat: 'abc12345', system: 's', prompt: 'p', tools: [], workspace: { root: '/x' }, signal: new AbortController().signal, onText: () => undefined })).rejects.toThrow(/only Codex/);
+    await expect(host.task({ adapter: 'claude', toilProject: 'card-payments', chat: 'abc12345', system: 's', prompt: 'p', tools: [], workspace: { root: '/x' }, signal: new AbortController().signal, onText: () => undefined })).rejects.toThrow(/only Codex/);
     expect(host.adapterChoices().map((a) => [a.name, a.workspace])).toEqual([['claude', false], ['copilot', false], ['codex', true]]);
   });
 
   it('holds an assignment to the per-chat cap, and marks the refusal as a cap', async () => {
     const holder = new McpGrants(() => 'http://127.0.0.1:1/api/agent/mcp');
     const stub = codexStub(SCRIPT, holder);
-    const ledger = memoryLedger([{ id: 'r1', chatId: 'abc12345', turn: 1, dossier: 'card-payments', adapter: 'codex', at: FIXTURE_NOW, model: null, costSource: 'none', inputTokens: 900 }]);
+    const ledger = memoryLedger([{ id: 'r1', chatId: 'abc12345', turn: 1, toilProject: 'card-payments', adapter: 'codex', at: FIXTURE_NOW, model: null, costSource: 'none', inputTokens: 900 }]);
     const { host, dataDir } = hostFor('codex', stub.module, { serveTools: (tools) => holder.serve(tools), ledger });
     writeFileSync(usageSettingsFile(dataDir), JSON.stringify({ caps: { 'codex.chat': { unit: 'tokens', limit: 500 } }, codexRates: null }));
-    const e = await host.task({ adapter: 'codex', dossier: 'card-payments', chat: 'abc12345', system: 's', prompt: 'p', tools: [], workspace: null, signal: new AbortController().signal, onText: () => undefined }).catch((x: unknown) => x);
+    const e = await host.task({ adapter: 'codex', toilProject: 'card-payments', chat: 'abc12345', system: 's', prompt: 'p', tools: [], workspace: null, signal: new AbortController().signal, onText: () => undefined }).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(AgentError);
     expect((e as AgentError).capped).toBe(true);
     expect(stub.seen.thread).toBeUndefined();
   });
 
   it('records the model Settings gave the adapter when the run starts, so a run a cap stops still names it (#318, seen live)', async () => {
-    const ledger = memoryLedger([{ id: 'r1', chatId: 'abc12345-0000-0000-0000-000000000009', turn: 1, dossier: 'card-payments', adapter: 'claude', at: FIXTURE_NOW, model: 'test-model', costSource: 'none', inputTokens: 900 }]);
+    const ledger = memoryLedger([{ id: 'r1', chatId: 'abc12345-0000-0000-0000-000000000009', turn: 1, toilProject: 'card-payments', adapter: 'claude', at: FIXTURE_NOW, model: 'test-model', costSource: 'none', inputTokens: 900 }]);
     const { host, rec, dataDir } = hostFor('claude', claudeStub(SCRIPT).module, { ledger });
     writeFileSync(usageSettingsFile(dataDir), JSON.stringify({ caps: { 'claude.chat': { unit: 'tokens', limit: 500 } }, codexRates: null }));
     const runner = hostRunner({ host, dataDir, registry: registry.commands, execute: rec.execute, mapIds: () => [], data: () => data, version: 't', toilVersion: '0.0.0-test', now: () => FIXTURE_NOW });
-    const assignment = { id: 'abc12345-0000-0000-0000-000000000009', dossier: 'card-payments', item: 'corp-jira:PAY-107', itemTitle: 'x', mode: 'refine', adapter: 'claude', origin: 'person', trigger: null, state: 'working', waiting: null, repo: null, createdAt: FIXTURE_NOW, startedAt: FIXTURE_NOW, endedAt: null, stop: null, report: null, questions: [], proposals: [], usage: null, startedOn: null, branch: null } as const;
+    const assignment = { id: 'abc12345-0000-0000-0000-000000000009', toilProject: 'card-payments', item: 'corp-jira:PAY-107', itemTitle: 'x', mode: 'refine', adapter: 'claude', origin: 'person', trigger: null, state: 'working', waiting: null, repo: null, createdAt: FIXTURE_NOW, startedAt: FIXTURE_NOW, endedAt: null, stop: null, report: null, questions: [], proposals: [], usage: null, startedOn: null, branch: null } as const;
     const started: Array<{ adapter: string; model: string | null }> = [];
     const stopped = await runner
       .run({ assignment: { ...assignment, proposals: [], questions: [] }, item: data.items().find((i) => i.id === 'corp-jira:PAY-107')!, signal: new AbortController().signal, record: () => undefined, started: (s) => void started.push(s) })
@@ -1289,12 +1289,12 @@ describe('implement mode, when the agent commits anyway (#293 review)', () => {
     const calls: string[] = [];
     const execute: Execute = async (command) => {
       calls.push(command);
-      const data = command === 'dossiers show' ? { dossier: { repos: [{ name: 'payments-core', path: source }] } } : { staged: ['README.md'] };
+      const data = command === 'projects show' ? { toilProject: { repos: [{ name: 'payments-core', path: source }] } } : { staged: ['README.md'] };
       return { ok: true, data, error: null, meta: { command, durationMs: 0, version: '0', contractVersion: 1 } } as unknown as Envelope;
     };
     const runner = hostRunner({ host, dataDir, registry: registry.commands, execute, mapIds: () => [], data: () => data, version: 't', toilVersion: 't', now: () => FIXTURE_NOW });
     const item = data.items().find((i) => i.id === 'corp-jira:PAY-107')!;
-    const a = { id: 'abc12345-0000-0000-0000-000000000001', dossier: 'card-payments', item: item.id, itemTitle: 'x', mode: 'implement', adapter: 'codex', origin: 'person', trigger: null, state: 'working', waiting: null, repo: 'payments-core', createdAt: FIXTURE_NOW, startedAt: FIXTURE_NOW, endedAt: null, stop: null, report: null, questions: [], proposals: [], usage: null, startedOn: null, branch: null } as const;
+    const a = { id: 'abc12345-0000-0000-0000-000000000001', toilProject: 'card-payments', item: item.id, itemTitle: 'x', mode: 'implement', adapter: 'codex', origin: 'person', trigger: null, state: 'working', waiting: null, repo: 'payments-core', createdAt: FIXTURE_NOW, startedAt: FIXTURE_NOW, endedAt: null, stop: null, report: null, questions: [], proposals: [], usage: null, startedOn: null, branch: null } as const;
     const result = await runner.run({ assignment: { ...a, questions: [], proposals: [] }, item, signal: new AbortController().signal, record: () => undefined });
     expect(result.report!.warnings[0]).toMatch(/moved the clone off the commit it started at \(aaaaaaaaaaaa, now bbbbbbbbbbbb\)/);
     expect(result.proposals.some((p) => p.title.startsWith('Commit and push'))).toBe(false);
@@ -1353,13 +1353,13 @@ describe('implement mode, when the diff would hide something staged (#293 review
     process.env.HOME = home;
     process.env.USERPROFILE = home;
     const execute: Execute = async (command, input = {}, options = {}) =>
-      command === 'dossiers show'
-        ? ({ ok: true, data: { dossier: { repos: [{ name: 'payments-core', path: source }] } }, error: null, meta: { command, durationMs: 0, version: '0', contractVersion: 1 } } as unknown as Envelope)
+      command === 'projects show'
+        ? ({ ok: true, data: { toilProject: { repos: [{ name: 'payments-core', path: source }] } }, error: null, meta: { command, durationMs: 0, version: '0', contractVersion: 1 } } as unknown as Envelope)
         : ((await realExecute(command, input, options as never)) as unknown as Envelope);
     try {
       const runner = hostRunner({ host, dataDir, registry: registry.commands, execute, mapIds: () => [], data: () => data, version: 't', toilVersion: 't', now: () => FIXTURE_NOW });
       const item = data.items().find((i) => i.id === 'corp-jira:PAY-107')!;
-      const a = { id: 'abc12345-0000-0000-0000-000000000002', dossier: 'card-payments', item: item.id, itemTitle: 'x', mode: 'implement', adapter: 'codex', origin: 'person', trigger: null, state: 'working', waiting: null, repo: 'payments-core', createdAt: FIXTURE_NOW, startedAt: FIXTURE_NOW, endedAt: null, stop: null, report: null, questions: [], proposals: [], usage: null, startedOn: null, branch: null } as const;
+      const a = { id: 'abc12345-0000-0000-0000-000000000002', toilProject: 'card-payments', item: item.id, itemTitle: 'x', mode: 'implement', adapter: 'codex', origin: 'person', trigger: null, state: 'working', waiting: null, repo: 'payments-core', createdAt: FIXTURE_NOW, startedAt: FIXTURE_NOW, endedAt: null, stop: null, report: null, questions: [], proposals: [], usage: null, startedOn: null, branch: null } as const;
       const result = await runner.run({ assignment: { ...a, questions: [], proposals: [] }, item, signal: new AbortController().signal, record: () => undefined });
       return result;
     } finally {

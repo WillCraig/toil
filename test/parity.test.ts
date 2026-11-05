@@ -16,13 +16,13 @@ import { runCommand } from '../src/core/run.js';
 import { clearTokenCache, watchTokenExchanges } from '../src/core/token.js';
 import { argvFor, routedArgvFor } from '../src/program.js';
 import { areas as registeredAreas, commands, routedAliases } from '../src/registry.js';
-import { EXAMPLE_BRIEF_RECORDS } from '../src/dossiers/brief.js';
+import { EXAMPLE_BRIEF_RECORDS } from '../src/projects/brief.js';
 import { demoCommands } from './fixtures/demo-commands.js';
 import { runCli } from './harness/cli.js';
 import { testContext } from './harness/context.js';
 import { withoutExchanges, type Route } from './harness/fake-fetch.js';
 import { examplesOf, loadFixtures, setUp, tearDown, writeOperations, type LoadedFixture } from './harness/fixtures.js';
-import { dossierDisk } from './harness/dossiers.js';
+import { toilProjectDisk } from './harness/toil-projects.js';
 import { connectMcp, type McpSession } from './harness/mcp.js';
 import { recordOperations } from './harness/operations.js';
 
@@ -51,8 +51,8 @@ beforeAll(() => setUp(fixtures));
 afterAll(() => tearDown(fixtures));
 type Files = Record<string, string | Uint8Array>;
 // Config, files and routes are read from the fixture when each test runs, after setup.
-// Two connections the dossier build examples bind to, both with writes off, and the
-// OWI records `dossiers brief` reads from a file.
+// Two connections the toil project build examples bind to, both with writes off, and the
+// OWI records `toil projects brief` reads from a file.
 const outside: LoadedFixture = { area: '', routes: [], config: { jira: { baseUrl: 'https://jira.imagile.dev' }, openshift: { baseUrl: 'https://api.ocp.imagile.dev:6443' } }, files: { 'owi/brief.owi.json': EXAMPLE_BRIEF_RECORDS }, commands: [], trace: [] };
 // A group of standalone commands that read files or run git (`util`) brings
 // its own fixture, named after the group, and runs in that suite instead.
@@ -64,14 +64,14 @@ const suites: Array<{ name: string; commands: AnyCommand[]; fixture: LoadedFixtu
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-/** The registry's areas as dossiers see them: each one's context inputs. */
-const dossierAreas = registeredAreas.map((a) => ({ name: a.name, context: Object.keys(a.context) }));
+/** The registry's areas as toil projects see them: each one's context inputs. */
+const toilProjectAreas = registeredAreas.map((a) => ({ name: a.name, context: Object.keys(a.context) }));
 
-// The dossiers and repos commands sit outside any area and read and write
-// dossiers on disk: a temp home and workspace, put back as made before each
+// The toil projects and repos commands sit outside any area and read and write
+// toil projects on disk: a temp home and workspace, put back as made before each
 // run, so the CLI and MCP runs of a writing example start from the same files.
-const outsideDisk = dossierDisk({
-  'home/.toil/dossiers/payments.json': {
+const outsideDisk = toilProjectDisk({
+  'home/.toil/projects/payments.json': {
     name: 'payments',
     description: 'Payments platform',
     repos: [
@@ -81,27 +81,27 @@ const outsideDisk = dossierDisk({
     jira: { project: 'PAY', projects: ['PAY', 'LEDG'] },
   },
   'work/.git/HEAD': 'ref: refs/heads/main\n',
-  'work/.toil/dossiers/team.json': { name: 'team', description: 'Shared by the team', repos: [{ name: 'payments-api', remotes: ['https://bitbucket.imagile.dev/scm/pay/payments-api.git'] }] },
+  'work/.toil/projects/team.json': { name: 'team', description: 'Shared by the team', repos: [{ name: 'payments-api', remotes: ['https://bitbucket.imagile.dev/scm/pay/payments-api.git'] }] },
 });
 afterAll(() => outsideDisk.cleanup());
-// An area fixture's own dossier (`dossier`), as your own and named by TOIL_DOSSIER, for its check-dossier.
-const fixtureDisks = new Map<LoadedFixture, ReturnType<typeof dossierDisk>>();
+// An area fixture's own toil project (`toil-project`), as your own and named by TOIL_PROJECT, for its check-toil-project.
+const fixtureDisks = new Map<LoadedFixture, ReturnType<typeof toilProjectDisk>>();
 afterAll(() => fixtureDisks.forEach((d) => d.cleanup()));
-type Local = { repo?: GitContext; git?: GitRunner; home?: Record<string, string>; dossiers?: ReturnType<typeof dossierDisk>['catalog']; configFile?: string };
+type Local = { repo?: GitContext; git?: GitRunner; home?: Record<string, string>; toilProjects?: ReturnType<typeof toilProjectDisk>['catalog']; configFile?: string };
 function localOf(f: LoadedFixture): Local {
   const local: Local = { ...(f.repo ? { repo: f.repo } : {}), ...(f.git ? { git: f.git } : {}), ...(f.home ? { home: f.home } : {}) };
   if (f === outside) {
     // `theme set` writes the config file: one in the temp home, which the reset below empties before each run.
     local.configFile = join(outsideDisk.home, '.toil', 'config.json');
-    local.dossiers = (config) => {
+    local.toilProjects = (config) => {
       outsideDisk.reset();
-      return outsideDisk.catalog(config, { areas: dossierAreas });
+      return outsideDisk.catalog(config, { areas: toilProjectAreas });
     };
-  } else if (f.dossier) {
-    const name = String(f.dossier.name);
-    if (!fixtureDisks.has(f)) fixtureDisks.set(f, dossierDisk({ [`home/.toil/dossiers/${name}.json`]: f.dossier }));
+  } else if (f.toilProject) {
+    const name = String(f.toilProject.name);
+    if (!fixtureDisks.has(f)) fixtureDisks.set(f, toilProjectDisk({ [`home/.toil/projects/${name}.json`]: f.toilProject }));
     const disk = fixtureDisks.get(f)!;
-    local.dossiers = (config) => disk.catalog(config, { areas: dossierAreas, env: { TOIL_DOSSIER: name } });
+    local.toilProjects = (config) => disk.catalog(config, { areas: toilProjectAreas, env: { TOIL_PROJECT: name } });
   }
   return local;
 }
@@ -231,7 +231,7 @@ for (const suite of suites) {
     it('uses every input field in at least one example, so parity covers every flag', () => {
       for (const def of suite.commands) {
         const used = new Set(def.examples.flatMap((e) => Object.keys(e as object)));
-        // `connection`, `dossier` and `cwd` are added by core to every area command; the suites below cover them.
+        // `connection`, `toil-project` and `cwd` are added by core to every area command; the suites below cover them.
         // A command with an implementation per deployment lists the area's other-deployment inputs too (`--ws` on `pr create-many`), which no deployment of it takes.
         const taken = def.deployments ? new Set(Object.values(def.deployments.routes).flatMap((r) => r.fields)) : undefined;
         const unused = Object.keys(def.input.shape).filter((f) => !used.has(f) && !CORE_FIELDS.includes(f) && (taken === undefined || taken.has(f)));
@@ -277,7 +277,7 @@ for (const suite of suites) {
 
         it(`${commandName(def)} example ${i + 1}: under readOnly, refused before anything runs if it writes anything, otherwise runs and changes nothing`, async () => {
           const ro = testContext({ config: suite.fixture.config, routes: suite.fixture.routes, files: suite.fixture.files, ...localOf(suite.fixture) });
-          // The dossiers commands write straight to disk, where no guard sees: compare the disk itself.
+          // The toil projects commands write straight to disk, where no guard sees: compare the disk itself.
           const before = suite.fixture === outside ? snapshot(outsideDisk.root) : undefined;
           const exchanges = watchTokenExchanges();
           const { result: envelope, operations } = await recordOperations(() => runCommand(def, example, () => ro.context, ro.context.version, 'api', { targets: suite.commands }, { readOnly: true })).finally(exchanges.stop);

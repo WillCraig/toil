@@ -1,6 +1,6 @@
 /**
  * The sync panel (#250): what the local app's cache holds and how fresh it
- * is, for every dossier and each of its sources, with Sync now and Wipe the
+ * is, for every toil project and each of its sources, with Sync now and Wipe the
  * cache. It sits beside the App rather than inside it (src/local.tsx), so the
  * views stay functions of their data and the preview never shows it.
  *
@@ -12,9 +12,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { dateTime, dossierHref, sourceLabel } from './format.ts';
+import { dateTime, toilProjectHref, sourceLabel } from './format.ts';
 import { history, type HistoryEntry } from './history.ts';
-import type { DossierState, SyncClient, SyncStatus } from './server-client.ts';
+import type { ToilProjectState, SyncClient, SyncStatus } from './server-client.ts';
 import { matches } from './shortcuts.ts';
 import './sync-panel.css';
 
@@ -32,41 +32,41 @@ export interface SyncPanelProps {
   request?: number;
 }
 
-/** The newest sync time across the dossiers, which is when the views' data was read. */
+/** The newest sync time across the toil projects, which is when the views' data was read. */
 export function lastSynced(status: SyncStatus | null): string | null {
-  const times = (status?.dossiers ?? []).map((d) => d.lastSyncAt).sort();
+  const times = (status?.toilProjects ?? []).map((d) => d.lastSyncAt).sort();
   return times.length ? times[times.length - 1]! : null;
 }
 
-/** A finished sync as the bell keeps it (#417): how it went, linking to the dossier that failed, or the Dossiers view. */
+/** A finished sync as the bell keeps it (#417): how it went, linking to the toil project that failed, or the Toil projects view. */
 export function syncEntry(s: SyncStatus): Omit<HistoryEntry, 'seq'> {
   const at = s.job.finishedAt ?? new Date().toISOString();
   // Every tab sees the same sync end, so the id is the sync's own.
   const id = `sync:${at}`;
   if (s.job.error) return { id, at, kind: 'sync-failed', title: 'The sync stopped', line: s.job.error, href: '#/' };
-  const bad = s.dossiers.flatMap((d) => d.sources.filter((x) => x.status === 'failed').map((x) => ({ dossier: d.name, area: x.area })));
-  const badDossiers = s.dossiers.filter((d) => d.status === 'failed' && !d.sources.some((x) => x.status === 'failed')).map((d) => d.name);
-  if (bad.length || badDossiers.length) {
-    const named = [...bad.map((b) => `${b.dossier}: ${sourceLabel(b.area)}`), ...badDossiers.map((d) => `${d}: the dossier`)];
-    const first = bad[0]?.dossier ?? badDossiers[0]!;
-    return { id, at, kind: 'sync-failed', title: `Sync finished; ${named.length} ${named.length === 1 ? 'source' : 'sources'} failed`, line: named.join(', '), href: dossierHref(first) };
+  const bad = s.toilProjects.flatMap((d) => d.sources.filter((x) => x.status === 'failed').map((x) => ({ toilProject: d.name, area: x.area })));
+  const badToilProjects = s.toilProjects.filter((d) => d.status === 'failed' && !d.sources.some((x) => x.status === 'failed')).map((d) => d.name);
+  if (bad.length || badToilProjects.length) {
+    const named = [...bad.map((b) => `${b.toilProject}: ${sourceLabel(b.area)}`), ...badToilProjects.map((d) => `${d}: the Toil project`)];
+    const first = bad[0]?.toilProject ?? badToilProjects[0]!;
+    return { id, at, kind: 'sync-failed', title: `Sync finished; ${named.length} ${named.length === 1 ? 'source' : 'sources'} failed`, line: named.join(', '), href: toilProjectHref(first) };
   }
-  const n = s.dossiers.length;
-  return { id, at, kind: 'sync', title: 'Sync finished', line: `${n} ${n === 1 ? 'dossier' : 'dossiers'} up to date`, href: '#/' };
+  const n = s.toilProjects.length;
+  return { id, at, kind: 'sync', title: 'Sync finished', line: `${n} ${n === 1 ? 'Toil project' : 'Toil projects'} up to date`, href: '#/' };
 }
 
-function DossierRow({ dossier }: { dossier: DossierState }) {
-  const failed = dossier.sources.filter((s) => s.status === 'failed');
+function ToilProjectRow({ toilProject }: { toilProject: ToilProjectState }) {
+  const failed = toilProject.sources.filter((s) => s.status === 'failed');
   return (
-    <li className="sync-dossier">
+    <li className="sync-toil-project">
       <p>
-        <strong>{dossier.name}</strong> <span className="sync-when">synced {dateTime(dossier.lastSyncAt)}</span>
+        <strong>{toilProject.name}</strong> <span className="sync-when">synced {dateTime(toilProject.lastSyncAt)}</span>
       </p>
-      {/* A dossier whose own read failed (dossiers show) keeps its sources as they were, so the error is the dossier's. */}
-      {dossier.status === 'failed' && failed.length === 0 && <p className="sync-bad">The latest sync couldn't read this dossier: {dossier.error}</p>}
-      {dossier.sources.length > 0 && (
-        <ul className="sync-sources" aria-label={`${dossier.name} sources`}>
-          {dossier.sources.map((s) => (
+      {/* A toil project whose own read failed (projects show) keeps its sources as they were, so the error is the toil project's. */}
+      {toilProject.status === 'failed' && failed.length === 0 && <p className="sync-bad">The latest sync couldn't read this Toil project: {toilProject.error}</p>}
+      {toilProject.sources.length > 0 && (
+        <ul className="sync-sources" aria-label={`${toilProject.name} sources`}>
+          {toilProject.sources.map((s) => (
             <li key={s.area} className={s.status === 'failed' ? 'sync-bad' : undefined}>
               {s.status === 'ok' ? (
                 <>
@@ -101,7 +101,7 @@ export function SyncPanel({ client, onChange, onStatus, pollMs = POLL_MS, reques
       setProblem(null);
       onStatus?.(next);
       if (wasRunning.current && !next.job.running) {
-        const failed = next.dossiers.flatMap((d) => d.sources).filter((s) => s.status === 'failed').length;
+        const failed = next.toilProjects.flatMap((d) => d.sources).filter((s) => s.status === 'failed').length;
         setAnnounce(next.job.error ? `The sync stopped: ${next.job.error}` : failed ? `Sync finished; ${failed} source${failed === 1 ? '' : 's'} failed.` : 'Sync finished.');
         history.add([syncEntry(next)]);
         onChange(next);
@@ -165,7 +165,7 @@ export function SyncPanel({ client, onChange, onStatus, pollMs = POLL_MS, reques
         <div className="sync-head">
           <h2 id="sync-heading">Sync</h2>
           <p className="sync-when">
-            {!status ? 'Reading the cache…' : last ? `Last synced ${dateTime(last)}. Kept ${status.retentionDays} days.` : 'Nothing synced yet: press Sync now to read your dossiers through toil.'}
+            {!status ? 'Reading the cache…' : last ? `Last synced ${dateTime(last)}. Kept ${status.retentionDays} days.` : 'Nothing synced yet: press Sync now to read your Toil projects through toil.'}
           </p>
           <div className="sync-actions">
             <button type="button" onClick={start} disabled={!status || running}>
@@ -178,10 +178,10 @@ export function SyncPanel({ client, onChange, onStatus, pollMs = POLL_MS, reques
         </div>
 
         <p role="status" className="sync-live">
-          {running && job ? `Syncing ${job.dossier ?? 'the dossiers'}: ${job.dossiersDone} of ${job.dossiersTotal || '?'} dossiers, ${job.requests} requests, ${job.pages} pages${job.retries ? `, ${job.retries} retries` : ''}. ${job.messages[job.messages.length - 1] ?? ''}` : announce}
+          {running && job ? `Syncing ${job.toilProject ?? 'the Toil projects'}: ${job.toilProjectsDone} of ${job.toilProjectsTotal || '?'} Toil projects, ${job.requests} requests, ${job.pages} pages${job.retries ? `, ${job.retries} retries` : ''}. ${job.messages[job.messages.length - 1] ?? ''}` : announce}
         </p>
-        {running && job && job.dossiersTotal > 0 && (
-          <progress className="sync-progress" max={job.dossiersTotal} value={job.dossiersDone} aria-label="Dossiers synced" />
+        {running && job && job.toilProjectsTotal > 0 && (
+          <progress className="sync-progress" max={job.toilProjectsTotal} value={job.toilProjectsDone} aria-label="Toil projects synced" />
         )}
         {problem && (
           <p role="alert" className="sync-bad">
@@ -206,10 +206,10 @@ export function SyncPanel({ client, onChange, onStatus, pollMs = POLL_MS, reques
           </div>
         )}
 
-        {status && status.dossiers.length > 0 && (
-          <ul className="sync-dossiers" aria-label="Dossiers in the cache">
-            {status.dossiers.map((d) => (
-              <DossierRow key={d.name} dossier={d} />
+        {status && status.toilProjects.length > 0 && (
+          <ul className="sync-toil-projects" aria-label="Toil projects in the cache">
+            {status.toilProjects.map((d) => (
+              <ToilProjectRow key={d.name} toilProject={d} />
             ))}
           </ul>
         )}

@@ -1,7 +1,7 @@
 /**
- * What a dossier's views read: the dashboard's data, loaded once by the shell
+ * What a toil project's views read: the dashboard's data, loaded once by the shell
  * through `execute()`, the Agent, and the clock the figures are worked out at.
- * One load per dossier, shared by the dashboard and its item pages: the rare
+ * One load per toil project, shared by the dashboard and its item pages: the rare
  * meeting that could have been an email and was.
  */
 
@@ -10,8 +10,8 @@ import type { Agent } from './agent.ts';
 import type { AnalysesApi } from './analyses.ts';
 import type { AssignmentsApi } from './assign/model.ts';
 import type { ConfigApi } from './config.ts';
-import type { Described } from './components/dossier-head.tsx';
-import type { DossierData } from './load.ts';
+import type { Described } from './components/toil-project-head.tsx';
+import type { ToilProjectData } from './load.ts';
 import { prepare, type Prepared } from './model/insights.ts';
 import { health, type Health } from './model/sprint.ts';
 import type { Change, Execute, WorkItem } from './toil.ts';
@@ -27,9 +27,9 @@ import type { Change, Execute, WorkItem } from './toil.ts';
 export type StartReady = (plan: { id: string; items: string[] }) => Promise<string>;
 
 export interface Data {
-  dossier: DossierData;
+  toilProject: ToilProjectData;
   byId: Map<string, WorkItem>;
-  /** The dossier's pull requests, by OWI change id, for citations that name one. */
+  /** The toil project's pull requests, by OWI change id, for citations that name one. */
   prById?: Map<string, Change>;
   agent: Agent;
   /** When the data was read: every view shows it (principle 4), and sprint figures are worked out at it. */
@@ -38,13 +38,13 @@ export interface Data {
   viewedAt?: string;
   /** toil's config commands, for a change a person approves on a view (the People view's suggested matches); absent where there are none. */
   config?: ConfigApi;
-  /** Reads the dossier again, after a person changed it from a view; absent where nothing can change. */
+  /** Reads the toil project again, after a person changed it from a view; absent where nothing can change. */
   refresh?: () => void;
   /** After its name or description was changed in place (#342): reads it again, and follows a rename to the new name. */
   described?: (d: Described) => void;
   /** Assigning items to an agent (#293): the server's, or the preview's sample; absent where there is neither. */
   assignments?: AssignmentsApi;
-  /** The history of analyses (#395): every Analyze kept for the dossier; absent in a view rendered on its own. */
+  /** The history of analyses (#395): every Analyze kept for the toil project; absent in a view rendered on its own. */
   analyses?: AnalysesApi;
   /** toil's `execute()`, read-only, for the one live read a view may make on a person's press (the readiness gate's workflow check, #307); absent where there is none. */
   execute?: Execute;
@@ -62,21 +62,21 @@ export const DataContext = createContext<Data | null>(null);
 
 export function useData(): Data {
   const data = useContext(DataContext);
-  if (!data) throw new Error('useData() needs the shell to have loaded the dossier first.');
+  if (!data) throw new Error('useData() needs the shell to have loaded the Toil project first.');
   return data;
 }
 
-const derived = new WeakMap<DossierData, Map<string, { health: Health | null; insights: Prepared }>>();
+const derived = new WeakMap<ToilProjectData, Map<string, { health: Health | null; insights: Prepared }>>();
 
-/** The sprint and the insights for the dossier on screen, worked out once per dossier and clock. */
+/** The sprint and the insights for the toil project on screen, worked out once per toil project and clock. */
 export function useDerived(): { health: Health | null; insights: Prepared } {
-  const { dossier, now } = useData();
-  let byNow = derived.get(dossier);
-  if (!byNow) derived.set(dossier, (byNow = new Map()));
+  const { toilProject, now } = useData();
+  let byNow = derived.get(toilProject);
+  if (!byNow) derived.set(toilProject, (byNow = new Map()));
   let d = byNow.get(now);
   if (!d) {
-    const h = health(dossier.items, dossier.changes, now);
-    d = { health: h, insights: prepare({ items: dossier.items, changes: dossier.changes, deployments: dossier.deployments, health: h, now }) };
+    const h = health(toilProject.items, toilProject.changes, now);
+    d = { health: h, insights: prepare({ items: toilProject.items, changes: toilProject.changes, deployments: toilProject.deployments, health: h, now }) };
     byNow.set(now, d);
   }
   return d;

@@ -1,19 +1,19 @@
 /**
- * The UI's test harness: each dossier loaded through the fixture `execute()`,
+ * The UI's test harness: each toil project loaded through the fixture `execute()`,
  * exactly as the dashboard loads it, so the tests read the same data the
  * preview shows.
  */
 
-import { DOSSIERS } from '../src/fixtures/dossiers.ts';
+import { TOIL_PROJECTS } from '../src/fixtures/toil-projects.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
-import { loadDossier, type DossierData } from '../src/load.ts';
+import { loadToilProject, type ToilProjectData } from '../src/load.ts';
 import { health } from '../src/model/sprint.ts';
 
-export const NAMES = DOSSIERS.map((d) => d.name);
+export const NAMES = TOIL_PROJECTS.map((d) => d.name);
 
-export async function loaded(name: string): Promise<{ data: DossierData; calls: ReturnType<typeof fixtureExecute>['calls'] }> {
+export async function loaded(name: string): Promise<{ data: ToilProjectData; calls: ReturnType<typeof fixtureExecute>['calls'] }> {
   const fixture = fixtureExecute();
-  const data = await loadDossier(fixture.execute, name);
+  const data = await loadToilProject(fixture.execute, name);
   return { data, calls: fixture.calls };
 }
 

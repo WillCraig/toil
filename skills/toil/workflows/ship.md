@@ -3,7 +3,7 @@ job: ship
 description: Take your own branch to a pull request as the author, running the gate, updating the docs the change made stale, checking your own diff against the repository's principles, opening the PR, answering its review and fixing a failing build in one loop of at most three rounds. Use for "ship this branch" or "answer the review on #12".
 role: author
 needs: {"any": ["github", "bitbucket", "ado"], "optional": ["jira", "confluence", "sonar"]}
-inputs: [{"name": "branch", "dossier": false}, {"name": "ticket", "dossier": false}, {"name": "repository", "dossier": true}, {"name": "connection", "dossier": true}]
+inputs: [{"name": "branch", "toilProject": false}, {"name": "ticket", "toilProject": false}, {"name": "repository", "toilProject": true}, {"name": "connection", "toilProject": true}]
 writes: ["github pr create", "github pr update", "github pr reply", "github pr resolve", "github pr comment", "github pr enable-auto-merge", "github issue label", "bitbucket pr create", "bitbucket pr update", "bitbucket pr reply", "bitbucket pr resolve", "bitbucket pr comment", "ado pr create", "ado pr update", "ado pr reply", "ado pr resolve", "ado pr comment", "confluence page update"]
 loop: 3
 verification: unit

@@ -1,6 +1,6 @@
 /**
  * Settings, Agent usage (#295): what the agent's models used over the last
- * 30 days, by day, adapter, model and dossier, and the chats that used the
+ * 30 days, by day, adapter, model and toil project, and the chats that used the
  * most, all added up in the page by the meter's one function from the
  * records the server keeps in its local cache. Below that, the caps, each
  * off until it's turned on, and the rates Codex's dollar figure is computed
@@ -94,7 +94,7 @@ function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; o
   const all = useMemo(() => addUp(records), [records]);
   const byAdapter = useMemo(() => totalsBy(records, (r) => r.adapter), [records]);
   const byModel = useMemo(() => totalsBy(records, modelKey), [records]);
-  const byDossier = useMemo(() => totalsBy(records, (r) => r.dossier), [records]);
+  const byToilProject = useMemo(() => totalsBy(records, (r) => r.toilProject), [records]);
   const byChat = useMemo(() => totalsBy(records, (r) => r.chatId).slice(0, 10), [records]);
   const turns = useMemo(() => {
     const out = new Map<string, number>();
@@ -182,15 +182,15 @@ function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; o
         />
       </Card>
 
-      <Card as="section" className="panel" aria-labelledby="model-usage-dossiers">
-        <h2 id="model-usage-dossiers">By dossier</h2>
+      <Card as="section" className="panel" aria-labelledby="model-usage-toil-projects">
+        <h2 id="model-usage-toil-projects">By Toil project</h2>
         <DataTable
-          label="Usage by dossier"
-          caption="Usage by dossier"
-          rows={byDossier}
+          label="Usage by Toil project"
+          caption="Usage by Toil project"
+          rows={byToilProject}
           rowKey={(g) => g.key}
           columns={[
-            { header: 'Dossier', label: 'Dossier', rowHeader: true, cell: (g) => g.key },
+            { header: 'Toil project', label: 'Toil project', rowHeader: true, cell: (g) => g.key },
             { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
             { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, null) },
           ]}
@@ -209,7 +209,7 @@ function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; o
             rowKey={(g) => g.key}
             columns={[
               { header: 'Started', label: 'Started', rowHeader: true, cell: (g) => dateTime(g.sample.at) },
-              { header: 'Dossier', label: 'Dossier', cell: (g) => g.sample.dossier },
+              { header: 'Toil project', label: 'Toil project', cell: (g) => g.sample.toilProject },
               { header: 'Model', label: 'Model', cell: (g) => `${ADAPTER_LABEL[g.sample.adapter]}, ${modelLabel(g.sample)}` },
               { header: 'Questions', label: 'Questions', cell: (g) => turns.get(g.key) ?? 1 },
               { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },

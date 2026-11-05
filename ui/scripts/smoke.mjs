@@ -22,7 +22,7 @@ const repo = join(ui, '..');
 const work = mkdtempSync(join(tmpdir(), 'toil-ui-smoke-'));
 const home = join(work, 'home');
 const env = { ...process.env, HOME: home, USERPROFILE: home, TOIL_UI_DATA_DIR: join(work, 'data') };
-for (const key of Object.keys(env)) if (/^TOIL_(CONN_|DOSSIER)/.test(key)) delete env[key];
+for (const key of Object.keys(env)) if (/^TOIL_(CONN_|TOIL_PROJECT)/.test(key)) delete env[key];
 const npm = (args, cwd) => execFileSync(process.execPath, [npmCli(), ...args], { cwd, encoding: 'utf8', env });
 const steps = [];
 const problems = [];
@@ -116,18 +116,18 @@ try {
   // The package's app is the local entry, which reads through the server, not the preview's fixtures.
   check(asset.body.includes('api/session') && !asset.body.includes('The preview has no sample answer'), `the app's script ${script} is the preview's build, not the local app's`);
   check(s.session.store === 'fixture' && s.session.sample === true && s.session.toil.version === toilInstalled, `the session was ${JSON.stringify(s.session)}`);
-  const list = JSON.parse((await s.call('dossiers list')).body);
-  check(list.ok && list.data.dossiers.length === 3, `dossiers list over the API returned ${JSON.stringify(list).slice(0, 200)}`);
+  const list = JSON.parse((await s.call('projects list')).body);
+  check(list.ok && list.data.toilProjects.length === 3, `projects list over the API returned ${JSON.stringify(list).slice(0, 200)}`);
   const refused = await s.call('jira issue create', { project: 'PAY' });
   check(refused.status === 403 && JSON.parse(refused.body).ok === false, `a write command got ${refused.status}`);
-  const noCsrf = await s.call('dossiers list', {}, { 'x-toil-ui-csrf': 'wrong' });
+  const noCsrf = await s.call('projects list', {}, { 'x-toil-ui-csrf': 'wrong' });
   check(noCsrf.status === 403, `a POST without the CSRF token got ${noCsrf.status}`);
   const onlyCookie = await send(origin, '/api/session', { headers: { cookie: `toil-ui=${s.sid}` } });
   check(onlyCookie.status === 401, `a session id in a cookie, not the header, got ${onlyCookie.status}`);
   const all = [foreign, page, asset, refused, noCsrf];
   check(all.every((r) => !r.headers['set-cookie']), 'a response set a cookie');
   check(all.every((r) => !Object.keys(r.headers).some((h) => h.startsWith('access-control-'))), 'a response carried a CORS header');
-  steps.push(`--sample on ${origin}: foreign Host 403, API without a session 401, wrong token 401, token traded for a header session (no cookie), a cookie-only session 401, app and script 200, 3 dossiers over the API, a write refused, no CSRF 403, no CORS header`);
+  steps.push(`--sample on ${origin}: foreign Host 403, API without a session 401, wrong token 401, token traded for a header session (no cookie), a cookie-only session 401, app and script 200, 3 Toil projects over the API, a write refused, no CSRF 403, no CORS header`);
 
   // Every view in every theme, at 375, 768 and 1440, in real Chrome (scripts/layout-check.mjs).
   const layout = await checkLayout({
@@ -156,8 +156,8 @@ try {
   children.push(live.child);
   const l = await signIn(await live.url);
   check(l.session.store === 'sqlite' && l.session.sync === true && l.session.agent === 'none' && l.session.sample === false, `the live session was ${JSON.stringify(l.session)}`);
-  const liveList = JSON.parse((await l.call('dossiers list')).body);
-  check(liveList.ok === true && Array.isArray(liveList.data?.dossiers) && liveList.meta?.command === 'dossiers list', `dossiers list through the installed toil returned ${JSON.stringify(liveList).slice(0, 300)}`);
+  const liveList = JSON.parse((await l.call('projects list')).body);
+  check(liveList.ok === true && Array.isArray(liveList.data?.toilProjects) && liveList.meta?.command === 'projects list', `projects list through the installed toil returned ${JSON.stringify(liveList).slice(0, 300)}`);
   const syncHeaders = { 'x-toil-ui-session': l.sid, origin: l.origin, 'content-type': 'application/json', 'x-toil-ui-csrf': l.session.csrf };
   const started = await send(l.origin, '/api/sync', { method: 'POST', body: '{}', headers: syncHeaders });
   check(started.status === 202, `starting a sync answered ${started.status}: ${started.body.slice(0, 200)}`);
@@ -166,11 +166,11 @@ try {
     await new Promise((r) => setTimeout(r, 100));
     status = JSON.parse((await send(l.origin, '/api/sync', { headers: { 'x-toil-ui-session': l.sid } })).body);
   }
-  check(status.job.running === false && status.job.error === null && status.job.dossiersTotal === 0, `the sync with no dossiers ended as ${JSON.stringify(status.job)}`);
+  check(status.job.running === false && status.job.error === null && status.job.toilProjectsTotal === 0, `the sync with no Toil projects ended as ${JSON.stringify(status.job)}`);
   const db = join(work, 'data', 'cache', 'toil-ui.db');
   check(existsSync(db), `the cache wasn't created at ${db}`);
   check(!/ExperimentalWarning|SQLite is an experimental/.test(live.errors()), `toil-ui printed node:sqlite's warning: ${live.errors()}`);
-  steps.push(`live on ${l.origin}: dossiers list through the installed toil's execute() returned ok with ${liveList.data?.dossiers?.length} dossiers; a sync ran through the API into ${db}, with no ExperimentalWarning on stderr`);
+  steps.push(`live on ${l.origin}: projects list through the installed toil's execute() returned ok with ${liveList.data?.toilProjects?.length} Toil projects; a sync ran through the API into ${db}, with no ExperimentalWarning on stderr`);
 
   // toil-ui wipe refuses while the server holds the data folder's lock, on every OS...
   let refusedWipe = '';

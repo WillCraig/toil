@@ -13,9 +13,9 @@
  * never ranked.
  */
 
-import { commandCenterHref, dossierHref, peekHref, prName, prsHref, shortKey, sourceLabel } from '../format.ts';
+import { commandCenterHref, toilProjectHref, peekHref, prName, prsHref, shortKey, sourceLabel } from '../format.ts';
 import { PANEL_WORDS } from '../guided-questions.ts';
-import type { DossierData, Panel } from '../load.ts';
+import type { ToilProjectData, Panel } from '../load.ts';
 import type { BriefingView } from './briefing.ts';
 import { behindAll, blockerOrder, heldBy } from './blockers.ts';
 import { flows } from './flow.ts';
@@ -39,10 +39,10 @@ const nameOf = (p: Person | null | undefined) => (p ? (p.name ?? p.id) : null);
 const cap = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
 const list = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 
-/** The services a dossier reads, in the order a team would say them: where the work is tracked, then the code, then builds, then where it runs. */
+/** The services a toil project reads, in the order a team would say them: where the work is tracked, then the code, then builds, then where it runs. */
 const SOURCE_ORDER = ['jira', 'ado', 'github', 'bitbucket', 'jenkins', 'openshift'];
 const sourceRank = (family: string) => (SOURCE_ORDER.includes(family) ? SOURCE_ORDER.indexOf(family) : SOURCE_ORDER.length);
-export function sourcesText(d: Pick<DossierData, 'sources'>): string {
+export function sourcesText(d: Pick<ToilProjectData, 'sources'>): string {
   const families = [...new Set(d.sources.map((s) => s.area.split('-')[0]!))].sort((a, b) => sourceRank(a) - sourceRank(b));
   return list(families.map(sourceLabel));
 }
@@ -50,7 +50,7 @@ export function sourcesText(d: Pick<DossierData, 'sources'>): string {
 // What the sentences and cards are computed from -------------------------------------------
 
 export interface Ctx {
-  d: DossierData;
+  d: ToilProjectData;
   name: string;
   now: string;
   byId: Map<string, WorkItem>;
@@ -66,7 +66,7 @@ export interface Ctx {
 
 const reviewWord = (c: Ctx) => (c.plain ? 'code review' : 'pull request');
 
-export function contextOf(input: { d: DossierData; now: string; byId: Map<string, WorkItem>; h: Health | null; p: Prepared; view: BriefingView; plain?: boolean }): Ctx {
+export function contextOf(input: { d: ToilProjectData; now: string; byId: Map<string, WorkItem>; h: Health | null; p: Prepared; view: BriefingView; plain?: boolean }): Ctx {
   const { d, now, byId } = input;
   const prs = d.pullRequests ?? [];
   return {
@@ -90,7 +90,7 @@ function holdsOf(c: Ctx, id: string): { items: number; points: number } {
   return { items: waiting.length, points: waiting.reduce((n, i) => n + points(i), 0) };
 }
 
-/** A person as the dossier's `people` names them ("Ada D."), else as the tracker does: a GitHub login is not a name anyone says out loud. */
+/** A person as the toil project's `people` names them ("Ada D."), else as the tracker does: a GitHub login is not a name anyone says out loud. */
 function personIn(c: Ctx, p: Person | null | undefined, area: string): Person | null {
   if (!p) return null;
   const entry = (c.d.people ?? []).find((e) => isPerson(e, { area, id: p.id, name: p.name, email: p.email }));
@@ -106,7 +106,7 @@ function plainCites(text: string, c: Ctx): string {
   });
 }
 
-const itemHref = (c: Ctx, id: string) => peekHref(dossierHref(c.name), id);
+const itemHref = (c: Ctx, id: string) => peekHref(toilProjectHref(c.name), id);
 const keyOf = (i: WorkItem) => `${sourceLabel(i.source.area)} ${shortKey(i)}`;
 /** A pull request's title without the ticket key its author put in front. */
 const stripKey = (t: string) => t.replace(/^[A-Z][A-Z0-9]*-\d+[:\s]+/, '');

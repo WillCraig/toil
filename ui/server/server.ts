@@ -27,7 +27,7 @@
  * Agent sees it. Reads are only the commands the views make (`READ_COMMANDS`),
  * always read-only. A config change (#253) is only a command on the server's
  * config allowlist (ui/server/config.ts): toil's own commands for its
- * connections and dossiers, with the person's answers to their questions. The
+ * connections and toil projects, with the person's answers to their questions. The
  * Feedback (#265) is `toil feedback` alone, on `feedback`: read-only for the
  * dialog's preview, and sent only with the person's `consent`, which answers
  * the command's own consent question. The
@@ -63,7 +63,7 @@ import { AgentError } from './agents/cli.ts';
 import type { AdapterStatus, AgentStatus } from './agents/host.ts';
 import type { InstallPlan, InstallRun } from './agents/install.ts';
 import type { AdapterName } from './agents/runtime.ts';
-import type { DossierAgents } from './agents/dossier-agents.ts';
+import type { ToilProjectAgents } from './agents/toil-project-agents.ts';
 import { answerMcp, McpGrants } from './agents/mcp.ts';
 import type { ServeTools } from './agents/runtime.ts';
 import { StyleError, styleFrom, type StyleChoice } from './agents/voices.ts';
@@ -97,8 +97,8 @@ export interface UiServerOptions {
   agentControl?: AgentControl;
   /** The worklog (#308): the cache's pages, or the sample's. Absent, `api/worklog/*` says there is none. */
   worklog?: WorklogApi;
-  /** The agent last used for each dossier's Analyze (#494): `api/agent/adapters?dossier=` says it, a whole Analyze sets it. Absent with sample data. */
-  dossierAgents?: DossierAgents;
+  /** The agent last used for each toil project's Analyze (#494): `api/agent/adapters?toil project=` says it, a whole Analyze sets it. Absent with sample data. */
+  toilProjectAgents?: ToilProjectAgents;
   /** The history of analyses (#395): `api/analyses`, and every Analyze kept as it ends. Absent, Analyze keeps nothing. */
   analyses?: AnalysisKeeper;
   /** The agent's model usage and its caps (#295): `api/usage`. */
@@ -106,13 +106,13 @@ export interface UiServerOptions {
   /** Assigning work items to an agent (#293): `api/assignments`. */
   assignments?: AssignmentControl;
   /**
-   * A dossier renamed through `/api/config` (#342, `toil dossiers describe --name`):
+   * A toil project renamed through `/api/config` (#342, `toil projects describe --name`):
    * `blocked` says why it can't be renamed now (a sync or an assignment of it is
    * running), and `moved` takes Toil UI's own records of it (the cache, the
    * worklog, assignments) to the new name once toil has renamed it, returning
    * anything it couldn't move, in words. None with sample data.
    */
-  renames?: DossierRenames;
+  renames?: ToilProjectRenames;
   /** The server's own staleness (#305): `api/fingerprint`. Absent with sample data, which never goes out of date. */
   serverStatus?: () => ServerStatus;
   /** Tests pass a fixed token; a real start makes one. */
@@ -120,22 +120,22 @@ export interface UiServerOptions {
   viewer?: Viewer;
 }
 
-export interface DossierRenames {
+export interface ToilProjectRenames {
   /** Stops a sync starting until the returned function is called. */
   hold(): () => void;
-  blocked(dossier: string): { message: string; fix: string } | null;
+  blocked(toilProject: string): { message: string; fix: string } | null;
   moved(from: string, to: string): Promise<string[]>;
 }
 
-/** toil's dossier names: lowercase letters, digits and single hyphens. */
-const DOSSIER_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+/** toil's toil project names: lowercase letters, digits and single hyphens. */
+const TOIL_PROJECT_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 /** What the Settings page reads and changes about the agent. */
 export interface AgentControl {
   status(): AgentStatus;
   save(input: unknown): AgentStatus;
-  /** The system prompt a question about the dossier gets now, in the page's style (#283). */
-  systemPrompt(dossier: string, style: StyleChoice | null): string;
+  /** The system prompt a question about the toil project gets now, in the page's style (#283). */
+  systemPrompt(toilProject: string, style: StyleChoice | null): string;
   /** The one command Install would run for an adapter, or why it can't here (#344). */
   installPlan(adapter: AdapterName): InstallPlan;
   /** Runs that command, as shown, streaming npm's output; then loads the SDK to prove it. */
@@ -164,11 +164,11 @@ export const MAX_PROMPT = 8000;
  * then: a stopped, failed or empty answer is no analysis. A record that can't
  * be kept never fails the answer; the answer says so instead.
  */
-function kept(keeper: AnalysisKeeper, dossier: string, startedAt: string) {
+function kept(keeper: AnalysisKeeper, toilProject: string, startedAt: string) {
   const one = async (answer: Answer): Promise<Answer> => {
     if (!isWhole(answer)) return answer;
     try {
-      return { ...answer, analysis: await keeper.record(dossier, answer, startedAt) };
+      return { ...answer, analysis: await keeper.record(toilProject, answer, startedAt) };
     } catch (e) {
       return { ...answer, warnings: [...(answer.warnings ?? []), `Toil UI couldn't keep this analysis in its history: ${e instanceof Error ? e.message : String(e)}`] };
     }
@@ -184,14 +184,14 @@ function kept(keeper: AnalysisKeeper, dossier: string, startedAt: string) {
   return { one, stream };
 }
 /**
- * Remembers the adapter for a dossier (#494) once an answer from it is whole, and only then: a stopped
+ * Remembers the adapter for a toil project (#494) once an answer from it is whole, and only then: a stopped
  * or failed run says nothing about what the person prefers. A memory that can't be written never fails the answer.
  */
-function rememberer(store: DossierAgents, dossier: string, adapter: string) {
+function rememberer(store: ToilProjectAgents, toilProject: string, adapter: string) {
   const one = (answer: Answer) => {
     if (!isWhole(answer)) return;
     try {
-      store.set(dossier, adapter);
+      store.set(toilProject, adapter);
     } catch {
       // The answer matters more than the memory; the next question simply asks the default again.
     }
@@ -488,7 +488,7 @@ export function createUiServer(options: UiServerOptions): UiServer {
 
   /** The sync job, or a 404 saying this server has none (sample data syncs nothing). */
   const syncer = (): SyncService => {
-    if (!options.sync) throw new HttpError(404, 'This Toil UI has no cache to sync: it serves sample data.', 'Start toil-ui without --sample to sync your own dossiers.');
+    if (!options.sync) throw new HttpError(404, 'This Toil UI has no cache to sync: it serves sample data.', 'Start toil-ui without --sample to sync your own Toil projects.');
     return options.sync;
   };
 
@@ -529,13 +529,13 @@ export function createUiServer(options: UiServerOptions): UiServer {
     const body = await readJson(req);
     const command = body.command;
     const input = body.input ?? {};
-    if (typeof command !== 'string') throw new HttpError(400, 'The call needs a command name.', 'Send { "command": "dossiers list", "input": {} }.');
-    if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new HttpError(400, 'The call\'s input must be an object of the command\'s fields.', 'Send { "command": "dossiers show", "input": { "dossier": "<name>" } }.');
+    if (typeof command !== 'string') throw new HttpError(400, 'The call needs a command name.', 'Send { "command": "projects list", "input": {} }.');
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new HttpError(400, 'The call\'s input must be an object of the command\'s fields.', 'Send { "command": "projects show", "input": { "toilProject": "<name>" } }.');
     const allowed = access === 'read' ? READ_COMMANDS : configCommands;
     if (!allowed.has(command)) {
       const message = access === 'read'
         ? `Toil UI doesn't run toil ${command} from the page: it runs only the reads its views make.`
-        : `Toil UI doesn't change ${command} from the page: its settings pages run only toil's commands for its own connections and dossiers.`;
+        : `Toil UI doesn't change ${command} from the page: its settings pages run only toil's commands for its own connections and Toil projects.`;
       json(res, 403, refusal(command, message, `Run toil ${command} on the CLI, where toil's own rules apply.`));
       return;
     }
@@ -553,17 +553,17 @@ export function createUiServer(options: UiServerOptions): UiServer {
       throw e;
     }
     const fields = input as Record<string, unknown>;
-    const renames = command === 'dossiers describe' ? options.renames : undefined;
+    const renames = command === 'projects describe' ? options.renames : undefined;
     const renaming = renames !== undefined && fields.name !== undefined;
-    if (renaming && (typeof fields.dossier !== 'string' || !DOSSIER_NAME.test(fields.dossier))) {
-      // Toil UI's records are kept by name, so a rename from the page names the dossier the same way; toil itself also takes a path.
-      json(res, 400, refusal(command, 'Toil UI renames a dossier by its name, not a path to its file.', 'Send the name toil dossiers list shows, or rename it on the CLI.'));
+    if (renaming && (typeof fields.toilProject !== 'string' || !TOIL_PROJECT_NAME.test(fields.toilProject))) {
+      // Toil UI's records are kept by name, so a rename from the page names the toil project the same way; toil itself also takes a path.
+      json(res, 400, refusal(command, 'Toil UI renames a Toil project by its name, not a path to its file.', 'Send the name toil projects list shows, or rename it on the CLI.'));
       return;
     }
-    // While it renames, no sync may start, and none may be running, nor an assignment of the dossier: each reads it by name as it goes.
+    // While it renames, no sync may start, and none may be running, nor an assignment of the toil project: each reads it by name as it goes.
     const release = renaming ? renames!.hold() : () => undefined;
     try {
-      const why = renaming ? renames!.blocked(fields.dossier as string) : null;
+      const why = renaming ? renames!.blocked(fields.toilProject as string) : null;
       if (why) {
         json(res, 409, { ...refusal(command, why.message, why.fix), error: { code: 'CONFLICT', message: why.message, fix: why.fix } });
         return;
@@ -634,29 +634,29 @@ export function createUiServer(options: UiServerOptions): UiServer {
         json(res, 200, configInfo.settings);
         return;
       case 'GET agent/starters': {
-        const dossier = url.searchParams.get('dossier');
-        if (!dossier) throw new HttpError(400, 'Name the dossier.', `Ask ${base}api/agent/starters?dossier=<name>.`);
-        json(res, 200, await agent.starters(ctx, dossier));
+        const toilProject = url.searchParams.get('toilProject');
+        if (!toilProject) throw new HttpError(400, 'Name the Toil project.', `Ask ${base}api/agent/starters?toilProject=<name>.`);
+        json(res, 200, await agent.starters(ctx, toilProject));
         return;
       }
       case 'POST agent/ask': {
         const body = await readJson(req);
-        if (typeof body.dossier !== 'string' || typeof body.prompt !== 'string') throw new HttpError(400, 'A question needs a dossier and a prompt.', 'Send { "dossier": "<name>", "prompt": "<question>", "theme": "<theme>", "voice": true }.');
+        if (typeof body.toilProject !== 'string' || typeof body.prompt !== 'string') throw new HttpError(400, 'A question needs a Toil project and a prompt.', 'Send { "toilProject": "<name>", "prompt": "<question>", "theme": "<theme>", "voice": true }.');
         if (body.prompt.length > MAX_PROMPT) throw new HttpError(413, `A question is at most ${MAX_PROMPT} characters.`, 'Ask a shorter question.');
         const style = checkedStyle(body);
         const chat = chatOf(body.chat);
         const extra = extraOf(body);
         // Analyze is kept in the history once its answer is whole (#395); the answer's last line names the record.
-        const keep = body.prompt === ANALYZE && options.analyses ? kept(options.analyses, body.dossier, new Date().toISOString()) : null;
-        // The adapter a whole answer was asked of, Analyze or an ordinary question, is the dossier's next default (#494); a fallback was nobody's choice.
-        const remember = extra.adapter && !extra.fallback && options.dossierAgents ? rememberer(options.dossierAgents, body.dossier, extra.adapter) : null;
+        const keep = body.prompt === ANALYZE && options.analyses ? kept(options.analyses, body.toilProject, new Date().toISOString()) : null;
+        // The adapter a whole answer was asked of, Analyze or an ordinary question, is the toil project's next default (#494); a fallback was nobody's choice.
+        const remember = extra.adapter && !extra.fallback && options.toilProjectAgents ? rememberer(options.toilProjectAgents, body.toilProject, extra.adapter) : null;
         if (body.stream === true && agent.stream) {
-          const answers = agent.stream(ctx, body.dossier, body.prompt, style, chat, extra);
+          const answers = agent.stream(ctx, body.toilProject, body.prompt, style, chat, extra);
           const remembered = remember ? remember.stream(answers, ctx.signal) : answers;
           return streamAnswer(res, keep ? keep.stream(remembered, ctx.signal) : remembered);
         }
         try {
-          const answer = await agent.ask(ctx, body.dossier, body.prompt, style, chat, extra);
+          const answer = await agent.ask(ctx, body.toilProject, body.prompt, style, chat, extra);
           if (remember && !ctx.signal.aborted) remember.one(answer);
           json(res, 200, keep && !ctx.signal.aborted ? await keep.one(answer) : answer);
         } catch (e) {
@@ -665,15 +665,15 @@ export function createUiServer(options: UiServerOptions): UiServer {
         return;
       }
       case 'GET analyses': {
-        const dossier = named(url.searchParams.get('dossier'), 'dossier', `Ask ${base}api/analyses?dossier=<name>.`);
-        json(res, 200, await keeper().list(dossier));
+        const toilProject = named(url.searchParams.get('toilProject'), 'toilProject', `Ask ${base}api/analyses?toilProject=<name>.`);
+        json(res, 200, await keeper().list(toilProject));
         return;
       }
       case 'GET analyses/one': {
-        const shape = `Ask ${base}api/analyses/one?dossier=<name>&id=<analysis id>.`;
-        const dossier = named(url.searchParams.get('dossier'), 'dossier', shape);
-        const view = await keeper().get(dossier, named(url.searchParams.get('id'), 'analysis', shape));
-        if (!view) throw new HttpError(404, `${dossier} has no analysis by that id: it may have passed the retention period, or the cache was wiped.`, 'Open the Analyses tab for the ones kept now.');
+        const shape = `Ask ${base}api/analyses/one?toilProject=<name>&id=<analysis id>.`;
+        const toilProject = named(url.searchParams.get('toilProject'), 'toilProject', shape);
+        const view = await keeper().get(toilProject, named(url.searchParams.get('id'), 'analysis', shape));
+        if (!view) throw new HttpError(404, `${toilProject} has no analysis by that id: it may have passed the retention period, or the cache was wiped.`, 'Open the Analyses tab for the ones kept now.');
         json(res, 200, view);
         return;
       }
@@ -686,10 +686,10 @@ export function createUiServer(options: UiServerOptions): UiServer {
       }
       case 'POST agent/renew': {
         const body = await readJson(req);
-        if (typeof body.chat !== 'string' || !CHAT_ID.test(body.chat) || typeof body.dossier !== 'string' || !body.dossier) throw new HttpError(400, 'A renew names the chat and its dossier.', 'Send { "chat": "<chat id>", "dossier": "<name>" }.');
+        if (typeof body.chat !== 'string' || !CHAT_ID.test(body.chat) || typeof body.toilProject !== 'string' || !body.toilProject) throw new HttpError(400, 'A renew names the chat and its Toil project.', 'Send { "chat": "<chat id>", "toilProject": "<name>" }.');
         if (!agent.renew) throw new HttpError(404, 'This agent keeps no sessions, so there is nothing to renew.', 'Start toil-ui with its cache to record what each chat started on.');
         try {
-          json(res, 200, await agent.renew(body.chat, body.dossier));
+          json(res, 200, await agent.renew(body.chat, body.toilProject));
         } catch (e) {
           if (e instanceof AgentError) throw new HttpError((e as AgentError & { status?: number }).status ?? 400, e.message, e.fix);
           throw e;
@@ -702,12 +702,12 @@ export function createUiServer(options: UiServerOptions): UiServer {
         return;
       case 'GET agent/prompt': {
         // Read-only: the prompt as the next question would get it, with the saved instructions. `voice` is on or off.
-        const dossier = url.searchParams.get('dossier') || '<dossier>';
-        if (dossier.length > 200) throw new HttpError(400, 'That dossier name is over 200 characters.', 'Name a dossier toil dossiers list shows.');
+        const toilProject = url.searchParams.get('toilProject') || '<Toil project>';
+        if (toilProject.length > 200) throw new HttpError(400, 'That Toil project name is over 200 characters.', 'Name a Toil project toil projects list shows.');
         const voice = url.searchParams.get('voice');
         if (voice !== 'on' && voice !== 'off') throw new HttpError(400, 'Say whether the voice is on.', `Ask ${base}api/agent/prompt?theme=<name>&voice=on (or off).`);
         const style = checkedStyle({ theme: url.searchParams.get('theme') ?? undefined, voice: voice === 'on' });
-        json(res, 200, { dossier, prompt: control().systemPrompt(dossier, style) });
+        json(res, 200, { toilProject, prompt: control().systemPrompt(toilProject, style) });
         return;
       }
       case 'GET agent/settings':
@@ -717,9 +717,9 @@ export function createUiServer(options: UiServerOptions): UiServer {
         // The chat's switcher (#344): every adapter with its model and whether it can answer, or none for an agent with no choice.
         {
           const list = agent.adapterOptions?.() ?? { chosen: null, options: [] };
-          // With a dossier named (#494), the agent last used for its Analyze comes too; the page decides whether it is still ready.
-          const dossier = url.searchParams.get('dossier');
-          const remembered = dossier && options.dossierAgents ? options.dossierAgents.get(dossier) : null;
+          // With a toil project named (#494), the agent last used for its Analyze comes too; the page decides whether it is still ready.
+          const toilProject = url.searchParams.get('toilProject');
+          const remembered = toilProject && options.toilProjectAgents ? options.toilProjectAgents.get(toilProject) : null;
           json(res, 200, remembered ? { ...list, remembered } : list);
         }
         return;
@@ -760,9 +760,9 @@ export function createUiServer(options: UiServerOptions): UiServer {
         return;
       case 'POST sync': {
         const body = await readJson(req);
-        if (body.dossier !== undefined && typeof body.dossier !== 'string') throw new HttpError(400, 'dossier must be a dossier name.', 'Send {} to sync every dossier, or { "dossier": "<name>" } for one.');
+        if (body.toilProject !== undefined && typeof body.toilProject !== 'string') throw new HttpError(400, 'Toil project must be a Toil project name.', 'Send {} to sync every Toil project, or { "toilProject": "<name>" } for one.');
         try {
-          syncer().start(ctx, body.dossier as string | undefined);
+          syncer().start(ctx, body.toilProject as string | undefined);
         } catch (e) {
           if (e instanceof SyncBusy) throw new HttpError(409, e.message, 'Wait for it to finish; the page shows its progress.');
           throw e;
@@ -786,40 +786,40 @@ export function createUiServer(options: UiServerOptions): UiServer {
         return;
       }
       case 'GET worklog/month': {
-        const dossier = named(url.searchParams.get('dossier'), 'dossier', `Ask ${base}api/worklog/month?dossier=<name>&month=<yyyy-mm>.`);
-        return worklogCall(res, () => worklog().month(dossier, url.searchParams.get('month') ?? undefined));
+        const toilProject = named(url.searchParams.get('toilProject'), 'toilProject', `Ask ${base}api/worklog/month?toilProject=<name>&month=<yyyy-mm>.`);
+        return worklogCall(res, () => worklog().month(toilProject, url.searchParams.get('month') ?? undefined));
       }
       case 'GET worklog/day': {
-        const dossier = named(url.searchParams.get('dossier'), 'dossier', `Ask ${base}api/worklog/day?dossier=<name>&day=<yyyy-mm-dd>.`);
-        const day = named(url.searchParams.get('day'), 'day', `Ask ${base}api/worklog/day?dossier=<name>&day=<yyyy-mm-dd>.`);
-        return worklogCall(res, () => worklog().day(dossier, day));
+        const toilProject = named(url.searchParams.get('toilProject'), 'toilProject', `Ask ${base}api/worklog/day?toilProject=<name>&day=<yyyy-mm-dd>.`);
+        const day = named(url.searchParams.get('day'), 'day', `Ask ${base}api/worklog/day?toilProject=<name>&day=<yyyy-mm-dd>.`);
+        return worklogCall(res, () => worklog().day(toilProject, day));
       }
       case 'GET worklog/standup': {
-        const shape = `Ask ${base}api/worklog/standup?dossier=<name>&from=<yyyy-mm-dd>&to=<yyyy-mm-dd>.`;
-        const dossier = named(url.searchParams.get('dossier'), 'dossier', shape);
-        return worklogCall(res, () => worklog().standup(dossier, named(url.searchParams.get('from'), 'first day', shape), named(url.searchParams.get('to'), 'last day', shape)));
+        const shape = `Ask ${base}api/worklog/standup?toilProject=<name>&from=<yyyy-mm-dd>&to=<yyyy-mm-dd>.`;
+        const toilProject = named(url.searchParams.get('toilProject'), 'toilProject', shape);
+        return worklogCall(res, () => worklog().standup(toilProject, named(url.searchParams.get('from'), 'first day', shape), named(url.searchParams.get('to'), 'last day', shape)));
       }
       case 'POST worklog/rebuild': {
         const body = await readJson(req);
-        const shape = 'Send { "dossier": "<name>", "day": "<yyyy-mm-dd>" }.';
-        only(body, ['dossier', 'day'], 'A rebuild takes dossier and day', shape);
-        return worklogCall(res, () => worklog().rebuild(named(body.dossier, 'dossier', shape), named(body.day, 'day', shape)));
+        const shape = 'Send { "toilProject": "<name>", "day": "<yyyy-mm-dd>" }.';
+        only(body, ['toilProject', 'day'], 'A rebuild takes toilProject and day', shape);
+        return worklogCall(res, () => worklog().rebuild(named(body.toilProject, 'toilProject', shape), named(body.day, 'day', shape)));
       }
       case 'POST worklog/note': {
         const body = await readJson(req);
-        const shape = 'Send { "dossier": "<name>", "text": "<the note>" }.';
-        only(body, ['dossier', 'text'], 'A note takes dossier and text', shape);
+        const shape = 'Send { "toilProject": "<name>", "text": "<the note>" }.';
+        only(body, ['toilProject', 'text'], 'A note takes toilProject and text', shape);
         if (typeof body.text !== 'string') throw new HttpError(400, 'A note needs its text.', shape);
-        return worklogCall(res, () => worklog().addNote(named(body.dossier, 'dossier', shape), body.text as string, viewer.name));
+        return worklogCall(res, () => worklog().addNote(named(body.toilProject, 'toilProject', shape), body.text as string, viewer.name));
       }
       case 'POST worklog/export': {
         const body = await readJson(req);
-        const shape = 'Send { "dossier": "<name>", "day": "<yyyy-mm-dd>" }, { "dossier": "<name>", "month": "<yyyy-mm>" } or, for a stand-up, { "dossier": "<name>", "from": "<yyyy-mm-dd>", "to": "<yyyy-mm-dd>" }, with "folder": "<a full path>".';
-        only(body, ['dossier', 'day', 'month', 'from', 'to', 'folder'], "An export takes dossier, a day, a month or a stand-up's from and to, and folder", shape);
+        const shape = 'Send { "toilProject": "<name>", "day": "<yyyy-mm-dd>" }, { "toilProject": "<name>", "month": "<yyyy-mm>" } or, for a stand-up, { "toilProject": "<name>", "from": "<yyyy-mm-dd>", "to": "<yyyy-mm-dd>" }, with "folder": "<a full path>".';
+        only(body, ['toilProject', 'day', 'month', 'from', 'to', 'folder'], "An export takes toilProject, a day, a month or a stand-up's from and to, and folder", shape);
         const standup = body.from !== undefined || body.to !== undefined;
         if ([body.day !== undefined, body.month !== undefined, standup].filter(Boolean).length !== 1) throw new HttpError(400, 'Export a day, a month or a stand-up, one of the three.', shape);
         const what: ExportWhat = standup ? { from: named(body.from, 'first day', shape), to: named(body.to, 'last day', shape) } : body.day !== undefined ? { day: named(body.day, 'day', shape) } : { month: named(body.month, 'month', shape) };
-        return worklogCall(res, () => worklog().exportTo(named(body.dossier, 'dossier', shape), what, named(body.folder, 'folder', shape)));
+        return worklogCall(res, () => worklog().exportTo(named(body.toilProject, 'toilProject', shape), what, named(body.folder, 'folder', shape)));
       }
       default:
         throw new HttpError(404, `There is no ${key} in the API.`, `The API is under ${base}api/: session, execute, config, config/areas, config/settings, feedback, sync, cache/wipe, usage, usage/settings, worklog/month, worklog/day, worklog/standup, worklog/rebuild, worklog/note, worklog/export, analyses, analyses/one, fingerprint, agent/starters, agent/ask, agent/session, agent/renew, agent/prompt, agent/settings, agent/adapters, agent/install, agent/mcp and assignments.`);

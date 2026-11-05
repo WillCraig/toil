@@ -1,5 +1,5 @@
 /**
- * A dossier's pull requests (#291): the open ones ranked by how long each
+ * A toil project's pull requests (#291): the open ones ranked by how long each
  * has waited and on what, the flags a lead would raise, flow metrics split
  * by who wrote the change (people, agents, bots) with every sample size
  * shown, and reviewers to suggest where none is asked. Every figure comes
@@ -16,7 +16,7 @@ import { DataTable, type Column } from '../components/layout.tsx';
 import { Panel } from '../components/panel.tsx';
 import { Help } from '../components/help.tsx';
 import { useData } from '../data.ts';
-import { dateTime, dossierEditHref, dossierHref, personText } from '../format.ts';
+import { dateTime, toilProjectEditHref, toilProjectHref, personText } from '../format.ts';
 import { Empty, EmptyLink, SyncOr } from '../components/empty.tsx';
 import {
   allFlags, daysText, FAILING_HOURS, KIND_LABEL, KINDS, openQueue, parseCodeowners, PICKUP_DAYS, PR_FLAG_LABEL, prMetrics, reviewProposal, SIZE_LINES, SIZES, suggestReviewers, WAITING_LABEL,
@@ -125,22 +125,22 @@ const metricColumns: Array<Column<MetricRow>> = [
 ];
 
 export function PullRequests() {
-  const { dossier, byId, now, sync, config } = useData();
+  const { toilProject, byId, now, sync, config } = useData();
   const plain = usePlain();
   const connections = useConnectionInfo(config);
-  const prs = dossier.pullRequests ?? [];
+  const prs = toilProject.pullRequests ?? [];
   const queue = openQueue(prs, byId, now);
   const flags = allFlags(prs, byId, now);
   const m = prMetrics(prs, now);
-  const rules = Object.fromEntries(Object.entries(dossier.codeowners ?? {}).map(([repo, file]) => [repo, parseCodeowners(file.text)]));
+  const rules = Object.fromEntries(Object.entries(toilProject.codeowners ?? {}).map(([repo, file]) => [repo, parseCodeowners(file.text)]));
   const unasked = queue.filter((r) => !r.change.reviewers.length);
-  const calls = dossier.calls.prs;
+  const calls = toilProject.calls.prs;
 
   return (
     <PeekLinks>
       <div className="view-head">
         <p className="eyebrow">
-          <a href={dossierHref(dossier.name)}>{dossier.name}</a>
+          <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a>
         </p>
         <h1 tabIndex={-1} title={plain.title('Pull requests')}>
           {plain.pw('Pull requests', 'Code reviews')}
@@ -148,12 +148,12 @@ export function PullRequests() {
         <p className="lede">
           {queue.length} open across {new Set(prs.map((c) => c.repo)).size} {new Set(prs.map((c) => c.repo)).size === 1 ? 'repository' : 'repositories'}, {prs.length - queue.length} merged or closed. Read {dateTime(now)}. <Help topic="prs" />
         </p>
-        {(dossier.readTargets ?? []).filter((t) => !t.pullRequests).map((t) => (
+        {(toilProject.readTargets ?? []).filter((t) => !t.pullRequests).map((t) => (
           <p key={t.label} className="note">
             {t.label}: <a href="#queue">pull requests not read</a>
           </p>
         ))}
-        {(dossier.prNotes ?? []).map((n, i) => (
+        {(toilProject.prNotes ?? []).map((n, i) => (
           <p key={i} role="note" className="failure">
             {n}
           </p>
@@ -162,7 +162,7 @@ export function PullRequests() {
 
       <Panel id="queue" title="Waiting now" calls={calls}>
         <p className="note">Open pull requests, longest wait first, each with what it waits on and since when. Drafts come last. Waits count working days, Monday to Friday UTC.</p>
-        {queue.length ? <DataTable className="pr-queue" label="Open pull requests" wide rows={queue} rowKey={(r) => r.change.id} columns={queueColumns(connections, plain.on)} /> : <Empty message="No open pull requests for this dossier." action={<SyncOr sync={sync}><EmptyLink edit href={dossierEditHref(dossier.name, 'repos')}>Add a repository</EmptyLink></SyncOr>} />}
+        {queue.length ? <DataTable className="pr-queue" label="Open pull requests" wide rows={queue} rowKey={(r) => r.change.id} columns={queueColumns(connections, plain.on)} /> : <Empty message="No open pull requests for this Toil project." action={<SyncOr sync={sync}><EmptyLink edit href={toilProjectEditHref(toilProject.name, 'repos')}>Add a repository</EmptyLink></SyncOr>} />}
       </Panel>
 
       <Panel id="flags" title="Flags" calls={calls} alerts={false}>
@@ -214,12 +214,12 @@ export function PullRequests() {
         />
       </Panel>
 
-      <Panel id="reviewers" title="Suggested reviewers" calls={dossier.calls.owners ?? []} alerts={false}>
+      <Panel id="reviewers" title="Suggested reviewers" calls={toilProject.calls.owners ?? []} alerts={false}>
         <p className="note">For open pull requests with nobody asked: the CODEOWNERS of the paths each changes, then who reviewed changes to the same files and folders. Each is a proposal; asking for a review is a write you apply.</p>
-        {(dossier.calls.owners ?? []).length > 0 && !Object.keys(dossier.codeowners ?? {}).length && (
+        {(toilProject.calls.owners ?? []).length > 0 && !Object.keys(toilProject.codeowners ?? {}).length && (
           <p className="evidence">No CODEOWNERS file was found where GitHub looks for one (.github/, the repository root, docs/).</p>
         )}
-        {Object.entries(dossier.codeowners ?? {}).map(([repo, file]) => (
+        {Object.entries(toilProject.codeowners ?? {}).map(([repo, file]) => (
           <p key={repo} className="evidence">
             {repo}: CODEOWNERS read from <code>{file.path}</code>.
           </p>
@@ -235,7 +235,7 @@ export function PullRequests() {
                     <ul className="plain proposals">
                       {people.map((s) => (
                         <li key={s.id}>
-                          <ProposalCard proposal={reviewProposal(change, s, dossier.name)} />
+                          <ProposalCard proposal={reviewProposal(change, s, toilProject.name)} />
                         </li>
                       ))}
                     </ul>

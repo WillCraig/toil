@@ -154,15 +154,15 @@ export const projectsCommand = sdeArea.command({
 export const projectCommand = sdeArea.command({
   path: ['sde', 'project', 'get'],
   description: 'Get a single project by ID',
-  toolDescription: "Returns one SD Elements project by ID. Without id, it reads the project from --project, the dossier or the connection's project setting.",
+  toolDescription: "Returns one SD Elements project by ID. Without id, it reads the project from --project, the toil project or the connection's project setting.",
   input: z.object({
-    id: z.string().optional().describe("SD Elements project ID; defaults to the call's project (--project, the dossier, then the connection's project)"),
+    id: z.string().optional().describe("SD Elements project ID; defaults to the call's project (--project, the toil project, then the connection's project)"),
     expand: z.string().optional().describe('Expand nested fields (comma-separated): application,business_unit,creator'),
     include: z.string().optional().describe('Include extra fields (comma-separated): task_counts,permissions'),
   }),
   writes: false,
   context: { project: 'optional' },
-  args: [{ name: 'id', field: 'id', description: "SD Elements project ID (default: --project, then the dossier, then the connection's project)", required: false }],
+  args: [{ name: 'id', field: 'id', description: "SD Elements project ID (default: --project, then the toil project, then the connection's project)", required: false }],
   options: [
     { flags: '--expand <fields>', field: 'expand', description: 'Expand nested fields (comma-separated): application,business_unit,creator' },
     { flags: '--include <fields>', field: 'include', description: 'Include extra fields (comma-separated): task_counts,permissions' },

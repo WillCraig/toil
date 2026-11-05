@@ -32,7 +32,7 @@ export const overrides: Record<string, DeploymentOverride> = {
   },
   'jira issue transition': {
     toolDescription:
-      "Moves a Jira issue through its workflow. Give to with an intent (start, review, done, reopen) or a status name, and toil resolves it against the transitions this issue offers right now, by its own issue type's workflow: a pin in the dossier first, then an exact status name, then the intent's status category, then a single transition named for it. No match, or more than one, is refused with the transitions the issue does offer; meta.transition says what it resolved to. Or give transition with a transition name (case-insensitive) or id. Use jira_issue_transitions to see the transitions.",
+      "Moves a Jira issue through its workflow. Give to with an intent (start, review, done, reopen) or a status name, and toil resolves it against the transitions this issue offers right now, by its own issue type's workflow: a pin in the toil project first, then an exact status name, then the intent's status category, then a single transition named for it. No match, or more than one, is refused with the transitions the issue does offer; meta.transition says what it resolved to. Or give transition with a transition name (case-insensitive) or id. Use jira_issue_transitions to see the transitions.",
   },
   'jira issue comment': {
     toolDescription: 'Adds a comment to a Jira issue and returns the comment Jira created. On Cloud the body is plain text sent as ADF paragraphs (Markdown is not interpreted), and the result adds bodyText, the body as plain text.',
@@ -68,8 +68,8 @@ export const overrides: Record<string, DeploymentOverride> = {
   'jira board list': {
     describe: { project: 'Project key (or id on Cloud)' },
   },
-  'jira check-dossier': {
+  'jira check-toil-project': {
     toolDescription:
-      'Checks the Jira sections of the dossier that applies to this call (or the one named in dossier) against Jira: each project key it names exists, and each field alias points at a field id Jira has. Returns ok and one check per value, with its key path; the CLI exits 1 when one is missing. Read only.',
+      'Checks the Jira sections of the toil project that applies to this call (or the one named in toil project) against Jira: each project key it names exists, and each field alias points at a field id Jira has. Returns ok and one check per value, with its key path; the CLI exits 1 when one is missing. Read only.',
   },
 };

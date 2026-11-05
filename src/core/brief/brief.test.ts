@@ -76,7 +76,7 @@ describe('the briefing on Sprint 42', () => {
     expect(b.onTrack).toEqual({ open: 3, done: 13 });
   });
 
-  it('follows the order and thresholds a dossier sets, and leaves a lens out when it is off', () => {
+  it('follows the order and thresholds a toil project sets, and leaves a lens out when it is off', () => {
     const settings = standardSettings(2);
     settings.lenses = [{ id: 'blocked', on: true, threshold: null }, { id: 'failing', on: false, threshold: 24 }, { id: 'waiting', on: true, threshold: 5 }];
     const tuned = sprint42(settings);
@@ -87,7 +87,7 @@ describe('the briefing on Sprint 42', () => {
 
   it("says why a lens wasn't checked, rather than guessing", () => {
     const notes = Object.fromEntries(sprint42(standardSettings(null)).lenses.map((l) => [l.id, l.note]));
-    expect(notes.load).toBe('The dossier sets no WIP limit (toil dossiers wip-limit).');
+    expect(notes.load).toBe('The toil project sets no WIP limit (toil projects wip-limit).');
     expect(notes.ready).toBeNull();
     expect(LENSES.find((l) => l.id === 'ready')!.on).toBe(false);
   });
@@ -115,7 +115,7 @@ describe('each lens', () => {
     expect(run(items, [], 3).reasons).toEqual([]);
     const over = run(items, [], 2);
     expect(over.reasons[0]).toMatchObject({ lens: 'load', line: '1 person over the limit of 2' });
-    expect(over.reasons[0]!.items[0]!.why).toBe("Pat Example has 3 items in progress; the dossier's limit is 2.");
+    expect(over.reasons[0]!.items[0]!.why).toBe("Pat Example has 3 items in progress; the toil project's limit is 2.");
   });
 
   it('flags a merged pull request whose item is still open, after a working day', () => {

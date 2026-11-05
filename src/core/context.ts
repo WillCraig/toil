@@ -1,7 +1,7 @@
 import type { AuditLog } from './audit.js';
-import type { DossierLookup, GitRemoteReader, SuppliedSource } from './call-context.js';
+import type { ToilProjectLookup, GitRemoteReader, SuppliedSource } from './call-context.js';
 import type { ResolvedConfig } from './config.js';
-import type { DossierCatalog, DossierView } from './dossier.js';
+import type { ToilProjectCatalog, ToilProjectView } from './toil-project.js';
 import type { ApiAnswer, ContextReport, LintReport, Page, Warning } from './envelope.js';
 import type { FileAccess } from './files.js';
 import type { GitRunner } from './git.js';
@@ -58,25 +58,25 @@ export interface Context {
   /** Questions for a person, only when stdin and stderr are terminals. Never set under MCP. */
   prompt?: Prompter;
   /**
-   * The dossiers toil can see (src/core/dossier.ts). execute() asks it, with the
-   * call's `dossier` and `cwd` inputs, which one applies, and that one's lookup
-   * replaces `dossier` for the call. Absent means no dossiers: tests that want
-   * one give a `dossier` lookup directly.
+   * The toil projects toil can see (src/core/toil-project.ts). execute() asks it, with the
+   * call's `toilProject` and `cwd` inputs, which one applies, and that one's lookup
+   * replaces `toilProject` for the call. Absent means no toil projects: tests that want
+   * one give a `toilProject` lookup directly.
    */
-  dossiers?: DossierCatalog;
-  /** Context values from a dossier, for a test that supplies one without files. `dossiers` overrides it per call. */
-  dossier?: DossierLookup;
+  toilProjects?: ToilProjectCatalog;
+  /** Context values from a toil project, for a test that supplies one without files. `projects` overrides it per call. */
+  toilProject?: ToilProjectLookup;
   /** The working folder's git remote, for areas that read context from it. Absent means no git step. */
   gitRemote?: GitRemoteReader;
   /** The workspace's repository: root, branch, remotes, read from `.git` without git. Absent means none. */
   repo?: () => GitContext | undefined;
   /**
-   * Whether the user has adopted a dossier's or the git remote's choice of
-   * this connection, so writes may use it: a dossier in your own folder is
-   * yours (`toil dossiers import` puts one there). Absent means nothing is
+   * Whether the user has adopted a toil project's or the git remote's choice of
+   * this connection, so writes may use it: a toil project in your own folder is
+   * yours (`toil projects import` puts one there). Absent means nothing is
    * adopted: such writes are refused.
    */
-  adopted?: (area: string, connection: string, by: 'dossier' | 'git') => boolean;
+  adopted?: (area: string, connection: string, by: 'toil-project' | 'git') => boolean;
   /**
    * The audit log (src/core/audit.ts): execute() appends one line per call.
    * Commands never get it; `toil audit` reads it through `ctx.manage`.
@@ -117,14 +117,14 @@ export interface ConfigAccess {
    * config and the credential store, get it.
    */
   env: NodeJS.ProcessEnv;
-  /** The dossiers toil can see, for `toil dossiers ...`. Undefined where there are none (tests). */
-  dossiers: DossierCatalog | undefined;
+  /** The toil projects toil can see, for `toil projects ...`. Undefined where there are none (tests). */
+  toilProjects: ToilProjectCatalog | undefined;
   /** The audit log, for `toil audit`. Undefined where there is none. */
   audit: AuditLog | undefined;
   /**
-   * Which front door the call came through. Binding a dossier to a connection
-   * with writes on is done by a person on the CLI, so the dossier commands
-   * refuse it over MCP (docs/dossiers.md, Agents and the write gate).
+   * Which front door the call came through. Binding a toil project to a connection
+   * with writes on is done by a person on the CLI, so the toil project commands
+   * refuse it over MCP (docs/projects.md, Agents and the write gate).
    */
   via: FrontDoor;
 }
@@ -140,7 +140,7 @@ export interface ConfigAccess {
  * connection's, on its own.
  */
 export interface CommandContext<C = undefined, X = Record<string, string | undefined>>
-  extends Omit<Context, 'config' | 'env' | 'secrets' | 'prompt' | 'dossiers' | 'dossier' | 'gitRemote' | 'adopted' | 'repo' | 'audit' | 'skillUpkeep' | 'progress'> {
+  extends Omit<Context, 'config' | 'env' | 'secrets' | 'prompt' | 'toilProjects' | 'toilProject' | 'gitRemote' | 'adopted' | 'repo' | 'audit' | 'skillUpkeep' | 'progress'> {
   connection: C;
   /** The area's context inputs, resolved (`ctx.context.project`). Unset ones are absent. */
   context: X;
@@ -165,25 +165,25 @@ export interface CommandContext<C = undefined, X = Record<string, string | undef
    */
   repo: () => GitContext | undefined;
   /**
-   * The field aliases (`storyPoints` to `customfield_10002`) the call's dossier
+   * The field aliases (`storyPoints` to `customfield_10002`) the call's toil project
    * gives this area: its environment's section's, then its own. Empty with no
-   * dossier. Asking consults the dossier, so call it only when the call uses
-   * a field name (a `--field`), and the dossier is then reported in meta.context.
+   * toil project. Asking consults the toil project, so call it only when the call uses
+   * a field name (a `--field`), and the toil project is then reported in meta.context.
    */
-  dossierFields: () => Record<string, string>;
+  toilProjectFields: () => Record<string, string>;
   /**
-   * Every section the call's dossier has for this area (its own, and each
-   * environment's), for `<area> check-dossier`. Undefined with no dossier.
-   * Asking consults the dossier.
+   * Every section the call's toil project has for this area (its own, and each
+   * environment's), for `<area> check-toil-project`. Undefined with no toil project.
+   * Asking consults the toil project.
    */
-  dossierView: () => DossierView | undefined;
+  toilProjectView: () => ToilProjectView | undefined;
   /**
-   * The transitions the call's dossier pins for this area, work item type to
+   * The transitions the call's toil project pins for this area, work item type to
    * intent to a transition or status name (`{ "Story": { "review": "Peer
    * Review" } }`): its environment's section's over its own. Empty with no
-   * dossier. Asking consults the dossier, so call it only for `--to`.
+   * toil project. Asking consults the toil project, so call it only for `--to`.
    */
-  dossierTransitions: () => TransitionPins;
+  toilProjectTransitions: () => TransitionPins;
   /** Set only for defineConfigCommand commands. */
   manage?: ConfigAccess;
   signal: AbortSignal;

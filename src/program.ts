@@ -1,7 +1,9 @@
 import { Command, CommanderError, Option } from 'commander';
-import { aliasInput, aliasPaths, commandName, takesAllowWrite, toolName, writesFor, type AnyCommand, type CliOption } from './core/command.js';
+import { aliasInput, aliasPaths, commandName, deprecatedPathsOf, takesAllowWrite, toolName, writesFor, type AnyCommand, type CliOption } from './core/command.js';
 import type { Context } from './core/context.js';
-import { failure, type Envelope } from './core/envelope.js';
+import { deprecatedName } from './core/deprecation.js';
+import { failure, type Envelope, type Warning } from './core/envelope.js';
+import { TOIL_PROJECT_FIELD } from './core/area.js';
 import { ToilError, toToilError } from './core/errors.js';
 import { renamedArea, renamedAreaFix } from './core/renamed-areas.js';
 import { exitCodeOf, runCommand } from './core/run.js';
@@ -99,13 +101,13 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
   );
 
   const groups = new Map<string, Command>();
-  const groupFor = (segments: string[]): Command => {
+  const groupFor = (segments: string[], hidden = false, instead?: string): Command => {
     let parent = program;
     for (let i = 0; i < segments.length; i++) {
       const key = segments.slice(0, i + 1).join(' ');
       let group = groups.get(key);
       if (!group) {
-        group = quiet(parent.command(segments[i]!).description(i === 0 ? `${key} commands` : groupSummary(key, options.commands)));
+        group = quiet((hidden && i === 0 ? parent.command(segments[i]!, { hidden: true }) : parent.command(segments[i]!)).description(i === 0 ? (hidden && instead ? `retired: use toil ${instead}` : `${key} commands`) : groupSummary(key, options.commands)));
         groups.set(key, group);
       }
       parent = group;
@@ -118,17 +120,20 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
   const onGroup = new Map<string, Set<string>>();
   const groupFlags = (area: string) => onGroup.get(area) ?? new Set<string>();
 
-  const register = (def: AnyCommand, path: string[]) => {
+  const register = (def: AnyCommand, path: string[], retired = false) => {
     const canonical = path === def.path;
     // A preset alias (`jenkins instance list`) fixes some fields and has no flag for them.
     const preset = canonical ? {} : aliasInput(def, path);
     const fixed = Object.entries(preset)
       .map(([field, value]) => `${def.options?.find((o) => o.field === field)?.flags.split(/[ ,]+/).find((p) => p.startsWith('--')) ?? field} ${String(value)}`)
       .join(' ');
+    // A retired path stays out of --help (its group too), but still answers, with a warning saying what to type instead. Inside a retired group
+    // the commands are listed, each saying what replaced it, so someone who types the old group to look around finds the new one.
+    const retiredGroup = retired && path.length > 1 && path[0] !== def.path[0];
     const leaf = quiet(
-      groupFor(path.slice(0, -1))
-        .command(path[path.length - 1]!)
-        .description(canonical ? def.description : `${def.description} (same as toil ${commandName(def)}${fixed ? ` ${fixed}` : ''})`),
+      groupFor(path.slice(0, -1), retired, retiredGroup ? def.path[0] : undefined)
+        .command(path[path.length - 1]!, retired && !retiredGroup ? { hidden: true } : undefined)
+        .description(canonical ? def.description : retired ? `${def.description} (retired: use toil ${commandName(def)})` : `${def.description} (same as toil ${commandName(def)}${fixed ? ` ${fixed}` : ''})`),
     );
     if (canonical) for (const alias of def.aliases ?? []) if (typeof alias === 'string') leaf.alias(alias);
     for (const arg of def.args ?? []) {
@@ -151,6 +156,9 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
       }
     }
     if (takesAllowWrite(def)) leaf.option('--allow-write', 'Allow this command to change data (writes must also be enabled in config)');
+    // `--toil-project` was `--dossier` until toil projects got their name: still read on the CLI, never over MCP or the API.
+    const oldFlag = (def.options ?? []).some((o) => o.field === TOIL_PROJECT_FIELD);
+    if (oldFlag) leaf.addOption(new Option('--dossier <name|file>').hideHelp());
 
     leaf.action(async (...actionArgs: unknown[]) => {
       const cmd = actionArgs[actionArgs.length - 1] as Command;
@@ -158,6 +166,14 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
       // An alias in another area's group still hears that group's flags, so one
       // it doesn't take is refused rather than quietly ignored.
       const input = withCore({ ...inputFromCli(def, cmd, groupFlags(path[0]!), preset), ...preset }, globals);
+      const deprecations: Warning[] = [];
+      const flagged = oldFlag ? cmd.opts<Record<string, unknown>>().dossier : undefined;
+      if (typeof flagged === 'string') {
+        // The new flag wins when both are given.
+        deprecations.push(deprecatedName('--dossier', '--toil-project', input[TOIL_PROJECT_FIELD] !== undefined));
+        input[TOIL_PROJECT_FIELD] ??= flagged;
+      }
+      if (retired) deprecations.push(deprecatedName(`toil ${path.join(' ')}`, `toil ${commandName(def)}`));
       // Through an alias in another group (`openshift cluster list` for
       // `connections list`), say so in the words the user typed, rather than
       // let strict parsing name a command and a field they never mentioned.
@@ -185,6 +201,7 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
         }
       }
       const envelope = await runCommand(def, input, (d) => options.createContext(globals, d), options.version);
+      if (deprecations.length > 0) envelope.meta.warnings = [...(envelope.meta.warnings ?? []), ...deprecations];
       const written = emit(envelope, globals, io, writesFor(def, input));
       // A success may still ask for a non-zero exit (a build that ran and failed).
       result.exitCode = written ? exitCodeOf(envelope) : 1;
@@ -245,6 +262,7 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
   // gets a leaf of its own that runs the same definition.
   for (const def of options.commands) {
     for (const [i, path] of aliasPaths(def).entries()) if (typeof def.aliases![i] !== 'string') register(def, path);
+    for (const path of deprecatedPathsOf(def)) register(def, path, true);
   }
 
   // A routed alias is one leaf with every target's flags: the routing flag

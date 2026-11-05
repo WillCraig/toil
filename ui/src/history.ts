@@ -31,7 +31,7 @@ export interface HistoryEntry {
   title: string;
   /** One line on what it's about. */
   line: string;
-  /** Where it links: an assignment, a dossier, or the Dossiers view. */
+  /** Where it links: an assignment, a toil project, or the Toil projects view. */
   href: string;
 }
 

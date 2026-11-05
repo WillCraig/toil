@@ -2,7 +2,7 @@
  * `@imagile-dev/toil/api`: toil for a program, in-process. A host (Toil UI's
  * sync, a script) calls `execute()` with a command's name and its input, the
  * same fields an MCP client sends, and gets the same envelope the CLI prints.
- * Connections, the credential store, dossiers, bounds, the write gate and the
+ * Connections, the credential store, toil projects, bounds, the write gate and the
  * audit log all apply unchanged, because this is the same `execute()` both
  * other front doors use; the host holds no credentials of its own.
  *
@@ -38,7 +38,7 @@ import { VERSION } from './version.js';
 import { authorKinds, documentsFrom, fieldOverrides, findSimilar as findSimilarItems, inputValues, keyPatterns, mapOwi as mapDocuments, OWI_VERSION, parseOwiInput, parseOwiRecords, type KeyPattern, type OwiResult, type SimilarItem, type SimilarOptions, type SimilarRequest, type SimilarResult } from './core/owi/index.js';
 import owiSchemaJson from '../docs/owi/schema.json' with { type: 'json' };
 
-export type { ApiAnswer, ContextReport, ContextSource, ContextValue, DossierReport, Envelope, ErrorBody, Meta, Page, Warning } from './core/envelope.js';
+export type { ApiAnswer, ContextReport, ContextSource, ContextValue, ToilProjectReport, Envelope, ErrorBody, Meta, Page, Warning } from './core/envelope.js';
 export type { ErrorCode } from './core/errors.js';
 export type { PageProgress, ProgressEvent, RequestProgress, RetryProgress } from './core/progress.js';
 export type { CommandKind } from './core/command.js';
@@ -70,7 +70,7 @@ export interface CommandInfo {
   description: string;
   /** Every call writes: refused under `readOnly`, and gated by `writes` plus `allowWrite` otherwise. */
   writes: boolean;
-  /** Every call changes something on this machine (toil's config or dossiers, a download): refused under `readOnly`. */
+  /** Every call changes something on this machine (toil's config or toil projects, a download): refused under `readOnly`. */
   writesLocal: boolean;
   /** Some calls write, depending on the input (the raw passthrough's POST, a file named with `out`); those are refused under `readOnly`. */
   writesDependOnInput: boolean;
@@ -126,8 +126,8 @@ export interface Registry {
  * `confirm-name` (type the connection's name to turn writes on), `unwrap:<key>`
  * (the secret for `<key>` is in quotes or starts with `Bearer ` or `token `:
  * `y` stores it without them, `n` as entered; `checkSecret` says which before
- * the call, so a host can ask its person first), for `dossiers onboard`
- * `create:<section>` (add a connection that dossier section needs: `y` or `n`),
+ * the call, so a host can ask its person first), for `toil projects onboard`
+ * `create:<section>` (add a connection that toil project section needs: `y` or `n`),
  * `name:<section>` (the new connection's name) and `pin:<section>` (which
  * matching connection the person's own copy uses), and `consent`
  * (`feedback`: send the report and disclaimer the question shows to Imagile
@@ -159,7 +159,7 @@ export interface ExecuteOptions {
   /**
    * Refuse the call, before anything resolves or is sent, if it would change
    * anything: a write to a service, or on this machine (toil's config or
-   * dossiers, a download, a file named with `out`). The refusal is
+   * toil projects, a download, a file named with `out`). The refusal is
    * `WRITE_DISABLED`, whatever the config says. A read-only call writes
    * nothing but its audit line.
    */
@@ -212,10 +212,10 @@ const byName = new Map(served.map((def) => [commandName(def), def]));
  * The person's commands a host may run with `person`: setting up and changing
  * connections, and `feedback`, which sends a report to Imagile LLC only on the
  * person's yes to its `consent` question (AGENT_DECISIONS.md, #265). The other
- * CLI-only commands (a shell alias, a dossier's or a marketplace's removal)
+ * CLI-only commands (a shell alias, a toil project's or a marketplace's removal)
  * and every delete stay on the CLI.
  */
-const PERSON_COMMANDS = new Set(['connections add', 'connections login', 'connections remove', 'connections writes', 'connections default', 'dossiers onboard', 'feedback']);
+const PERSON_COMMANDS = new Set(['connections add', 'connections login', 'connections remove', 'connections writes', 'connections default', 'projects onboard', 'feedback']);
 const forPerson: AnyCommand[] = commands.filter((def) => PERSON_COMMANDS.has(commandName(def)));
 const personByName = new Map(forPerson.map((def) => [commandName(def), def]));
 const areaInfo: AreaInfo[] = areas.map((a) => ({ name: a.name, fallbacks: a.fallbacks, ...(a.fallbackWhen ? { fallbackWhen: a.fallbackWhen } : {}), contextInputs: Object.keys(a.context), ...(a.siteApis ? { siteApis: a.siteApis } : {}) }));
@@ -354,7 +354,7 @@ export async function execute(command: string, input: Record<string, unknown> = 
  * holds envelopes: the same mapping `util owi map` does, in-process and
  * synchronous. `input` is envelopes (one, an array, or JSON or JSON Lines
  * text), or a command's bare `data` with `command` named; `fields` is a
- * dossier section's `fields` object (`{ estimate: "customfield_10234",
+ * toil project section's `fields` object (`{ estimate: "customfield_10234",
  * estimateUnit: "points" }`). It doesn't validate against the schema the way
  * `execute('util owi map', …)` does, which runs the check in a worker; use
  * that, or `owiSchema`, to check. Refusals (an override OWI has no field for,
@@ -367,7 +367,7 @@ export function mapOwi(input: unknown, options: OwiMapOptions = {}): OwiResult {
 }
 
 export interface OwiMapOptions {
-  /** OWI fields pointed at a team's own fields: a dossier section's `fields`, or `name=field` strings. */
+  /** OWI fields pointed at a team's own fields: a toil project section's `fields`, or `name=field` strings. */
   fields?: Record<string, string> | string[];
   /** The command whose bare `data` the input is (`jira issue search`). */
   command?: string;

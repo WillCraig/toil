@@ -6,7 +6,7 @@
     "package": "@imagile-dev/toil"
   },
   "_contractVersion": "contractVersion is the version of this contract that toil reports in toil version and on every envelope's meta (CONTRACT_VERSION in src/core/envelope.ts; test/api.test.ts keeps them equal). It goes up by one with every breaking change to what this file records or to the envelope, and never for an additive one. See docs/command-contract.md, Changing the contract.",
-  "contractVersion": 2,
+  "contractVersion": 3,
   "globalOptions": [
     {
       "flags": "-v, --version",
@@ -515,7 +515,7 @@
         },
         {
           "flags": "--project <key>",
-          "description": "Project key (or \"project\" in --input-file); defaults to your dossier's project, then the connection's project."
+          "description": "Project key (or \"project\" in --input-file); defaults to your toil project's project, then the connection's project."
         }
       ],
       "output": [
@@ -6401,7 +6401,7 @@
         },
         {
           "flags": "--project <key>",
-          "description": "SonarQube project key; defaults to your dossier's project, then the connection's project."
+          "description": "SonarQube project key; defaults to your toil project's project, then the connection's project."
         }
       ],
       "output": [
@@ -6463,7 +6463,7 @@
         },
         {
           "flags": "--project <key>",
-          "description": "SonarQube project key; defaults to your dossier's project, then the connection's project."
+          "description": "SonarQube project key; defaults to your toil project's project, then the connection's project."
         }
       ],
       "output": [
@@ -6545,7 +6545,7 @@
         },
         {
           "flags": "--project <key>",
-          "description": "SonarQube project key; defaults to your dossier's project, then the connection's project."
+          "description": "SonarQube project key; defaults to your toil project's project, then the connection's project."
         }
       ],
       "output": [
@@ -6663,7 +6663,7 @@
         },
         {
           "flags": "--project <key>",
-          "description": "SonarQube project key; defaults to your dossier's project, then the connection's project."
+          "description": "SonarQube project key; defaults to your toil project's project, then the connection's project."
         }
       ],
       "output": [
@@ -6916,7 +6916,7 @@
         },
         {
           "flags": "--project <id>",
-          "description": "SD Elements project ID; defaults to your dossier's project, then the connection's project."
+          "description": "SD Elements project ID; defaults to your toil project's project, then the connection's project."
         }
       ],
       "output": [
@@ -7016,7 +7016,7 @@
         },
         {
           "flags": "--project <id>",
-          "description": "SD Elements project ID; defaults to your dossier's project, then the connection's project."
+          "description": "SD Elements project ID; defaults to your toil project's project, then the connection's project."
         }
       ],
       "output": [
@@ -7104,7 +7104,7 @@
         },
         {
           "flags": "--project <id>",
-          "description": "SD Elements project ID; defaults to your dossier's project, then the connection's project."
+          "description": "SD Elements project ID; defaults to your toil project's project, then the connection's project."
         }
       ],
       "output": [
@@ -7194,7 +7194,7 @@
         },
         {
           "flags": "--project <id>",
-          "description": "SD Elements project ID; defaults to your dossier's project, then the connection's project."
+          "description": "SD Elements project ID; defaults to your toil project's project, then the connection's project."
         }
       ],
       "output": [
@@ -10476,7 +10476,7 @@
         },
         {
           "flags": "--space <id>",
-          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your dossier's space, then the connection's space."
+          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your toil project's space, then the connection's space."
         }
       ],
       "output": [
@@ -10508,7 +10508,7 @@
         },
         {
           "flags": "--space <id>",
-          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your dossier's space, then the connection's space."
+          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your toil project's space, then the connection's space."
         }
       ],
       "output": [
@@ -10537,7 +10537,7 @@
       "options": [
         {
           "flags": "--space <id>",
-          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your dossier's space, then the connection's space."
+          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your toil project's space, then the connection's space."
         }
       ],
       "output": [
@@ -10581,7 +10581,7 @@
         },
         {
           "flags": "--space <id>",
-          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your dossier's space, then the connection's space."
+          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your toil project's space, then the connection's space."
         }
       ],
       "output": [
@@ -10605,7 +10605,7 @@
       "options": [
         {
           "flags": "--space <id>",
-          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your dossier's space, then the connection's space."
+          "description": "Kibana space ID (default: kibana.space, else the default space); defaults to your toil project's space, then the connection's space."
         }
       ],
       "output": [
@@ -10682,7 +10682,7 @@
       "options": [
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -10724,7 +10724,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -10753,7 +10753,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -10816,7 +10816,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -10874,7 +10874,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -10924,7 +10924,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -10974,7 +10974,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -11024,7 +11024,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -11072,7 +11072,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -11118,7 +11118,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -11164,7 +11164,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [
@@ -11213,7 +11213,7 @@
         },
         {
           "flags": "--ws <id>",
-          "description": "Split workspace (project) ID; defaults to your dossier's workspace, then the connection's workspace."
+          "description": "Split workspace (project) ID; defaults to your toil project's workspace, then the connection's workspace."
         }
       ],
       "output": [

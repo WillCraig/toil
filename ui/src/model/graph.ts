@@ -2,12 +2,12 @@
  * The dependency graph (#252), from OWI links alone. Each link appears on
  * both of its items (outward on one, inward on the other), so the graph keeps
  * one edge per pair and type, pointing the way the link reads: A blocks B is
- * A → B. A link to an item the dossier doesn't hold is kept, as a node marked
+ * A → B. A link to an item the toil project doesn't hold is kept, as a node marked
  * unknown, rather than dropped (principle 4).
  *
  * The layout is part of the model, so it is tested and needs no layout
  * library: each item's column is the length of the longest `blocks` chain
- * leading to it, and items keep the dossier's own order down each column.
+ * leading to it, and items keep the toil project's own order down each column.
  * Other link types draw edges but don't move anything. A cycle can't loop
  * forever: ranks stop growing after one pass per node, and the graph says so.
  * A critical path, found without a Gantt chart.
@@ -17,7 +17,7 @@ import type { LinkType, WorkItem } from '../toil.ts';
 
 export interface GraphNode {
   id: string;
-  /** False for a link target the dossier doesn't hold. */
+  /** False for a link target the toil project doesn't hold. */
   known: boolean;
   /** Column: the longest chain of `blocks` edges leading here. */
   rank: number;

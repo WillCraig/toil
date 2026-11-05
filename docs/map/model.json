@@ -46,7 +46,7 @@
           "id": "core",
           "name": "Core machinery",
           "technology": "TypeScript",
-          "description": "src/core: defineArea, defineCommand, execute, config, secrets, dossier, db providers, query, output (151 files, 33k lines, util size src)",
+          "description": "src/core: defineArea, defineCommand, execute, config, secrets, toil project, db providers, query, output (151 files, 33k lines, util size src)",
           "components": [
             {
               "id": "core_run",
@@ -61,10 +61,10 @@
               "description": "Config loading and writing, env precedence (src/core/config.ts, 774 lines)"
             },
             {
-              "id": "core_dossier",
-              "name": "dossier.ts",
+              "id": "core_toil_project",
+              "name": "toil-project.ts",
               "technology": "TypeScript",
-              "description": "Dossier model, resolution and writing (src/core/dossier.ts, 1440 lines, the largest source file)"
+              "description": "Toil project model, resolution and writing (src/core/toil-project.ts, 1440 lines, the largest source file)"
             },
             {
               "id": "core_db",
@@ -99,10 +99,10 @@
           "description": "src/areas: 28 area folders (ls src/areas): ado, jira, github, db, util, ... 343 files, 70k lines (util size src --depth 2)"
         },
         {
-          "id": "dossiers",
-          "name": "Dossier commands",
+          "id": "projects",
+          "name": "Toil project commands",
           "technology": "TypeScript",
-          "description": "src/dossiers: list, show, build, onboard, brief (4 files, 1.7k lines)"
+          "description": "src/projects: list, show, build, onboard, brief (4 files, 1.7k lines)"
         },
         {
           "id": "connections",
@@ -253,7 +253,7 @@
     },
     {
       "source": "registry",
-      "destination": "dossiers",
+      "destination": "projects",
       "description": "Registers commands of (src/registry.ts:4-7)",
       "technology": "import"
     },
@@ -282,9 +282,9 @@
       "technology": "import"
     },
     {
-      "source": "dossiers",
-      "destination": "core_dossier",
-      "description": "Built on (outline.imports over src/dossiers: all 4 files import ../core, 32 imports)",
+      "source": "projects",
+      "destination": "core_toil_project",
+      "description": "Built on (outline.imports over src/projects: all 4 files import ../core, 32 imports)",
       "technology": "import"
     },
     {

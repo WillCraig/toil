@@ -86,9 +86,9 @@
     ]
   },
   {
-    "name": "check-dossier",
-    "tool": "openshift_check_dossier",
-    "description": "Check the call's dossier against OpenShift: its namespaces and deployments exist",
+    "name": "check-toil-project",
+    "tool": "openshift_check_toil_project",
+    "description": "Check the call's toil project against OpenShift: its namespaces and deployments exist",
     "writes": false,
     "connection": true,
     "flags": [

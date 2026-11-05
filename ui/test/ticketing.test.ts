@@ -7,7 +7,7 @@ import { loaded } from './harness.ts';
 /**
  * Ticket the work (#304): which chat prompts count as work no ticket covers,
  * what the scorer matches them to, and the proposals "Ticket this" offers,
- * on the preview's own dossiers. test/registry.test.ts holds every proposal
+ * on the preview's own toil projects. test/registry.test.ts holds every proposal
  * here to toil's registry.
  */
 
@@ -74,11 +74,11 @@ describe('the proposals "Ticket this" offers', () => {
       item: 'corp-jira:PAY-101',
       title: 'Create a sub-task under PAY-101',
       command: 'jira issue create',
-      input: { dossier: 'card-payments', project: 'PAY', issueType: 'Sub-task', parent: 'PAY-101', summary: 'Tokenise the card numbers at the edge of the gateway', description: 'Filed from a Toil UI chat: Tokenise the card numbers at the edge of the gateway' },
+      input: { toilProject: 'card-payments', project: 'PAY', issueType: 'Sub-task', parent: 'PAY-101', summary: 'Tokenise the card numbers at the edge of the gateway', description: 'Filed from a Toil UI chat: Tokenise the card numbers at the edge of the gateway' },
     });
     expect(proposals[0]!.reason).toContain('name PAY-101 in the branch');
-    expect(proposals.at(-1)).toMatchObject({ command: 'jira issue create', input: { dossier: 'card-payments', summary: 'Tokenise the card numbers at the edge of the gateway' } });
-    expect(commandLine(proposals[0]!, 'posix').line).toBe("toil jira issue create --dossier 'card-payments' --project 'PAY' --type 'Sub-task' --parent 'PAY-101' --summary 'Tokenise the card numbers at the edge of the gateway' --description 'Filed from a Toil UI chat: Tokenise the card numbers at the edge of the gateway' --allow-write");
+    expect(proposals.at(-1)).toMatchObject({ command: 'jira issue create', input: { toilProject: 'card-payments', summary: 'Tokenise the card numbers at the edge of the gateway' } });
+    expect(commandLine(proposals[0]!, 'posix').line).toBe("toil jira issue create --toil-project 'card-payments' --project 'PAY' --type 'Sub-task' --parent 'PAY-101' --summary 'Tokenise the card numbers at the edge of the gateway' --description 'Filed from a Toil UI chat: Tokenise the card numbers at the edge of the gateway' --allow-write");
   });
 
   it('offers a new ticket alone when nothing matches', () => {
@@ -91,7 +91,7 @@ describe('the proposals "Ticket this" offers', () => {
 
   it('on Azure DevOps Server, a Task with a parent; a new item takes the type most open items have', () => {
     const parent = settlement.items.find((i) => i.id === 'corp-ado:2302')!;
-    expect(subTaskProposal('Add a header row to the CSV', parent, 'settlement')).toMatchObject({ command: 'ado work-item create', input: { dossier: 'settlement', type: 'Task', title: 'Add a header row to the CSV', parent: '2302' } });
+    expect(subTaskProposal('Add a header row to the CSV', parent, 'settlement')).toMatchObject({ command: 'ado work-item create', input: { toilProject: 'settlement', type: 'Task', title: 'Add a header row to the CSV', parent: '2302' } });
     expect(newTicketProposal('Add a header row to the CSV', settlement.items, 'settlement', null)).toMatchObject({ command: 'ado work-item create', input: { type: 'User Story' } });
   });
 
@@ -124,6 +124,6 @@ describe('the proposals "Ticket this" offers', () => {
   it('says so, with no command, where toil has none', () => {
     const odd = { ...cards.items[6]!, id: 'x:1', source: { ...cards.items[6]!.source, area: 'bitbucket' } };
     expect(subTaskProposal('Something', odd, 'card-payments')).toMatchObject({ command: null, input: null, note: 'toil has no create command for bitbucket items.' });
-    expect(newTicketProposal('Something', [], 'empty', null)).toMatchObject({ command: null, note: 'The dossier has no open item to say which tracker a new ticket goes on.' });
+    expect(newTicketProposal('Something', [], 'empty', null)).toMatchObject({ command: null, note: 'The Toil project has no open item to say which tracker a new ticket goes on.' });
   });
 });

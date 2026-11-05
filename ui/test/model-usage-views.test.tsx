@@ -41,17 +41,17 @@ function reportingAgent(asked: ChatTurn[]): Agent {
   return {
     ...base,
     stream: undefined,
-    ask: async (dossier, prompt, style, chat) => {
+    ask: async (toilProject, prompt, style, chat) => {
       asked.push(chat!);
-      const answer = (await base.ask(dossier, prompt, style)) as Answer;
+      const answer = (await base.ask(toilProject, prompt, style)) as Answer;
       const turn = chat!.turn;
       const at = FIXTURE_NOW;
       if (turn === 1) {
-        return { ...answer, usage: { adapter: 'codex', records: [{ id: `codex:t${turn}:1`, chatId: chat!.id, turn, dossier, adapter: 'codex', model: null, inputTokens: 21000, cachedInputTokens: 14000, outputTokens: 380, costSource: 'none', inputIncludesCached: true, at }], notices: [] } };
+        return { ...answer, usage: { adapter: 'codex', records: [{ id: `codex:t${turn}:1`, chatId: chat!.id, turn, toilProject, adapter: 'codex', model: null, inputTokens: 21000, cachedInputTokens: 14000, outputTokens: 380, costSource: 'none', inputIncludesCached: true, at }], notices: [] } };
       }
       return {
         ...answer,
-        usage: { adapter: 'copilot', records: [{ id: `copilot:e${turn}`, chatId: chat!.id, turn, dossier, adapter: 'copilot', model: 'gpt-5-mini', inputTokens: 3000, cachedInputTokens: 1000, outputTokens: 200, premiumRequests: 1, costSource: 'none', at }], context: { used: 7400, window: 128000 }, notices: ["This chat has used 41,000 tokens of Codex's per-chat cap (codex.chat) of 50,000 tokens (82%)."] },
+        usage: { adapter: 'copilot', records: [{ id: `copilot:e${turn}`, chatId: chat!.id, turn, toilProject, adapter: 'copilot', model: 'gpt-5-mini', inputTokens: 3000, cachedInputTokens: 1000, outputTokens: 200, premiumRequests: 1, costSource: 'none', at }], context: { used: 7400, window: 128000 }, notices: ["This chat has used 41,000 tokens of Codex's per-chat cap (codex.chat) of 50,000 tokens (82%)."] },
       };
     },
   };
@@ -60,7 +60,7 @@ function reportingAgent(asked: ChatTurn[]): Agent {
 describe('the chat', () => {
   it('shows what each answer used under it, labelled by adapter and model, and the chat total in its header', async () => {
     const asked: ChatTurn[] = [];
-    await open('#/dossier/card-payments', { agent: reportingAgent(asked) });
+    await open('#/project/card-payments', { agent: reportingAgent(asked) });
     await openChat('card-payments');
     await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
     const first = await screen.findByRole('group', { name: 'What this answer used' });
@@ -83,16 +83,16 @@ describe('the chat', () => {
     expect(new Set(asked.map((c) => c.id)).size).toBe(1);
 
     const header = screen.getByLabelText('What this chat used');
-    const total = addUp([{ id: 'a', chatId: 'c', turn: 1, dossier: 'd', adapter: 'codex', model: null, inputTokens: 21000, cachedInputTokens: 14000, outputTokens: 380, costSource: 'none', inputIncludesCached: true, at: FIXTURE_NOW }, { id: 'b', chatId: 'c', turn: 2, dossier: 'd', adapter: 'copilot', model: 'gpt-5-mini', inputTokens: 3000, cachedInputTokens: 1000, outputTokens: 200, premiumRequests: 1, costSource: 'none', at: FIXTURE_NOW }]);
+    const total = addUp([{ id: 'a', chatId: 'c', turn: 1, toilProject: 'd', adapter: 'codex', model: null, inputTokens: 21000, cachedInputTokens: 14000, outputTokens: 380, costSource: 'none', inputIncludesCached: true, at: FIXTURE_NOW }, { id: 'b', chatId: 'c', turn: 2, toilProject: 'd', adapter: 'copilot', model: 'gpt-5-mini', inputTokens: 3000, cachedInputTokens: 1000, outputTokens: 200, premiumRequests: 1, costSource: 'none', at: FIXTURE_NOW }]);
     expect(header.textContent).toContain(`${compact(total.tokens!)} tokens, on 2 models.`);
     expect(header.textContent).toContain('Context of the last answer: 7.4k of 128k tokens (6%)');
     expect(within(header).getByRole('meter')).toBeTruthy();
   });
 
   it('counts what a stopped run used, under its error and in the chat total, as the server does', async () => {
-    const usage = { adapter: 'claude' as const, records: [{ id: 'claude:msg_1', chatId: 'c', turn: 1, dossier: 'card-payments', adapter: 'claude' as const, model: 'claude-sonnet-4-6', inputTokens: 600, outputTokens: 50, cachedInputTokens: 1000, costSource: 'none' as const, at: FIXTURE_NOW }], notices: [] };
+    const usage = { adapter: 'claude' as const, records: [{ id: 'claude:msg_1', chatId: 'c', turn: 1, toilProject: 'card-payments', adapter: 'claude' as const, model: 'claude-sonnet-4-6', inputTokens: 600, outputTokens: 50, cachedInputTokens: 1000, costSource: 'none' as const, at: FIXTURE_NOW }], notices: [] };
     const agent: Agent = { ...scriptedAgent(), stream: undefined, ask: async () => Promise.reject(Object.assign(new Error("Claude's per-chat cap (claude.chat) stopped this question: this chat has used 1,650 tokens, and the cap is 1,000 tokens."), { usage })) };
-    await open('#/dossier/card-payments', { agent });
+    await open('#/project/card-payments', { agent });
     await openChat('card-payments');
     await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
     expect((await screen.findByRole('alert')).textContent).toContain('stopped this question');
@@ -106,7 +106,7 @@ describe('the chat', () => {
   });
 
   it('marks the preview\'s figures as sample, never as a model\'s', async () => {
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     await openChat('card-payments');
     await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
     const footer = await screen.findByRole('group', { name: 'What this answer used' }, { timeout: 5000 });
@@ -115,16 +115,16 @@ describe('the chat', () => {
 });
 
 describe('Settings, Agent usage', () => {
-  it('sits beside Usage, and totals the sample month by day, adapter, model and dossier with the meter\'s figures', async () => {
+  it('sits beside Usage, and totals the sample month by day, adapter, model and Toil project with the meter\'s figures', async () => {
     const { container } = await open('#/settings/agent-usage');
     const nav = screen.getByRole('navigation', { name: 'Settings pages' });
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Connections', 'Dossiers', 'General', 'Usage', 'Agent usage', 'Agent']);
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Connections', 'Toil projects', 'General', 'Usage', 'Agent usage', 'Agent']);
     await screen.findByRole('heading', { name: "Usage of the agent's models" });
     const all = addUp(sampleUsageRecords());
     expect(screen.getByText('These are sample figures, made up for the preview. No model reported them.')).toBeTruthy();
     const totals = container.querySelector('.usage-totals')!;
     expect(totals.textContent).toContain(compact(all.tokens!));
-    for (const name of ['By adapter', 'By model', 'By dossier', 'Chats that used the most', 'Caps']) expect(screen.getByRole('heading', { name })).toBeTruthy();
+    for (const name of ['By adapter', 'By model', 'By Toil project', 'Chats that used the most', 'Caps']) expect(screen.getByRole('heading', { name })).toBeTruthy();
     const adapters = screen.getByRole('table', { name: 'Usage by adapter' });
     expect(within(adapters).getAllByRole('rowheader').map((c) => c.querySelector('.l-table__value')!.textContent).sort()).toEqual(['Claude', 'Codex', 'GitHub Copilot']);
     // Copilot's row is premium requests, never dollars.

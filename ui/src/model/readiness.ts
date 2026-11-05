@@ -1,7 +1,7 @@
 /**
  * The readiness gate (#307): whether a work item is ready to hand to an
  * agent, worked out before any model is asked. Pure functions of the item's
- * cached OWI record, the dossier it came from, the dossier's other items and,
+ * cached OWI record, the toil project it came from, the toil project's other items and,
  * at most, one live read of the item's workflow, which the caller makes and
  * passes in (`liveWorkflow`). No model, no premium request, no network of its
  * own, so the item page, the Command Center and the agent's readiness tools
@@ -9,19 +9,19 @@
  *
  * Five checks, one row each, as the issue's table has them:
  *
- * - **Acceptance criteria**: in the field the dossier names
+ * - **Acceptance criteria**: in the field the toil project names
  *   (`<area>.fields.acceptanceCriteria`; Azure DevOps' own
  *   `Microsoft.VSTS.Common.AcceptanceCriteria` when it names none), or as a
  *   heading or a checklist in the body.
  * - **Description**: at least `minWords` words (25 by default, the section's
- *   `readiness.minWords`) of real text, once lines from the dossier's
+ *   `readiness.minWords`) of real text, once lines from the toil project's
  *   templates (`readiness.templates`) and placeholder lines are taken out.
  * - **Done state**: not already done, and a way to Done is known: GitHub
  *   issues close from any state; otherwise an item of the same type in the
- *   dossier has reached Done, or the live read says the workflow has a Done
+ *   toil project has reached Done, or the live read says the workflow has a Done
  *   state (Azure DevOps) or offers a move into Done now (Jira).
  * - **Blockers**: no open item `blocks` it.
- * - **Scope**: it comes from one of the dossier's sources, and the dossier
+ * - **Scope**: it comes from one of the toil project's sources, and the toil project
  *   names a repository to work in.
  *
  * A row is `pass`, `thin` (missing something a person can decide to live
@@ -68,7 +68,7 @@ export interface Readiness {
   why: Row[];
 }
 
-/** Description words a ready item needs when the dossier sets no number. */
+/** Description words a ready item needs when the toil project sets no number. */
 export const DEFAULT_MIN_WORDS = 25;
 /** Azure DevOps' own acceptance criteria field, on every process that has one. */
 export const ADO_ACCEPTANCE_FIELD = 'Microsoft.VSTS.Common.AcceptanceCriteria';
@@ -77,18 +77,18 @@ export const ADO_ACCEPTANCE_FIELD = 'Microsoft.VSTS.Common.AcceptanceCriteria';
 export interface AreaReadiness {
   /** The field holding acceptance criteria, or null when there is none to look in. */
   acceptanceField: string | null;
-  /** Where that field came from: the dossier, or the area's own default. */
-  acceptanceFrom: 'dossier' | 'default' | null;
+  /** Where that field came from: the toil project, or the area's own default. */
+  acceptanceFrom: 'toilProject' | 'default' | null;
   minWords: number;
   /** Template text, line by line, normalised: lines a description doesn't get credit for. */
   templateLines: string[];
 }
 
-/** What the gate reads from a dossier: its sources, its repositories, and each area's settings. */
+/** What the gate reads from a toil project: its sources, its repositories, and each area's settings. */
 export interface ReadinessSettings {
-  /** The areas the dossier has a section for. */
+  /** The areas the toil project has a section for. */
   sources: string[];
-  /** The dossier's repositories, by name. */
+  /** The toil project's repositories, by name. */
   repos: string[];
   areas: Record<string, AreaReadiness>;
   /** What couldn't be used, in words the views show. */
@@ -98,17 +98,17 @@ export interface ReadinessSettings {
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** Keys at the top of a dossier that aren't area sections (src/core/dossier.ts, TOP_LEVEL). */
+/** Keys at the top of a toil project that aren't area sections (src/core/toil-project.ts, TOP_LEVEL). */
 const NOT_SECTIONS = new Set(['$schema', 'name', 'description', 'env', 'repos', 'environments', 'people', 'wipLimit']);
 
 /**
- * The gate's settings, from the dossier as `dossiers show` prints it. Each
+ * The gate's settings, from the toil project as `projects show` prints it. Each
  * area section may hold `fields.acceptanceCriteria` (a field id, also the
  * area's `--field` alias) and `readiness: { minWords, templates }`, reference
  * data toil keeps as written.
  */
-export function readReadiness(dossier: unknown): ReadinessSettings {
-  const d = isRec(dossier) ? dossier : {};
+export function readReadiness(toilProject: unknown): ReadinessSettings {
+  const d = isRec(toilProject) ? toilProject : {};
   const notes: string[] = [];
   const repos = (Array.isArray(d.repos) ? d.repos : []).flatMap((r) => (isRec(r) && typeof r.name === 'string' && r.name ? [r.name] : []));
   const sources: string[] = [];
@@ -133,7 +133,7 @@ export function readReadiness(dossier: unknown): ReadinessSettings {
         else notes.push(`The ${area} section's readiness.templates isn't a list of template texts, so no template is taken out of descriptions.`);
       }
     }
-    areas[area] = { acceptanceField: named ?? fallback, acceptanceFrom: named ? 'dossier' : fallback ? 'default' : null, minWords, templateLines };
+    areas[area] = { acceptanceField: named ?? fallback, acceptanceFrom: named ? 'toilProject' : fallback ? 'default' : null, minWords, templateLines };
   }
   return { sources, repos, areas, notes };
 }
@@ -315,7 +315,7 @@ export function liveWorkflow(item: WorkItem, command: string, data: unknown, err
 export interface GateInput {
   item: WorkItem;
   settings: ReadinessSettings;
-  /** The dossier's items, by id: blockers and the done-state evidence are read from them. */
+  /** The toil project's items, by id: blockers and the done-state evidence are read from them. */
   byId: Map<string, WorkItem>;
   /** The one live read, when someone asked for it. */
   live?: LiveWorkflow;
@@ -372,7 +372,7 @@ function doneState(item: WorkItem, byId: Map<string, WorkItem>, live: LiveWorkfl
   if (item.source.area === 'github') return row('done', 'pass', `Open (${item.status ?? 'open'}); a GitHub issue closes from any state.`, 'status');
   const seen = [...byId.values()].find((other) => other.id !== item.id && sameType(other, item) && reachedDone(other));
   if (seen) return row('done', 'pass', `Open (${item.status ?? 'open'}), and another ${type} here reached Done ([[${seen.id}]]), so the workflow gets there.`, 'cache');
-  return row('done', 'thin', `Open (${item.status ?? 'open'}), but no ${type} in this dossier has reached Done, so a way there isn't known from the cache. Check the workflow live.`, 'cache');
+  return row('done', 'thin', `Open (${item.status ?? 'open'}), but no ${type} in this Toil project has reached Done, so a way there isn't known from the cache. Check the workflow live.`, 'cache');
 }
 
 function blockers(item: WorkItem, byId: Map<string, WorkItem>): Row {
@@ -381,21 +381,21 @@ function blockers(item: WorkItem, byId: Map<string, WorkItem>): Row {
   const open = by.filter((l) => byId.has(l.target) && byId.get(l.target)!.statusCategory !== 'DONE');
   const unknown = by.filter((l) => !byId.has(l.target));
   if (open.length) return row('blockers', 'fail', `Blocked by ${open.map((l) => `[[${l.target}]] (${byId.get(l.target)!.status ?? 'open'})`).join(', ')}.`, 'links');
-  if (unknown.length) return row('blockers', 'thin', `Blocked by ${unknown.map((l) => l.target).join(', ')}, which this dossier doesn't hold, so whether ${unknown.length === 1 ? "it's" : "they're"} still open isn't known.`, 'links');
+  if (unknown.length) return row('blockers', 'thin', `Blocked by ${unknown.map((l) => l.target).join(', ')}, which this Toil project doesn't hold, so whether ${unknown.length === 1 ? "it's" : "they're"} still open isn't known.`, 'links');
   return row('blockers', 'pass', `Its ${by.length === 1 ? 'blocker is' : 'blockers are'} done (${by.map((l) => `[[${l.target}]]`).join(', ')}).`, 'links');
 }
 
-/** The repository a GitHub issue lives in, by the dossier's repository names; null for other trackers. */
+/** The repository a GitHub issue lives in, by the toil project's repository names; null for other trackers. */
 const issueRepo = (item: WorkItem) => (item.source.area === 'github' ? (/^[^/]+\/([^#]+)#/.exec(item.source.key)?.[1] ?? null) : null);
 
 function scope(item: WorkItem, settings: ReadinessSettings): Row {
-  if (!settings.sources.includes(item.source.area)) return row('scope', 'fail', `It came from ${item.source.area}, which isn't one of this dossier's sources (${settings.sources.join(', ') || 'none'}).`, 'dossier');
+  if (!settings.sources.includes(item.source.area)) return row('scope', 'fail', `It came from ${item.source.area}, which isn't one of this Toil project's sources (${settings.sources.join(', ') || 'none'}).`, 'toilProject');
   const repos = settings.repos;
-  if (!repos.length) return row('scope', 'thin', 'The dossier names no repository, so an agent could plan it but has nowhere to implement it. Add one with toil dossiers add-repo.', 'dossier repos');
+  if (!repos.length) return row('scope', 'thin', 'The Toil project names no repository, so an agent could plan it but has nowhere to implement it. Add one with toil projects add-repo.', 'Toil project repos');
   const own = issueRepo(item);
-  if (own && repos.includes(own)) return row('scope', 'pass', `${item.source.area} is one of the dossier's sources, and its repository, ${own}, is in the dossier.`, 'dossier repos');
-  if (repos.length === 1) return row('scope', 'pass', `${item.source.area} is one of the dossier's sources, and an agent works in ${repos[0]}.`, 'dossier repos');
-  return row('scope', 'pass', `${item.source.area} is one of the dossier's sources, which names ${plural(repos.length, 'repository', 'repositories')} (${repos.join(', ')}); one is chosen when it starts.`, 'dossier repos');
+  if (own && repos.includes(own)) return row('scope', 'pass', `${item.source.area} is one of the Toil project's sources, and its repository, ${own}, is in the Toil project.`, 'Toil project repos');
+  if (repos.length === 1) return row('scope', 'pass', `${item.source.area} is one of the Toil project's sources, and an agent works in ${repos[0]}.`, 'Toil project repos');
+  return row('scope', 'pass', `${item.source.area} is one of the Toil project's sources, which names ${plural(repos.length, 'repository', 'repositories')} (${repos.join(', ')}); one is chosen when it starts.`, 'Toil project repos');
 }
 
 const ORDER: Record<RowState, number> = { fail: 0, thin: 1, pass: 2 };
@@ -410,7 +410,7 @@ export function readiness({ item, settings, byId, live }: GateInput): Readiness 
   return { id: item.id, verdict, rows, why };
 }
 
-/** Every item's readiness, in the dossier's order. */
+/** Every item's readiness, in the toil project's order. */
 export function readinessAll(items: WorkItem[], settings: ReadinessSettings): Readiness[] {
   const byId = new Map(items.map((i) => [i.id, i]));
   return items.map((item) => readiness({ item, settings, byId }));

@@ -45,11 +45,11 @@ function Calendar() {
 }
 
 function Panel({ id, children }: { id: string; children: ReactNode }) {
-  // A panel can sit outside a dossier (none do yet), so the calendar only asks for the sprint inside one.
-  const inDossier = useContext(DataContext) !== null;
+  // A panel can sit outside a toil project (none do yet), so the calendar only asks for the sprint inside one.
+  const inToilProject = useContext(DataContext) !== null;
   return (
     <>
-      {id === 'sprint' && inDossier && <Calendar />}
+      {id === 'sprint' && inToilProject && <Calendar />}
       {children}
     </>
   );

@@ -43,7 +43,7 @@ export function writeCommands(registry: ReadonlyArray<{ name: string; writes: bo
 }
 
 export interface Finish {
-  dossier: string;
+  toilProject: string;
   prompt: string;
   by: string;
   ledger: Ledger;
@@ -84,7 +84,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 
 /** One proposal block, checked; a reason string when it can't be one. */
-export function proposalOf(raw: string, f: Pick<Finish, 'dossier' | 'writes'>, index: number): Proposal | string {
+export function proposalOf(raw: string, f: Pick<Finish, 'toilProject' | 'writes'>, index: number): Proposal | string {
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -107,8 +107,8 @@ export function proposalOf(raw: string, f: Pick<Finish, 'dossier' | 'writes'>, i
     } else if (!isObject(value.input)) {
       note = [`The agent named toil ${named} but gave no input for it, so there is no command line to show.`, note].filter(Boolean).join(' ');
     } else {
-      // The dossier is this one, whatever the model wrote: a proposal never reaches past the dossier it is about.
-      const rest = Object.fromEntries(Object.entries(value.input).filter(([k]) => k !== 'dossier' && k !== 'allowWrite'));
+      // The toil project is this one, whatever the model wrote: a proposal never reaches past the toil project it is about.
+      const rest = Object.fromEntries(Object.entries(value.input).filter(([k]) => k !== 'toilProject' && k !== 'allowWrite'));
       const unknown = Object.keys(rest).filter((k) => !write.fields.has(k));
       const absent = write.required.filter((k) => !(k in rest));
       if (unknown.length || absent.length) {
@@ -119,14 +119,14 @@ export function proposalOf(raw: string, f: Pick<Finish, 'dossier' | 'writes'>, i
         note = [`The agent's input doesn't fit toil ${write.name}, which ${why}, so there is no command line to show; see toil ${write.name} --help.`, note].filter(Boolean).join(' ');
       } else {
         command = write.name;
-        input = write.fields.has('dossier') ? { dossier: f.dossier, ...rest } : rest;
+        input = write.fields.has('toilProject') ? { toilProject: f.toilProject, ...rest } : rest;
       }
     }
   }
   return { id: `agent:${item}:${command ?? 'none'}:${index}`, from: 'agent', item, title, reason, command, input, note };
 }
 
-/** The ids a text names: cited, bare `<connection>:<key>` for a connection the dossier has, and tracker keys. */
+/** The ids a text names: cited, bare `<connection>:<key>` for a connection the toil project has, and tracker keys. */
 export function named(text: string, connections: ReadonlySet<string>): { cited: string[]; bare: string[]; keys: string[] } {
   const cited = citationsOf([{ text }]);
   const outside = text.replace(/\[\[[^\]]+\]\]/g, ' ');

@@ -2,11 +2,11 @@
  * Pull requests, builds and deployments, read from each command's own output
  * into the UI's `ChangeRef` and `Deployment` (src/toil.ts). Pure functions of
  * the `data` the commands return, so the dashboards and the tests agree. The
- * rules, which AGENT_DECISIONS.md (#228 dossier dashboard) records:
+ * rules, which AGENT_DECISIONS.md (#228 toil project dashboard) records:
  *
  * - **A pull request names its work items** in its title, branch or
  *   description, as its OWI change reads them (src/core/owi/change.ts). Only
- *   items the dossier's own queries returned count.
+ *   items the toil project's own queries returned count.
  * - **A build belongs to a pull request** by the source's own link: the
  *   Jenkins multibranch job `PR-<id>`, an Azure Pipelines run's
  *   `triggerInfo["pr.number"]`, or the GitHub check runs `pr get --include
@@ -46,7 +46,7 @@ const family = (area: string): SourceKind => area.split('-')[0] as SourceKind;
 
 /**
  * A pull request's `ChangeRef`, made from its OWI change: the work items it
- * names that the dossier's own queries returned, its state, and the time the
+ * names that the toil project's own queries returned, its state, and the time the
  * panels sort it by (merged or closed, else opened). A host that records no
  * merge time (Bitbucket Cloud) is sorted by its last update.
  */
@@ -164,7 +164,7 @@ export function included(commit: string | null | undefined, prs: ChangeRef[]): {
 
 const IMAGE_TAG = /:(?:(.+)-)?([0-9a-f]{7,40})$/;
 
-/** An OpenShift namespace's Deployments for the dossier's repositories, by the commit in each image tag. */
+/** An OpenShift namespace's Deployments for the toil project's repositories, by the commit in each image tag. */
 export function openshiftDeployments(data: unknown, environment: string, repos: string[], prs: ChangeRef[]): Deployment[] {
   const body = isRec(data) ? data : {};
   return recs(body.deployments)
@@ -185,7 +185,7 @@ export function openshiftDeployments(data: unknown, environment: string, repos: 
         state: `${ready} ready`,
         outcome: unavailable > 0 ? ('failed' as const) : ('passed' as const),
         url: null,
-        // Only the deployment's own repository's merges: a dossier may have several code hosts.
+        // Only the deployment's own repository's merges: a toil project may have several code hosts.
         ...included(commit, prs.filter((p) => p.id.includes(`/${d.name}#`))),
       };
     });

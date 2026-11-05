@@ -30,7 +30,7 @@ const JIRA: AreaSummary = {
   signsIn: true,
   live: true,
   configurable: true,
-  commands: [ISSUE_COMMENT, ISSUE_GET, cmd(['jira', 'board', 'list']), cmd(['jira', 'check-dossier'])],
+  commands: [ISSUE_COMMENT, ISSUE_GET, cmd(['jira', 'board', 'list']), cmd(['jira', 'check-toil-project'])],
 };
 const SONAR: AreaSummary = { name: 'sonar', description: 'SonarQube', signsIn: true, live: true, configurable: true, commands: [cmd(['sonar', 'issue', 'list'])] };
 
@@ -60,7 +60,7 @@ describe('the Services module', () => {
     const d = data();
     let s = press(settled, d, '1', '2');
     expect(top(s)).toMatchObject({ view: 'service', params: { area: 'jira' } });
-    expect(screen(s, d)).toMatch(/issue\s+comment, get[\s\S]*board\s+list[\s\S]*check-dossier/);
+    expect(screen(s, d)).toMatch(/issue\s+comment, get[\s\S]*board\s+list[\s\S]*check-toil-project/);
     s = press(s, d, '1');
     expect(where(s)).toBe('service-resource');
     expect(screen(s, d)).toMatch(/get[\s\S]*comment[\s\S]*\(writes\)/);

@@ -1,14 +1,14 @@
 # Toil UI
 
 A local web app for seeing work across Jira, Azure DevOps and GitHub, read through
-[toil](https://www.npmjs.com/package/@imagile-dev/toil): one dashboard per dossier,
+[toil](https://www.npmjs.com/package/@imagile-dev/toil): one dashboard per Toil project,
 with its stories, pull requests, builds and deployments side by side, a pull
 requests view for what is waiting on review, and a daily worklog of what happened.
 
 **Status: beta, local only.** It runs on your own machine, binds loopback, and
-reads through toil with your own connections and dossiers, read-only. Its
-settings pages, and a dossier's name and description edited in place, are the only
-places it changes anything of toil's, and only toil's own connections and dossiers. The worklog keeps its pages and the notes you add in its own
+reads through toil with your own connections and Toil projects, read-only. Its
+settings pages, and a Toil project's name and description edited in place, are the only
+places it changes anything of toil's, and only toil's own connections and Toil projects. The worklog keeps its pages and the notes you add in its own
 data folder, and writes anywhere else only when you export a page. Its Feedback dialog sends a report to Imagile through
 `toil feedback`, only when you approve it. It is a separate package from toil: installing toil
 never installs it. toil's beta commitment to stable commands, flags and output doesn't
@@ -36,7 +36,7 @@ It prints one URL and keeps running until you press Ctrl+C:
 
 ```text
 Toil UI <version> (beta, local only), on toil <version>
-Syncing through toil, read-only, with your own connections and dossiers. Only its Settings pages, and a dossier's name and description edited in place, change anything: toil's own connections and dossiers, when you ask. The worklog keeps its pages and your notes in its data folder, and writes anywhere else only when you export one. Feedback goes to Imagile only when you send it.
+Syncing through toil, read-only, with your own connections and Toil projects. Only its Settings pages, and a Toil project's name and description edited in place, change anything: toil's own connections and toilProjects, when you ask. The worklog keeps its pages and your notes in its data folder, and writes anywhere else only when you export one. Feedback goes to Imagile only when you send it.
 The cache is /home/you/.toil-ui/cache/toil-ui.db, kept 30 days after each sync; toil-ui wipe deletes it.
 
 Open this URL in your browser. It carries this launch's token, so keep it to yourself:
@@ -56,31 +56,31 @@ cookie to every port on `127.0.0.1`, so any other local server would receive the
 session. `sessionStorage` belongs to this exact origin (port included) and is never
 sent anywhere. `localStorage` would outlive the tab, so it isn't used.
 
-`toil-ui --sample` serves the sample dossiers and the scripted agent that
+`toil-ui --sample` serves the sample Toil projects and the scripted agent that
 [the site's Toil UI page](https://imagile-dev.github.io/toil/ui/) runs on, with
 nothing connected to a tracker.
 
 ## First run
 
-Until you have a dossier and it has synced once, the Dossiers view shows a short
+Until you have a Toil project and it has synced once, the Toil projects view shows a short
 checklist in place of the empty page:
 
 1. **Connect a tracker** opens Settings, Connections at the add form. If an agent following the toil skill's `setup.md` already created the connection, you only enter its secret here, on its row.
-2. **Create a dossier** opens Settings, Dossiers at Create a dossier.
+2. **Create a Toil project** opens Settings, Toil projects at Create a Toil project.
 3. **Sync** starts the first sync, as the Sync panel's Sync now does.
 
 Each step ticks itself off from toil's own state: `toil connections list` for a
 connection to Jira, Azure DevOps or GitHub (one made by env vars counts), `toil
-dossiers list` for a dossier, and the Sync panel for the sync. Beside the steps,
+projects list` for a Toil project, and the Sync panel for the sync. Beside the steps,
 **Try the sample data** shows `npx @imagile-dev/toil-ui --sample` with a Copy
-button, to restart Toil UI on the sample dossiers. The checklist goes once the first
+button, to restart Toil UI on the sample Toil projects. The checklist goes once the first
 sync finishes. Each step's (i) explains it and links to these docs.
 
 ## What it reads
 
-Each dashboard reads its dossier the way `toil dossiers show` describes it: the
+Each dashboard reads its Toil project the way `toil projects show` describes it: the
 Jira project, the Azure DevOps project and pipelines, the GitHub repositories and
-project board, and the OpenShift namespace of each environment. A dossier's GitHub
+project board, and the OpenShift namespace of each environment. A Toil project's GitHub
 repositories are the `github` section's `owner` and `repo` (one value, or one per repo
 name), plus its `repos` remotes on github.com or on the host of a repository the section names, and each is read on its own
 with `owner` and `repo` passed explicitly (`src/github-repos.ts`); a repository that
@@ -94,7 +94,7 @@ with plain values sends the calls it always did. Only GitHub's remotes are read 
 targets. A GitHub section with no `projects`
 reads each repository's own issues, open and closed, as its work items, with the
 history of every open one and the 50 most recently closed in each. Pull
-requests are read from every code host the dossier names (GitHub, Bitbucket Data
+requests are read from every code host the Toil project names (GitHub, Bitbucket Data
 Center and Cloud, Azure DevOps Server and Services) with `pr list`, then `pr get
 --include reviews,checks,commits,files` for every open one and the 20 newest closed or
 merged ones (of each GitHub repository), and mapped to OWI 0.2 changes; a GitHub repository's CODEOWNERS is read
@@ -110,58 +110,58 @@ in any view.
 
 ## Plain words
 
-Screens read in everyday words by default: a dossier is a **Toil project**, a pull request a **code review**, an agent an **AI helper**, with toil's own term in the hover. Facts, numbers, commands and errors read the same either way. **Settings, General** (and the command palette) turn it off, kept in this browser; `?words=standard` in the address does too. Themed wording and themed agent voice are off until chosen.
+Screens read in everyday words by default: a pull request is a **code review**, an agent an **AI helper**, with toil's own term in the hover. Facts, numbers, commands and errors read the same either way. **Settings, General** (and the command palette) turn it off, kept in this browser; `?words=standard` in the address does too. Themed wording and themed agent voice are off until chosen.
 
 The tabs read **Summary**, **Board**, **What blocks what** (Dependencies), **Code reviews**, **People**, **What happened** (Worklog) and **Past briefings** (Analyses); Analyze is **Get a briefing**. A panel's source reads "From Jira and GitHub", with the commands one step in. **Settings → General** has a **Plain words** switch with an (i), and the command palette has **Use plain words** / **Use toil's own terms**. Quoted titles, the tracker's words and a briefing's own sentences are never reworded.
 
-## The Dossiers view
+## The Toil projects view
 
-Toil UI opens on its dossiers, one card each, read from the same data the dashboards
+Toil UI opens on its Toil projects, one card each, read from the same data the dashboards
 read, so it asks no tracker anything: in the local app that is the cache a sync
-filled, plus `dossiers list` and `dossiers show` for the dossiers themselves.
+filled, plus `projects list` and `projects show` for the Toil projects themselves.
 
 - **What each card shows:** the current sprint with its working days left, points
   done and a small burn-up; how many items are in progress and blocked, and how many
   pull requests wait on a review; the people with work in it, as avatars; its sources
   as badges; when it was last synced; and how many work items and pull requests
   changed since this browser last opened its dashboard.
-- **Which card leads:** the dossier opened most recently in this browser, or, before
+- **Which card leads:** the Toil project opened most recently in this browser, or, before
   any was opened, the one with the most in motion (in progress, blocked and waiting on
   review together), takes two columns where they fit. On a wide screen the grid goes
   wider than the dashboards and fits more cards across; at 375px it is one column.
 - **What this browser remembers:** when each dashboard was last opened, in
   `localStorage`, never sent anywhere. Without it (a private window) the cards just
   say nothing about "since".
-- **A dossier's top row** uses the same parts: the description beside the name, the
-  sources as badges, and the sprint's day (The dossier page, below).
+- **A Toil project's top row** uses the same parts: the description beside the name, the
+  sources as badges, and the sprint's day (The Toil project page, below).
 
-### Renaming and describing a dossier
+### Renaming and describing a Toil project
 
 The name and the description have a pencil beside them, on the card and in the
-dossier's top row. It opens an inline field: Enter saves through
-`toil dossiers describe <dossier> --name <new name>` or `--description <text>`, run
+Toil project's top row. It opens an inline field: Enter saves through
+`toil projects describe <toilProject> --name <new name>` or `--description <text>`, run
 on the settings pages' path (below), so toil's own checks apply and the change is in
 its audit log as `caller: "toil-ui"`. Escape cancels, and a refusal shows toil's
-message and fix under the field. Only a dossier in your own folder can be renamed or
-described; a checked-in one is refused with the `toil dossiers import` fix.
+message and fix under the field. Only a Toil project in your own folder can be renamed or
+described; a checked-in one is refused with the `toil projects import` fix.
 
-A rename keeps everything Toil UI holds for the dossier: the server moves its cache
+A rename keeps everything Toil UI holds for the Toil project: the server moves its cache
 (responses, items, history, sources, sync runs, notes and agent runs), its assignments
 and its worklog pages to the new name once toil has renamed the file, so its
 dashboard opens straight away with no new sync. A rename waits, refused with a
-message, while a sync or an assignment of that dossier is running, since both read it
+message, while a sync or an assignment of that Toil project is running, since both read it
 by name as they go. What can't be moved is said beside toil's result, and the next
-sync reads the dossier afresh under its new name.
+sync reads the Toil project afresh under its new name.
 
-## The dossier page
+## The Toil project page
 
-A dossier opens on its **Overview**, the briefing, in a frame all of its pages share:
+A Toil project opens on its **Overview**, the briefing, in a frame all of its pages share:
 
-- **The top row:** on the Overview, a **Diagram** link (`#/dossier/<name>/job/diagram`) draws the dossier's repositories as a C4 diagram in Mermaid; the steps that need a folder on disk (`util size`, `git log`, `deps scan`) are reported unchecked. Its name, with the pencil that renames it; **Switch**, for another
-  dossier or the Dossiers view; the sprint and its day; its description, cut to one
+- **The top row:** on the Overview, a **Diagram** link (`#/project/<name>/job/diagram`) draws the Toil project's repositories as a C4 diagram in Mermaid; the steps that need a folder on disk (`util size`, `git log`, `deps scan`) are reported unchecked. Its name, with the pencil that renames it; **Switch**, for another
+  Toil project or the Toil projects view; the sprint and its day; its description, cut to one
   line with the whole of it in its tooltip, and its sources (on a phone, a **Details** button beside the name opens them); and the Ask bar, with the
   **AI helpers** button beside it (The agent, below).
-- **The tabs**, one address each: **Overview** (`#/dossier/<name>`), **Board**
+- **The tabs**, one address each: **Overview** (`#/project/<name>`), **Board**
   (`/board`, with how many of its cards need attention), **Dependencies**
   (`/dependencies`), **Pull requests** (`/prs`), **People** (`/people`), **Worklog**
   (`/worklog`) and **Analyses** (`/analyses`). The Command Center (`/command-center`)
@@ -173,18 +173,18 @@ A dossier opens on its **Overview**, the briefing, in a frame all of its pages s
   beside the Ask bar, counting what waits on you (the tracker's inbox, proposals to approve and
   questions to answer, and any assignment or proposal that failed, since a closed panel must not hide a failure). From 1200px wide it opens the panel beside every tab, and remembers
   whether you left it open (in `localStorage`); below that it opens a drawer. The palette's
-  **Open the Agents panel** does the same. It holds: the tracker's inbox, then the dossier's assignments
+  **Open the Agents panel** does the same. It holds: the tracker's inbox, then the Toil project's assignments
   in three groups (those that need you, those working, and those gone stale), with the
   finished ones under **Earlier**; then **Renew all stale**, the **Limits**, and this
-  dossier's three newest analyses, each linking to it (Assigning work to an agent, below). Each card's title is its link; how many run at once, for how long, and what the inbox is are in the heading's (i), and the tracker's raw label (`agent:refine`) is in the Start dialog.
+  Toil project's three newest analyses, each linking to it (Assigning work to an agent, below). Each card's title is its link; how many run at once, for how long, and what the inbox is are in the heading's (i), and the tracker's raw label (`agent:refine`) is in the Start dialog.
   While an item's drawer is open (`?item=<id>`, The briefing, below), it takes the
   sidebar's column from 1200px wide, and covers the view from the right below that.
-- **Analyses** lists every Analyze kept for the dossier, newest first: when it was made,
+- **Analyses** lists every Analyze kept for the Toil project, newest first: when it was made,
   the adapter and model that wrote it, its one-line recommendation, and what changed
   since the one before (items newly blocked or blocked by something new, blockers
   cleared, points moved on an item or in the sprint, items newly cited or no longer
   cited, a new recommendation). What changed is worked out by code, from a snapshot of
-  the dossier's items each analysis keeps, never by asking the agent. **Open** reads one
+  the Toil project's items each analysis keeps, never by asking the agent. **Open** reads one
   again at its own address (`/analyses/<id>`), top-down like the chat, with its
   suggested changes and what it used. The server keeps them in the cache (Sync and the
   cache, below), so they outlast a reload and a restart; with `--sample`,
@@ -192,7 +192,7 @@ A dossier opens on its **Overview**, the briefing, in a frame all of its pages s
 
 ### The briefing
 
-A dossier opens on its briefing: one column to read top to bottom, each part a step
+A Toil project opens on its briefing: one column to read top to bottom, each part a step
 further in, and each step one you choose (#494). The tab's top is the answer (#552):
 
 - **The status sentence**, the biggest text on the tab: a word with a shape (On
@@ -218,16 +218,16 @@ further in, and each step one you choose (#494). The tab's top is the answer (#5
    its day, and who wrote the briefing, stay under the answer, outside the fold: the latest Analyze, when it is
    current (made since the data was read, or the same UTC day) and answered with a
    briefing, with who wrote it, when, and a link to it; otherwise toil's briefing by
-   code (`toil dossiers brief`, `src/core/brief/`), with no agent call, which says so,
+   code (`toil projects brief`, `src/core/brief/`), with no agent call, which says so,
    and why when an older Analyze exists.
 2. **Why:** the reasons, one line each, the first open and the rest folded: Failing
    checks, Blocked, Waiting on review, Sprint at risk, Stale, Over the WIP limit, and
-   Ticket and pull request disagree, in the dossier's order. Each item is under one
+   Ticket and pull request disagree, in the Toil project's order. Each item is under one
    reason only, as a row with its key, title and assignee. Then **On track**, counted
    rather than listed.
-3. **One step in:** anything the dossier's focus left out, with why, and anything the
+3. **One step in:** anything the Toil project's focus left out, with why, and anything the
    code flagged that Analyze didn't mention, so nothing drops off the page unsaid. An
-   id Analyze named that isn't the dossier's is shown in red.
+   id Analyze named that isn't the Toil project's is shown in red.
 4. **The numbers**, folded: burn-up, throughput, cycle time, aging work in progress
    and pull request wait, each opening its full chart.
 5. **Go to:** every other view, as well as its tab.
@@ -242,15 +242,15 @@ to the view behind it.
 
 #### Tuning Analyze
 
-Each dossier tunes how Analyze briefs it, under **Settings → Dossiers**, **How
-Analyze briefs** (`#/settings/dossiers/<name>/analyze`): its goal, who it's written
+Each Toil project tunes how Analyze briefs it, under **Settings → Toil projects**, **How
+Analyze briefs** (`#/settings/projects/<name>/analyze`): its goal, who it's written
 for, its lenses in order with their thresholds, and what else to watch for or leave
 out, the lenses folded until you open them. **The prompt Analyze will send**, under
 the form, shows it as you type, composed by toil's own code, and **Save** runs
-`toil dossiers analyze set` with only what you changed, the line it runs shown under
-the form. The settings live in the dossier file, so a team that shares the dossier
-shares them; whenever a dossier tunes Analyze, the briefing names the file and
-whether it's your own, and a focus from a dossier you haven't adopted still applies.
+`toil projects analyze set` with only what you changed, the line it runs shown under
+the form. The settings live in the Toil project file, so a team that shares the Toil project
+shares them; whenever a Toil project tunes Analyze, the briefing names the file and
+whether it's your own, and a focus from a Toil project you haven't adopted still applies.
 Clearing a setting is a delete, made in a terminal. Toil UI composes the preview with
 the toil code it's built with, and Analyze asks the toil it runs on, so the two match
 when Toil UI and toil are released together.
@@ -288,7 +288,7 @@ blocks another or is blocked, on the current sprint's dates, then the dependency
   toil reads dates a link, so a block is drawn from when both items existed. An item
   whose history records no move into In progress (GitHub records only open and closed)
   is drawn in progress from when it was created. Nothing is fetched for the chart: it
-  reads the links, transitions, pull requests, builds and checks the dossier already
+  reads the links, transitions, pull requests, builds and checks the Toil project already
   synced, and the readiness gate's verdict for work not started.
 - **The table under the chart lists every bar and every arrow**, with links: each
   item's status and points, its time in progress, blocked (and by what) and with
@@ -323,19 +323,19 @@ and the item view lists them all.
 |---|---|---|
 | Blocked | Another item that isn't done blocks it (its links) | needs action now |
 | Build failing | Its pull request's latest build failed | needs action now |
-| Aging | In progress longer than 85% of the dossier's finished items took; needs at least three cycle times to compare with | needs action now |
+| Aging | In progress longer than 85% of the Toil project's finished items took; needs at least three cycle times to compare with | needs action now |
 | Deployed, still open | An environment runs it, but it isn't done | needs a look |
 | Carried over | It was in the previous sprint too | needs a look |
 | PR with no build | A pull request for it is open with no build | needs a look |
 | Stale | No update for more than 5 days | needs a look |
 | Blocking | It blocks another item | needs a look |
-| Merged, not deployed | Its pull requests are merged, but no environment runs them yet; only for a dossier that names environments | worth knowing |
+| Merged, not deployed | Its pull requests are merged, but no environment runs them yet; only for a Toil project that names environments | worth knowing |
 | No estimate | It has no estimate | worth knowing |
 | Added mid-sprint | It joined the sprint after it started | worth knowing |
 
 ## Pull requests
 
-Each dossier has a **Pull requests** tab (`#/dossier/<name>/prs`), built from OWI 0.2
+Each Toil project has a **Pull requests** tab (`#/project/<name>/prs`), built from OWI 0.2
 changes:
 
 - **Waiting now:** the open pull requests, longest wait first, each with what it
@@ -349,36 +349,36 @@ changes:
   merge (approval to merge) times, review rounds, sizes and merges per week, over six
   weeks, each split by people, agents and bots and each with its sample size and what
   couldn't be measured.
-- **Actions:** each open pull request has one **Actions** menu with **Review** (reads the pull request, its diff and checks, and drafts findings as comments you can post) and **Ship** (on a pull request a person wrote: drafts replies to its review; editing, the gate and pushing stay in your terminal). Each opens its own page, `#/dossier/<name>/job/review?target=<change id>` or `/job/ship?…`, which says what the job does and needs and has **Run**. The run goes through the Ask bar, so every write is a proposal card and the run is kept in the worklog. A job missing its code host's connection stays in the menu, dimmed, naming the connection to add. Ship stops after 3 finished rounds on one pull request; the next run is refused and says it needs a person (`needs-human`). The steps come from toil's workflow pages (`skills/toil/workflows/`).
+- **Actions:** each open pull request has one **Actions** menu with **Review** (reads the pull request, its diff and checks, and drafts findings as comments you can post) and **Ship** (on a pull request a person wrote: drafts replies to its review; editing, the gate and pushing stay in your terminal). Each opens its own page, `#/project/<name>/job/review?target=<change id>` or `/job/ship?…`, which says what the job does and needs and has **Run**. The run goes through the Ask bar, so every write is a proposal card and the run is kept in the worklog. A job missing its code host's connection stays in the menu, dimmed, naming the connection to add. Ship stops after 3 finished rounds on one pull request; the next run is refused and says it needs a person (`needs-human`). The steps come from toil's workflow pages (`skills/toil/workflows/`).
 - **Suggested reviewers:** for an open pull request with nobody asked, the CODEOWNERS
   of its paths and the earlier reviewers of the same files and folders, each as a
   proposal with the `toil … --allow-write` line to ask them.
 
-The dossier's work item keys are matched in each pull request's title, branch and
+The Toil project's work item keys are matched in each pull request's title, branch and
 description (a Jira project's `PAY-101`, Azure Boards' `AB#2302`, a GitHub
 repository's `owner/repo#41`). A code host's section may set author kinds by hand,
 `"authorKinds": { "release-bot": "BOT" }`, which win over every other signal.
 
 ## People
 
-Each dossier has a **People** tab (`#/dossier/<name>/people`), built
+Each Toil project has a **People** tab (`#/project/<name>/people`), built
 from the same OWI work items and changes as the dashboard and the pull requests view,
-and from the dossier's `people` section, which says who each person is in every
-system (`toil dossiers person`, or **Settings, Dossiers**):
+and from the Toil project's `people` section, which says who each person is in every
+system (`toil projects person`, or **Settings, Toil projects**):
 
 - **A card per person**, agents included, in name order: their work in progress by
   status with how long each item has sat in it, their open pull requests and what
   each waits on, the reviews waiting on them (oldest first), their blocked items and
   what blocks each, and what they did in the last 14 days. A link opens their items
   on the Board tab, filtered to them.
-- **A team strip:** work in progress against the dossier's `wipLimit` and who is over
+- **A team strip:** work in progress against the Toil project's `wipLimit` and who is over
   it, the review queue, and the current sprint's unassigned items.
 - **Agents:** a person with `kind: "agent"`, matched by the same signals as a pull
   request's author kind (its account, a Co-Authored-By trailer, a branch prefix) where
   the signal names it. A person's own pull request written with an agent says so.
-- **Accounts the dossier doesn't map** get cards of their own, so no work goes
+- **Accounts the Toil project doesn't map** get cards of their own, so no work goes
   missing. One that shares an email with a person, or with an account in another
-  system, is suggested as a match with the `toil dossiers person` line that applies
+  system, is suggested as a match with the `toil projects person` line that applies
   it; it is applied only when someone presses the button, and an email that fits more
   than one candidate suggests nothing and says why. Accounts that only wrote bots'
   pull requests are left out and counted.
@@ -391,20 +391,20 @@ stay team-level, in the pull requests view.
 
 Before a work item goes to an agent, Toil UI checks whether it is ready for one. The
 check uses no model and no premium request: only the item's cached OWI record, the
-dossier's other items, and at most one live read, made when you press for it
+Toil project's other items, and at most one live read, made when you press for it
 (`ui/src/model/readiness.ts`). Its verdict is **ready**, **thin** or **blocked**, with
 one row per check:
 
 | Check | Passes when | Otherwise |
 |---|---|---|
-| Acceptance criteria | The field the dossier names has them, or the description has an "Acceptance criteria", "Definition of done" or "Done when" heading with text under it, or a checklist | thin |
-| Description | At least `minWords` words (25 by default) of real text, not counting the dossier's template lines, placeholder lines (TBD, N/A, lorem ipsum) or unfilled `<slots>` | thin |
-| Done state | It isn't done, and a way to Done is known: a GitHub issue closes from any state; otherwise an item of the same type in the dossier reached Done, or the live read finds a Done state (Azure DevOps) or a move into Done (Jira) | blocked when it's already done, or the workflow has no Done state; thin when it isn't known |
-| Blockers | No open item blocks it | blocked by an open item; thin for a blocker the dossier doesn't hold |
-| Scope | It comes from one of the dossier's sources, and the dossier names a repository | blocked from outside the dossier; thin with no repository |
+| Acceptance criteria | The field the Toil project names has them, or the description has an "Acceptance criteria", "Definition of done" or "Done when" heading with text under it, or a checklist | thin |
+| Description | At least `minWords` words (25 by default) of real text, not counting the Toil project's template lines, placeholder lines (TBD, N/A, lorem ipsum) or unfilled `<slots>` | thin |
+| Done state | It isn't done, and a way to Done is known: a GitHub issue closes from any state; otherwise an item of the same type in the Toil project reached Done, or the live read finds a Done state (Azure DevOps) or a move into Done (Jira) | blocked when it's already done, or the workflow has no Done state; thin when it isn't known |
+| Blockers | No open item blocks it | blocked by an open item; thin for a blocker the Toil project doesn't hold |
+| Scope | It comes from one of the Toil project's sources, and the Toil project names a repository | blocked from outside the Toil project; thin with no repository |
 
 The verdict is blocked when any row is, thin when any row is, and ready only when every
-row passes. Each area's section in the dossier sets it up:
+row passes. Each area's section in the Toil project sets it up:
 
 ```json
 "jira": {
@@ -421,10 +421,10 @@ that names none uses `Microsoft.VSTS.Common.AcceptanceCriteria`.
   rows, each with where its answer came from. **Check the workflow live** makes the one
   live read, read-only: `jira issue transitions` for a Jira issue, `ado work-item
   states` for an Azure DevOps type. A GitHub issue needs none.
-- **The Command Center** (`#/dossier/<name>/command-center`, the Board tab's Readiness view) lists every
+- **The Command Center** (`#/project/<name>/command-center`, the Board tab's Readiness view) lists every
   work item with its verdict and, for each one that isn't ready, the rows that say why.
   It filters by verdict, status, type, assignee and source, and makes no live read.
-  It is strict: only ready items are slated, in the dossier's order, under a plan id
+  It is strict: only ready items are slated, in the Toil project's order, under a plan id
   that changes when anything in the plan does.
 - **Starting the plan comes with assign-to-agent (#293).** Until then the start button
   is disabled and says so; the plan it would start is shown above it.
@@ -432,10 +432,10 @@ that names none uses `Microsoft.VSTS.Common.AcceptanceCriteria`.
   are ready for an agent?" (The agent, below).
 ## Worklog
 
-Each dossier has a **Worklog** tab (`#/dossier/<name>/worklog`):
+Each Toil project has a **Worklog** tab (`#/project/<name>/worklog`):
 one page a day, folded by code from what the cache holds, facts only. No model writes
 a line of it. A calendar shows the days that have a page, with how many lines each
-has; a day opens as `#/dossier/<name>/worklog/<yyyy-mm-dd>`. Days and times are UTC,
+has; a day opens as `#/project/<name>/worklog/<yyyy-mm-dd>`. Days and times are UTC,
 as everywhere else in Toil UI.
 
 A page has:
@@ -478,8 +478,8 @@ page is folded again from the cache and written where its text changed, as Markd
 in the data folder:
 
 ```text
-<data folder>/cache/worklog/<dossier>/<yyyy-mm>/<yyyy-mm-dd>.md
-<data folder>/cache/worklog/<dossier>/runs/<run id>.md
+<data folder>/cache/worklog/<toilProject>/<yyyy-mm>/<yyyy-mm-dd>.md
+<data folder>/cache/worklog/<toilProject>/runs/<run id>.md
 ```
 
 The pages live under the cache's retention: a day whose rows are gone loses its page,
@@ -490,16 +490,16 @@ it came out the same as the page kept; the same cache always gives the same page
 toil's own file service: `toil util encode base64 --decode --out <file>`, run with that
 folder as its workspace, which writes a new file only and never into toil's own
 config. Publishing an exported page is a proposal: `toil confluence page create
---body-file <file> --markdown` in the dossier's Confluence space, or `toil github issue
+--body-file <file> --markdown` in the Toil project's Confluence space, or `toil github issue
 create --body-file <file>` in its repository, for you to run through toil's write gate.
 Toil UI posts nothing. With sample data, notes and export are off.
 
 ### Stand-up
 
 **Stand-up since the last working day**, on the Worklog
-(`#/dossier/<name>/worklog/standup`), reshapes the worklog for a meeting: since the last
+(`#/project/<name>/worklog/standup`), reshapes the worklog for a meeting: since the last
 working day through today (Friday through Monday on a Monday), or any range of up to 31
-days you pick (`#/dossier/<name>/worklog/standup/<from>/<to>`, or `/<day>` for one), and each day's page has a
+days you pick (`#/project/<name>/worklog/standup/<from>/<to>`, or `/<day>` for one), and each day's page has a
 **Stand-up for this day**. It is a fold of those days' pages by code, with no model, so the
 same days always give the same report.
 
@@ -511,9 +511,9 @@ same days always give the same report.
   failed build of their pull request, a pull request of theirs waiting on review for 2
   working days or more) and **Next** (current-sprint items assigned to them and not
   started). A line belongs to whoever the fact names: who moved the item, who wrote or
-  reviewed the pull request. A pull request a dossier agent wrote goes under the agent.
-- **People** come from the dossier's `people`, so one person's Jira, Azure DevOps and
-  GitHub accounts land under one name. An account the dossier doesn't map gets its own
+  reviewed the pull request. A pull request a Toil project agent wrote goes under the agent.
+- **People** come from the Toil project's `people`, so one person's Jira, Azure DevOps and
+  GitHub accounts land under one name. An account the Toil project doesn't map gets its own
   card, named with its area and id; the People view suggests where it belongs.
 - **What the worklog can't vouch for** in the range is said at the top. Review waits, the
   sprint and Next aren't on any worklog page, so they are as of the latest sync, and the
@@ -522,7 +522,7 @@ same days always give the same report.
 
 It copies as **Markdown** (for Slack, Teams or a wiki) or **plain text**, line for line as
 shown. **Export** writes the Markdown through toil's file service, as a page's export does,
-to `standup-<dossier>-<from>-to-<to>.md`, and publishing it to Confluence or GitHub is a
+to `standup-<toilProject>-<from>-to-<to>.md`, and publishing it to Confluence or GitHub is a
 proposal for you to run.
 
 **Write it up** is optional: it asks the agent for a short narrative of the same report,
@@ -533,7 +533,7 @@ usage counts like any chat's.
 
 ## Toil's configuration
 
-The Settings pages manage what `toil connections` and `toil dossiers` manage, by
+The Settings pages manage what `toil connections` and `toil projects` manage, by
 running those commands through `@imagile-dev/toil/api`, never by editing a file:
 
 - **Connections:** list, add, test, set the default, turn writes on or off,
@@ -548,9 +548,9 @@ running those commands through `@imagile-dev/toil/api`, never by editing a file:
   Turning writes on asks you to type the connection's name, as the CLI does. A
   connection made by `TOIL_*` env vars alone is shown read-only, with where it
   came from.
-- **Dossiers:** create one, add a repository, link an area, name a field, and
-  show and check any of them. A dossier's name and description are edited in place
-  on its card and dashboard, through `toil dossiers describe`. A link to a connection with writes on is refused
+- **Toil projects:** create one, add a repository, link an area, name a field, and
+  show and check any of them. A Toil project's name and description are edited in place
+  on its card and dashboard, through `toil projects describe`. A link to a connection with writes on is refused
   here, as over MCP: make it on the CLI.
 - **Bounds and time limit:** toil has no command for these, so they are shown
   read-only, with the file or env var that sets them.
@@ -572,7 +572,7 @@ newer than 0.1.0-alpha.2; with that one, use the CLI.
 An **(i)** beside a term explains it in a sentence or two when you hover or focus
 it, and pressing it opens the same words with a **Read more** link to the section
 of these docs that says the rest. A **pencil** beside a configurable value (a
-connection, a dossier's sources, people, field names or work-in-progress limit,
+connection, a Toil project's sources, people, field names or work-in-progress limit,
 the agent, a usage cap) opens the settings page where it's set, at that value; it
 only navigates. **Help** in the header is a menu with the docs for the view you're on
 and **What's new** (below).
@@ -597,12 +597,12 @@ views follow.
 
 Every empty panel offers the one action that fills it, under one short line, with any
 explanation in its (i): **Link a pipeline** and **Add an environment** (pencils to
-Dossier setup at the dossier's sources) on the Board tab's builds and deployments, **Add
+Toil project setup at the Toil project's sources) on the Board tab's builds and deployments, **Add
 a repository** for pull requests, **Add a person** on the People tab, **Analyze now**
 for an empty Analyses tab, **Show every item** for a Command Center filter that hides
 everything, and **Sync now** in the local app wherever only a newer read of the tracker
 fills the panel (the sprint, the burn-up, links between items). The site preview can't
-sync, so it offers Dossier setup there instead. A test fails on any empty panel with
+sync, so it offers Toil project setup there instead. A test fails on any empty panel with
 neither an action nor a link.
 
 ### What's new
@@ -623,23 +623,23 @@ screen it's **Search and commands** in the header's Menu. Type to narrow it down
 use the arrow keys to move, **Enter** to open and **Escape** to close. It's hidden
 until you call it up.
 
-- **Jump** to a dossier, any of a dossier's tabs (Overview, Board, Dependencies,
+- **Jump** to a Toil project, any of a Toil project's tabs (Overview, Board, Dependencies,
   Pull requests, People, Worklog, Analyses), a saved analysis, a settings page, or a
   theme.
-- **Run** Sync now (where Toil UI keeps a cache), **Use plain words** / **Use toil's own terms**, and on a dossier's page Ask (it
-  focuses the Ask bar), Analyze, **Review a pull request**, **Ship: answer a review** and **Diagram <dossier>** (each opens its job's page), **Open the Agents panel** (**Open the AI helpers panel** in plain words), the agent that answers this chat, and Assign the
+- **Run** Sync now (where Toil UI keeps a cache), **Use plain words** / **Use toil's own terms**, and on a Toil project's page Ask (it
+  focuses the Ask bar), Analyze, **Review a pull request**, **Ship: answer a review** and **Diagram <Toil project>** (each opens its job's page), **Open the Agents panel** (**Open the AI helpers panel** in plain words), the agent that answers this chat, and Assign the
   item you were on to an agent: the board card that had focus, or the item whose
   page is open.
 - Matching is fuzzy and ignores case: `pay12` finds `PAY-12`, and each word you
   type has to appear, in order. Results are grouped by kind, and the group with the
   best match comes first.
 
-### Search across dossiers
+### Search across Toil projects
 
-With something typed, the palette searches the items of every dossier, by key and
-title. Each result shows its dossier and status and opens the item. It reads only
-what the last sync stored, never the tracker: opening it reads each dossier from
-the cache the way its dashboard does. A result from a dossier last synced more than
+With something typed, the palette searches the items of every Toil project, by key and
+title. Each result shows its Toil project and status and opens the item. It reads only
+what the last sync stored, never the tracker: opening it reads each Toil project from
+the cache the way its dashboard does. A result from a Toil project last synced more than
 a day ago, or whose last sync failed, says how old its copy is.
 
 ### Keyboard shortcuts
@@ -664,7 +664,7 @@ request: the kind, a title, the details and your email. It sends through
   first. Send works only while the box is ticked, and any edit clears it, so you
   agree to the report on screen and no other.
 - **Only what you typed.** toil adds its version and commit, nothing else: no
-  dossier, connection, host or cached data.
+  Toil project, connection, host or cached data.
 - **The same lock as Settings.** `api/feedback` needs the session, the page's
   Origin and the CSRF token, takes the four fields and nothing else, and runs
   `toil feedback` and no other command. Your tick becomes the yes to the command's
@@ -676,7 +676,7 @@ request: the kind, a title, the details and your email. It sends through
 
 The dashboards read from a local cache, which a sync fills. Press **Sync now** in
 the Sync panel at the foot of the page. The sync makes the same toil calls the
-dashboards make, for every dossier, and stores the answers. The work items go
+dashboards make, for every Toil project, and stores the answers. The work items go
 through toil's Open Work Item mapping, with their status changes and the pull
 requests, builds and deployments that name them.
 
@@ -689,27 +689,27 @@ requests, builds and deployments that name them.
   Once a day, the Jira and Azure DevOps searches are also sent whole (ids only
   where toil can), and an item they no longer list is dropped; if that listing
   fails, the changes are kept and the next sync tries it again. Per-item calls
-  (histories, pull request gets) run 4 at a time across a dossier.
+  (histories, pull request gets) run 4 at a time across a Toil project.
   Azure DevOps histories come from the project's revisions feed, read from the
   watermark; an item is read on its own when the feed doesn't hold all of it.
 - **Every page.** Each call follows `meta.page.nextCursor` to the end, up to 200
   pages, and fails that source, saying so, rather than keep part of a listing.
-- **Each source on its own.** Each area a dossier reads (Jira, Bitbucket, Jenkins,
+- **Each source on its own.** Each area a Toil project reads (Jira, Bitbucket, Jenkins,
   OpenShift and so on) is a source with its own state. A source that fails shows
   toil's message and fix in the Sync panel, and keeps its last good data, marked
-  stale. The other sources and dossiers aren't touched. The next sync asks it
+  stale. The other sources and Toil projects aren't touched. The next sync asks it
   for everything since its last good sync, so nothing is missed.
 - **When.** The line under the header says when the data was synced. The panel
-  says when each dossier was synced, and shows a running sync's progress
+  says when each Toil project was synced, and shows a running sync's progress
   (requests, pages and retries, from toil's own progress events).
 - **Where.** The cache is one SQLite file, `cache/toil-ui.db` in the data folder,
   through Node's built-in `node:sqlite`, so there's no native module. While Toil
   UI runs, its write-ahead log (`toil-ui.db-wal` and `toil-ui.db-shm`) sits beside
   it, and closing folds the log back into the file. It holds
   ticket content, so it stays on this machine and is readable by your account
-  only. The analyses (#395) are kept in the same file, the newest 100 per dossier,
+  only. The analyses (#395) are kept in the same file, the newest 100 per Toil project,
   and a sync never rewrites them.
-- **For how long.** A dossier's synced data (responses, items,
+- **For how long.** A Toil project's synced data (responses, items,
   transitions, change refs, worklog facts and each source's state) expires together, once the
   last sync that saved data for it is older than the retention period (30 days by default),
   at start and after each sync. A sync that fails doesn't keep old data alive. Worklog facts that no
@@ -717,7 +717,7 @@ requests, builds and deployments that name them.
   goes when it is that old itself. The retention period
   also sets how far back closed Jira and Azure DevOps items are read, with a
   floor of 6 weeks (see What it reads). An analysis goes once
-  it is older than the retention period, and with its dossier when toil no longer
+  it is older than the retention period, and with its Toil project when toil no longer
   has it.
 - **Wiping it.** **Wipe the cache** in the Sync panel deletes it after asking
   first. `toil-ui wipe` does the same from a terminal, once `toil-ui` has
@@ -729,7 +729,7 @@ requests, builds and deployments that name them.
   exist. So is an item closed longer ago than the read window. A GitHub issue
   stays until the retention period ends or you wipe the cache.
 
-The page can run only the reads the dashboards make: `dossiers list` and `dossiers
+The page can run only the reads the dashboards make: `projects list` and `Toil projects
 show`, and each area's search, history, pull request, build and deployment reads.
 Any other command is refused before it reaches toil, and a change to a tracker is
 never made from the page. The worklog's own calls are made by the server, never named
@@ -738,10 +738,10 @@ by the page: `toil audit list`, read-only, to see whether a proposal was applied
 
 ## The agent
 
-Every dossier page has an **Ask bar** in its top row: one line. Pressing into it opens the **focused view**: the conversation takes the
-screen and the page steps back, with a slim strip that keeps the dossier, its sprint
+Every Toil project page has an **Ask bar** in its top row: one line. Pressing into it opens the **focused view**: the conversation takes the
+screen and the page steps back, with a slim strip that keeps the Toil project, its sprint
 and the agent answering in sight. **Escape** or **Close** puts it away; the
-conversation stays, for the rest of the dossier's pages, until you reload.
+conversation stays, for the rest of the Toil project's pages, until you reload.
 
 - **The guided start** (#552) is what the chat shows before the first question:
   "What would you like to know about {name}?", then nine plain questions in four groups
@@ -773,26 +773,26 @@ conversation stays, for the rest of the dossier's pages, until you reload.
 - **The wording follows the theme** when themed wording is on and plain words are off: the bar's placeholder, the welcome and the status
   words are in each game theme's voice, and Plain stays neutral. With plain words on (the default), they read in plain words. The starter questions
   read the same in every theme.
-- **Analyze** briefs the dossier in one press (#494). It is the guided start's first
+- **Analyze** briefs the Toil project in one press (#494). It is the guided start's first
   question, "Give me the full briefing", and still the command palette's Get a briefing and the
   Analyses tab's button; the Ask bar has no button of its own for it. Its question comes from toil,
-  `toil dossiers analyze prompt <dossier> --host toil-ui`: the standard method with
-  the dossier's own lenses and focus (Tuning Analyze, above). It answers with a
+  `toil projects analyze prompt <toilProject> --host toil-ui`: the standard method with
+  the Toil project's own lenses and focus (Tuning Analyze, above). It answers with a
   briefing block, which the server lifts out of the answer and checks, every id in it
   against what the agent's tools read: a recommendation, then the reasons, each item
   with why it's there and the next step, then what changed, and anything the
-  dossier's focus left out. The briefing, the item drawer, the chat and the analysis
+  Toil project's focus left out. The briefing, the item drawer, the chat and the analysis
   page all lay it out, with the rest of the answer as **Evidence**, folded until you
   open it. An answer with no briefing block is shown as it came, and says so. With a
-  toil that has no `dossiers analyze prompt`, Analyze asks Toil UI's own question
+  toil that has no `projects analyze prompt`, Analyze asks Toil UI's own question
   instead, and the answer warns that it did. Each whole Analyze is kept in the
-  dossier's **Analyses** tab, and the answer links to it.
+  Toil project's **Analyses** tab, and the answer links to it.
 - **Citations are links in the text**: in every answer, each `[[id]]` is an ordinary link
   (a short source name such as ADO or GH, the item's key and a cut title) to its page (a
   pull request to its host). Hovering or focusing one shows the whole title, its source and
   status, type, assignee, estimate, sprint and last update; the status is also in the
   link's name for a screen reader. An id the
-  dossier doesn't hold stays the bare id, marked, and the server's check above the
+  Toil project doesn't hold stays the bare id, marked, and the server's check above the
   answer still names any id its tools never returned.
 - **Each question carries the chat so far**: its last 8 questions and answers, each
   answer cut to 1,500 characters. An item an earlier answer named is still checked
@@ -802,17 +802,17 @@ conversation stays, for the rest of the dossier's pages, until you reload.
   from its next question, which carries the conversation so far; the default stays in
   Settings. An adapter that can't answer is listed with the reason and **Install** or
   **Fix**, never left out. Each answer names the adapter and model that wrote it.
-- **The chat remembers its agent for each dossier** (#494). A whole answer, Analyze or an
-  ordinary question, records the agent it was asked of, in `<data folder>/dossier-agents.json` (an adapter name per
-  dossier name, Toil UI's own state, never in the dossier file). The next time the chat
-  opens on that dossier it starts on that agent if it can still answer, else on the
+- **The chat remembers its agent for each Toil project** (#494). A whole answer, Analyze or an
+  ordinary question, records the agent it was asked of, in `<data folder>/toil-project-agents.json` (an adapter name per
+  Toil project name, Toil UI's own state, never in the Toil project file). The next time the chat
+  opens on that Toil project it starts on that agent if it can still answer, else on the
   default from Settings, Agent (Claude, GitHub Copilot or Codex), else the first agent
   that is ready, else as before, with the server trying the default and saying why it
-  can't. A few words beside **Answered by** say which: "last used on this dossier",
+  can't. A few words beside **Answered by** say which: "last used on this Toil project",
   "your default", "your default can't run", "the first one ready" or
   "picked for this chat". Picking another agent and asking updates the memory; a question that names no
-  agent, or an answer that fails, is stopped or comes back empty, doesn't. Renaming a dossier moves its
-  memory, and a dossier toil no longer has is forgotten on the next full sync. The sample
+  agent, or an answer that fails, is stopped or comes back empty, doesn't. Renaming a Toil project moves its
+  memory, and a Toil project toil no longer has is forgotten on the next full sync. The sample
   remembers nothing.
 
 The chat answers with the agent your organization already approved, on the
@@ -885,12 +885,12 @@ for (docs/decisions/343-ask-up-front.md).
   `TOIL_*` variables, `GITHUB_TOKEN` and CI tokens never reach it. Not found is a plain
   error naming the CLI and the fix. On Windows a `.cmd` shim can't be started by the
   SDKs, so point at the `.exe` (Copilot's npm shim is the exception, above).
-- **Read-only tools, one dossier.** The agent gets `owi_query`, `owi_get`,
+- **Read-only tools, one Toil project.** The agent gets `owi_query`, `owi_get`,
   `owi_similar` (likely duplicates, scored as `toil util owi similar` scores them)
   and `owi_history` over the cache, `pr_query`, `pr_get` and `pr_metrics` over its
   pull requests (what each waits on, its flags, and flow figures by author kind with
   their sample sizes), `people_list` and `person_get` (each person's plate as the
-  People view works it out, with the dossier read live through `dossiers show`, and
+  People view works it out, with the Toil project read live through `projects show`, and
   told it describes load, never performance), `readiness_list` and
   `readiness_get` (each item's readiness verdict and its rows, as the Command Center
   works them out), `proposal_fields` (a write command's input fields,
@@ -898,7 +898,7 @@ for (docs/decisions/343-ask-up-front.md).
   with what it can't vouch for), `standup_report` (a range of days as the Stand-up folds
   them, each line numbered), `proposal_fields` (a write command's input fields,
   from toil's registry), and `toil mcp`'s read tools for live lookups, called through
-  toil's `execute()` with `readOnly: true`. The dossier is fixed to the one on screen.
+  toil's `execute()` with `readOnly: true`. The Toil project is fixed to the one on screen.
   There is no write tool, and each SDK's own tools (shell, files, web, plugins, other
   MCP servers) are switched off.
 - **Citations are checked.** Every answer cites the work items and pull requests it
@@ -945,10 +945,10 @@ which answers its starter questions, Analyze and the workflow jobs from the samp
 
 When you ask the chat for work that names no ticket (not a question, which ends in `?` or
 opens with what, why, how and the like, and no key such as `PAY-12` or `#42`), a **Not ticketed yet** banner lists up to three of the
-dossier's open items likeliest to cover it, scored as `toil util owi similar` scores
+Toil project's open items likeliest to cover it, scored as `toil util owi similar` scores
 them, each with why. Attach the work to one by naming its key in your branch and
 commits, which writes nothing, or press **Ticket this** for proposals: a sub-task
-under each match, and a new ticket on the dossier's tracker. They are proposal cards
+under each match, and a new ticket on the Toil project's tracker. They are proposal cards
 like the chat's others, with the command line to run through toil's write gate, and
 nothing is created until you run one. With no match, it says there is no likely
 ticket and offers only a new one. It asks once per chat, and **Not now** hides it.
@@ -972,13 +972,13 @@ called):
   the last answer's context got, where the SDK says (Claude and Copilot; Codex's SDK
   doesn't). On a phone the chat's header is one line, "Answered by … · Change".
 - **Settings, Agent usage** (beside Usage, which counts toil's own commands): the last
-  30 days by day, adapter, model and dossier, the chats that used the most, and an
+  30 days by day, adapter, model and Toil project, the chats that used the most, and an
   **Export as CSV** download made in the page.
 - **One adding-up rule**, `addUp` in `src/model-usage.ts`, read by the server's caps,
   the footer, the heading and Settings: reports with one id are one report, merged to
   the highest of each figure (a running total), and different ids are summed.
 - **The ledger** is the cache's `usage` table, apart from everything a sync writes: a
-  sync's cleanup or a dossier leaving never lowers a total. It follows the cache's
+  sync's cleanup or a Toil project leaving never lowers a total. It follows the cache's
   retention, `toil-ui wipe` clears it, and it is never sent anywhere.
 
 **Caps** are optional and off until you turn one on, under Settings, Agent usage: a
@@ -1004,29 +1004,29 @@ you apply it.
 |---|---|---|
 | **Refine** | Checks for duplicates, drafts acceptance criteria, suggests an estimate, splits the item into children where it is too big, and asks its open questions | Nothing: every change is a proposal |
 | **Investigate** | Reads the item, its parent, children, links, likely duplicates, pull requests and toil's live reads, and writes a report that cites each source | Nothing: the report is kept with the assignment, and posting it as a comment is a proposal |
-| **Implement** | Works in a copy of the dossier repository's git folder that Toil UI makes in a folder of its own, fills it from the last commit, makes the branch `agent/<key>`, changes and tests the code, and stages the change | Only that clone, with no network. Committing, pushing and opening a pull request are proposals |
+| **Implement** | Works in a copy of the Toil project repository's git folder that Toil UI makes in a folder of its own, fills it from the last commit, makes the branch `agent/<key>`, changes and tests the code, and stages the change | Only that clone, with no network. Committing, pushing and opening a pull request are proposals |
 
 - **Refine and investigate** get the same read-only tools as the chat (`owi_*`, `pr_*`,
   `proposal_fields` and toil's live reads), with no shell and no file writes.
 - **Implement runs on Codex only, for now.** Codex's own sandbox, `workspace-write`,
   holds the agent's commands and writes to the clone, with no network and none of the
   temp folders Codex adds by default, on Windows (its `unelevated` restricted-token sandbox), macOS and Linux. The clone is
-  `<data folder>/cache/work/<assignment>/repo`, so `toil-ui wipe` deletes it; before any git runs there outside the sandbox, Toil UI rewrites its git config and removes its hooks. The dossier's
-  repository needs a local path (`toil dossiers add-repo <dossier> <folder>`). The agent stages its change and never commits, pushes or fetches; the
+  `<data folder>/cache/work/<assignment>/repo`, so `toil-ui wipe` deletes it; before any git runs there outside the sandbox, Toil UI rewrites its git config and removes its hooks. The Toil project's
+  repository needs a local path (`toil projects add-repo <toilProject> <folder>`). The agent stages its change and never commits, pushes or fetches; the
   staged diff is shown through toil's own `git status` and `git diff`, and the commit
   and push are a proposal of the exact git lines to run, since toil has no command
   that pushes.
 - **States**: `queued` (waiting for a free slot, or for a person to press Start),
   `working`, `needs you` (proposals or questions to review, or an item the agent
   thought was trying to instruct it), `done` and `failed`. The **Agents** sidebar beside
-  every dossier tab shows each assignment's state, mode, adapter, run time and what it
+  every Toil project tab shows each assignment's state, mode, adapter, run time and what it
   used, and the People view shows each agent's assignments.
 - **From the Command Center**, "Start every ready item" assigns each slated item in
   implement mode, in order, on Codex (or the adapter chosen in Settings, when it can
-  implement), in the dossier's one repository with a local path, and says what it
+  implement), in the Toil project's one repository with a local path, and says what it
   queued or why it started nothing.
 - **The tracker only queues.** An item labelled `agent:refine`, `agent:investigate` or
-  `agent:implement`, or assigned to one of the dossier's agents (its `people` with
+  `agent:implement`, or assigned to one of the Toil project's agents (its `people` with
   `kind: agent`, which queues a refine), appears in the **Agent inbox** on the next
   read. It runs only when a person presses Start.
 - **Applying a proposal** runs its toil command, the one the server stored when the
@@ -1043,7 +1043,7 @@ you apply it.
 - **The transcript** keeps the prompts, every tool call, the agent's text, the
   commands and file changes Codex reports, and each proposal and what came of it.
   Each assignment also records what it started on: the toil and Toil UI versions, the
-  adapter and model, the tools, and SHA-256 fingerprints of the dossier, the item and
+  adapter and model, the tools, and SHA-256 fingerprints of the Toil project, the item and
   the prompt, and the install fingerprint a later look holds it to (Stale sessions, below). Assignments are kept under the cache, in
   `<data folder>/cache/assignments/`, so a wipe deletes them.
 - **For programs on the same server**, `api/assignments` lists, assigns, starts,
@@ -1053,7 +1053,7 @@ you apply it.
 ## Stale sessions
 
 An agent works from the instructions it got when it started. Upgrade toil, edit the
-dossier or change your instructions under **Settings, Agent**, and the chats and
+Toil project or change your instructions under **Settings, Agent**, and the chats and
 assignments already going are still on the old ones. Toil UI records what each one
 started on, says which have gone stale and why, and renews them on request.
 
@@ -1061,7 +1061,7 @@ started on, says which have gone stale and why, and renews them on request.
   run starts, keeps an install fingerprint: toil's and Toil UI's version and commit,
   one SHA-256 per toil area of the tools the agent was handed (Toil UI loads no skill
   page, so those tools are the toil instructions its agent reads), SHA-256 of the
-  dossier as `toil dossiers show` reads it, and SHA-256 of the prompts (the system
+  Toil project as `toil projects show` reads it, and SHA-256 of the prompts (the system
   prompt, the starters or the mode's task, and your own instructions and voice). The
   theme on screen isn't part of it. An assignment recorded before this has none, and
   is never called stale.
@@ -1069,7 +1069,7 @@ started on, says which have gone stale and why, and renews them on request.
   assignment page compares what the session started on with the current fingerprint,
   whose builds are the ones on disk, read again only when their files change. The
   reason names what moved: "started on toil 0.1.0-alpha.3 · now alpha.4 · skills
-  changed: github · dossier changed". A session's earlier turns aren't marked; only
+  changed: github · Toil project changed". A session's earlier turns aren't marked; only
   the instructions it started on are.
 - **Where it shows.** A **Stale** badge with the reason on the chat (in the Ask bar and
   the focused view), on each assignment in the Agents sidebar and on its page, and on the
@@ -1082,7 +1082,7 @@ started on, says which have gone stale and why, and renews them on request.
   stays readable, marked as renewed. Renew never interrupts a turn: a chat that is
   answering and a working assignment wait, and an assignment that needs you is
   skipped until you've reviewed it.
-- **Renew all stale**, in the Agents sidebar, lists every stale session of the dossier
+- **Renew all stale**, in the Agents sidebar, lists every stale session of the Toil project
   first, the chat included, each saying whether it renews or why it's skipped, and
   renews the rest with one press.
 - **The server itself.** When toil or Toil UI on disk is newer than the running
@@ -1116,15 +1116,15 @@ call, its progress, or a state that didn't change never notifies.
   the views.
 - **Where it listens.** The server's `api/assignments/events?since=latest` stream,
   which carries what a notice says with each event, and a minute's read of the
-  dossier on screen for sessions gone stale.
+  Toil project on screen for sessions gone stale.
 
 ### Notification history
 
 The **bell** in the header (beside **Menu** on a narrow screen) counts the unread and
 opens the last 50 things worth telling you, newest first: each change a notice carried
 (needs you, done, failed, stopped at a usage cap, gone stale), each sync's result, from
-the Sync panel, with the dossier that failed, and when each happened. Every entry links
-to what it's about: the assignment, the dossier, or the Dossiers view. **Mark all read**
+the Sync panel, with the Toil project that failed, and when each happened. Every entry links
+to what it's about: the assignment, the Toil project, or the Toil projects view. **Mark all read**
 clears the count and keeps the entries. The bell keeps a change that quiet hours held
 back, and one whose notice you dismissed; which changes reach it is the notification
 settings' choice. It's kept in this browser's `localStorage`, shared by its tabs (with one
@@ -1157,7 +1157,7 @@ reduced-motion setting, which stops everything).
 
 Crate, Harvest, Starship, Realm, Sprawl, Frontier and Overworld also have **theme moments**: a launch splash while the first read
 runs, their own loading screens with the real progress and a rotating line of their own,
-an entrance as a dossier opens, a transition between its tabs, and a short moment when a
+an entrance as a Toil project opens, a transition between its tabs, and a short moment when a
 sync brings an item done, a build passed or failed, a blocker cleared, a pull request
 merged, or a sprint's end. **Theme motion**, under Settings, General, plays them in full,
 subtly or not at all, and is off whenever reduced motion is asked for. Every loading
@@ -1210,22 +1210,22 @@ GitHub CLI signed in (`gh auth login`), or `TOIL_GITHUB_TOKEN` set in the shell.
 - **The token** comes from `gh auth token` each time it starts and goes only into
   Toil UI's environment, as `TOIL_GITHUB_TOKEN`. It's never written to a file or
   printed. `GITHUB_TOKEN` and other `TOIL_*` variables in your shell are left out.
-- **The dossiers**, made with `toil dossiers init` and `link` and checked with
-  `toil dossiers check`: one for `--repo`, and `toil-self` for the public
+- **The Toil projects**, made with `toil projects init` and `link` and checked with
+  `toil projects check`: one for `--repo`, and `toil-self` for the public
   `imagile-dev/toil` unless `--no-self`. `--repo` defaults to
   `imagile-dev/toil-sandbox` (as `sandbox`), which is private to Imagile's
   maintainers; anyone else passes their own repository, or seeds a sandbox of their
   own (below).
 - **toil from this checkout.** Each start builds toil from the clone into
   `.scratch/toil` (`npm run build` with `TOIL_BUILD_DIR`, a few seconds), and both the
-  dossier setup and Toil UI run on that build, not on the published toil
+  Toil project setup and Toil UI run on that build, not on the published toil
   `ui/package.json` pins. Toil UI is started with `node --import
   ui/scripts/local-toil-hook.mjs`, which resolves `@imagile-dev/toil/api` to
   `.scratch/toil/api.js` and says so on stderr. So a command `ui/` calls before its
   release works here. The committed `dist/` and `node_modules` are left alone, and a
   plain `node ui/dist/server/toil-ui.js` still runs on the pinned toil.
 - **Then** it starts `ui/dist/server/toil-ui.js` on loopback and prints its URL.
-  Press **Sync now**, then open a dossier. `--port <n>` fixes the port, and
+  Press **Sync now**, then open a Toil project. `--port <n>` fixes the port, and
   `--home <dir>` uses another folder.
 - **Ask with Codex.** Install the SDK in the clone without saving it
   (`npm install --no-save --ignore-scripts @openai/codex-sdk@0.160.0`), then choose
@@ -1254,7 +1254,7 @@ GitHub CLI signed in (`gh auth login`), or `TOIL_GITHUB_TOKEN` set in the shell.
   or set a token from `claude setup-token`, and start the script again.
 
 To run the same build against your own `~/.toil` instead (your connections and
-dossiers as they are, changed only by what you save in Settings, with Toil UI's own
+Toil projects as they are, changed only by what you save in Settings, with Toil UI's own
 data in `.scratch/toil-ui`), run `node ui/scripts/dev-mine.mjs`.
 That's the way to try unreleased changes on real work (`skills/toil/install.md`,
 Trying unreleased changes).
@@ -1281,18 +1281,18 @@ npm run verify:ui -- --no-build --starter standup
   is what the published package runs on.
 - **Sample data:** `toil-ui --sample` in a throwaway home, every view through the
   layout check (`scripts/layout-check.mjs`) in every theme and scheme at 375, 768 and
-  1440px. On each dossier's dashboard it also drags a board card to the next column
+  1440px. On each Toil project's dashboard it also drags a board card to the next column
   with real input, a mouse and at 375px a finger, and fails when the card doesn't
   follow the pointer or the dropped move doesn't show in the target column. It needs
   only a browser, so it runs anywhere, CI included.
-- **First run:** `toil-ui` on an empty home, with no connections, no dossiers and no
-  `TOIL_*` variable from your shell, through the same check: its Dossiers view must
+- **First run:** `toil-ui` on an empty home, with no connections, no Toil projects and no
+  `TOIL_*` variable from your shell, through the same check: its Toil projects view must
   show the three-step checklist, and the palette and the shortcuts sheet open over it.
 - **Real data:** the home `dev-real.mjs` sets up, made fresh at
   `.scratch/verify/home`, on `imagile-dev/toil-sandbox` with the token from `gh auth
-  token` in Toil UI's environment only. It syncs the `sandbox` dossier and runs the
-  same check over the home page, the dossier and its Board and Dependencies tabs, its worklog and stand-up, one of its items and the settings pages,
-  except that its header may fold into the Menu at 1440px, since a real dossier's name
+  token` in Toil UI's environment only. It syncs the `sandbox` Toil project and runs the
+  same check over the home page, the Toil project and its Board and Dependencies tabs, its worklog and stand-up, one of its items and the settings pages,
+  except that its header may fold into the Menu at 1440px, since a real Toil project's name
   and links can genuinely fill the row, and its Usage page's failed-command lines are
   opened on the sample only, since real data may have none.
   Without a GitHub sign-in it skips this part and says so; nothing else depends on it.
@@ -1302,7 +1302,7 @@ npm run verify:ui -- --no-build --starter standup
   run), and that `codex mcp list` in Toil UI's Codex home shows only `toil_ui`. Then it
   asks Analyze as the chat's second question, and checks the history of analyses
   (#395): that Analyze was kept with its briefing (a recommendation, and its first
-  three reasons as the history's issues); then it changes the dossier's WIP limit in the scratch home (`toil dossiers
+  three reasons as the history's issues); then it changes the Toil project's WIP limit in the scratch home (`toil projects
   wip-limit --replace`), asks Analyze again, checks the history lists both, newest
   first, the second compared with the first, and puts the Overview, the Analyses tab
   and the second analysis opened through the layout check, shot. It needs the Codex CLI signed in and the
@@ -1317,7 +1317,7 @@ npm run verify:ui -- --no-build --starter standup
 - **It stops** every server and browser it started, and exits 1 on any problem.
 
 `--source ado` runs the real-data part against an Azure DevOps Services board
-instead (the `ado-board` dossier, as `dev-real.mjs --source ado` makes it below),
+instead (the `ado-board` Toil project, as `dev-real.mjs --source ado` makes it below),
 with `TOIL_ADO_BASE_URL`, `TOIL_ADO_PAT` and `--project <name>` (else
 `TOIL_ADO_PROJECT`); without them it skips that part and says why. Each source is
 one entry in `SOURCES` in `scripts/verify.mjs`. Set `CHROME_PATH` if the browser it finds doesn't draw headless; Playwright's
@@ -1350,7 +1350,7 @@ toil's `github` area doesn't read.
 ### An Azure DevOps Services board
 
 `--source ado` runs the same way against an Azure DevOps Services project, through
-toil's `ado` area on a Services connection, with a dossier named `ado-board`:
+toil's `ado` area on a Services connection, with a Toil project named `ado-board`:
 
 ```bash
 node ui/scripts/dev-real.mjs --source ado --project "<project>"
@@ -1361,7 +1361,7 @@ It needs `TOIL_ADO_BASE_URL` (`https://dev.azure.com/<organization>`) and
 shell. They go into Toil UI's environment only: toil makes its `ado` (deployment cloud)
 connection from them, with writes off, and nothing about the organization is
 written to the config file. `--project`, or `TOIL_ADO_PROJECT`, names the
-project; the dossier in the scratch home holds it. The dossier names no repository,
+project; the Toil project in the scratch home holds it. The Toil project names no repository,
 so no pull requests are read; add `repo` to its `ado` section for them.
 
 To fill a board with made-up work, `ui/scripts/ado-seed/` seeds one from Open Work
@@ -1434,7 +1434,7 @@ npm run screens:sheet -w ui -- --theme realm --width 768 --motion full
   `ui/.moments/sheets/<theme>-<width>-<motion>.png`, ready to attach to the PR, with its
   frames and an HTML copy in a folder beside it. A sheet shows the splash arriving, held and
   handing over; the loading screen as its loops turn; each event moment the theme declares
-  coming in, held and going out, cropped to the card; the dossier entrance; and a change of
+  coming in, held and going out, cropped to the card; the Toil project entrance; and a change of
   tab. Every frame is a still: the engine's animations are caught paused as they start and
   stepped by hand, so a sheet is the same on every run. `--width` and `--motion` repeat, and
   replace the defaults.

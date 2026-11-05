@@ -241,14 +241,14 @@ describe('env names', () => {
     });
   });
 
-  it('reserve every TOIL_DOSSIER* name, even if an area called dossier is registered', () => {
-    expect(parseEnvName('TOIL_DOSSIER_PATHS', ['dossier', 'jira'])).toBeUndefined();
-    expect(parseEnvName('TOIL_DOSSIER', ['dossier'])).toBeUndefined();
+  it('reserve every TOIL_PROJECT* name, even if an area called toil project is registered', () => {
+    expect(parseEnvName('TOIL_PROJECT_PATHS', ['toil-project', 'jira'])).toBeUndefined();
+    expect(parseEnvName('TOIL_PROJECT', ['toil-project'])).toBeUndefined();
   });
 
   it('ignore names for areas toil does not know, and names toil reserves, instead of guessing', () => {
     expect(
-      fromEnv({ TOIL_GITLAB_TOKEN: 'g', TOIL_CONN_JIRA_PROD_TOKEN: 'c', TOIL_DOSSIER: 'payments', TOIL_ENV: 'prod', TOIL_CONFIG: '/x', TOIL_TIMEOUT_MS: '5', TOIL_JIRA_: 'x' }, knownAreas),
+      fromEnv({ TOIL_GITLAB_TOKEN: 'g', TOIL_CONN_JIRA_PROD_TOKEN: 'c', TOIL_PROJECT: 'payments', TOIL_ENV: 'prod', TOIL_CONFIG: '/x', TOIL_TIMEOUT_MS: '5', TOIL_JIRA_: 'x' }, knownAreas),
     ).toEqual({});
   });
 
@@ -345,29 +345,29 @@ describe('wait in the config file', () => {
   });
 });
 
-describe('dossierPaths in the config file', () => {
+describe('projectPaths in the config file', () => {
   it('reads absolute folders from a version 2 file, and is never read as an area', () => {
-    const folder = join(home, 'team-dossiers');
-    writeJson(file(), { version: 2, connections: {}, dossierPaths: [folder] });
+    const folder = join(home, 'team-toil-projects');
+    writeJson(file(), { version: 2, connections: {}, projectPaths: [folder] });
     const config = load();
-    expect(config.dossierPaths).toEqual([folder]);
+    expect(config.projectPaths).toEqual([folder]);
     expect(config.connections).toEqual({});
     expect(config.warnings).toEqual([]);
   });
 
   it('refuses anything but a list of absolute paths', () => {
     for (const bad of ['C:/x', ['relative/dir'], [1]]) {
-      writeJson(file(), { version: 2, connections: {}, dossierPaths: bad });
-      expect(() => load(), JSON.stringify(bad)).toThrow(/"dossierPaths" .* must be a list of absolute folder paths/);
+      writeJson(file(), { version: 2, connections: {}, projectPaths: bad });
+      expect(() => load(), JSON.stringify(bad)).toThrow(/"projectPaths" .* must be a list of absolute folder paths/);
     }
   });
 
   it('ignores it in a version 1 file with a warning, and refuses to upgrade such a file silently', () => {
-    writeJson(file(), { jira: { baseUrl: 'https://jira.imagile.dev' }, dossierPaths: [join(home, 'x')] });
+    writeJson(file(), { jira: { baseUrl: 'https://jira.imagile.dev' }, projectPaths: [join(home, 'x')] });
     const config = load();
-    expect(config.dossierPaths).toBeUndefined();
+    expect(config.projectPaths).toBeUndefined();
     expect(Object.keys(config.connections)).toEqual(['jira']);
     expect(config.warnings.map((w) => w.code)).toEqual(['CONFIG_RESERVED_KEY']);
-    expect(() => readConfigForEdit(file())).toThrow(/"dossierPaths" key, which version 1 ignores/);
+    expect(() => readConfigForEdit(file())).toThrow(/"projectPaths" key, which version 1 ignores/);
   });
 });

@@ -120,7 +120,7 @@ export const diff = { fromHash: SHA, toHash: SHA, contextLines: 10, whitespace: 
 const json = (body: unknown) => ({ json: body });
 
 export const routes: Route[] = [
-  // check-dossier's lookups: the project, and the repository in it.
+  // check-toil-project's lookups: the project, and the repository in it.
   { path: `${API}/projects/PROJ`, respond: json({ key: 'PROJ', id: 1, name: 'Project' }) },
   { path: REPO, respond: json(repository('imagile-api')) },
   { method: 'POST', path: `${API}/projects/PROJ/repos`, respond: (req) => json(repository(JSON.parse(req.body!).name)) },
@@ -173,10 +173,10 @@ export const routes: Route[] = [
 export const repo = { root: 'C:/work/imagile-api', branch: 'feature/retries', remotes: ['https://bitbucket.imagile.dev/scm/PROJ/imagile-api.git'] };
 
 /**
- * The dossier the examples run with, for check-dossier. Its context inputs are
+ * The toil project the examples run with, for check-toil-project. Its context inputs are
  * per repo, and no example's folder is that repo, so no other example reads them.
  */
-export const dossier = { name: 'payments', bitbucket: { project: { 'imagile-api': 'PROJ' }, repo: { 'imagile-api': 'imagile-api' } } };
+export const toilProject = { name: 'payments', bitbucket: { project: { 'imagile-api': 'PROJ' }, repo: { 'imagile-api': 'imagile-api' } } };
 
 /**
  * Both deployments, side by side: Data Center's connection (`bitbucket`, the
@@ -194,5 +194,5 @@ export const fixture = defineFixture({
   deployments: { server: 'bitbucket', cloud: 'bitbucket-cloud' },
   files: cloud.files,
   repo: { ...repo, remotes: [...repo.remotes, ...cloud.repo.remotes] },
-  dossier,
+  toilProject,
 });

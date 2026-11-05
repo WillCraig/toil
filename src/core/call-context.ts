@@ -13,7 +13,7 @@ import type { SecretStore } from './keychain.js';
  * (`--project`, `--repo`, `--instance`) resolves in this order:
  *
  *   1. the call's own value: a CLI flag or an MCP field
- *   2. the dossier that applies to the call (src/core/dossier.ts)
+ *   2. the toil project that applies to the call (src/core/toil-project.ts)
  *   3. the working folder's git remote, where the area declares how to read it
  *      (handed the resolved connection, so it can check the remote's host)
  *   4. the connection's setting, then the area's default
@@ -22,7 +22,7 @@ import type { SecretStore } from './keychain.js';
  * Jira's `--input-file` project), which ranks between 1 and 2.
  *
  * The connection goes through the same chain: at each source in turn (the
- * call, the dossier, the git remote), `connection` itself or an input that
+ * call, the toil project, the git remote), `connection` itself or an input that
  * selects one (`--instance prod`), and the two must agree; with neither, the
  * area's default connection. A selecting value from a lower source than the
  * one that picked the connection gives way to that connection's own setting.
@@ -31,7 +31,7 @@ import type { SecretStore } from './keychain.js';
  *
  * The git step runs only where a reader is supplied (`Context.gitRemote`);
  * the shipped CLI supplies one that reads `.git` in pure JS (src/core/git-repo.ts).
- * The dossier step runs where a dossier applies (`Context.dossiers`).
+ * The toil project step runs where a toil project applies (`Context.toil projects`).
  */
 
 /** A git remote as the reader hands it over: the area parses the URL. */
@@ -49,18 +49,18 @@ export interface GitRemote {
 export type GitRemoteReader = (signal: AbortSignal) => Promise<readonly GitRemote[]>;
 
 /**
- * A dossier's value for one area's key (`connection`, or a context input),
+ * A toil project's value for one area's key (`connection`, or a context input),
  * given the call's own input, since an explicit `--env` decides which of the
- * dossier's environments the rest comes from (src/core/dossier.ts).
+ * toil project's environments the rest comes from (src/core/toil-project.ts).
  */
-export type DossierLookup = (area: string, key: string, input?: Record<string, unknown>) => string | undefined;
+export type ToilProjectLookup = (area: string, key: string, input?: Record<string, unknown>) => string | undefined;
 
-export const noDossier: DossierLookup = () => undefined;
+export const noToilProject: ToilProjectLookup = () => undefined;
 
 export interface CallSources {
   config: ResolvedConfig;
   secrets?: Pick<SecretStore, 'get'> | undefined;
-  dossier?: DossierLookup | undefined;
+  toilProject?: ToilProjectLookup | undefined;
   gitRemote?: GitRemoteReader | undefined;
 }
 
@@ -87,7 +87,7 @@ export async function resolveCall(
   const area = def.area!;
   const declared = area.context as Record<string, ContextInput>;
   const needs = def.context ?? {};
-  const dossier = sources.dossier ?? noDossier;
+  const toilProject = sources.toilProject ?? noToilProject;
 
   let remotes: Promise<readonly GitRemote[]> | undefined;
   const fromGit = async (spec: ContextInput, connection: Connection | undefined): Promise<string | undefined> => {
@@ -107,7 +107,7 @@ export async function resolveCall(
   const early: Record<string, ContextValue> = {};
   const stranded = new Map<string, StrandedInput>();
   const namedAround = new Map<string, StrandedInput>();
-  const isCheck = def.path[def.path.length - 1] === 'check-dossier';
+  const isCheck = def.path[def.path.length - 1] === 'check-toil-project';
   for (const name of Object.keys(needs)) {
     const spec = declared[name]!;
     const explicit = input[name];
@@ -115,32 +115,32 @@ export async function resolveCall(
       early[name] = { value: explicit, source: 'input' };
       continue;
     }
-    // With --connection named, an input that selects one can only agree with it or give way, so the dossier isn't asked for it.
-    let fromDossier: string | undefined;
+    // With --connection named, an input that selects one can only agree with it or give way, so the toil project isn't asked for it.
+    let fromToilProject: string | undefined;
     try {
-      fromDossier = spec.selectsConnection && typeof input.connection === 'string' ? undefined : dossier(area.name, name, input);
+      fromToilProject = spec.selectsConnection && typeof input.connection === 'string' ? undefined : toilProject(area.name, name, input);
     } catch (err) {
       // A per-repo value with no repo to read it for: a command that needs it is told, one that doesn't gets nothing for it, never a git or connection value.
       if (!(err instanceof StrandedInput)) throw err;
       // The call named another per-repo input itself, so this one falls through as before; step 4 says where it came from.
       if (err.callNamed) {
         namedAround.set(name, err);
-        fromDossier = undefined;
+        fromToilProject = undefined;
       } else {
         // An input only some deployments take waits for the connection: Cloud never asks Data Center's project (step 4 decides).
         if (needs[name] === 'required' && !spec.deployments) throw err;
         stranded.set(name, err);
       // Said on the call, so a later "could not determine" error comes with the reason beside it (principle 4).
-      // check-dossier reads every per-repo value through the dossier's view by design, so the advice would be wrong there.
-        if (!isCheck) warn({ code: 'DOSSIER_REPO_UNMATCHED', message: `${err.message} ${err.fix ?? ''}`.trim() });
+      // check-toil-project reads every per-repo value through the toil project's view by design, so the advice would be wrong there.
+        if (!isCheck) warn({ code: 'TOIL_PROJECT_REPO_UNMATCHED', message: `${err.message} ${err.fix ?? ''}`.trim() });
         continue;
       }
     }
-    const found = checked(area, name, spec, fromDossier, 'dossier') ?? (spec.selectsConnection ? checked(area, name, spec, await fromGit(spec, undefined), 'git') : undefined);
+    const found = checked(area, name, spec, fromToilProject, 'toil-project') ?? (spec.selectsConnection ? checked(area, name, spec, await fromGit(spec, undefined), 'git') : undefined);
     if (found) early[name] = found;
   }
 
-  const chosen = chooseConnection(sources.config, area, def, input, early, dossier);
+  const chosen = chooseConnection(sources.config, area, def, input, early, toilProject);
   const shared: NonNullable<ContextReport['shared']> = {};
   const connection = await resolveConnection(sources.config, area, chosen?.value, warn, sources.secrets, signal, { shared });
   report.connection = chosen ? { value: connection.name, source: chosen.source, ...(chosen.via ? { via: chosen.via } : {}) } : { value: connection.name, source: 'default', default: defaultKind(sources.config, area, connection.name) };
@@ -149,7 +149,7 @@ export async function resolveCall(
   if (Object.keys(shared).length > 0) report.shared = shared;
 
   // A selecting value that lost to a higher source (an explicit --connection
-  // over a dossier's env) mustn't describe a different connection than the
+  // over a toil project's env) mustn't describe a different connection than the
   // one in use: it gives way to that connection's own setting.
   for (const [name, found] of Object.entries(early)) {
     const spec = declared[name]!;
@@ -177,7 +177,7 @@ export async function resolveCall(
     }
     const setting = spec.setting === undefined ? undefined : connection[spec.setting];
     // An input the area gives to other deployments, which this one takes only because its command lists it, comes from the call or the
-    // dossier alone: the connection's setting, defaults, env, git and the area default are documented as the other deployment's, and a
+    // toil project alone: the connection's setting, defaults, env, git and the area default are documented as the other deployment's, and a
     // write must not take its target from them (principles 2 and 9).
     if (def.deployments && spec.deployments && !spec.deployments.includes(String(connection[def.deployments.by]))) {
       if (early[name]) inputs[name] = early[name];
@@ -190,7 +190,7 @@ export async function resolveCall(
       checked(area, name, spec, setting === undefined || setting === null ? undefined : String(setting), 'connection') ??
       checked(area, name, spec, spec.default, 'default');
     const around = namedAround.get(name);
-    if (value && around && !isCheck) warn({ code: 'DOSSIER_REPO_UNMATCHED', message: `${around.message} ${name} came from ${value.source === 'git' ? 'the git remote' : value.source === 'connection' ? "the connection's setting" : value.source === 'default' ? "the area's default" : value.source} instead. Pass --${name} too, or run inside one of the dossier's repos (--cwd <repo folder>).` });
+    if (value && around && !isCheck) warn({ code: 'TOIL_PROJECT_REPO_UNMATCHED', message: `${around.message} ${name} came from ${value.source === 'git' ? 'the git remote' : value.source === 'connection' ? "the connection's setting" : value.source === 'default' ? "the area's default" : value.source} instead. Pass --${name} too, or run inside one of the toil project's repos (--cwd <repo folder>).` });
     if (value) inputs[name] = value;
     else if (need === 'required') missing.push(name);
   }
@@ -202,30 +202,30 @@ export async function resolveCall(
 }
 
 /**
- * The connection a dossier would choose for a call to `area` that gives no
- * input of its own: the same choice resolveCall makes at its dossier step,
- * from the dossier's `connection` (or host) and every input that selects a
- * connection (`env`, `instance`). Undefined when the dossier chooses nothing,
+ * The connection a toil project would choose for a call to `area` that gives no
+ * input of its own: the same choice resolveCall makes at its toil project step,
+ * from the toil project's `connection` (or host) and every input that selects a
+ * connection (`env`, `instance`). Undefined when the toil project chooses nothing,
  * so the call would use the area's default. Throws what the call would throw
- * (a host matching none). The dossier commands judge a change by this, so the
+ * (a host matching none). The toil project commands judge a change by this, so the
  * rule on writes sees exactly what a call would do, not a copy of it.
  */
-export function dossierConnection(config: ResolvedConfig, area: AnyArea, dossier: DossierLookup): ContextValue | undefined {
+export function toilProjectConnection(config: ResolvedConfig, area: AnyArea, toilProject: ToilProjectLookup): ContextValue | undefined {
   const declared = area.context as Record<string, ContextInput>;
   const early: Record<string, ContextValue> = {};
   for (const [name, spec] of Object.entries(declared)) {
     if (!spec.selectsConnection) continue;
     let value: string | undefined;
     try {
-      value = dossier(area.name, name, {});
+      value = toilProject(area.name, name, {});
     } catch (err) {
       if (!(err instanceof StrandedInput)) throw err;
     }
-    const found = checked(area, name, spec, value, 'dossier');
+    const found = checked(area, name, spec, value, 'toil-project');
     if (found) early[name] = found;
   }
-  const def = { path: [area.name, 'dossier'], area } as unknown as AnyCommand;
-  return chooseConnection(config, area, def, {}, early, dossier);
+  const def = { path: [area.name, 'toil-project'], area } as unknown as AnyCommand;
+  return chooseConnection(config, area, def, {}, early, toilProject);
 }
 
 /** How the area's default connection was found: named in `defaults`, named after the area, or the only one. */
@@ -241,16 +241,16 @@ function chooseConnection(
   def: AnyCommand,
   input: Record<string, unknown>,
   early: Record<string, ContextValue>,
-  dossier: DossierLookup,
+  toilProject: ToilProjectLookup,
 ): ContextValue | undefined {
   const declared = area.context as Record<string, ContextInput>;
-  // The dossier is asked only when the call itself didn't decide, so a call
-  // that names its connection never depends on which dossier would apply.
+  // The toil project is asked only when the call itself didn't decide, so a call
+  // that names its connection never depends on which toil project would apply.
   const named = (source: ContextSource): string | undefined =>
-    source === 'input' ? (typeof input.connection === 'string' ? input.connection : undefined) : source === 'dossier' ? dossier(area.name, 'connection', input) : undefined;
+    source === 'input' ? (typeof input.connection === 'string' ? input.connection : undefined) : source === 'toil-project' ? toilProject(area.name, 'connection', input) : undefined;
   // Source by source: at each step, a connection named outright and one an
   // input selects must agree, and the first step with either decides.
-  for (const source of ['input', 'dossier', 'git'] as const) {
+  for (const source of ['input', 'toil-project', 'git'] as const) {
     const name = named(source);
     let pick: ContextValue | undefined = name === undefined ? undefined : { value: name, source };
     const joint = jointSelection(config, area, early, source);
@@ -267,7 +267,7 @@ function chooseConnection(
       }
       if (pick && pick.value !== selected) {
         const first = pick.via ? `${flagOf(pick.via, declared[pick.via]!).split(' ')[0]} selects connection ${pick.value}` : `--connection is ${pick.value}`;
-        const where = { input: 'the call', dossier: 'your dossier', git: 'the git remote' }[source];
+        const where = { input: 'the call', 'toil-project': 'your toil project', git: 'the git remote' }[source];
         throw new ToilError('INVALID_INPUT', `Two different connections for ${commandName(def)}, both from ${where}: ${first}, but ${flagOf(name, spec).split(' ')[0]} ${found.value} selects connection ${selected}.`, {
           fix: `Give only one of them, or make them name the same connection.`,
         });
@@ -304,7 +304,7 @@ function checked(area: AnyArea, name: string, spec: ContextInput, value: string 
   if (value === undefined || value === '') return undefined;
   const parsed = (spec.schema ?? z.string().min(1)).safeParse(value);
   if (!parsed.success) {
-    const where = { input: 'the call', file: 'the input file', dossier: 'the dossier', git: 'the git remote', connection: `the connection's ${spec.setting} setting`, default: "the area's default" }[source];
+    const where = { input: 'the call', file: 'the input file', 'toil-project': 'the toil project', git: 'the git remote', connection: `the connection's ${spec.setting} setting`, default: "the area's default" }[source];
     throw new ToilError('INVALID_INPUT', `${area.name} ${name} "${value}" from ${where} isn't valid: ${parsed.error.issues.map((i) => i.message).join('; ')}.`, {
       fix: `Pass ${flagOf(name, spec).split(' ')[0]} explicitly, or correct ${where}.`,
     });
@@ -337,7 +337,7 @@ function missingContext(config: ResolvedConfig, def: AnyCommand, area: AnyArea, 
 /**
  * A context input the command filled itself from a value it read, such as a
  * project named in an `--input-file`. It ranks below the call's own value and
- * above everything else: the dossier, the git remote, the connection and the
+ * above everything else: the toil project, the git remote, the connection and the
  * default. Returns the value the command should use, and updates
  * `ctx.context` and `meta.context` to match. An empty or absent value changes
  * nothing. A selecting input can't be supplied this late, because the

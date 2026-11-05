@@ -40,7 +40,7 @@ export function progressText(p: CallProgress | null | undefined): string | null 
 }
 
 /** A running sync's progress in words, from the job the Sync panel polls. */
-export function syncText(job: { dossier: string | null; dossiersDone: number; dossiersTotal: number; requests: number; pages: number; retries: number } | null | undefined): string | null {
+export function syncText(job: { toilProject: string | null; toilProjectsDone: number; toilProjectsTotal: number; requests: number; pages: number; retries: number } | null | undefined): string | null {
   if (!job) return null;
-  return `Syncing ${job.dossier ?? 'the dossiers'}: ${job.dossiersDone} of ${job.dossiersTotal || '?'} dossiers, ${job.requests} requests, ${job.pages} pages${job.retries ? `, ${job.retries} retries` : ''}.`;
+  return `Syncing ${job.toilProject ?? 'the Toil projects'}: ${job.toilProjectsDone} of ${job.toilProjectsTotal || '?'} Toil projects, ${job.requests} requests, ${job.pages} pages${job.retries ? `, ${job.retries} retries` : ''}.`;
 }

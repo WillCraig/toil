@@ -26,8 +26,8 @@ import overworld from '../themes/overworld/theme.json';
 import themesDoc from '../docs/themes.md?raw';
 import readme from '../README.md?raw';
 
-/** The sample dossier every view and answer on the page is about. */
-export const DOSSIER = 'card-payments';
+/** The sample toil project every view and answer on the page is about. */
+export const TOIL_PROJECT = 'card-payments';
 
 /** The general instruction ui/docs/themes.md uses for its example prompt. */
 export const SAMPLE_INSTRUCTIONS = 'Answer in British English. Lead with risks.';
@@ -74,7 +74,7 @@ const INSTRUCTIONS_HEAD = '\n\nInstructions from the person asking:\n';
 
 /** The prompt for one theme with the voice on or off, cut into its three layers, each exactly as it appears in the whole. */
 function layers(theme: string, voice: boolean): PromptLayers {
-  const full = systemPrompt(DOSSIER, FIXTURE_NOW, promptStyle({ theme, voice }, { instructions: SAMPLE_INSTRUCTIONS, voice: null }));
+  const full = systemPrompt(TOIL_PROJECT, FIXTURE_NOW, promptStyle({ theme, voice }, { instructions: SAMPLE_INSTRUCTIONS, voice: null }));
   const [head, instructions] = full.split(INSTRUCTIONS_HEAD);
   const [rules, style] = head!.split(STYLE_HEAD);
   const strip = (text: string, rule: string) => {
@@ -96,15 +96,15 @@ function layers(theme: string, voice: boolean): PromptLayers {
 
 /** The microcopy rows the comparison shows: where each line appears, and its key in src/wording.ts. */
 const WORD_ROWS: { where: string; key: WordKey; vars?: Record<string, string> }[] = [
-  { where: 'Above the dossier name', key: 'dossier.eyebrow' },
-  { where: 'The Ask bar, empty', key: 'ask.placeholder', vars: { name: DOSSIER } },
-  { where: 'The chat, before a question', key: 'ask.welcome', vars: { name: DOSSIER } },
+  { where: 'Above the Toil project name', key: 'toilProject.eyebrow' },
+  { where: 'The Ask bar, empty', key: 'ask.placeholder', vars: { name: TOIL_PROJECT } },
+  { where: 'The chat, before a question', key: 'ask.welcome', vars: { name: TOIL_PROJECT } },
   { where: 'Status, reading the cache', key: 'status.cache' },
   { where: 'Status, writing the answer', key: 'status.writing' },
   { where: 'Status, finished', key: 'status.done', vars: { seconds: '4' } },
   { where: 'An empty board column', key: 'empty.column' },
   { where: 'No pull requests', key: 'empty.prs' },
-  { where: 'Loading a dossier', key: 'loading.dossier', vars: { name: DOSSIER } },
+  { where: 'Loading a Toil project', key: 'loading.toilProject', vars: { name: TOIL_PROJECT } },
 ];
 
 /** The real word each renamed term stands beside, as the dashboard and chat use it. */
@@ -129,8 +129,8 @@ export interface ShowTheme {
   terms: { real: string; themed: string }[];
 }
 
-const risk = SCRIPTS[DOSSIER]?.risk;
-if (!risk?.proposals?.[0]) throw new Error(`The scripted agent has no risk answer with a proposal for ${DOSSIER}; ui/src/fixtures/agent.ts changed shape.`);
+const risk = SCRIPTS[TOIL_PROJECT]?.risk;
+if (!risk?.proposals?.[0]) throw new Error(`The scripted agent has no risk answer with a proposal for ${TOIL_PROJECT}; ui/src/fixtures/agent.ts changed shape.`);
 
 export const QUESTION = risk.label;
 export const STANDARD_ANSWER = risk.parts;
@@ -149,13 +149,13 @@ export const THEMES: ShowTheme[] = MANIFESTS.map((t) => {
     voice: t.voice !== undefined,
     wording: t.lexicon !== undefined,
     prompt: layers(t.name, true),
-    answer: VOICED[DOSSIER]?.[t.name] ?? null,
+    answer: VOICED[TOIL_PROJECT]?.[t.name] ?? null,
     words: WORD_ROWS.map(({ where, key, vars }) => ({ where, key, standard: wordFor(undefined, false, key, vars), themed: wordFor(t.lexicon, true, key, vars) })),
     terms: TERMS.map((key) => ({ real: TERM_REAL[key], themed: themed(t, TERM_REAL[key], key, true) })),
   };
 });
 
-for (const t of THEMES) if (t.voice && !t.answer) throw new Error(`The scripted agent has no ${t.name} answer for ${DOSSIER}; ui/src/fixtures/agent.ts changed shape.`);
+for (const t of THEMES) if (t.voice && !t.answer) throw new Error(`The scripted agent has no ${t.name} answer for ${TOIL_PROJECT}; ui/src/fixtures/agent.ts changed shape.`);
 if (!THEMES.some((t) => t.name === DEFAULT_THEME)) throw new Error(`There is no ${DEFAULT_THEME} theme in ui/themes/.`);
 for (const { key } of WORD_ROWS) if (!(key in STANDARD)) throw new Error(`ui/src/wording.ts has no ${key}`);
 

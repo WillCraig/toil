@@ -54,7 +54,7 @@ export interface ThemeManifest {
   /** Themed agent voice (#283): the register the agent answers in, added to its prompt as style. Plain has none. */
   voice?: string;
   /**
-   * Theme moments (#419): the splash, the loading screens, the dossier
+   * Theme moments (#419): the splash, the loading screens, the toil project
    * entrance, the tab transitions and the event moments, as data the one
    * engine in src/moments/ plays. Absent means the plain defaults: a plain
    * loader with the progress text and tips, and nothing else.

@@ -150,7 +150,7 @@ listed when writes are on, and `allowWrite: true` stands in for the flag.
 | `board list` | `--project --limit --cursor` | Boards (id, name, scrum or kanban) |
 | `sprint list` | `--board` or `--project`, `--state active,future,closed`, `--limit --cursor` (with `--board`) | Sprints with dates and goal |
 | `api` (Data Center) | `<method> <path> --query key=value (repeatable) --body-file --content-type` | The response body; see **Any endpoint** below. ✎ for `POST`, `PUT`, `PATCH`, `DELETE` |
-| `check-dossier` | `--dossier <name\|file>` (or the folder's dossier) | `{ dossier, connection, env, ok, checked, checks, unchecked }`: each project and field id the dossier names, found or not; exit 1 when one is missing |
+| `check-toil-project` | `--toil-project <name\|file>` (or the folder's toil project) | `{ toil project, connection, env, ok, checked, checks, unchecked }`: each project and field id the toil project names, found or not; exit 1 when one is missing |
 
 Over MCP the same commands are tools named after the path, with spaces and
 hyphens as underscores (`jira_issue_get`, `jira_sprint_list`,
@@ -381,9 +381,9 @@ Jira's fields with a `suggestedType`; add `--project ABC` to see each select fie
 `allowedValues`. A select field that only accepts option ids needs `"type": "option-id"`.
 **Sprint is not a custom field**: use `issue set-sprint` after the issue exists.
 
-A **dossier** can name fields too (`"jira": { "fields": { "storyPoints": "customfield_10016" } }`,
-or `toil dossiers field <dossier> jira storyPoints customfield_10016`). Then
-`issue create` and `issue update` take `--field storyPoints=5` in any folder the dossier
+A **toil project** can name fields too (`"jira": { "fields": { "storyPoints": "customfield_10016" } }`,
+or `toil projects field <toil project> jira storyPoints customfield_10016`). Then
+`issue create` and `issue update` take `--field storyPoints=5` in any folder the toil project
 applies to. An alias takes the type the connection registers for that id. A name the
 connection already uses keeps the connection's meaning.
 
@@ -424,10 +424,10 @@ old names are gone, not deprecated:
   Cloud site by accident. Set `TOIL_JIRA_DEPLOYMENT=cloud` if the values are Cloud ones, or
   define a separate Data Center connection with `TOIL_CONN_<NAME>_*`. `TOIL_CONN_<NAME>_*`
   is never affected.
-- **Dossiers:** a `jira-cloud` section is read as `jira` (also under an environment and in a
-  person's `ids`), with a `DOSSIER_RENAMED_AREA` warning to rename it (`toil dossiers check`
-  reports it). With both, `jira` wins. A dossier has one `jira` section, so it picks one Jira
-  connection: a body of work that uses both a Data Center and a Cloud Jira takes two dossiers.
+- **Toil projects:** a `jira-cloud` section is read as `jira` (also under an environment and in a
+  person's `ids`), with a `TOIL_PROJECT_RENAMED_AREA` warning to rename it (`toil projects check`
+  reports it). With both, `jira` wins. A toil project has one `jira` section, so it picks one Jira
+  connection: a body of work that uses both a Data Center and a Cloud Jira takes two toil projects.
 
 ## Ticket the work
 
@@ -442,7 +442,7 @@ match (nothing is written), create a sub-task under it, or create a new ticket. 
 sub-task is
 `toil jira issue create --type Sub-task --parent PAY-12 --summary "<text>" --allow-write`
 (the project may name the type differently, `Subtask` on Cloud); a new ticket takes the project and type
-from the dossier and the connection. Both are writes, made only on the person's yes.
+from the toil project and the connection. Both are writes, made only on the person's yes.
 
 ## Notes
 
@@ -465,10 +465,10 @@ from the dossier and the connection. Both are writes, made only on the person's 
   else as a name (case-insensitive), looked up first, on Cloud.
 - Issue keys and ids are sent as one URL path segment each, encoded, so a `/` or `?` in
   one can't change the endpoint called. A project key from `--project`, the
-  connection's `project` setting, a dossier or `--input-file` that holds `/`, `\`, `?`,
+  connection's `project` setting, a toil project or `--input-file` that holds `/`, `\`, `?`,
   `#`, `%` or a control character is refused with `INVALID_INPUT`.
 - A 429 is retried after the delay Jira asks for, as in every area.
 
-## Checking a dossier
+## Checking a toil project
 
-`check-dossier` checks the call's dossier: each project key it names (`project`, `projects`) exists, and each field alias in `fields` names a field id Jira has. It's `toil jira check-dossier` (`--dossier <name|file>`, or the dossier the folder resolves to), and it returns `{ dossier, connection, env, ok, checked, checks, unchecked }`, one check per value with its key path. The CLI exits 1 when one is missing. A failure other than not-found (a bad token, an unreachable host) fails the command. Read only.
+`check-toil-project` checks the call's toil project: each project key it names (`project`, `projects`) exists, and each field alias in `fields` names a field id Jira has. It's `toil jira check-toil-project` (`--toil-project <name|file>`, or the toil project the folder resolves to), and it returns `{ toil project, connection, env, ok, checked, checks, unchecked }`, one check per value with its key path. The CLI exits 1 when one is missing. A failure other than not-found (a bad token, an unreachable host) fails the command. Read only.

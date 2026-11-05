@@ -169,7 +169,7 @@
         "state": { "enum": ["OPEN", "MERGED", "DECLINED", "DRAFT"] },
         "author": { "anyOf": [{ "$ref": "#/$defs/Person" }, { "type": "null" }] },
         "authorKind": { "enum": ["HUMAN", "AGENT", "BOT"] },
-        "authorKindSource": { "description": "The signal that set authorKind: an override in the dossier, the account itself, an agent's Co-Authored-By trailer, an agent's branch prefix, or default (HUMAN, no signal).", "enum": ["override", "account", "trailer", "branch", "default"] },
+        "authorKindSource": { "description": "The signal that set authorKind: an override in the toil project, the account itself, an agent's Co-Authored-By trailer, an agent's branch prefix, or default (HUMAN, no signal).", "enum": ["override", "account", "trailer", "branch", "default"] },
         "authorKindSignal": { "description": "The signal in words; null for default.", "type": ["string", "null"] },
         "reviewers": { "type": "array", "items": { "$ref": "#/$defs/Reviewer" } },
         "reviews": { "description": "Every review, oldest first; null when the input held none.", "anyOf": [{ "type": "array", "items": { "$ref": "#/$defs/Review" } }, { "type": "null" }] },

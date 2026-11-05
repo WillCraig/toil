@@ -260,7 +260,7 @@ jobs:
 
                **Safety layers must never be edited quietly.** Allowed, but flagged. They are the code that holds a bound or
                a gate: toil's write gate, secrets, files, network, bounds, audit and config code, the
-               connections, skills, setup, feedback and dossier commands, `src/os/`, `src/shims/`,
+               connections, skills, setup, feedback and toil project commands, `src/os/`, `src/shims/`,
                `src/mcp/` and `src/api.ts`, the command contract, the suites that check those rules
                (triage's own included), the shipped skill (all of
                `skills/toil/`, which users' agents read as instructions), and Toil UI's server, Settings allowlist, theme `voice` text and

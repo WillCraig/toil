@@ -3,7 +3,7 @@
  * Agents sidebar's parts (./sidebar.tsx) with the tracker's inbox, the item page's
  * list, and each agent's assignments on the People view. The assignment's
  * own page is src/views/Assignment.tsx. Every one of them reads the same
- * AssignmentsApi from the dossier's data, and none of them can write to a
+ * AssignmentsApi from the toil project's data, and none of them can write to a
  * tracker: Apply, on the assignment page, asks the server to run a
  * proposal it already holds. The in-tray, the out-tray, and a third tray
  * marked "pending signature".
@@ -14,7 +14,7 @@ import { Button, Dialog, DialogTrigger, Heading, Input, Label, Modal, ModalOverl
 import { ItemLink } from '../components/items.tsx';
 import { Card, CardGrid, Cluster, Stack } from '../components/layout.tsx';
 import { useData } from '../data.ts';
-import { CAPS_HREF, boardHref, dossierHref } from '../format.ts';
+import { CAPS_HREF, boardHref, toilProjectHref } from '../format.ts';
 import { Empty, EmptyLink } from '../components/empty.tsx';
 import { EditLink, Help } from '../components/help.tsx';
 import { ADAPTER_LABEL, addUp, usageParts } from '../model-usage.ts';
@@ -26,14 +26,14 @@ import { StaleChip, StaleNote } from '../components/stale.tsx';
 import { usePlain } from '../plain-words.ts';
 import './assign.css';
 
-export const assignmentHref = (dossier: string, id: string) => `${dossierHref(dossier)}/assignment/${encodeURIComponent(id)}`;
+export const assignmentHref = (toilProject: string, id: string) => `${toilProjectHref(toilProject)}/assignment/${encodeURIComponent(id)}`;
 
 const active = (a: Pick<Assignment, 'state' | 'waiting'>) => a.state === 'working' || (a.state === 'queued' && a.waiting === 'slot');
 /** How often a view reads again while something is queued or working. */
 export const POLL_MS = 2000;
 
-/** The dossier's assignments, read again every couple of seconds while any is queued or working. */
-export function useAssignments(dossier: string): { list: AssignmentList | null; error: string | null; reload: () => void } {
+/** The toil project's assignments, read again every couple of seconds while any is queued or working. */
+export function useAssignments(toilProject: string): { list: AssignmentList | null; error: string | null; reload: () => void } {
   const { assignments: api } = useData();
   const [list, setList] = useState<AssignmentList | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function useAssignments(dossier: string): { list: AssignmentList | null; 
   useEffect(() => {
     if (!api || api.disabled) return;
     let live = true;
-    api.list(dossier).then(
+    api.list(toilProject).then(
       (l) => {
         if (!live) return;
         setList(l);
@@ -53,7 +53,7 @@ export function useAssignments(dossier: string): { list: AssignmentList | null; 
     return () => {
       live = false;
     };
-  }, [api, dossier, tick]);
+  }, [api, toilProject, tick]);
   const busy = list?.assignments.some(active) ?? false;
   useEffect(() => {
     if (!busy) return;
@@ -101,9 +101,9 @@ export function AssignmentCard({ a, now }: { a: Assignment; now: string }) {
         )}
         {a.stop && a.state === 'failed' && <p className="assign-stop">{a.stop.message}</p>}
         {a.stale && <StaleNote stale={a.stale} />}
-        {a.renewedBy && <p className="note">Renewed as <a href={assignmentHref(a.dossier, a.renewedBy)}>a fresh assignment</a>.</p>}
+        {a.renewedBy && <p className="note">Renewed as <a href={assignmentHref(a.toilProject, a.renewedBy)}>a fresh assignment</a>.</p>}
         <p>
-          <a href={assignmentHref(a.dossier, a.id)}>
+          <a href={assignmentHref(a.toilProject, a.id)}>
             Open the assignment<span className="sr-only"> on {a.item}</span>
           </a>
         </p>
@@ -118,7 +118,7 @@ export function AssignmentCard({ a, now }: { a: Assignment; now: string }) {
  * whose item and mode are fixed.
  */
 export function AssignForm({ item, list, start, close, onDone }: { item: Pick<WorkItem, 'id' | 'title'>; list: AssignmentList; start?: Assignment; close: () => void; onDone: (a: Assignment) => void }) {
-  const { assignments: api, dossier } = useData();
+  const { assignments: api, toilProject } = useData();
   const plain = usePlain();
   const usable = list.adapters.filter((a) => !a.problem);
   const [adapter, setAdapter] = useState<AssignAdapter | null>(start?.adapter ?? (usable.find((a) => a.name === list.preferred)?.name ?? usable[0]?.name ?? null));
@@ -127,7 +127,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const choice = list.adapters.find((a) => a.name === adapter);
-  const implementOff = mode === 'implement' ? (choice?.implement ?? (list.repos.length ? null : `${dossier.name} lists no repository with a local path, so implement mode has nothing to clone. Add one with toil dossiers add-repo ${dossier.name} <folder>.`)) : null;
+  const implementOff = mode === 'implement' ? (choice?.implement ?? (list.repos.length ? null : `${toilProject.name} lists no repository with a local path, so implement mode has nothing to clone. Add one with toil projects add-repo ${toilProject.name} <folder>.`)) : null;
   const canSend = api && !api.disabled && adapter !== null && !choice?.problem && !implementOff && !busy && (mode !== 'implement' || repo !== null);
 
   const submit = async (e: FormEvent) => {
@@ -136,7 +136,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
     setBusy(true);
     setProblem(null);
     try {
-      const a = start ? await api.start(start.id, adapter) : await api.assign({ dossier: dossier.name, item: item.id, mode, adapter, ...(mode === 'implement' && repo ? { repo } : {}) });
+      const a = start ? await api.start(start.id, adapter) : await api.assign({ toilProject: toilProject.name, item: item.id, mode, adapter, ...(mode === 'implement' && repo ? { repo } : {}) });
       onDone(a);
       close();
     } catch (err) {
@@ -219,10 +219,10 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
   );
 }
 
-/** The dialog around the form; it reads the dossier's adapters and repositories when it opens. */
+/** The dialog around the form; it reads the toil project's adapters and repositories when it opens. */
 export function AssignModal({ item, start, isOpen, onOpenChange, onDone }: { item: Pick<WorkItem, 'id' | 'title'>; start?: Assignment; isOpen?: boolean; onOpenChange?: (open: boolean) => void; onDone?: (a: Assignment) => void }) {
   const controlled = isOpen === undefined ? {} : { isOpen, ...(onOpenChange ? { onOpenChange } : {}) };
-  const done = onDone ?? ((a: Assignment) => void (window.location.hash = assignmentHref(a.dossier, a.id)));
+  const done = onDone ?? ((a: Assignment) => void (window.location.hash = assignmentHref(a.toilProject, a.id)));
   return (
     <ModalOverlay className="feedback-overlay" data-backdrop="" isDismissable {...controlled}>
       <Modal className="feedback-modal">
@@ -235,7 +235,7 @@ export function AssignModal({ item, start, isOpen, onOpenChange, onDone }: { ite
 }
 
 function AssignBody({ item, start, close, onDone }: { item: Pick<WorkItem, 'id' | 'title'>; start?: Assignment; close: () => void; onDone: (a: Assignment) => void }) {
-  const { assignments: api, dossier } = useData();
+  const { assignments: api, toilProject } = useData();
   const plain = usePlain();
   const [list, setList] = useState<AssignmentList | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -243,14 +243,14 @@ function AssignBody({ item, start, close, onDone }: { item: Pick<WorkItem, 'id' 
     if (!api) return void setProblem('This view has no agent assignments.');
     if (api.disabled) return void setProblem(api.disabled);
     let live = true;
-    api.list(dossier.name).then(
+    api.list(toilProject.name).then(
       (l) => live && setList(l),
       (e: unknown) => live && setProblem(e instanceof Error ? e.message : String(e)),
     );
     return () => {
       live = false;
     };
-  }, [api, dossier.name]);
+  }, [api, toilProject.name]);
   if (list) return <AssignForm item={item} list={list} {...(start ? { start } : {})} close={close} onDone={onDone} />;
   return (
     <div className="assign-form">
@@ -353,11 +353,11 @@ interface Renewal {
 /**
  * Renew all stale (#305): the list first, each stale session with whether it
  * renews or why it is skipped (working, waiting on you), then one press
- * renews the rest. The dossier's chat is on the list when it is stale.
+ * renews the rest. The toil project's chat is on the list when it is stale.
  */
 export function RenewAll({ list, onDone }: { list: AssignmentList; onDone: () => void }) {
   const plain = usePlain();
-  const { assignments: api, dossier } = useData();
+  const { assignments: api, toilProject } = useData();
   const chat = useChatScope();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -370,7 +370,7 @@ export function RenewAll({ list, onDone }: { list: AssignmentList; onDone: () =>
     if (why) throw new Error(why);
   };
   const rows: Renewal[] = [
-    ...(chat?.session?.stale ? [{ key: 'chat', label: `The chat about ${dossier.name}: ${chat.session.stale.text}`, skip: chat.session.stale.restart ?? (chat.busy ? 'It is answering a question now, and a renew never interrupts one.' : null), run: renewChat }] : []),
+    ...(chat?.session?.stale ? [{ key: 'chat', label: `The chat about ${toilProject.name}: ${chat.session.stale.text}`, skip: chat.session.stale.restart ?? (chat.busy ? 'It is answering a question now, and a renew never interrupts one.' : null), run: renewChat }] : []),
     ...list.assignments
       .filter((a) => a.stale)
       .map((a) => ({ key: a.id, label: `${modeInfo(a.mode, plain.on).label} ${a.item} on ${a.adapter ? ADAPTER_NAME[a.adapter] : 'no adapter'}, ${STATE_LABEL[a.state].toLowerCase()}: ${a.stale!.text}`, skip: renewRefusal(a), run: () => api.renew(a.id) })),
@@ -450,8 +450,8 @@ export function RenewAll({ list, onDone }: { list: AssignmentList; onDone: () =>
 
 /** The item page's part: assign it, and what was assigned before. */
 export function ItemAssignments({ item }: { item: WorkItem }) {
-  const { dossier, now, assignments: api } = useData();
-  const { list, error } = useAssignments(dossier.name);
+  const { toilProject, now, assignments: api } = useData();
+  const { list, error } = useAssignments(toilProject.name);
   if (!api) return null;
   const mine = list?.assignments.filter((a) => a.item === item.id) ?? [];
   return (
@@ -475,17 +475,17 @@ export function ItemAssignments({ item }: { item: WorkItem }) {
   );
 }
 
-/** The dossier agent an adapter's work belongs to, by name or by an id naming the adapter. */
+/** The toil project agent an adapter's work belongs to, by name or by an id naming the adapter. */
 export function agentFor(adapter: AssignAdapter, people: readonly PersonEntry[]): PersonEntry | null {
   const words = [adapter, ADAPTER_NAME[adapter].toLowerCase()];
   return people.find((p) => p.kind === 'agent' && (words.some((w) => p.name.toLowerCase().includes(w)) || Object.values(p.ids).some((id) => words.includes(id.toLowerCase())))) ?? null;
 }
 
-/** The People view's part: each adapter with assignments, as a teammate, under the dossier's agent of that name where there is one. */
+/** The People view's part: each adapter with assignments, as a teammate, under the toil project's agent of that name where there is one. */
 export function AgentAssignments({ people }: { people: readonly PersonEntry[] }) {
   const plain = usePlain();
-  const { dossier, now, assignments: api } = useData();
-  const { list } = useAssignments(dossier.name);
+  const { toilProject, now, assignments: api } = useData();
+  const { list } = useAssignments(toilProject.name);
   if (!api || !list) return null;
   const adapters = [...new Set(list.assignments.flatMap((a) => (a.adapter ? [a.adapter] : [])))].sort();
   return (
@@ -516,7 +516,7 @@ export function AgentAssignments({ people }: { people: readonly PersonEntry[] })
                     <ul className="rows">
                       {mine.map((a) => (
                         <li key={a.id}>
-                          <StateChip a={a} /> {a.stale && <StaleChip />} <a href={assignmentHref(a.dossier, a.id)}>{modeInfo(a.mode, plain.on).label}</a> <ItemLink id={a.item} /> <span className="note">{runText(a.ranMs ?? runMs(a, now))}</span>
+                          <StateChip a={a} /> {a.stale && <StaleChip />} <a href={assignmentHref(a.toilProject, a.id)}>{modeInfo(a.mode, plain.on).label}</a> <ItemLink id={a.item} /> <span className="note">{runText(a.ranMs ?? runMs(a, now))}</span>
                         </li>
                       ))}
                     </ul>
@@ -527,7 +527,7 @@ export function AgentAssignments({ people }: { people: readonly PersonEntry[] })
           })}
         </CardGrid>
       ) : (
-        <Empty message={`Nothing has been assigned to an agent in ${dossier.name} yet.`} action={<EmptyLink href={boardHref(dossier.name)}>Assign from the board</EmptyLink>} help="assignments" />
+        <Empty message={`Nothing has been assigned to an agent in ${toilProject.name} yet.`} action={<EmptyLink href={boardHref(toilProject.name)}>Assign from the board</EmptyLink>} help="assignments" />
       )}
     </section>
   );

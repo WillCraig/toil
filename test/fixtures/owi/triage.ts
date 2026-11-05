@@ -44,7 +44,7 @@ const envelope = (command: string, data: unknown, connection: string, inputs: Re
     version: VERSION,
     context: {
       connection: { value: connection, source: 'default', default: 'named' },
-      ...(Object.keys(inputs).length ? { inputs: Object.fromEntries(Object.entries(inputs).map(([k, value]) => [k, { value, source: 'dossier' }])) } : {}),
+      ...(Object.keys(inputs).length ? { inputs: Object.fromEntries(Object.entries(inputs).map(([k, value]) => [k, { value, source: 'toil-project' }])) } : {}),
     },
   },
 });

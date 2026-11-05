@@ -153,7 +153,7 @@ describe('defineArea', async () => {
   it('adds the connection input and --connection to every command', async () => {
     const x = defineArea({ name: 'x', description: '', connection: z.object({}) });
     const cmd = x.command({ path: ['x', 'go'], description: '', input: z.object({ id: z.string() }), writes: false, examples: [{ id: '1' }], run: async () => null });
-    expect(Object.keys(cmd.input.shape)).toEqual(['id', 'connection', 'dossier', 'cwd']);
+    expect(Object.keys(cmd.input.shape)).toEqual(['id', 'connection', 'toilProject', 'cwd']);
     expect(cmd.options?.map((o) => o.flags)).toContain('--connection <name>');
     expect(cmd.area?.name).toBe('x');
   });

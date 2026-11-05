@@ -21,13 +21,13 @@ import { ProposalCard } from '../components/proposal.tsx';
 import { UsageFooter } from '../components/usage.tsx';
 import { useData } from '../data.ts';
 import { Empty, EmptyLink } from '../components/empty.tsx';
-import { AGENT_SETTINGS_HREF, dateTime, dossierHref } from '../format.ts';
+import { AGENT_SETTINGS_HREF, dateTime, toilProjectHref } from '../format.ts';
 import { EditLink } from '../components/help.tsx';
 
 const when = (iso: string | null) => (iso ? dateTime(iso) : 'not yet');
 
 export function AssignmentView({ id }: { id: string }) {
-  const { dossier, assignments: api, now } = useData();
+  const { toilProject, assignments: api, now } = useData();
   const plain = usePlain();
   const [record, setRecord] = useState<AssignmentRecord | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -59,7 +59,7 @@ export function AssignmentView({ id }: { id: string }) {
     return (
       <>
         <h1 tabIndex={-1}>No such assignment</h1>
-        <Empty message={problem ?? 'This view has no agent assignments.'} action={<EmptyLink href={dossierHref(dossier.name)}>Back to {dossier.name}</EmptyLink>} />
+        <Empty message={problem ?? 'This view has no agent assignments.'} action={<EmptyLink href={toilProjectHref(toilProject.name)}>Back to {toilProject.name}</EmptyLink>} />
       </>
     );
   }
@@ -85,7 +85,7 @@ export function AssignmentView({ id }: { id: string }) {
     <>
       <div className="view-head">
         <p className="eyebrow">
-          <a href={dossierHref(a.dossier)}>{a.dossier}</a> · Agent assignment
+          <a href={toilProjectHref(a.toilProject)}>{a.toilProject}</a> · Agent assignment
         </p>
         <h1 tabIndex={-1}>
           {modeInfo(a.mode, plain.on).label}: {a.itemTitle}
@@ -112,12 +112,12 @@ export function AssignmentView({ id }: { id: string }) {
       )}
       {a.renews && (
         <p className="note">
-          This renews <a href={assignmentHref(a.dossier, a.renews)}>an earlier assignment</a> on the same item, which started on older instructions; what it left was in this run's prompt.
+          This renews <a href={assignmentHref(a.toilProject, a.renews)}>an earlier assignment</a> on the same item, which started on older instructions; what it left was in this run's prompt.
         </p>
       )}
       {a.renewedBy && (
         <p className="note">
-          Renewed as <a href={assignmentHref(a.dossier, a.renewedBy)}>a fresh assignment</a> on today's instructions.
+          Renewed as <a href={assignmentHref(a.toilProject, a.renewedBy)}>a fresh assignment</a> on today's instructions.
         </p>
       )}
 
@@ -128,7 +128,7 @@ export function AssignmentView({ id }: { id: string }) {
             onPress={() =>
               act('Renewed.', async () => {
                 const fresh = await api.renew(a.id);
-                window.location.hash = assignmentHref(fresh.dossier, fresh.id);
+                window.location.hash = assignmentHref(fresh.toilProject, fresh.id);
                 return fresh;
               })
             }
@@ -242,9 +242,9 @@ export function AssignmentView({ id }: { id: string }) {
             <dd>{a.startedOn.skills.length ? a.startedOn.skills.join(', ') : 'none: Toil UI gives an assigned agent its tools and prompt only'}</dd>
             <dt>Tools</dt>
             <dd className="any-break">{a.startedOn.tools.join(', ')}</dd>
-            <dt>Dossier</dt>
+            <dt>Toil project</dt>
             <dd className="any-break">
-              {a.startedOn.dossier.name}, <code>{a.startedOn.dossier.fingerprint ?? 'unread'}</code>
+              {a.startedOn.toilProject.name}, <code>{a.startedOn.toilProject.fingerprint ?? 'unread'}</code>
             </dd>
             <dt>Item</dt>
             <dd className="any-break">
@@ -262,14 +262,14 @@ export function AssignmentView({ id }: { id: string }) {
                   {Object.entries(a.startedOn.fingerprint.skills)
                     .map(([area, hash]) => `${area} ${hash.slice(0, 12)}`)
                     .join(', ') || 'none'}
-                  ; dossier <code>{a.startedOn.fingerprint.dossier?.slice(0, 12) ?? 'unread'}</code>; prompts <code>{a.startedOn.fingerprint.prompts.slice(0, 12)}</code>
+                  ; Toil project <code>{a.startedOn.fingerprint.toilProject?.slice(0, 12) ?? 'unread'}</code>; prompts <code>{a.startedOn.fingerprint.prompts.slice(0, 12)}</code>
                 </>
               ) : (
                 'not recorded: this run started before Toil UI recorded one, so it is never called stale'
               )}
             </dd>
           </dl>
-          <p className="note">Fingerprints are SHA-256 of what the run read, so a later look can tell whether the item, the dossier or the prompt has changed since.</p>
+          <p className="note">Fingerprints are SHA-256 of what the run read, so a later look can tell whether the item, the Toil project or the prompt has changed since.</p>
         </details>
       )}
 

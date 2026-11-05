@@ -8,7 +8,7 @@ import { apiPath } from '../../core/api-path.js';
  * Pods, deployments, events and logs for one namespace, summarised for an
  * agent to read: problems first, counters up top. --raw hands back the
  * objects as the API server sent them, for anyone who prefers the full
- * dossier to the executive summary.
+ * toil project to the executive summary.
  */
 
 const namespace = z.string().describe('Kubernetes namespace');

@@ -1,9 +1,9 @@
 /**
- * The Agents sidebar (#394), beside every dossier tab, or a drawer on a
- * narrower screen: the tracker's inbox, then the dossier's assignments as
+ * The Agents sidebar (#394), beside every toil project tab, or a drawer on a
+ * narrower screen: the tracker's inbox, then the toil project's assignments as
  * small cards in three groups, those that need you, those working and those
  * gone stale, with the finished ones folded under Earlier; then Renew all
- * stale, the limits, and the dossier's recent analyses (#395). It replaced the Agents
+ * stale, the limits, and the toil project's recent analyses (#395). It replaced the Agents
  * lane, a panel halfway down the old dashboard, and reads the same
  * assignments the same way (./views.tsx). Same trays, nearer the desk.
  */
@@ -45,8 +45,8 @@ export function waitingOnYou(assignments: Assignment[]): number {
 
 /** How many things wait on a person, for the button that opens the panel. */
 export function useAgentsSummary(): { needsYou: number } {
-  const { dossier } = useData();
-  const { list } = useAssignments(dossier.name);
+  const { toilProject } = useData();
+  const { list } = useAssignments(toilProject.name);
   return { needsYou: waitingOnYou(list?.assignments ?? []) };
 }
 
@@ -63,7 +63,7 @@ function AgentCard({ a, now }: { a: Assignment; now: string }) {
       </p>
       <p className="agent-card__item">
         <ItemLink id={a.item} />{' '}
-        <a className="agent-card__title" href={assignmentHref(a.dossier, a.id)}>
+        <a className="agent-card__title" href={assignmentHref(a.toilProject, a.id)}>
           {a.itemTitle}
         </a>
       </p>
@@ -75,7 +75,7 @@ function AgentCard({ a, now }: { a: Assignment; now: string }) {
       {a.stale && <StaleNote stale={a.stale} />}
       {a.renewedBy && (
         <p className="note">
-          Renewed as <a href={assignmentHref(a.dossier, a.renewedBy)}>a fresh assignment</a>.
+          Renewed as <a href={assignmentHref(a.toilProject, a.renewedBy)}>a fresh assignment</a>.
         </p>
       )}
     </li>
@@ -87,9 +87,9 @@ export function analysesOf(turns: Turn[]): Turn[] {
   return turns.filter((t) => t.analyze).reverse();
 }
 
-/** The three newest analyses the dossier keeps (#395), the same list the Analyses tab shows, and one being written now. */
+/** The three newest analyses the toil project keeps (#395), the same list the Analyses tab shows, and one being written now. */
 function RecentAnalyses() {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const plain = usePlain();
   const chat = useChatScope();
   const running = analysesOf(chat?.turns ?? []).find((t) => !t.done);
@@ -103,7 +103,7 @@ function RecentAnalyses() {
         <ul className="plain">
           {list.map((a) => (
             <li key={a.id} className="analysis-line">
-              <a href={analysisHref(dossier.name, a.id)}>
+              <a href={analysisHref(toilProject.name, a.id)}>
                 <span className="note">{dateTime(a.at)}</span>
                 <span className="sr-only">, </span> <span>{a.recommendation ? plainText(a.recommendation) : 'No recommendation line.'}</span>
               </a>
@@ -113,7 +113,7 @@ function RecentAnalyses() {
       ) : (
         !running && <p className="note">None yet.</p>
       )}
-      <a href={analysesHref(dossier.name)}>{plain.pw('All analyses', 'All past briefings')}</a>
+      <a href={analysesHref(toilProject.name)}>{plain.pw('All analyses', 'All past briefings')}</a>
     </section>
   );
 }
@@ -127,9 +127,9 @@ export function plainText(text: string): string {
 
 /** The sidebar itself, the same inside the drawer and beside the view. */
 export function AgentsSidebar() {
-  const { dossier, now, assignments: api } = useData();
+  const { toilProject, now, assignments: api } = useData();
   const plain = usePlain();
-  const { list, error, reload } = useAssignments(dossier.name);
+  const { list, error, reload } = useAssignments(toilProject.name);
   const inbox = list?.assignments.filter(inInbox) ?? [];
   const rest = list?.assignments.filter((a) => !inInbox(a)) ?? [];
   const groups = (['needs-you', 'working', 'stale', 'earlier'] as const).map((g) => ({ g, items: rest.filter((a) => groupOf(a) === g) }));
@@ -162,7 +162,7 @@ export function AgentsSidebar() {
       )}
       {list && !rest.length && (
         <p className="note">
-          Nothing assigned yet. <a href={boardHref(dossier.name)}>Assign from the board</a>
+          Nothing assigned yet. <a href={boardHref(toilProject.name)}>Assign from the board</a>
         </p>
       )}
       {groups.map(({ g, items }) =>

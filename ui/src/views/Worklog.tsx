@@ -1,5 +1,5 @@
 /**
- * A dossier's worklog (#308): a calendar of the days that have a page, and
+ * A toil project's worklog (#308): a calendar of the days that have a page, and
  * one day's page, folded by code from what the cache holds (src/model/worklog.ts):
  * the work items that moved, the pull requests opened, reviewed, merged or
  * declined, the builds and deployments that failed or recovered, the agent's
@@ -18,7 +18,7 @@ import { Path } from '../components/layout.tsx';
 import { Panel } from '../components/panel.tsx';
 import { Help } from '../components/help.tsx';
 import { useData } from '../data.ts';
-import { dossierHref, standupHref, worklogHref } from '../format.ts';
+import { toilProjectHref, standupHref, worklogHref } from '../format.ts';
 import {
   addMonths, appliedText, daysOfMonth, longDay, monthName, monthOf, OUTCOME_TEXT, seenText, timeOf,
   type RunLine, type WorklogEvent,
@@ -33,7 +33,7 @@ const WEEKDAYS = [['Mon', 'Monday'], ['Tue', 'Tuesday'], ['Wed', 'Wednesday'], [
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function Worklog({ api, day }: { api: WorklogApi | null; day: string | null }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const plain = usePlain();
   const [month, setMonth] = useState<string | null>(day ? monthOf(day) : null);
   const [calendar, setCalendar] = useState<Loaded<WorklogMonth>>(null);
@@ -45,32 +45,32 @@ export function Worklog({ api, day }: { api: WorklogApi | null; day: string | nu
     if (!api) return;
     let live = true;
     setCalendar(null);
-    api.month(dossier.name, month ?? undefined).then(
+    api.month(toilProject.name, month ?? undefined).then(
       (value) => live && setCalendar({ ok: true, value }),
       (e: unknown) => live && setCalendar(failedWith(e)),
     );
     return () => {
       live = false;
     };
-  }, [api, dossier.name, month]);
+  }, [api, toilProject.name, month]);
 
   useEffect(() => {
     if (!api || !selected) return;
     let live = true;
     setPage(null);
-    api.day(dossier.name, selected).then(
+    api.day(toilProject.name, selected).then(
       (value) => live && setPage({ ok: true, value }),
       (e: unknown) => live && setPage(failedWith(e)),
     );
     return () => {
       live = false;
     };
-  }, [api, dossier.name, selected]);
+  }, [api, toilProject.name, selected]);
 
   const head = (
     <div className="view-head">
       <p className="eyebrow">
-        <a href={dossierHref(dossier.name)}>{dossier.name}</a>
+        <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a>
       </p>
       <h1 tabIndex={-1} title={plain.title('Worklog')}>
         {plain.pw('Worklog', 'What happened')}
@@ -80,7 +80,7 @@ export function Worklog({ api, day }: { api: WorklogApi | null; day: string | nu
       </p>
       {api && (
         <p>
-          <a className="btn" href={standupHref(dossier.name)} data-standup-link="">
+          <a className="btn" href={standupHref(toilProject.name)} data-standup-link="">
             Stand-up since the last working day
           </a>
         </p>
@@ -122,7 +122,7 @@ export function Worklog({ api, day }: { api: WorklogApi | null; day: string | nu
 
 /** The month's days, Monday first: a link for each day with a page, the rest as plain numbers. */
 function Calendar({ data, selected, onMonth }: { data: WorklogMonth; selected: string | null; onMonth: (month: string) => void }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const pages = new Map(data.days.map((d) => [d.day, d]));
   const days = daysOfMonth(data.month);
   const lead = (new Date(`${days[0]}T00:00:00Z`).getUTCDay() + 6) % 7;
@@ -172,7 +172,7 @@ function Calendar({ data, selected, onMonth }: { data: WorklogMonth; selected: s
                 }
                 return (
                   <td key={d}>
-                    <a href={worklogHref(dossier.name, d)} className="calendar__day" aria-current={d === selected ? 'date' : undefined} data-today={d === data.today || undefined} data-quiet={p.lines === 0 || undefined}>
+                    <a href={worklogHref(toilProject.name, d)} className="calendar__day" aria-current={d === selected ? 'date' : undefined} data-today={d === data.today || undefined} data-quiet={p.lines === 0 || undefined}>
                       <span className="sr-only">{longDay(d)}{d === data.today ? ', today' : ''}: </span>
                       <span className="calendar__n" aria-hidden="true">
                         {n}
@@ -214,7 +214,7 @@ function Subject({ e }: { e: WorklogEvent }) {
 
 function Line({ e }: { e: WorklogEvent }) {
   const { byId, prById } = useData();
-  // An item or pull request the dossier holds carries its title in its link; anything else keeps the title the record has.
+  // An item or pull request the toil project holds carries its title in its link; anything else keeps the title the record has.
   const title = byId.has(e.subject) || prById?.has(e.subject) ? null : e.title;
   return (
     <li className="worklog-line">
@@ -307,7 +307,7 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
   const rebuild = async () => {
     setBusy(true);
     try {
-      const r = await api.rebuild(page.dossier, page.day);
+      const r = await api.rebuild(page.toilProject, page.day);
       onChange(r);
       setRebuilt(r.same === null ? 'Rebuilt from the cache. There was no page kept to compare it with.' : r.same ? 'Rebuilt from the cache: the same, line for line, as the page kept.' : 'Rebuilt from the cache: it differs from the page kept, which now matches the cache again.');
     } catch (e) {
@@ -366,7 +366,7 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
         <Button className="btn" data-worklog-rebuild="" isDisabled={busy} onPress={() => void rebuild()}>
           Rebuild this day
         </Button>
-        <a className="btn" href={standupHref(page.dossier, { from: page.day, to: page.day })}>
+        <a className="btn" href={standupHref(page.toilProject, { from: page.day, to: page.day })}>
           Stand-up for this day
         </a>
         {rebuilt && (
@@ -375,7 +375,7 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
           </p>
         )}
       </div>
-      <Export api={api} dossier={page.dossier} day={page.day} />
+      <Export api={api} toilProject={page.toilProject} day={page.day} />
       <details className="worklog-md">
         <summary>The page as Markdown</summary>
         <pre role="region" aria-label="The page as Markdown" tabIndex={0}>
@@ -395,7 +395,7 @@ function Notes({ api, data, today, onChange }: { api: WorklogApi; data: WorklogD
     e.preventDefault();
     setProblem(null);
     try {
-      onChange(await api.addNote(page.dossier, text));
+      onChange(await api.addNote(page.toilProject, text));
       setText('');
     } catch (err) {
       setProblem(err instanceof Error ? err.message : String(err));
@@ -438,7 +438,7 @@ function Notes({ api, data, today, onChange }: { api: WorklogApi; data: WorklogD
   );
 }
 
-function Export({ api, dossier, day }: { api: WorklogApi; dossier: string; day: string }) {
+function Export({ api, toilProject, day }: { api: WorklogApi; toilProject: string; day: string }) {
   const [folder, setFolder] = useState('');
   const [span, setSpan] = useState<'day' | 'month'>('day');
   const [result, setResult] = useState<{ ok: true; value: WorklogExport } | { ok: false; message: string } | null>(null);
@@ -449,7 +449,7 @@ function Export({ api, dossier, day }: { api: WorklogApi; dossier: string; day: 
     setResult(null);
     const what: ExportWhat = span === 'day' ? { day } : { month: monthOf(day) };
     try {
-      setResult({ ok: true, value: await api.exportTo(dossier, what, folder) });
+      setResult({ ok: true, value: await api.exportTo(toilProject, what, folder) });
     } catch (err) {
       setResult(failedWith(err));
     } finally {
@@ -491,7 +491,7 @@ function Export({ api, dossier, day }: { api: WorklogApi; dossier: string; day: 
             {result.value.proposals.length ? (
               result.value.proposals.map((p) => <ProposalCard key={p.id} proposal={p} />)
             ) : (
-              <p className="note">This dossier names no Confluence space and no GitHub repository, so there is nowhere to propose publishing it.</p>
+              <p className="note">This Toil project names no Confluence space and no GitHub repository, so there is nowhere to propose publishing it.</p>
             )}
           </>
         ) : (

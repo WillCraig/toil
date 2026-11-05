@@ -75,11 +75,11 @@ describe('defineArea', () => {
 
     expect(plain.context).toEqual({ project: 'optional', instance: 'optional' });
     expect(board.context).toEqual({ project: 'required', instance: 'optional', boardId: 'required' });
-    expect(Object.keys(plain.input.shape).sort()).toEqual(['connection', 'cwd', 'dossier', 'instance', 'project']);
+    expect(Object.keys(plain.input.shape).sort()).toEqual(['connection', 'cwd', 'instance', 'project', 'toilProject']);
     expect(board.options).toEqual(
       expect.arrayContaining([
-        { flags: '--project <value>', field: 'project', description: "Project; defaults to your dossier's project, then the connection's project.", group: true },
-        { flags: '--board-id <value>', field: 'boardId', description: "Board; defaults to your dossier's boardId." },
+        { flags: '--project <value>', field: 'project', description: "Project; defaults to your toil project's project, then the connection's project.", group: true },
+        { flags: '--board-id <value>', field: 'boardId', description: "Board; defaults to your toil project's boardId." },
       ]),
     );
     expect(() => area.command({ ...base, path: ['ctx', 'x'], context: { nope: 'optional' } as never })).toThrow(/isn't a context input/);

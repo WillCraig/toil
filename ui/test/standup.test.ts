@@ -57,7 +57,7 @@ const SYNCS: SyncRun[] = [
   { area: 'github', at: at('07:00'), ok: true, error: null },
 ];
 
-/** A small dossier: Ada's jira and GitHub work, Bob reviewing, an agent's pull request, a sprint, a blocker and builds. */
+/** A small toil project: Ada's jira and GitHub work, Bob reviewing, an agent's pull request, a sprint, a blocker and builds. */
 function sample() {
   const sprint = { id: '42', name: 'Sprint 42', path: null, start: '2026-10-05T00:00:00.000Z', end: '2026-10-17T00:00:00.000Z', state: 'ACTIVE' };
   const done = item('PAY-1', { status: 'Done', statusCategory: 'DONE', assignee: adaJira, iteration: sprint as WorkItem['iteration'], history: { transitions: [{ from: 'In Review', to: 'Done', fromCategory: 'IN_PROGRESS', toCategory: 'DONE', at: at('15:00'), by: adaJira }], iterations: [] } });
@@ -77,12 +77,12 @@ function sample() {
   return { items, pullRequests: [merged, agentPr, waiting], events };
 }
 
-const assignment: AgentRun = { id: 'run-1', kind: 'assignment', dossier: 'card-payments', startedAt: at('11:30'), finishedAt: at('11:50'), outcome: 'finished', by: 'Claude (sonnet)', prompt: 'Fix the retry', answer: 'Done', error: null, citations: [], unverified: [], proposals: [] };
+const assignment: AgentRun = { id: 'run-1', kind: 'assignment', toilProject: 'card-payments', startedAt: at('11:30'), finishedAt: at('11:50'), outcome: 'finished', by: 'Claude (sonnet)', prompt: 'Fix the retry', answer: 'Done', error: null, citations: [], unverified: [], proposals: [] };
 
 function input(over: Partial<StandupInput> = {}): StandupInput {
   const s = sample();
-  const pages = daysBetween(MON, TUE).map((day) => buildDay({ dossier: 'card-payments', day, events: s.events, runs: [assignment], applied: {}, notes: [], syncs: SYNCS, now: at('12:00', TUE), retentionDays: 30 }));
-  return { dossier: 'card-payments', from: MON, to: TUE, pages, people: PEOPLE, items: s.items, pullRequests: s.pullRequests, asOf: at('07:00', TUE), ...over };
+  const pages = daysBetween(MON, TUE).map((day) => buildDay({ toilProject: 'card-payments', day, events: s.events, runs: [assignment], applied: {}, notes: [], syncs: SYNCS, now: at('12:00', TUE), retentionDays: 30 }));
+  return { toilProject: 'card-payments', from: MON, to: TUE, pages, people: PEOPLE, items: s.items, pullRequests: s.pullRequests, asOf: at('07:00', TUE), ...over };
 }
 
 const texts = (lines: Array<{ label: string; text: string }>) => lines.map((l) => `${l.label}: ${l.text}`);
@@ -118,7 +118,7 @@ describe('the fold', () => {
     expect(adaLines.next).toEqual([]);
   });
 
-  it("gives a review to the reviewer, an agent's pull request to the dossier's agent, and Next from the sprint", () => {
+  it("gives a review to the reviewer, an agent's pull request to the Toil project's agent, and Next from the sprint", () => {
     const r = buildStandup(input());
     const bobs = r.people.find((p) => p.key === 'id:github:bob')!;
     expect(bobs).toMatchObject({ name: 'Bob', mapped: false, account: { area: 'github', id: 'bob' } });
@@ -141,7 +141,7 @@ describe('the fold', () => {
     ]);
   });
 
-  it('lists everyone in the dossier, empty or not, and an unmapped account only with lines; nobody is left out', () => {
+  it('lists everyone in the Toil project, empty or not, and an unmapped account only with lines; nobody is left out', () => {
     const r = buildStandup(input({ people: [...PEOPLE, { name: 'Linus', kind: 'human', email: null, ids: {} }] }));
     expect(r.people.map((p) => p.name)).toEqual(['Ada Lovelace', 'Bob', 'Claude', 'Grace Hopper', 'Linus']);
     expect(r.people.find((p) => p.name === 'Linus')!.lines).toEqual({ done: [], progress: [], blocked: [], next: [] });
@@ -177,7 +177,7 @@ describe('the fold', () => {
     const s = input();
     const old = s.pages.map((p) => ({ ...p, work: p.work.map(({ who: _who, toCategory: _c, ...e }) => e) }));
     const r = buildStandup({ ...s, pages: old });
-    // The worklog line named the mover by name only, so the dossier can't map it to Ada; the item's history still says the move was into Done.
+    // The worklog line named the mover by name only, so the toil project can't map it to Ada; the item's history still says the move was into Done.
     expect(texts(r.people.find((p) => p.key === 'id:jira:a. lovelace')!.lines.done)).toEqual(['PAY-1: In Review → Done']);
   });
 
@@ -190,8 +190,8 @@ describe('the fold', () => {
   });
 
   it('says what the worklog cannot vouch for, each gap once with the days it covers, after anything it could not read', () => {
-    const r = buildStandup(input({ notes: ["The dossier's \"people\" isn't a list, so nobody is mapped."] }));
-    expect(r.gaps[0]).toBe("The dossier's \"people\" isn't a list, so nobody is mapped.");
+    const r = buildStandup(input({ notes: ["The Toil project's \"people\" isn't a list, so nobody is mapped."] }));
+    expect(r.gaps[0]).toBe("The Toil project's \"people\" isn't a list, so nobody is mapped.");
     expect(r.gaps).toContain('13 Oct 2026: Today so far: built from the syncs up to 07:00 UTC. Anything after that shows once the next sync runs.');
     expect(r.gaps).toContain('12 Oct 2026: The last sync of github ran on this day; anything later in it shows after the next sync.');
     // The same words on every day of the range are said once.
@@ -218,7 +218,7 @@ describe('the text', () => {
     expect(md).toContain('## Ada Lovelace\n\n**Done**\n\n- [PAY-1](https://jira.imagile.dev/browse/PAY-1) Title of PAY-1: In Review → Done (12 Oct 2026 15:00 UTC)');
     expect(md).toContain('- [PAY-2](https://jira.imagile.dev/browse/PAY-2) Title of PAY-2: blocked by [PAY-3](https://jira.imagile.dev/browse/PAY-3) (13 Oct 2026 07:00 UTC)');
     expect(md).toContain('## Claude (agent)');
-    expect(md).toContain("## Bob (github bob), not in the dossier's people");
+    expect(md).toContain("## Bob (github bob), not in the Toil project's people");
     const text = standupText(r);
     expect(text).toContain('- PAY-2 Title of PAY-2: blocked by PAY-3 (13 Oct 2026 07:00 UTC) https://jira.imagile.dev/browse/PAY-2');
     expect(text).not.toMatch(/\]\(/);
@@ -266,12 +266,12 @@ describe('export and publishing', () => {
 });
 
 describe('the sample', () => {
-  it('builds a stand-up for each sample dossier, the same twice', async () => {
+  it('builds a stand-up for each sample Toil project, the same twice', async () => {
     const api = fixtureWorklog();
     const range = defaultRange(FIXTURE_NOW.slice(0, 10));
-    for (const dossier of ['card-payments', 'settlement', 'checkout-web']) {
-      const a = await api.standup(dossier, range.from, range.to);
-      const b = await api.standup(dossier, range.from, range.to);
+    for (const toilProject of ['card-payments', 'settlement', 'checkout-web']) {
+      const a = await api.standup(toilProject, range.from, range.to);
+      const b = await api.standup(toilProject, range.from, range.to);
       expect(a.markdown).toBe(b.markdown);
       expect(a.report.facts).toBeGreaterThan(0);
     }

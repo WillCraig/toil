@@ -1,6 +1,6 @@
 /**
  * The stand-up report (#345): the worklog's days, reshaped for a meeting. A
- * pure fold of a range of worklog pages (src/model/worklog.ts), the dossier's
+ * pure fold of a range of worklog pages (src/model/worklog.ts), the toil project's
  * `people` and the picture the latest sync holds, with no model anywhere: the
  * same inputs always give the same report, byte for byte, in Markdown and in
  * plain text.
@@ -20,7 +20,7 @@
  * worklog's facts in the range. A review wait and Next are as of the latest
  * sync (`asOf`), said in the report, since no worklog line records them.
  * Who a line belongs to is the fact's `who`: who moved the item, who wrote or
- * reviewed the pull request. The dossier's `people` folds each person's
+ * reviewed the pull request. The toil project's `people` folds each person's
  * accounts into one name, as the People view does (src/model/people.ts).
  *
  * The team lines come first: the sprint's working days left, scope added to
@@ -72,19 +72,19 @@ export interface StandupLine {
 }
 
 export interface StandupGroup {
-  /** `person:<name>` for someone the dossier lists, `id:<area>:<id>` for an account it doesn't, `agent:<label>` for an agent it doesn't name, `none` for lines with nobody to give them to. */
+  /** `person:<name>` for someone the toil project lists, `id:<area>:<id>` for an account it doesn't, `agent:<label>` for an agent it doesn't name, `none` for lines with nobody to give them to. */
   key: string;
   name: string;
   kind: 'human' | 'agent';
-  /** Whether the dossier's `people` lists them. */
+  /** Whether the toil project's `people` lists them. */
   mapped: boolean;
-  /** For an account the dossier doesn't map: the area and id it has there, which tell two accounts of one name apart. */
+  /** For an account the toil project doesn't map: the area and id it has there, which tell two accounts of one name apart. */
   account: { area: string; id: string } | null;
   lines: Record<Bucket, StandupLine[]>;
 }
 
 export interface StandupReport {
-  dossier: string;
+  toilProject: string;
   from: string;
   to: string;
   timeZone: 'UTC';
@@ -101,18 +101,18 @@ export interface StandupReport {
 }
 
 export interface StandupInput {
-  dossier: string;
+  toilProject: string;
   from: string;
   to: string;
   /** The worklog page of every day from `from` to `to`, in any order. */
   pages: WorklogPage[];
-  /** The dossier's `people` (#292). */
+  /** The toil project's `people` (#292). */
   people: PersonEntry[];
   /** The work items and pull requests the latest sync holds. */
   items: WorkItem[];
   pullRequests: Change[];
   asOf: string | null;
-  /** Anything that couldn't be read for the report (the dossier's people), said first among its gaps. */
+  /** Anything that couldn't be read for the report (the toil project's people), said first among its gaps. */
   notes?: string[];
 }
 
@@ -164,7 +164,7 @@ function grouper(entries: PersonEntry[]) {
   };
   return {
     groups,
-    /** An account's group: the person the dossier maps it to, else one of its own. */
+    /** An account's group: the person the toil project maps it to, else one of its own. */
     of(area: string, who: Person | null): StandupGroup {
       if (!who) return make('none', 'Not attributed', 'human');
       const id: Identity = { area, id: who.id, name: who.name, email: who.email };
@@ -222,7 +222,7 @@ const order = (a: Draft, b: Draft) => (time(a) < time(b) ? -1 : time(a) > time(b
 
 /** The stand-up for a range of days: a pure fold of its input. */
 export function buildStandup(input: StandupInput): StandupReport {
-  const { dossier, from, to, people: entries, asOf } = input;
+  const { toilProject, from, to, people: entries, asOf } = input;
   const items = new Map(input.items.map((i) => [i.id, i]));
   const prs = new Map(input.pullRequests.map((c) => [c.id, c]));
   const agents = entries.filter((e) => e.kind === 'agent');
@@ -235,7 +235,7 @@ export function buildStandup(input: StandupInput): StandupReport {
     drafts.get(group)![bucket].push(line);
   };
 
-  /** A pull request's group: the dossier's agent that wrote it, else its author. */
+  /** A pull request's group: the toil project's agent that wrote it, else its author. */
   const prGroup = (id: string, area: string, who: Person | null): { group: StandupGroup; withAuthor: string | null } => {
     const c = prs.get(id);
     const agent = c ? agentsOf(c, agents)[0] : undefined;
@@ -328,7 +328,7 @@ export function buildStandup(input: StandupInput): StandupReport {
     const d = drafts.get(group);
     for (const b of BUCKETS) group.lines[b] = (d?.[b] ?? []).sort(order).map(number);
   }
-  return { dossier, from, to, timeZone: 'UTC', asOf, sprint: sprint?.sprint.name ?? null, gaps: [...(input.notes ?? []), ...gapsOf(pages)], team: teamLines, people: groups, facts: n };
+  return { toilProject, from, to, timeZone: 'UTC', asOf, sprint: sprint?.sprint.name ?? null, gaps: [...(input.notes ?? []), ...gapsOf(pages)], team: teamLines, people: groups, facts: n };
 }
 
 function runLine(run: AgentRun): Draft {
@@ -369,11 +369,11 @@ const rangeText = (r: Pick<StandupReport, 'from' | 'to'>) => (r.from === r.to ? 
 const asOfText = (r: StandupReport) =>
   r.asOf ? `Review waits, the sprint and Next are as of the sync at ${shortDay(dayOf(r.asOf)!)} ${timeOf(r.asOf)} UTC.` : 'Review waits, the sprint and Next come from a sync, and none has run yet, so there are none.';
 
-/** A group's heading: its name, the account for one the dossier doesn't map, and whether it is an agent. */
+/** A group's heading: its name, the account for one the toil project doesn't map, and whether it is an agent. */
 export const groupTitle = (p: StandupGroup) => `${p.name}${p.account && p.account.id !== p.name ? ` (${p.account.area} ${p.account.id})` : p.account ? ` (${p.account.area})` : ''}${p.kind === 'agent' ? ' (agent)' : ''}`;
 
 /** The report's title. */
-export const standupTitle = (r: Pick<StandupReport, 'dossier' | 'from' | 'to'>) => `Stand-up: ${r.dossier}, ${rangeText(r)}`;
+export const standupTitle = (r: Pick<StandupReport, 'toilProject' | 'from' | 'to'>) => `Stand-up: ${r.toilProject}, ${rangeText(r)}`;
 
 /** What the report is, in a sentence, under its title. */
 export const standupLede = (r: StandupReport) =>
@@ -398,7 +398,7 @@ export function standupMarkdown(r: StandupReport): string {
   else out.push('No sprint, scope changes, or builds and deployments that broke or recovered.');
   out.push('');
   for (const p of r.people) {
-    out.push(`## ${escapeMd(groupTitle(p))}${p.mapped || p.key === 'none' ? '' : ", not in the dossier's people"}`, '');
+    out.push(`## ${escapeMd(groupTitle(p))}${p.mapped || p.key === 'none' ? '' : ", not in the Toil project's people"}`, '');
     for (const b of BUCKETS) {
       out.push(`**${BUCKET_TITLE[b]}**`, '');
       if (p.lines[b].length) for (const l of p.lines[b]) out.push(mdLine(r, l));
@@ -425,7 +425,7 @@ export function standupText(r: StandupReport): string {
   if (r.gaps.length) out.push('Coverage', ...r.gaps.map((gap) => `- ${flat(gap)}`), '');
   out.push('Team', ...(r.team.length ? r.team.map((l) => plainLine(r, l)) : ['No sprint, scope changes, or builds and deployments that broke or recovered.']), '');
   for (const p of r.people) {
-    out.push(`${flat(groupTitle(p))}${p.mapped || p.key === 'none' ? '' : ", not in the dossier's people"}`);
+    out.push(`${flat(groupTitle(p))}${p.mapped || p.key === 'none' ? '' : ", not in the Toil project's people"}`);
     for (const b of BUCKETS) out.push(`${BUCKET_TITLE[b]}:`, ...(p.lines[b].length ? p.lines[b].map((l) => plainLine(r, l)) : [`- ${bucketNone(b, r.sprint)}`]));
     out.push('');
   }

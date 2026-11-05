@@ -96,7 +96,7 @@ export interface CommandDefinition<S extends z.ZodObject = z.ZodObject> {
   offMcpWhen?(input: z.output<S>): string | undefined;
   /**
    * Whether it changes something on this machine outside the write gate:
-   * toil's own config, the credential store or dossiers, a skills folder, a
+   * toil's own config, the credential store or toil projects, a skills folder, a
    * shell profile, or a file in the workspace (a download, a CSV): every
    * call, where `writesLocalWhen` picks out the calls that do (`out` given). A
    * read-only call (`CallOptions.readOnly`) refuses it before anything runs,
@@ -141,7 +141,7 @@ export interface CommandDefinition<S extends z.ZodObject = z.ZodObject> {
   connectionOptional?: true;
   /**
    * The call's own input makes a connection unnecessary (`db lint --engine
-   * postgres`): core resolves none, reads no secret and consults no dossier,
+   * postgres`): core resolves none, reads no secret and consults no toil project,
    * and `run` gets `ctx.connection` undefined. Only on a `connectionOptional`
    * command, so it's served with nothing set up too.
    */
@@ -173,6 +173,13 @@ export interface CommandDefinition<S extends z.ZodObject = z.ZodObject> {
    * `defineArea({ coreAliases })`; see {@link withCoreAliases}.
    */
   aliases?: Array<string | [string, ...string[]] | PresetAlias>;
+  /**
+   * Retired CLI paths that still run this command (`toil dossiers list`, now
+   * `toil projects list`). Not aliases: they are never documented, MCP never
+   * serves them, and each call gets a TOIL_PROJECT_DEPRECATED_NAME warning naming
+   * the path to type instead. Dropped after at least one beta (principle 7).
+   */
+  deprecatedPaths?: Array<[string, ...string[]]>;
   /**
    * The area's context inputs this command takes, and whether each must
    * resolve. Set by `area.command()`: every group-level input, plus the
@@ -281,6 +288,11 @@ export function aliasPaths(def: AnyCommand): string[][] {
   return (def.aliases ?? []).map((alias) => (typeof alias === 'string' ? [...def.path.slice(0, -1), alias] : Array.isArray(alias) ? [...alias] : [...alias.path]));
 }
 
+/** Every retired CLI path of `def`, which still runs it with a deprecation warning. */
+export function deprecatedPathsOf(def: AnyCommand): string[][] {
+  return (def.deprecatedPaths ?? []).map((path) => [...path]);
+}
+
 /** The input fields an alias at `path` fixes, or none. */
 export function aliasInput(def: AnyCommand, path: readonly string[]): Record<string, unknown> {
   const key = path.join(' ');
@@ -317,7 +329,7 @@ export function withCoreAliases(commands: readonly AnyCommand[], areas: Readonly
 export function assertUniquePaths(commands: readonly AnyCommand[]): void {
   const seen = new Map<string, string>();
   for (const def of commands) {
-    for (const path of [def.path, ...aliasPaths(def)]) {
+    for (const path of [def.path, ...aliasPaths(def), ...deprecatedPathsOf(def)]) {
       const key = path.join(' ');
       const owner = seen.get(key);
       if (owner !== undefined) throw new Error(`"${key}" is claimed by both ${owner} and ${commandName(def)}.`);

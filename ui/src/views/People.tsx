@@ -1,10 +1,10 @@
 /**
- * A dossier's people (#292): one card per person in the dossier's `people`,
+ * A toil project's people (#292): one card per person in the toil project's `people`,
  * agents included, with their work in progress by status and how long each
  * item has sat there, their open pull requests, the reviews waiting on them,
  * what blocks them and what they did lately; a team strip with work in
- * progress against the dossier's limit, the review queue and the sprint's
- * unassigned items; accounts the dossier doesn't map, with matches to
+ * progress against the toil project's limit, the review queue and the sprint's
+ * unassigned items; accounts the toil project doesn't map, with matches to
  * approve. Everything comes from src/model/people.ts over the same OWI items
  * and changes the dashboard reads. It shows what is on each plate and never
  * scores or ranks anyone: cards are in name order and no figure sets one
@@ -19,7 +19,7 @@ import { Panel } from '../components/panel.tsx';
 import { EditLink, Help } from '../components/help.tsx';
 import { useData } from '../data.ts';
 import { Empty, EmptyLink } from '../components/empty.tsx';
-import { boardHref, dateTime, dossierHref, sourceLabel, dossierEditHref } from '../format.ts';
+import { boardHref, dateTime, toilProjectHref, sourceLabel, toilProjectEditHref } from '../format.ts';
 import { ACTIVITY_DAYS, people, suggestionLine, type Activity, type Card as PersonCard, type Identity, type Suggestion } from '../model/people.ts';
 import { daysText, WAITING_LABEL } from '../model/prs.ts';
 import { useTerm, useTheme, useThemeChoiceContext } from '../skins.tsx';
@@ -35,14 +35,14 @@ const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? on
 const identityText = (i: Identity) => `${sourceLabel(i.area)} ${i.name && i.name !== i.id ? `${i.id} (${i.name})` : i.id}`;
 
 export function People() {
-  const { dossier, now } = useData();
+  const { toilProject, now } = useData();
   const term = useTerm();
   const alignments = useAlignments();
   const view = useMemo(
-    () => people({ dossier: dossier.name, entries: dossier.people ?? [], wipLimit: dossier.wipLimit ?? null, items: dossier.items, changes: dossier.pullRequests ?? [], now }),
-    [dossier, now],
+    () => people({ toilProject: toilProject.name, entries: toilProject.people ?? [], wipLimit: toilProject.wipLimit ?? null, items: toilProject.items, changes: toilProject.pullRequests ?? [], now }),
+    [toilProject, now],
   );
-  const calls = [...dossier.calls.dossier, ...dossier.calls.work, ...dossier.calls.prs];
+  const calls = [...toilProject.calls.toilProject, ...toilProject.calls.work, ...toilProject.calls.prs];
   const humans = view.people.filter((c) => c.who.kind === 'human').length;
   const agents = view.people.length - humans;
 
@@ -50,22 +50,22 @@ export function People() {
     <>
       <div className="view-head">
         <p className="eyebrow">
-          <a href={dossierHref(dossier.name)}>{dossier.name}</a>
+          <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a>
         </p>
         <h1 tabIndex={-1}>{term('people', 'People')}</h1>
         <p className="lede">
           {view.people.length
-            ? `${[humans ? count(humans, 'person', 'people') : '', agents ? count(agents, 'agent') : ''].filter(Boolean).join(' and ')} from the dossier's people, and ${count(view.unmapped.length, 'account')} it doesn't map.`
-            : `This dossier lists nobody yet, so each account its data names has a card of its own (${view.unmapped.length}).`}{' '}
+            ? `${[humans ? count(humans, 'person', 'people') : '', agents ? count(agents, 'agent') : ''].filter(Boolean).join(' and ')} from the Toil project's people, and ${count(view.unmapped.length, 'account')} it doesn't map.`
+            : `This Toil project lists nobody yet, so each account its data names has a card of its own (${view.unmapped.length}).`}{' '}
           Read {dateTime(now)}; work in progress counts work items, not the epics and features that hold them. <Help topic="people" />
         </p>
         {!view.people.length && (
           <p className="note">
-            Say who is who across systems in the dossier's people, from Settings, Dossiers, or with <code>toil dossiers person {dossier.name} "Pat Example" --id jira=pat --id github=pat-ex</code>.{' '}
-            <EditLink href={dossierEditHref(dossier.name, 'people')} label={`Edit ${dossier.name}'s people`} />
+            Say who is who across systems in the Toil project's people, from Settings, Toil projects, or with <code>toil projects person {toilProject.name} "Pat Example" --id jira=pat --id github=pat-ex</code>.{' '}
+            <EditLink href={toilProjectEditHref(toilProject.name, 'people')} label={`Edit ${toilProject.name}'s people`} />
           </p>
         )}
-        {(dossier.peopleNotes ?? []).map((n, i) => (
+        {(toilProject.peopleNotes ?? []).map((n, i) => (
           <p key={i} role="note" className="failure">
             {n}
           </p>
@@ -80,7 +80,7 @@ export function People() {
         <section className="people-section" aria-labelledby="people-cards">
           <div className="edit-head">
             <h2 id="people-cards">People and agents</h2>
-            <EditLink href={dossierEditHref(dossier.name, 'people')} label={`Edit ${dossier.name}'s people`} />
+            <EditLink href={toilProjectEditHref(toilProject.name, 'people')} label={`Edit ${toilProject.name}'s people`} />
             {alignments && <Help topic="alignments" />}
           </div>
           <CardGrid min="md" className="people-cards">
@@ -93,10 +93,10 @@ export function People() {
         </section>
       )}
 
-      <AgentAssignments people={dossier.people ?? []} />
+      <AgentAssignments people={toilProject.people ?? []} />
 
       {(view.suggestions.length > 0 || view.ambiguous.length > 0) && (
-        <Panel id="matches" title="Possible matches" calls={dossier.calls.dossier} alerts={false}>
+        <Panel id="matches" title="Possible matches" calls={toilProject.calls.toilProject} alerts={false}>
           <p className="note">Accounts that share an email with a person, or with an account in another system. Nothing is mapped until you approve it, and an email that fits more than one person suggests nothing.</p>
           {view.suggestions.length > 0 && (
             <ul className="rows">
@@ -116,14 +116,14 @@ export function People() {
       )}
 
       <section className="people-section" aria-labelledby="unmapped-cards">
-        <h2 id="unmapped-cards">{view.people.length ? 'Not in the dossier\'s people' : 'Accounts in this dossier\'s data'}</h2>
+        <h2 id="unmapped-cards">{view.people.length ? 'Not in the Toil project\'s people' : 'Accounts in this Toil project\'s data'}</h2>
         <p className="note">
-          Each account the data names that the dossier doesn't map to a person, with something on its plate.
+          Each account the data names that the Toil project doesn't map to a person, with something on its plate.
           {view.bots.length > 0 && ` ${count(view.bots.length, 'bot account')} (${view.bots.map((b) => b.id).join(', ')}) only wrote bots' pull requests and ${view.bots.length === 1 ? 'is' : 'are'} left out.`}
         </p>
         {view.unnamedAgents.length > 0 && (
           <p className="note">
-            {count(view.unnamedAgents.length, 'pull request')} {view.unnamedAgents.length === 1 ? 'was' : 'were'} written with an agent the dossier's people don't name ({[...new Set(view.unnamedAgents.map((c) => c.authorKindSignal ?? 'an agent account'))].join('; ')}). Add the agent with <code>toil dossiers person {dossier.name} "&lt;name&gt;" --kind agent</code> to give it a card.
+            {count(view.unnamedAgents.length, 'pull request')} {view.unnamedAgents.length === 1 ? 'was' : 'were'} written with an agent the Toil project's people don't name ({[...new Set(view.unnamedAgents.map((c) => c.authorKindSignal ?? 'an agent account'))].join('; ')}). Add the agent with <code>toil projects person {toilProject.name} "&lt;name&gt;" --kind agent</code> to give it a card.
           </p>
         )}
         {view.unmapped.length ? (
@@ -136,9 +136,9 @@ export function People() {
           </CardGrid>
         ) : (
           <Empty
-            message={view.people.length ? 'Every account with work on its plate is mapped to someone.' : "This dossier's data names nobody with work on their plate."}
+            message={view.people.length ? 'Every account with work on its plate is mapped to someone.' : "This Toil project's data names nobody with work on their plate."}
             action={
-              <EmptyLink edit href={dossierEditHref(dossier.name, 'people')}>
+              <EmptyLink edit href={toilProjectEditHref(toilProject.name, 'people')}>
                 Add a person
               </EmptyLink>
             }
@@ -161,7 +161,7 @@ function TeamStrip({ view }: { view: ReturnType<typeof people> }) {
           <p className="note">
             {wip.limit === null ? (
               // The pencil after the note sets one (#417), so the note no longer spells out the command.
-              <>No limit is set in the dossier.</>
+              <>No limit is set in the Toil project.</>
             ) : wip.over.length ? (
               <>
                 Limit {wip.limit} per person. Over it: {wip.over.map((o) => `${o.name} (${o.count})`).join(', ')}.
@@ -169,7 +169,7 @@ function TeamStrip({ view }: { view: ReturnType<typeof people> }) {
             ) : (
               <>Limit {wip.limit} per person. Nobody is over it.</>
             )}{' '}
-            <EditLink href={dossierEditHref(view.dossier, 'wip')} label={`Edit ${view.dossier}'s work-in-progress limit`} />
+            <EditLink href={toilProjectEditHref(view.toilProject, 'wip')} label={`Edit ${view.toilProject}'s work-in-progress limit`} />
           </p>
         </Stack>
       </li>
@@ -205,7 +205,7 @@ function TeamStrip({ view }: { view: ReturnType<typeof people> }) {
               <p className="note">Everything in {unassigned.sprint} that isn't done has someone on it.</p>
             )
           ) : (
-            <p className="note">No sprint is current in this dossier's data.</p>
+            <p className="note">No sprint is current in this Toil project's data.</p>
           )}
         </Stack>
       </li>
@@ -221,7 +221,7 @@ function useAlignments() {
 }
 
 function PersonCardView({ card, limit }: { card: PersonCard; limit: number | null }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const alignments = useAlignments();
   const { who } = card;
   const id = `who-${who.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
@@ -243,9 +243,9 @@ function PersonCardView({ card, limit }: { card: PersonCard; limit: number | nul
             )}
           </ul>
         </div>
-        <p className="note any-break">{who.identities.length ? who.identities.map(identityText).join(' · ') : 'No identities in the dossier yet.'}</p>
+        <p className="note any-break">{who.identities.length ? who.identities.map(identityText).join(' · ') : 'No identities in the Toil project yet.'}</p>
         <p>
-          <a href={boardHref(dossier.name, who.key)}>{who.name}'s items on the board</a>
+          <a href={boardHref(toilProject.name, who.key)}>{who.name}'s items on the board</a>
         </p>
 
         <h4>
@@ -312,7 +312,7 @@ function PersonCardView({ card, limit }: { card: PersonCard; limit: number | nul
                   <span key={x.id}>
                     {i > 0 && ', '}
                     <ItemLink id={x.id} />
-                    {x.item ? <span className="field"> ({x.item.status ?? 'not done'})</span> : <span className="field"> (not in this dossier, so its status is unknown)</span>}
+                    {x.item ? <span className="field"> ({x.item.status ?? 'not done'})</span> : <span className="field"> (not in this Toil project, so its status is unknown)</span>}
                   </span>
                 ))}
               </li>
@@ -381,7 +381,7 @@ function SuggestionRow({ suggestion: s }: { suggestion: Suggestion }) {
     setBusy(true);
     try {
       const e = await config.run(s.command, s.input);
-      setOutcome(outcomeOf(e, `Mapped in ${s.input.dossier}'s people. Reload the dossier to see the cards change.`));
+      setOutcome(outcomeOf(e, `Mapped in ${s.input.toilProject}'s people. Reload the Toil project to see the cards change.`));
     } catch (e) {
       setOutcome(failedOutcome(e));
     } finally {
@@ -418,7 +418,7 @@ function SuggestionRow({ suggestion: s }: { suggestion: Suggestion }) {
       {outcome?.ok && refresh && (
         <p>
           <button type="button" className="btn" onClick={refresh}>
-            Reload the dossier
+            Reload the Toil project
           </button>
         </p>
       )}

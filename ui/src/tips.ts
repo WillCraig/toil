@@ -27,8 +27,8 @@ export interface Tip {
 export const TIPS: readonly Tip[] = [
   { id: 'board-m', text: 'Press M on a focused board card to open its menu: propose a move, or assign it to an agent.', topic: 'assignments' },
   { id: 'board-drag', text: 'Drag a board card to another column to propose the move. Nothing changes in the tracker until you run the command it shows.', topic: 'board' },
-  { id: 'onboard', text: 'Joining a repository that already has a dossier? toil dossiers onboard sets up the connections it needs.', topic: 'repo-setup' },
-  { id: 'analyses', text: "Every Analyze is kept in the dossier's Analyses tab, with what changed since the one before.", topic: 'analyses' },
+  { id: 'onboard', text: 'Joining a repository that already has a Toil project? toil projects onboard sets up the connections it needs.', topic: 'repo-setup' },
+  { id: 'analyses', text: "Every Analyze is kept in the Toil project's Analyses tab, with what changed since the one before.", topic: 'analyses' },
   { id: 'notify', text: 'Notifications come only when an agent changes state. Pick which states, quiet hours and only your own under Settings, General.', topic: 'notifications' },
   { id: 'write-gate', text: "Toil UI only reads. A change goes through toil's write gate: writes on for the connection, and --allow-write on the call.", topic: 'proposal' },
   { id: 'theme-depth', text: 'Themed wording and Themed agent voice, under Settings, General, set how far a theme goes. Buttons, ids and errors never change.', topic: 'themed-wording' },
@@ -39,8 +39,8 @@ export const TIPS: readonly Tip[] = [
   { id: 'standup', text: "The stand-up, under the Worklog tab, folds the worklog's days into done, in progress and blocked, by code alone.", topic: 'standup' },
   { id: 'readiness', text: "The Board's Readiness view says which items are ready to start, worked out from the cache with no model call.", topic: 'readiness' },
   { id: 'wipe', text: 'toil-ui wipe deletes everything Toil UI synced to this machine. Your trackers are never touched.', topic: 'sync' },
-  { id: 'palette', text: 'Ctrl+K (Cmd+K on a Mac) opens the command palette: jump to a dossier, a tab, an item or a setting, or run Sync, Analyze and Ask.', topic: 'palette' },
-  { id: 'help', text: 'Help in the header opens the docs section for the view in front of you, and every (i) has a Read more link.', topic: 'dossiers' },
+  { id: 'palette', text: 'Ctrl+K (Cmd+K on a Mac) opens the command palette: jump to a Toil project, a tab, an item or a setting, or run Sync, Analyze and Ask.', topic: 'palette' },
+  { id: 'help', text: 'Help in the header opens the docs section for the view in front of you, and every (i) has a Read more link.', topic: 'toilProjects' },
 ];
 
 const ORDER_KEY = 'toil-ui.tips.order';

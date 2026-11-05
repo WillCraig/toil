@@ -289,9 +289,9 @@
     ]
   },
   {
-    "name": "check-dossier",
-    "tool": "jira_check_dossier",
-    "description": "Check the call's dossier against Jira: its projects and field ids exist",
+    "name": "check-toil-project",
+    "tool": "jira_check_toil_project",
+    "description": "Check the call's toil project against Jira: its projects and field ids exist",
     "writes": false,
     "connection": true,
     "flags": []

@@ -10,14 +10,14 @@ import { loaded } from './harness.ts';
 
 /**
  * Analyze's answers, kept and compared (#395): the top-down shape read back
- * out of the text, the snapshot of a dossier, and what changed between two
+ * out of the text, the snapshot of a toil project, and what changed between two
  * analyses, all by code.
  */
 
 const answer = (texts: string[], over: Partial<Answer> = {}): Answer => ({ prompt: 'Analyze', parts: texts.map((text) => ({ text })), citations: [], by: 'Codex', adapter: 'codex', model: 'gpt-5.5', proposals: [], ...over });
 const snap = (over: Partial<AnalysisSnapshot> = {}): AnalysisSnapshot => ({ blocked: [], points: {}, sprint: null, ...over });
 const record = (id: string, at: string, s: AnalysisSnapshot, citations: string[] = [], recommendation = 'Do it.'): AnalysisRecord => ({
-  ...recordOf(answer([`Recommendation: ${recommendation}`]), { id, dossier: 'd', startedAt: at, at, snapshot: s }),
+  ...recordOf(answer([`Recommendation: ${recommendation}`]), { id, toilProject: 'd', startedAt: at, at, snapshot: s }),
   citations,
 });
 
@@ -66,10 +66,10 @@ describe('structureOf', () => {
     expect(s.evidence).toEqual(['Evidence shows the build is green.\nIssues with it are none.']);
   });
 
-  it("reads the scripted Analyze answer of every sample dossier as a briefing (#494), the evidence beside it", () => {
-    for (const dossier of ['card-payments', 'settlement', 'checkout-web']) {
-      const read = readBriefing(analyzeParts(dossier).join('\n\n'));
-      expect(read.problems, dossier).toEqual([]);
+  it("reads the scripted Analyze answer of every sample Toil project as a briefing (#494), the evidence beside it", () => {
+    for (const toilProject of ['card-payments', 'settlement', 'checkout-web']) {
+      const read = readBriefing(analyzeParts(toilProject).join('\n\n'));
+      expect(read.problems, toilProject).toEqual([]);
       expect(read.briefing!.recommendation).toContain('[[');
       expect(read.briefing!.reasons.length).toBeGreaterThanOrEqual(2);
       expect(read.briefing!.reasons.every((r) => r.items.every((i) => i.why && i.next))).toBe(true);
@@ -139,12 +139,12 @@ describe('the history', () => {
   });
 
   it('keeps a record of who answered, what it used, its recommendation and issues, and the whole answer', () => {
-    const r = recordOf(answer(['Recommendation: Fix [[j:A-1]].', 'Issues:\n1. A: [[j:A-2]] waits.'], { citations: ['j:A-1', 'j:A-2'], unverified: ['j:A-9'], warnings: ['w'] }), { id: 'r', dossier: 'd', startedAt: 's', at: 't', snapshot: snap() });
+    const r = recordOf(answer(['Recommendation: Fix [[j:A-1]].', 'Issues:\n1. A: [[j:A-2]] waits.'], { citations: ['j:A-1', 'j:A-2'], unverified: ['j:A-9'], warnings: ['w'] }), { id: 'r', toilProject: 'd', startedAt: 's', at: 't', snapshot: snap() });
     expect(r).toMatchObject({ adapter: 'codex', model: 'gpt-5.5', by: 'Codex', recommendation: 'Fix [[j:A-1]].', issues: [{ title: 'A', text: '[[j:A-2]] waits.' }], citations: ['j:A-1', 'j:A-2'], unverified: ['j:A-9'], warnings: ['w'], usage: null });
     expect(r.parts).toHaveLength(2);
   });
 
-  it('in memory: records, lists, opens, and keeps only the newest of a dossier', async () => {
+  it('in memory: records, lists, opens, and keeps only the newest of a Toil project', async () => {
     const { data } = await loaded('card-payments');
     const api = memoryAnalyses();
     const ids: string[] = [];

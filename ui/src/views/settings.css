@@ -1,4 +1,4 @@
-/* The settings pages (#253): the sub-navigation, connection and dossier cards,
+/* The settings pages (#253): the sub-navigation, connection and toil project cards,
    and the change forms. Colours come from the theme's tokens, so Plain and
    Crate both style them; every control is at least 44px tall. */
 
@@ -98,7 +98,7 @@ button.btn:disabled { cursor: not-allowed; opacity: 0.75; }
   .rate { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
-/* How Analyze briefs a dossier (#494): the prompt as it will be sent, beside the form. */
+/* How Analyze briefs a toil project (#494): the prompt as it will be sent, beside the form. */
 .analyze-preview > summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; color: var(--link); }
 .analyze-preview__text { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.5; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.75rem; max-height: 24rem; overflow: auto; margin: 0.5rem 0; }
 .analyze-lenses > summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; }

@@ -5,10 +5,10 @@
  *
  * - **refine** drafts acceptance criteria, an estimate, a split into
  *   children and open questions, all as write proposals;
- * - **investigate** researches the item across the dossier's sources and
+ * - **investigate** researches the item across the toil project's sources and
  *   writes a report that cites them, saved with the assignment; posting it
  *   as a comment is a proposal;
- * - **implement** works the item in a clone of the dossier's repository, on
+ * - **implement** works the item in a clone of the toil project's repository, on
  *   a new local branch `agent/<key>`; pushing it and opening a pull request
  *   are proposals.
  *
@@ -43,12 +43,12 @@ export const MODE_INFO: Record<AssignMode, { label: string; does: string; change
   },
   investigate: {
     label: 'Investigate',
-    does: "Researches the item across the dossier's sources (related items, pull requests, builds) and writes a report that cites each one.",
+    does: "Researches the item across the Toil project's sources (related items, pull requests, builds) and writes a report that cites each one.",
     changes: 'Nothing. The report is saved with the assignment, and posting it as a comment is a proposal.',
   },
   implement: {
     label: 'Implement',
-    does: "Works the item in a copy of the dossier's repository, on a new local branch, through the adapter's coding runtime and its own sandbox.",
+    does: "Works the item in a copy of the Toil project's repository, on a new local branch, through the adapter's coding runtime and its own sandbox.",
     changes: 'Only that branch, in a folder of its own, with no network. Pushing it and opening a pull request are proposals.',
   },
 };
@@ -95,7 +95,7 @@ export interface Stop {
  * What a run started on, so a later look can tell whether the ground moved
  * under it (#305): the toil and Toil UI versions, the adapter and model, the
  * skills it was given (none: Toil UI hands the agent no skill), and
- * fingerprints (SHA-256) of the dossier, the item as synced, the system
+ * fingerprints (SHA-256) of the toil project, the item as synced, the system
  * prompt and the tool list.
  */
 export interface StartedOn {
@@ -106,7 +106,7 @@ export interface StartedOn {
   model: string | null;
   skills: string[];
   tools: string[];
-  dossier: { name: string; fingerprint: string | null };
+  toilProject: { name: string; fingerprint: string | null };
   item: { id: string; updated: string | null; fingerprint: string };
   prompt: string;
   /** The install fingerprint (#305) a later check holds it to; absent on a run recorded before there was one. */
@@ -165,7 +165,7 @@ export interface Branch {
 
 export interface Assignment {
   id: string;
-  dossier: string;
+  toilProject: string;
   /** The OWI id of the work item. */
   item: string;
   itemTitle: string;
@@ -179,7 +179,7 @@ export interface Assignment {
   state: AssignState;
   /** For a queued assignment: waiting for a person to press Start, or for a free slot. */
   waiting: 'start' | 'slot' | null;
-  /** Implement mode: the dossier repository to clone. */
+  /** Implement mode: the toil project repository to clone. */
   repo: string | null;
   createdAt: string;
   startedAt: string | null;
@@ -219,7 +219,7 @@ export interface AssignmentEvent {
   seq: number;
   at: string;
   id: string;
-  dossier: string;
+  toilProject: string;
   item: string;
   kind: 'created' | 'state' | 'proposal' | 'renamed' | 'renewed';
   state: AssignState;
@@ -257,7 +257,7 @@ export interface AdapterChoice {
   implement: string | null;
 }
 
-/** A dossier repository implement mode can clone: it has a local path. */
+/** A toil project repository implement mode can clone: it has a local path. */
 export interface RepoChoice {
   name: string;
   path: string;
@@ -273,7 +273,7 @@ export interface AssignmentList {
 }
 
 export interface AssignRequest {
-  dossier: string;
+  toilProject: string;
   item: string;
   mode: AssignMode;
   adapter: AssignAdapter;
@@ -284,8 +284,8 @@ export interface AssignRequest {
 export interface AssignmentsApi {
   /** Why nothing can be assigned here, or null. */
   disabled: string | null;
-  /** The dossier's assignments; `inbox: false` only reads, without queueing what the tracker asks for (#306's stale check). */
-  list(dossier: string, o?: { inbox?: boolean }): Promise<AssignmentList>;
+  /** The toil project's assignments; `inbox: false` only reads, without queueing what the tracker asks for (#306's stale check). */
+  list(toilProject: string, o?: { inbox?: boolean }): Promise<AssignmentList>;
   get(id: string): Promise<AssignmentRecord>;
   assign(request: AssignRequest): Promise<Assignment>;
   /** Starts a tracker-queued assignment, with an adapter when it has none. */
@@ -299,7 +299,7 @@ export interface AssignmentsApi {
   /** Starts a stale, idle assignment afresh on today's instructions (#305): the new assignment, with the old one kept. */
   renew(id: string): Promise<Assignment>;
   /**
-   * Every assignment's events from `since` on (#306), across dossiers, until
+   * Every assignment's events from `since` on (#306), across toil projects, until
    * the signal aborts or the stream ends; `latest` skips what already
    * happened. Absent where nothing streams.
    */
@@ -324,7 +324,7 @@ const AGENT_LABEL = /^agent:(refine|investigate|implement)$/i;
 
 /**
  * Whether an item asks for an agent on the tracker: a label `agent:<mode>`,
- * or an assignee who is one of the dossier's agents (in its `people`), which
+ * or an assignee who is one of the toil project's agents (in its `people`), which
  * queues a refine. It only ever queues: a person starts it (principle 2).
  */
 export function inboxMatch(item: Pick<WorkItem, 'labels' | 'assignee' | 'statusCategory'>, agents: readonly PersonEntry[]): { mode: AssignMode; trigger: string } | null {
@@ -343,7 +343,7 @@ export function inboxMatch(item: Pick<WorkItem, 'labels' | 'assignee' | 'statusC
 }
 
 /** The fields that only say where a change goes, which a diff leaves out. */
-const WHERE = new Set(['id', 'key', 'dossier', 'project', 'repo', 'owner', 'number', 'connection']);
+const WHERE = new Set(['id', 'key', 'toilProject', 'project', 'repo', 'owner', 'number', 'connection']);
 
 const plain = (v: unknown): string => (typeof v === 'string' ? v : v === null || v === undefined ? '' : JSON.stringify(v));
 

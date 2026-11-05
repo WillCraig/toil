@@ -4,7 +4,7 @@
  * generated OWI file, apply.mjs and cleanup.mjs against an organization in
  * memory (test/ado-board.ts), and then toil's own ado commands and
  * `mapOwi` reading that board back, compared with the file the board was
- * seeded from. Then Toil UI's loader on a Services dossier. The live run
+ * seeded from. Then Toil UI's loader on a Services toil project. The live run
  * this rehearses is in the PR (#319); this is the version that runs on a
  * plane.
  */
@@ -20,7 +20,7 @@ import { cleanup, confirmationCode } from '../scripts/ado-seed/cleanup.mjs';
 import { compare } from '../scripts/ado-seed/compare.mjs';
 import { ANCHOR, check, DEFAULT_OUT, DEFAULT_SEED, generate, render, type SeedRecord } from '../scripts/ado-seed/generate.mjs';
 import { READ_COMMANDS } from '../server/store.ts';
-import { loadDossier } from '../src/load.ts';
+import { loadToilProject } from '../src/load.ts';
 import { proposeMove } from '../src/model/board.ts';
 import type { Execute, WorkItem } from '../src/toil.ts';
 import { adoBoard, ORG, PROJECT, type Board } from './ado-board.ts';
@@ -190,19 +190,19 @@ describe('cleanup.mjs', () => {
 
 const saved: Record<string, string | undefined> = {};
 const folders: string[] = [];
-const ENV = ['HOME', 'USERPROFILE', 'TOIL_ADO_PAT', 'TOIL_ADO_BASE_URL', 'TOIL_ADO_DEPLOYMENT', 'TOIL_DOSSIER', 'TOIL_DOSSIER_PATHS', 'SYSTEM_ACCESSTOKEN'];
+const ENV = ['HOME', 'USERPROFILE', 'TOIL_ADO_PAT', 'TOIL_ADO_BASE_URL', 'TOIL_ADO_DEPLOYMENT', 'TOIL_TOIL_PROJECT', 'TOIL_TOIL_PROJECT_PATHS', 'SYSTEM_ACCESSTOKEN'];
 beforeEach(() => {
   const home = mkdtempSync(join(tmpdir(), 'toil-ui-ado-seed-'));
   folders.push(home);
-  mkdirSync(join(home, '.toil', 'dossiers'), { recursive: true });
+  mkdirSync(join(home, '.toil', 'projects'), { recursive: true });
   writeFileSync(join(home, '.toil', 'config.json'), JSON.stringify({ version: 3, connections: { 'imagile-ado': { area: 'ado', deployment: 'cloud', baseUrl: ORG } }, audit: { enabled: false } }));
-  writeFileSync(join(home, '.toil', 'dossiers', 'ado-board.json'), JSON.stringify({ name: 'ado-board', description: 'The seeded board', repos: [], ado: { connection: 'imagile-ado', project: PROJECT } }));
+  writeFileSync(join(home, '.toil', 'projects', 'ado-board.json'), JSON.stringify({ name: 'ado-board', description: 'The seeded board', repos: [], ado: { connection: 'imagile-ado', project: PROJECT } }));
   for (const key of ENV) saved[key] = process.env[key];
   process.env.HOME = home;
   process.env.USERPROFILE = home;
   process.env.TOIL_ADO_PAT = 'test-pat';
   process.env.TOIL_ADO_DEPLOYMENT = 'cloud';
-  for (const key of ['TOIL_ADO_BASE_URL', 'TOIL_DOSSIER', 'TOIL_DOSSIER_PATHS', 'SYSTEM_ACCESSTOKEN']) delete process.env[key];
+  for (const key of ['TOIL_ADO_BASE_URL', 'TOIL_TOIL_PROJECT', 'TOIL_TOIL_PROJECT_PATHS', 'SYSTEM_ACCESSTOKEN']) delete process.env[key];
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -219,7 +219,7 @@ describe("toil's ado commands on a Services connection, on the seeded board", ()
     await seed(board);
     vi.stubGlobal('fetch', board.fetch);
     board.writes.length = 0;
-    const data = await loadDossier(execute as unknown as Execute, 'ado-board', { mapOwi });
+    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi });
     expect(data.calls.work.filter((c) => !c.ok)).toEqual([]);
     expect(data.calls.work.map((c) => c.command)).toEqual(expect.arrayContaining(['ado work-item iterations', 'ado work-item search', 'ado work-item get-many', 'ado work-item history']));
     // One feed call (read in several batches) stood in for most histories; the items it doesn't hold whole were read one by one, and the result is the same board.
@@ -231,14 +231,14 @@ describe("toil's ado commands on a Services connection, on the seeded board", ()
     expect(compare(items, data.items, { project: PROJECT, backdated: true })).toEqual([]);
     // Scrum's In Progress is in progress, not a custom state.
     expect(data.items.filter((i) => i.status === 'In Progress').every((i) => i.statusCategory === 'IN_PROGRESS')).toBe(true);
-    // Reading never wrote; the dossier names no repository, so no pull requests were asked for.
+    // Reading never wrote; the toil project names no repository, so no pull requests were asked for.
     expect(board.writes).toEqual([]);
     expect(data.calls.prs).toEqual([]);
     // Toil UI's server lets the page make every one of these reads.
     expect(data.calls.work.filter((c) => !READ_COMMANDS.has(c.command))).toEqual([]);
   });
 
-  it("reads the pull requests of the dossier's repository, and ties each to the work items it names", async () => {
+  it("reads the pull requests of the Toil project's repository, and ties each to the work items it names", async () => {
     const board = adoBoard();
     const { ids } = await seed(board);
     const id = ids.get('cp-pbi-1')!;
@@ -252,22 +252,22 @@ describe("toil's ado commands on a Services connection, on the seeded board", ()
       lastMergeCommit: { commitId: 'abc1234' },
       repository: { name: 'payments-core', webUrl: `${ORG}/${PROJECT}/_git/payments-core`, project: { name: PROJECT } },
     });
-    const file = join(process.env.HOME!, '.toil', 'dossiers', 'ado-board.json');
+    const file = join(process.env.HOME!, '.toil', 'projects', 'ado-board.json');
     writeFileSync(file, JSON.stringify({ name: 'ado-board', repos: [], ado: { connection: 'imagile-ado', project: PROJECT, repo: 'payments-core' } }));
     vi.stubGlobal('fetch', board.fetch);
-    const data = await loadDossier(execute as unknown as Execute, 'ado-board', { mapOwi });
+    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi });
     expect(data.calls.prs.map((c) => [c.command, c.ok])).toEqual([['ado pr list', true], ['ado pr get', true]]);
     expect(data.pullRequests.map((c) => [c.id, c.state, c.workItems, c.checks])).toEqual([[`imagile-ado:${PROJECT}/payments-core#7`, 'MERGED', [`imagile-ado:${id}`], 'NONE']]);
     expect(READ_COMMANDS.has('ado pr list')).toBe(true);
     expect(data.changes.filter((c) => c.kind === 'pull-request').map((c) => [c.id, c.command, c.outcome, c.items])).toEqual([[`imagile-ado:${PROJECT}/payments-core#7`, 'ado pr get', 'merged', [`imagile-ado:${id}`]]]);
   });
 
-  it('reads no pull requests and no runs for a Services dossier with no items and no repository', async () => {
+  it('reads no pull requests and no runs for a Services Toil project with no items and no repository', async () => {
     const board = adoBoard();
-    const file = join(process.env.HOME!, '.toil', 'dossiers', 'ado-board.json');
+    const file = join(process.env.HOME!, '.toil', 'projects', 'ado-board.json');
     writeFileSync(file, JSON.stringify({ name: 'ado-board', repos: [], ado: { connection: 'imagile-ado', project: PROJECT, builds: ['ci'], deployments: ['deploy'] } }));
     vi.stubGlobal('fetch', board.fetch);
-    const data = await loadDossier(execute as unknown as Execute, 'ado-board', { mapOwi });
+    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi });
     expect(data.items).toEqual([]);
     const commands = Object.values(data.calls).flat().map((c) => c.command);
     expect(commands).not.toContain('ado pr list');
@@ -278,8 +278,8 @@ describe("toil's ado commands on a Services connection, on the seeded board", ()
     const board = adoBoard();
     await seed(board);
     vi.stubGlobal('fetch', board.fetch);
-    const data = await loadDossier(execute as unknown as Execute, 'ado-board', { mapOwi });
+    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi });
     const item = data.items.find((i) => i.status === 'New' && i.type === 'STORY') as WorkItem;
-    expect(proposeMove(item, 'IN_PROGRESS', data.items, 'ado-board')).toMatchObject({ command: 'ado work-item transition', input: { dossier: 'ado-board', id: Number(item.source.key), state: 'Committed' } });
+    expect(proposeMove(item, 'IN_PROGRESS', data.items, 'ado-board')).toMatchObject({ command: 'ado work-item transition', input: { toilProject: 'ado-board', id: Number(item.source.key), state: 'Committed' } });
   });
 });

@@ -71,10 +71,10 @@ function Rests() {
 }
 
 function Panel({ id, children }: { id: string; children: ReactNode }) {
-  // A panel can sit outside a dossier (none do yet), so the vitals only ask for the sprint inside one.
-  const inDossier = useContext(DataContext) !== null;
+  // A panel can sit outside a toil project (none do yet), so the vitals only ask for the sprint inside one.
+  const inToilProject = useContext(DataContext) !== null;
   const { wording } = useThemeChoiceContext();
-  if (id === 'sprint' && inDossier) {
+  if (id === 'sprint' && inToilProject) {
     return (
       <>
         <Vitals />

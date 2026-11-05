@@ -4,7 +4,7 @@
  * a Recommendation line, then at most three Issues, then the Evidence. This
  * module reads that shape back out of the text (`structureOf`), so the page
  * can lay it out and the history can keep the recommendation and issues on
- * their own. It also takes a small snapshot of the dossier at the moment of
+ * their own. It also takes a small snapshot of the toil project at the moment of
  * each analysis (what is blocked and by what, each item's points, the
  * sprint's points done and left), so the history can say what changed from
  * one analysis to the next by code, never by asking the agent. Pure, so the
@@ -24,7 +24,7 @@ import { health } from './sprint.ts';
 
 /** The most issues an analysis shows: the prompt asks for three at most, and any more go to the evidence. */
 export const MAX_ISSUES = 3;
-/** How many analyses a dossier keeps; the oldest go first. */
+/** How many analyses a toil project keeps; the oldest go first. */
 export const MAX_ANALYSES = 100;
 
 export interface AnalysisIssue {
@@ -105,7 +105,7 @@ export function structureOf(text: string): Structure | null {
 /** The answer's text, its paragraphs joined back, for `structureOf`. */
 export const textOfParts = (parts: readonly AnswerPart[]) => parts.map((p) => p.text).join('\n\n');
 
-/** What the dossier looked like when an analysis was made: enough to say what changed by the next one. */
+/** What the toil project looked like when an analysis was made: enough to say what changed by the next one. */
 export interface AnalysisSnapshot {
   /** Each open item held up by an open item, with what holds it. */
   blocked: Array<{ id: string; by: string[] }>;
@@ -117,7 +117,7 @@ export interface AnalysisSnapshot {
 
 const open = (i: WorkItem) => i.statusCategory !== 'DONE';
 
-/** The snapshot of a dossier's items at a moment, by the same blocks rule the sprint panel uses. */
+/** The snapshot of a toil project's items at a moment, by the same blocks rule the sprint panel uses. */
 export function snapshotOf(items: readonly WorkItem[], now: string): AnalysisSnapshot {
   const byId = new Map(items.map((i) => [i.id, i]));
   const blocked: AnalysisSnapshot['blocked'] = [];
@@ -135,7 +135,7 @@ export function snapshotOf(items: readonly WorkItem[], now: string): AnalysisSna
 /** One analysis, as the history keeps it. */
 export interface AnalysisRecord {
   id: string;
-  dossier: string;
+  toilProject: string;
   /** When it was asked, and when its answer was whole. */
   startedAt: string;
   at: string;
@@ -161,7 +161,7 @@ export interface AnalysisRecord {
 }
 
 /** An Analyze answer, finished, as a record for the history. */
-export function recordOf(answer: Answer, o: { id: string; dossier: string; startedAt: string; at: string; snapshot: AnalysisSnapshot }): AnalysisRecord {
+export function recordOf(answer: Answer, o: { id: string; toilProject: string; startedAt: string; at: string; snapshot: AnalysisSnapshot }): AnalysisRecord {
   const text = textOfParts(answer.parts);
   // The server lifts the block out into answer.briefing; the sample, and an answer kept before that, still carry it in the text.
   const read = answer.briefing !== undefined ? { briefing: answer.briefing, problems: answer.briefingProblems ?? [] } : text.includes('```briefing') ? readBriefing(text) : null;
@@ -169,7 +169,7 @@ export function recordOf(answer: Answer, o: { id: string; dossier: string; start
   const s = b ? null : structureOf(text);
   return {
     id: o.id,
-    dossier: o.dossier,
+    toilProject: o.toilProject,
     startedAt: o.startedAt,
     at: o.at,
     adapter: answer.adapter ?? null,
@@ -246,7 +246,7 @@ export interface AnalysisSummary {
   citations: string[];
   unverified: number;
   changes: AnalysisChanges;
-  /** Its briefing (#494) and proposals, for the dossier's home page and the item drawer. */
+  /** Its briefing (#494) and proposals, for the toil project's home page and the item drawer. */
   briefing: Briefing | null;
   /** What in the briefing block didn't fit, in words. */
   briefingProblems: string[];

@@ -18,8 +18,8 @@ export type JobId = 'review' | 'ship' | 'map-codebase';
 
 export interface JobInput {
   name: string;
-  /** Whether the dossier supplies it. */
-  dossier: boolean;
+  /** Whether the Toil project supplies it. */
+  toilProject: boolean;
 }
 
 export interface Job {
@@ -46,7 +46,7 @@ export interface Face {
   plain: string;
   /** What it works on, for the palette and the page. */
   on: 'pull request' | 'repository';
-  /** The address segment: `#/dossier/<name>/job/<segment>`. */
+  /** The address segment: `#/project/<name>/job/<segment>`. */
   segment: string;
   /** One line saying what pressing it does. */
   gist: string;
@@ -85,7 +85,7 @@ export function parseJob(text: string): Job | string {
   const role = fm.role === 'reviewer' || fm.role === 'author' || fm.role === 'any' ? fm.role : null;
   if (!role) return `its role is ${JSON.stringify(fm.role)}, not reviewer, author or any`;
   const needs = typeof fm.needs === 'object' && fm.needs !== null && !Array.isArray(fm.needs) ? (fm.needs as Record<string, unknown>) : {};
-  const inputs = (Array.isArray(fm.inputs) ? fm.inputs : []).flatMap((i): JobInput[] => (typeof i === 'object' && i !== null && typeof (i as { name?: unknown }).name === 'string' ? [{ name: (i as { name: string }).name, dossier: (i as { dossier?: unknown }).dossier === true }] : []));
+  const inputs = (Array.isArray(fm.inputs) ? fm.inputs : []).flatMap((i): JobInput[] => (typeof i === 'object' && i !== null && typeof (i as { name?: unknown }).name === 'string' ? [{ name: (i as { name: string }).name, toilProject: (i as { toilProject?: unknown }).toilProject === true }] : []));
   const loop = typeof fm.loop === 'number' && fm.loop > 0 ? fm.loop : null;
   return {
     id: fm.job,

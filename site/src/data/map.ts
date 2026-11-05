@@ -60,7 +60,7 @@ export const lanes: MapLane[] = [
     title: 'People',
     nodes: [
       node('menu', 'The welcome menu', docsLink('/docs/welcome/').href, 'Bare toil opens it in your terminal'),
-      node('Toil UI', 'Toil UI', '/ui/', 'A dashboard per dossier, in your browser'),
+      node('Toil UI', 'Toil UI', '/ui/', 'A dashboard per toil project, in your browser'),
     ],
   },
   {
@@ -75,7 +75,7 @@ export const lanes: MapLane[] = [
 
 /** What sits inside toil on the full map: pages from the docs path for organising work, local tools and the limits. */
 export const inside: MapNode[] = [
-  { text: 'dossiers', href: '/docs/dossiers/', label: 'What a body of work holds: repos, keys, environments' },
+  { text: 'toil projects', href: '/docs/projects/', label: 'What a body of work holds: repos, keys, environments' },
   { text: 'util', href: '/docs/utilities/', label: 'Local tools, with no server and no sign-in' },
   { text: 'bounds', href: '/docs/core/#files-and-the-workspace', label: 'The limits every command is held to' },
 ].map((n) => ({ ...n, name: docsLink(n.href).label }));

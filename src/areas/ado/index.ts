@@ -8,7 +8,7 @@ import { teamCommands as cloudTeam } from './cloud/team.js';
 import { workCommands as cloudWork } from './cloud/work.js';
 
 import { overrides } from './overrides.js';
-import { checkDossier as serverCheckDossier } from './server/check-dossier.js';
+import { checkToilProject as serverCheckToilProject } from './server/check-toil-project.js';
 import { commentCommands as serverComments } from './server/comments.js';
 import { pipelineCommands as serverPipelines } from './server/pipeline.js';
 import { repoCommands as serverRepos } from './server/repo.js';
@@ -39,7 +39,7 @@ const isSchema = (d: AnyCommand) => commandName(d) === 'ado work-item schema';
 export const commands = [
   ...adoArea.byDeployment(
     {
-      server: [...serverCommands, ...serverWork, ...serverWorkMeta.filter((d) => !isSchema(d)), ...serverRepos, ...serverComments, ...serverPipelines, serverCheckDossier],
+      server: [...serverCommands, ...serverWork, ...serverWorkMeta.filter((d) => !isSchema(d)), ...serverRepos, ...serverComments, ...serverPipelines, serverCheckToilProject],
       cloud: [...cloudRepos, ...cloudWork, ...cloudPullRequests, ...cloudComments, ...cloudTeam, adoApi],
     },
     { overrides },

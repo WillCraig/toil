@@ -180,7 +180,7 @@ export function unknownState(item: WorkItem, state: MapState, status: string, wh
   return 'UNKNOWN';
 }
 
-/** An override's unit: the dossier-style `estimateUnit`, checked by the caller; points when not given. */
+/** An override's unit: the toil-project-style `estimateUnit`, checked by the caller; points when not given. */
 export const overrideUnit = (state: MapState) => (state.fields.estimateUnit as 'points' | 'hours' | 'days' | undefined) ?? 'points';
 
 /** A Person from parts, or null without an id. */

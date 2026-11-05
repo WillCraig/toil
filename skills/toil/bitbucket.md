@@ -36,7 +36,7 @@ shape**, unchanged; `meta.context.connection.deployment` says which one ran. Wha
 | Paging | `nextPageStart` | `next` links |
 | `pr diff` | `<id>` required; `data.diff` is Bitbucket's JSON diff structure as a string | `[id]` or `--spec`; `data.diff` is unified diff text |
 | Pull request version | locks writes to the version it read | none |
-| Only here | `check-dossier`, `pr create-many`, `pr add-reviewer` | `repo list`, `repo get`, `branch`, `tag`, `commit list`, `commit get`, `file`, `pipeline`, `api` |
+| Only here | `check-toil-project`, `pr create-many`, `pr add-reviewer` | `repo list`, `repo get`, `branch`, `tag`, `commit list`, `commit get`, `file`, `pipeline`, `api` |
 
 A call the connection's deployment can't serve fails **before any request** with
 `UNSUPPORTED`, saying which deployment and what to do: `bitbucket pipeline list` or `--ws` on
@@ -222,7 +222,7 @@ a flag listed for one deployment is refused on the other.
 | `pipeline steps` | `<pipeline>` | Cloud: its steps |
 | `pipeline logs` | `<pipeline> <step>` | Cloud: `{ log }`, the step's log text |
 | `api` | `<method> <path> --query --body-file --content-type` | Cloud: any REST API 2.0 endpoint |
-| `check-dossier` | | Data Center: checks the call's dossier (see below) |
+| `check-toil-project` | | Data Center: checks the call's toil project (see below) |
 
 ```bash
 # Data Center
@@ -431,16 +431,16 @@ and the old names are gone, not deprecated:
   on Bitbucket Cloud by accident. Set `TOIL_BITBUCKET_DEPLOYMENT=cloud` if the values are Cloud
   ones, or define a separate Data Center connection with `TOIL_CONN_<NAME>_*`.
   `TOIL_CONN_<NAME>_*` is never affected.
-- **Dossiers:** a `bitbucket-cloud` section is read as `bitbucket` (also under an environment and
-  in a person's `ids`), with a `DOSSIER_RENAMED_AREA` warning to rename it (`toil dossiers check`
-  reports it). With both, `bitbucket` wins. A dossier has one `bitbucket` section, so it picks
+- **Toil projects:** a `bitbucket-cloud` section is read as `bitbucket` (also under an environment and
+  in a person's `ids`), with a `TOIL_PROJECT_RENAMED_AREA` warning to rename it (`toil projects check`
+  reports it). With both, `bitbucket` wins. A toil project has one `bitbucket` section, so it picks
   one Bitbucket connection: a body of work that uses both a Data Center and a Cloud Bitbucket takes
-  two dossiers. A person keeps one Bitbucket id per dossier now (a username on Data Center, an
+  two toil projects. A person keeps one Bitbucket id per toil project now (a username on Data Center, an
   account id on Cloud), as with Jira.
 - **Pipelines:** `BITBUCKET_WORKSPACE` and `BITBUCKET_REPO_SLUG` still fill `workspace` and `repo`,
   but only on a default connection that is Cloud, and the default is Data Center unless you say
   otherwise. Set `TOIL_BITBUCKET_DEPLOYMENT=cloud` in the pipeline.
 
-## Checking a dossier
+## Checking a toil project
 
-`check-dossier` checks the call's dossier on a Data Center connection: each project key it names (`project`, per repo or not, and `projects`) exists, and each repository (`repo`) in its project. It's `toil bitbucket check-dossier` (`--dossier <name|file>`, or the dossier the folder resolves to), and it returns `{ dossier, connection, env, ok, checked, checks, unchecked }`, one check per value with its key path. The CLI exits 1 when one is missing. A failure other than not-found (a bad token, an unreachable host) fails the command. Read only. A Cloud connection gets `UNSUPPORTED`.
+`check-toil-project` checks the call's toil project on a Data Center connection: each project key it names (`project`, per repo or not, and `projects`) exists, and each repository (`repo`) in its project. It's `toil bitbucket check-toil-project` (`--toil-project <name|file>`, or the toil project the folder resolves to), and it returns `{ toil project, connection, env, ok, checked, checks, unchecked }`, one check per value with its key path. The CLI exits 1 when one is missing. A failure other than not-found (a bad token, an unreachable host) fails the command. Read only. A Cloud connection gets `UNSUPPORTED`.

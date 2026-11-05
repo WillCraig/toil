@@ -5,7 +5,7 @@
  * they type, exactly the report toil would send, then toil's own disclaimer
  * and a checkbox. Send is possible only while the box is ticked, and any edit
  * clears the tick, so the yes always belongs to the report on screen. Toil UI
- * adds nothing to the report: no dossier, connection, host or cache content.
+ * adds nothing to the report: no toil project, connection, host or cache content.
  *
  * Built on React Aria's Modal and Dialog, so focus is trapped while it is
  * open, Escape closes it, and focus goes back to the Feedback button. Every

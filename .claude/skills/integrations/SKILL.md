@@ -60,7 +60,7 @@ versions.
      for every area that pages, and pass `what` so the error names the list.
    - **A context value read from a file** (Jira's `project` in `--input-file`)
      goes through `ctx.supply('project', value, 'file')`. It ranks below the
-     call's own flag and above the dossier, git and the connection, returns the
+     call's own flag and above the toil project, git and the connection, returns the
      value to use, and `meta.context` reports source `file`. Keep the input
      `optional` in the command's `context` when the file may supply it, since a
      required one is checked before `run`.
@@ -126,9 +126,9 @@ versions.
   stays text, and keep the `parseInt`.
 - **Where a command acts** (`--project`, `--repo`, `--owner`, `--instance`, `--env`)
   is a context input in `defineArea({ context })`, never an ordinary flag, so core
-  resolves it from the call, the dossier, the git remote and the connection in one
-  order. A dossier section supplies it by the input's name, so a context input is
-  also what makes a key usable from a dossier. The contract's group-level flags (`bitbucket --project --repo`, `github
+  resolves it from the call, the toil project, the git remote and the connection in one
+  order. A toil project section supplies it by the input's name, so a context input is
+  also what makes a key usable from a toil project. The contract's group-level flags (`bitbucket --project --repo`, `github
   --owner --repo`, `ado --collection --organization --project --repo`, `jenkins
   --instance`, `openshift --env --instance`, `dynatrace --env`) are `group` inputs,
   with the contract's spelling in `flags`; a per-command one (`jira --project`) is a
@@ -154,7 +154,7 @@ versions.
   `<key>From` is the user's call and isn't asked. Document the `<key>From` setting in the area's skill file.
   `ctx.resolved.shared` says whether the key came from the other area, for an auth
   error that names which key was sent.
-- **`--env` means which environment**, and it's the same input the dossier supplies.
+- **`--env` means which environment**, and it's the same input the toil project supplies.
   Name it `env`, give it `selectsConnection` (or an enum schema), and never add a
   second environment flag.
 - **A path the contract records in another group** (`deps outdated`, served by
@@ -194,7 +194,7 @@ versions.
   still fails as usual. Only for a read with no required context input. One whose
   own input can stand in for the connection (`db lint --engine postgres`) adds
   `connectionlessWhen(input)`: when it's true, core resolves no connection, reads
-  no secret and consults no dossier.
+  no secret and consults no toil project.
 - **The working repository** (root, current branch, remote URLs) is `ctx.repo()`,
   read from `.git` in pure JS; it spawns nothing and needs no git. Use `ctx.git` only
   for a command that is git.
@@ -230,8 +230,8 @@ versions.
   never by copying the format.
 - **An API on another host than the one people know** (GitHub's api.github.com for
   github.com) is `defineArea({ siteApis: { 'github.com': 'https://api.github.com' } })`.
-  A dossier's `host: github.com` then selects a connection on the API host, sharing a
-  dossier records `github.com`, and `dossiers onboard` offers that base URL. Only a
+  A toil project's `host: github.com` then selects a connection on the API host, sharing a
+  toil project records `github.com`, and `toil projects onboard` offers that base URL. Only a
   selector and a suggestion: toil never contacts it on its own.
 - **Not-configured wording of the area's own** ("OSS Index needs an account…") is
   `defineArea({ notConfigured: { message, fix? } })`; the fix defaults to core's.
@@ -268,15 +268,15 @@ versions.
   which were invented from the vendor's docs.
 - After registering, run `npx vitest run -u` once to write the site's command list.
 
-An area's dossier section (`docs/dossiers.md`) needs nothing from the area: its keys
+An area's toil project section (`docs/projects.md`) needs nothing from the area: its keys
 are the area's context inputs, plus `connection` or `host` to select a connection
 (never anything else) and `fields`. Any other key is kept as reference data. A
-read-only `toil <area> check-dossier` checks the section against the service. Build
-one with `src/core/check-dossier.ts`: `dossierToCheck(ctx, area)`, `viewValues` for the
+read-only `toil <area> check-toil-project` checks the section against the service. Build
+one with `src/core/check-toil-project.ts`: `toilProjectToCheck(ctx, area)`, `viewValues` for the
 keys to look up, `checkEach` with a lookup that returns false only on `NOT_FOUND`, and
-`dossierCheckResult`. Give the area's fixture a `dossier` holding only reference
+`toilProjectCheckResult`. Give the area's fixture a `toilProject` holding only reference
 keys, so the other examples don't pick it up (`jira`, `sonar` and `confluence` are the
-examples). A command that takes custom fields by name merges `ctx.dossierFields()`
+examples). A command that takes custom fields by name merges `ctx.toilProjectFields()`
 into its name map, and asks for them only when the call names a field (Jira's
 `withAliases`).
 
@@ -375,7 +375,7 @@ deployments still differ in their APIs, so the code stays apart and the surface 
   `--ws` is Cloud's) is declared once in the area's `context` with `deployments: [...]`.
   The other deployments refuse it with `UNSUPPORTED` and don't need it, and a deployment's
   own `missing` wording can differ (`missing` may be a function of the connection). A command
-  that lists the input itself takes it on any deployment (Cloud's `repo create --project`), but there core resolves it from the call or the dossier alone, never from the connection's setting, defaults, env, git or the area default, which are the other deployment's (a write's target comes only from what belongs to its deployment).
+  that lists the input itself takes it on any deployment (Cloud's `repo create --project`), but there core resolves it from the call or the toil project alone, never from the connection's setting, defaults, env, git or the area default, which are the other deployment's (a write's target comes only from what belongs to its deployment).
 - **Each returns its own API's shape.** Don't reshape `data` to make the two look alike;
   `meta.context.connection.deployment` says which ran, and OWI is the normalised view.
 - **The fixture runs both.** The area's fixture names a connection per deployment
@@ -385,7 +385,7 @@ deployments still differ in their APIs, so the code stays apart and the surface 
   verification level is recorded for the product; say in the PR when the deployments are at
   different levels.
 - **Retiring an old area name** (`jira-cloud`, `confluence-cloud`, `bitbucket-cloud`, `ado-cloud`) goes in `src/core/renamed-areas.ts`, which makes
-  every old form (env vars, `--areas`, a typed path, a dossier section, a config file) fail or
+  every old form (env vars, `--areas`, a typed path, a toil project section, a config file) fail or
   warn with the new one. The config fold in `migrateConfig()` runs for every version and is
   idempotent, so a file written before the area was folded folds too, whatever its version.
 - When the variants differ only in host (GitHub.com and GitHub Enterprise Server),
@@ -409,7 +409,7 @@ deployment pair is built the same way, as one area with a `deployment` field.
   `attachments`, `files`, `reviewers`, `builds`, `threads`, `fields`, `types`).
 - **A service-level command stays two words**: one that acts on the connection or the
   service as a whole rather than on one resource (`whoami`, `connection-data`, `api`,
-  `check-dossier`, `status`, `ping`, `db query`, `alation search`), and an inventory
+  `check-toil-project`, `status`, `ping`, `db query`, `alation search`), and an inventory
   command that is an area's one job (`osv vulns`, `ossindex vulns`, `sonatypeiq
   evaluate`). `sonatypeiq evaluate` keeps `--application-id` as a flag, a named
   exception: `deps frisk`'s routed alias can pass flags only.

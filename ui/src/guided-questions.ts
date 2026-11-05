@@ -12,7 +12,7 @@ import type { Panel } from './load.ts';
 import type { WorkItem } from './toil.ts';
 
 /** The panels a read can fail in, in words, for a sentence that names the ones that failed. */
-export const PANEL_WORDS: Record<Panel, string> = { dossier: 'the dossier', work: 'work items', prs: 'pull requests', owners: 'code owners', builds: 'builds', deployments: 'deployments' };
+export const PANEL_WORDS: Record<Panel, string> = { toilProject: 'the Toil project', work: 'work items', prs: 'pull requests', owners: 'code owners', builds: 'builds', deployments: 'deployments' };
 
 export type QuestionId = 'briefing' | 'finish' | 'changed' | 'blocking' | 'waiting' | 'review' | 'help' | 'ready' | 'boss';
 

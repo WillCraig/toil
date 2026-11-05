@@ -4,26 +4,26 @@
  * (server/sync.ts) fills it; the SQLite Store (server/store.ts) answers the
  * views from it. It holds:
  *
- * - **responses**: the envelope each view's toil call got, by dossier,
+ * - **responses**: the envelope each view's toil call got, by toil project,
  *   command and input, so the dashboards render from the cache unchanged;
- * - **items**: the dossier's OWI work items, as `mapOwi` made them;
+ * - **items**: the toil project's OWI work items, as `mapOwi` made them;
  * - **transitions**: each item's status changes, from the history commands;
  * - **change_refs**: pull requests, builds and deployments, joined to items;
- * - **sources**: the sync state of each dossier's sources (one per area):
+ * - **sources**: the sync state of each toil project's sources (one per area):
  *   when it last worked, when it was last tried, its error and fix, and the
  *   watermark the next incremental sync asks `--updated-since` from;
- * - **dossiers**: each dossier's last sync time and outcome;
+ * - **toil projects**: each toil project's last sync time and outcome;
  * - **worklog_events**, **sync_runs**, **agent_runs** and **notes**: what
  *   the worklog (#308, src/model/worklog.ts) folds a day's page from: every
  *   fact a sync recorded, each source's syncs, the agent's runs and the
  *   lines a person added. A sync upserts its facts by key, so the same fact
  *   is one row however often it's synced.
  * - **analyses**: every Analyze (#395), its answer and a snapshot of what
- *   the dossier looked like when it was made (src/model/analysis.ts), kept
- *   per dossier like the worklog: a sync never rewrites it, and the newest
- *   100 of a dossier stay until the retention period ends or a wipe.
+ *   the toil project looked like when it was made (src/model/analysis.ts), kept
+ *   per toil project like the worklog: a sync never rewrites it, and the newest
+ *   100 of a toil project stay until the retention period ends or a wipe.
  * - **usage**: the agent's model usage (#295), one row per report an SDK
- *   made, apart from everything a sync writes. Forgetting a dossier or a
+ *   made, apart from everything a sync writes. Forgetting a toil project or a
  *   sync's cleanup never touches it, so a total never drops and a cap never
  *   reopens; only the retention period and `wipe` remove it.
  *
@@ -237,6 +237,28 @@ export const MIGRATIONS: readonly Migration[] = [
       UPDATE dossiers SET last_saved_at = last_sync_at;
     `,
   },
+  {
+    version: 6,
+    description: 'dossiers become toil projects: the table and every column that named one, and the stored copies that carried the old key',
+    sql: `
+      ALTER TABLE dossiers RENAME TO toil_projects;
+      ALTER TABLE responses RENAME COLUMN dossier TO toil_project;
+      ALTER TABLE items RENAME COLUMN dossier TO toil_project;
+      ALTER TABLE transitions RENAME COLUMN dossier TO toil_project;
+      ALTER TABLE change_refs RENAME COLUMN dossier TO toil_project;
+      ALTER TABLE sources RENAME COLUMN dossier TO toil_project;
+      ALTER TABLE worklog_events RENAME COLUMN dossier TO toil_project;
+      ALTER TABLE sync_runs RENAME COLUMN dossier TO toil_project;
+      ALTER TABLE agent_runs RENAME COLUMN dossier TO toil_project;
+      ALTER TABLE notes RENAME COLUMN dossier TO toil_project;
+      ALTER TABLE analyses RENAME COLUMN dossier TO toil_project;
+      UPDATE agent_runs SET run = replace(run, '"dossier":', '"toilProject":');
+      UPDATE analyses SET record = replace(record, '"dossier":', '"toilProject":');
+      UPDATE worklog_events SET event = replace(event, '"dossier":', '"toilProject":');
+      DELETE FROM responses;
+      UPDATE sources SET full_read_at = NULL;
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
@@ -288,11 +310,11 @@ export interface SourceState {
   stale: boolean;
 }
 
-export interface DossierState {
+export interface ToilProjectState {
   name: string;
   /** The last attempt, saved or failed. */
   lastSyncAt: string;
-  /** The last time a sync saved data, which is what the dossier's expiry counts from; null when it only ever failed. */
+  /** The last time a sync saved data, which is what the toil project's expiry counts from; null when it only ever failed. */
   lastSavedAt: string | null;
   status: 'ok' | 'partial' | 'failed';
   error: string | null;
@@ -333,9 +355,9 @@ export interface SourceResult {
   calls: number;
 }
 
-/** What one dossier's sync hands the cache, written in one transaction. */
-export interface DossierSave {
-  dossier: string;
+/** What one toil project's sync hands the cache, written in one transaction. */
+export interface ToilProjectSave {
+  toilProject: string;
   startedAt: string;
   finishedAt: string;
   responses: Array<{
@@ -361,7 +383,7 @@ export interface CacheOptions {
 
 const DAY = 86_400_000;
 
-/** The worklog's tables (#308), which a forgotten dossier takes with it. */
+/** The worklog's tables (#308), which a forgotten toil project takes with it. */
 const WORKLOG_TABLES = ['worklog_events', 'sync_runs', 'agent_runs', 'notes'];
 
 /** How far before the last good sync a newly listed fact may be and still count as news: the clocks may disagree (#419). */
@@ -373,7 +395,7 @@ export function digestOf(env: Envelope): string {
 
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
-/** The tables kept per dossier that a sync never rewrites: the worklog's, and the analyses (#395). */
+/** The tables kept per toil project that a sync never rewrites: the worklog's, and the analyses (#395). */
 const KEPT_TABLES = [...WORKLOG_TABLES, 'analyses'];
 
 /** The lock a running Toil UI holds on its data folder: which process, and a token only the holder knows. */
@@ -575,167 +597,167 @@ export class Cache {
   }
 
   /** The envelope a call got on its last good sync. */
-  response(dossier: string, command: string, input: Record<string, unknown>): StoredResponse | null {
-    const row = this.db.prepare('SELECT envelope, area, synced_at FROM responses WHERE dossier = ? AND command = ? AND input_key = ?').get(dossier, command, inputKey(input, command)) as
+  response(toilProject: string, command: string, input: Record<string, unknown>): StoredResponse | null {
+    const row = this.db.prepare('SELECT envelope, area, synced_at FROM responses WHERE toil_project = ? AND command = ? AND input_key = ?').get(toilProject, command, inputKey(input, command)) as
       | { envelope: string; area: string; synced_at: string }
       | undefined;
     return row ? { envelope: JSON.parse(row.envelope) as Envelope, area: row.area, syncedAt: row.synced_at } : null;
   }
 
-  /** The newest envelope for a command in a dossier, whatever its input: what an incremental batch merges into. */
-  latest(dossier: string, command: string): StoredResponse | null {
-    const row = this.db.prepare('SELECT envelope, area, synced_at FROM responses WHERE dossier = ? AND command = ? ORDER BY synced_at DESC LIMIT 1').get(dossier, command) as
+  /** The newest envelope for a command in a toil project, whatever its input: what an incremental batch merges into. */
+  latest(toilProject: string, command: string): StoredResponse | null {
+    const row = this.db.prepare('SELECT envelope, area, synced_at FROM responses WHERE toil_project = ? AND command = ? ORDER BY synced_at DESC LIMIT 1').get(toilProject, command) as
       | { envelope: string; area: string; synced_at: string }
       | undefined;
     return row ? { envelope: JSON.parse(row.envelope) as Envelope, area: row.area, syncedAt: row.synced_at } : null;
   }
 
-  /** Every stored envelope for a command in a dossier, whatever its input. */
-  all(dossier: string, command: string): StoredResponse[] {
-    const rows = this.db.prepare('SELECT envelope, area, synced_at FROM responses WHERE dossier = ? AND command = ? ORDER BY synced_at DESC').all(dossier, command) as unknown as Array<{ envelope: string; area: string; synced_at: string }>;
+  /** Every stored envelope for a command in a toil project, whatever its input. */
+  all(toilProject: string, command: string): StoredResponse[] {
+    const rows = this.db.prepare('SELECT envelope, area, synced_at FROM responses WHERE toil_project = ? AND command = ? ORDER BY synced_at DESC').all(toilProject, command) as unknown as Array<{ envelope: string; area: string; synced_at: string }>;
     return rows.map((row) => ({ envelope: JSON.parse(row.envelope) as Envelope, area: row.area, syncedAt: row.synced_at }));
   }
 
-  source(dossier: string, area: string): SourceState | null {
-    const row = this.db.prepare('SELECT * FROM sources WHERE dossier = ? AND area = ?').get(dossier, area) as SourceRow | undefined;
+  source(toilProject: string, area: string): SourceState | null {
+    const row = this.db.prepare('SELECT * FROM sources WHERE toil_project = ? AND area = ?').get(toilProject, area) as SourceRow | undefined;
     return row ? sourceOf(row) : null;
   }
 
-  /** Every dossier's last sync and its sources, for the sync panel. */
-  states(): DossierState[] {
-    const dossiers = this.db.prepare('SELECT * FROM dossiers ORDER BY name').all() as unknown as DossierRow[];
-    const sources = this.db.prepare('SELECT * FROM sources ORDER BY dossier, area').all() as unknown as SourceRow[];
-    return dossiers.map((d) => ({
+  /** Every toil project's last sync and its sources, for the sync panel. */
+  states(): ToilProjectState[] {
+    const toilProjects = this.db.prepare('SELECT * FROM toil_projects ORDER BY name').all() as unknown as ToilProjectRow[];
+    const sources = this.db.prepare('SELECT * FROM sources ORDER BY toil_project, area').all() as unknown as SourceRow[];
+    return toilProjects.map((d) => ({
       name: d.name,
       lastSyncAt: d.last_sync_at,
       lastSavedAt: d.last_saved_at ?? null,
-      status: d.status as DossierState['status'],
+      status: d.status as ToilProjectState['status'],
       error: d.error,
-      sources: sources.filter((s) => s.dossier === d.name).map(sourceOf),
+      sources: sources.filter((s) => s.toil_project === d.name).map(sourceOf),
     }));
   }
 
-  items(dossier: string): WorkItem[] {
-    return (this.db.prepare('SELECT item FROM items WHERE dossier = ? ORDER BY id').all(dossier) as unknown as Array<{ item: string }>).map((r) => JSON.parse(r.item) as WorkItem);
+  items(toilProject: string): WorkItem[] {
+    return (this.db.prepare('SELECT item FROM items WHERE toil_project = ? ORDER BY id').all(toilProject) as unknown as Array<{ item: string }>).map((r) => JSON.parse(r.item) as WorkItem);
   }
 
-  transitions(dossier: string, itemId?: string): TransitionRow[] {
+  transitions(toilProject: string, itemId?: string): TransitionRow[] {
     const rows = (itemId === undefined
-      ? this.db.prepare('SELECT * FROM transitions WHERE dossier = ? ORDER BY item_id, seq').all(dossier)
-      : this.db.prepare('SELECT * FROM transitions WHERE dossier = ? AND item_id = ? ORDER BY seq').all(dossier, itemId)) as unknown as TransitionDbRow[];
+      ? this.db.prepare('SELECT * FROM transitions WHERE toil_project = ? ORDER BY item_id, seq').all(toilProject)
+      : this.db.prepare('SELECT * FROM transitions WHERE toil_project = ? AND item_id = ? ORDER BY seq').all(toilProject, itemId)) as unknown as TransitionDbRow[];
     return rows.map((r) => ({ itemId: r.item_id, seq: r.seq, from: r.from_status, to: r.to_status, fromCategory: r.from_category, toCategory: r.to_category, at: r.at, by: r.by_name }));
   }
 
-  changes(dossier: string): ChangeRow[] {
-    const rows = this.db.prepare('SELECT * FROM change_refs WHERE dossier = ? ORDER BY kind, id').all(dossier) as unknown as ChangeDbRow[];
+  changes(toilProject: string): ChangeRow[] {
+    const rows = this.db.prepare('SELECT * FROM change_refs WHERE toil_project = ? ORDER BY kind, id').all(toilProject) as unknown as ChangeDbRow[];
     return rows.map((r) => ({ id: r.id, kind: r.kind as ChangeRow['kind'], area: r.area, state: r.state, outcome: r.outcome, at: r.at, items: JSON.parse(r.items) as string[], ref: JSON.parse(r.ref) as ChangeRef | Deployment }));
   }
 
-  /** A dossier toil no longer has: everything synced for it goes. */
-  forget(dossier: string) {
+  /** A toil project toil no longer has: everything synced for it goes. */
+  forget(toilProject: string) {
     this.transaction(() => {
-      for (const table of ['responses', 'items', 'transitions', 'change_refs', 'sources', ...KEPT_TABLES]) this.db.prepare(`DELETE FROM ${table} WHERE dossier = ?`).run(dossier);
-      this.db.prepare('DELETE FROM dossiers WHERE name = ?').run(dossier);
+      for (const table of ['responses', 'items', 'transitions', 'change_refs', 'sources', ...KEPT_TABLES]) this.db.prepare(`DELETE FROM ${table} WHERE toil_project = ?`).run(toilProject);
+      this.db.prepare('DELETE FROM toil_projects WHERE name = ?').run(toilProject);
     });
   }
 
   /**
-   * A dossier toil renamed (#342, `toil dossiers describe --name`): everything
+   * A toil project toil renamed (#342, `toil projects describe --name`): everything
    * synced for it moves to the new name in one transaction, so its dashboard,
    * worklog and sources carry on without a fresh sync, and the next sync's
-   * cleanup doesn't forget it as a dossier toil no longer has. Anything left
-   * under the new name (a dossier of that name removed and not yet forgotten)
+   * cleanup doesn't forget it as a toil project toil no longer has. Anything left
+   * under the new name (a toil project of that name removed and not yet forgotten)
    * goes first. A stored response is keyed by its input, which names the
-   * dossier, so each key is made again, and each envelope and agent run that
+   * toil project, so each key is made again, and each envelope and agent run that
    * names it is rewritten too. Returns how many rows moved.
    */
   rename(from: string, to: string): number {
     if (from === to) return 0;
     let moved = 0;
     this.transaction(() => {
-      for (const table of ['responses', 'items', 'transitions', 'change_refs', 'sources', ...KEPT_TABLES]) this.db.prepare(`DELETE FROM ${table} WHERE dossier = ?`).run(to);
-      this.db.prepare('DELETE FROM dossiers WHERE name = ?').run(to);
-      const rows = this.db.prepare('SELECT command, input_key, envelope FROM responses WHERE dossier = ?').all(from) as unknown as Array<{ command: string; input_key: string; envelope: string }>;
-      const move = this.db.prepare('UPDATE responses SET dossier = ?, input_key = ?, envelope = ? WHERE dossier = ? AND command = ? AND input_key = ?');
+      for (const table of ['responses', 'items', 'transitions', 'change_refs', 'sources', ...KEPT_TABLES]) this.db.prepare(`DELETE FROM ${table} WHERE toil_project = ?`).run(to);
+      this.db.prepare('DELETE FROM toil_projects WHERE name = ?').run(to);
+      const rows = this.db.prepare('SELECT command, input_key, envelope FROM responses WHERE toil_project = ?').all(from) as unknown as Array<{ command: string; input_key: string; envelope: string }>;
+      const move = this.db.prepare('UPDATE responses SET toil_project = ?, input_key = ?, envelope = ? WHERE toil_project = ? AND command = ? AND input_key = ?');
       for (const r of rows) {
         const input = JSON.parse(r.input_key) as Record<string, unknown>;
-        if (input.dossier === from) input.dossier = to;
-        const envelope = JSON.parse(r.envelope) as { meta?: { context?: { dossier?: { name?: unknown } | null } } };
-        if (envelope.meta?.context?.dossier?.name === from) envelope.meta.context.dossier.name = to;
+        if (input.toilProject === from) input.toilProject = to;
+        const envelope = JSON.parse(r.envelope) as { meta?: { context?: { toilProject?: { name?: unknown } | null } } };
+        if (envelope.meta?.context?.toilProject?.name === from) envelope.meta.context.toilProject.name = to;
         moved += Number(move.run(to, inputKey(input, r.command), JSON.stringify(envelope), from, r.command, r.input_key).changes);
       }
-      for (const table of ['items', 'transitions', 'change_refs', 'sources', 'worklog_events', 'sync_runs', 'notes']) moved += Number(this.db.prepare(`UPDATE ${table} SET dossier = ? WHERE dossier = ?`).run(to, from).changes);
-      for (const r of this.db.prepare('SELECT id, run FROM agent_runs WHERE dossier = ?').all(from) as unknown as Array<{ id: string; run: string }>) {
+      for (const table of ['items', 'transitions', 'change_refs', 'sources', 'worklog_events', 'sync_runs', 'notes']) moved += Number(this.db.prepare(`UPDATE ${table} SET toil_project = ? WHERE toil_project = ?`).run(to, from).changes);
+      for (const r of this.db.prepare('SELECT id, run FROM agent_runs WHERE toil_project = ?').all(from) as unknown as Array<{ id: string; run: string }>) {
         const run = JSON.parse(r.run) as AgentRun;
-        moved += Number(this.db.prepare('UPDATE agent_runs SET dossier = ?, run = ? WHERE dossier = ? AND id = ?').run(to, JSON.stringify({ ...run, dossier: to }), from, r.id).changes);
+        moved += Number(this.db.prepare('UPDATE agent_runs SET toil_project = ?, run = ? WHERE toil_project = ? AND id = ?').run(to, JSON.stringify({ ...run, toilProject: to }), from, r.id).changes);
       }
-      for (const r of this.db.prepare('SELECT id, record FROM analyses WHERE dossier = ?').all(from) as unknown as Array<{ id: string; record: string }>) {
+      for (const r of this.db.prepare('SELECT id, record FROM analyses WHERE toil_project = ?').all(from) as unknown as Array<{ id: string; record: string }>) {
         const record = JSON.parse(r.record) as AnalysisRecord;
-        moved += Number(this.db.prepare('UPDATE analyses SET dossier = ?, record = ? WHERE dossier = ? AND id = ?').run(to, JSON.stringify({ ...record, dossier: to }), from, r.id).changes);
+        moved += Number(this.db.prepare('UPDATE analyses SET toil_project = ?, record = ? WHERE toil_project = ? AND id = ?').run(to, JSON.stringify({ ...record, toilProject: to }), from, r.id).changes);
       }
-      moved += Number(this.db.prepare('UPDATE dossiers SET name = ? WHERE name = ?').run(to, from).changes);
+      moved += Number(this.db.prepare('UPDATE toil_projects SET name = ? WHERE name = ?').run(to, from).changes);
     });
     return moved;
   }
 
-  /** The names of every dossier the cache holds. */
-  dossierNames(): string[] {
-    return (this.db.prepare('SELECT name FROM dossiers UNION SELECT DISTINCT dossier FROM responses ORDER BY 1').all() as unknown as Array<{ name: string }>).map((r) => r.name);
+  /** The names of every toil project the cache holds. */
+  toilProjectNames(): string[] {
+    return (this.db.prepare('SELECT name FROM toil_projects UNION SELECT DISTINCT toil_project FROM responses ORDER BY 1').all() as unknown as Array<{ name: string }>).map((r) => r.name);
   }
 
-  /** A dossier whose `dossiers show` failed: its last attempt and error, and nothing else touched. `last_saved_at` stays, so a failing sync keeps no data alive. */
-  saveFailure(dossier: string, at: string, error: string) {
-    this.db.prepare('INSERT INTO dossiers (name, last_sync_at, status, error) VALUES (?, ?, ?, ?) ON CONFLICT (name) DO UPDATE SET last_sync_at = excluded.last_sync_at, status = excluded.status, error = excluded.error').run(dossier, at, 'failed', error);
+  /** A toil project whose `projects show` failed: its last attempt and error, and nothing else touched. `last_saved_at` stays, so a failing sync keeps no data alive. */
+  saveFailure(toilProject: string, at: string, error: string) {
+    this.db.prepare('INSERT INTO toil_projects (name, last_sync_at, status, error) VALUES (?, ?, ?, ?) ON CONFLICT (name) DO UPDATE SET last_sync_at = excluded.last_sync_at, status = excluded.status, error = excluded.error').run(toilProject, at, 'failed', error);
   }
 
   /**
-   * One dossier's sync, in one transaction. Responses are upserted; a source
+   * One toil project's sync, in one transaction. Responses are upserted; a source
    * whose sync worked drops its responses this sync didn't touch, while a
    * failed one keeps its last good copy. Items, transitions and change refs
-   * are the dossier's whole picture as the sync saw it (the sync hands the
+   * are the toil project's whole picture as the sync saw it (the sync hands the
    * loader a failed source's last good copy, so a failure never blanks them).
    *
    * Returns the facts this sync recorded for the first time (#419), which the
-   * theme moments play: none on a dossier's first sync, when everything in its
+   * theme moments play: none on a toil project's first sync, when everything in its
    * history would be new, and none from before the last good sync, so a fact
    * a source only now lists (an old build, a closed issue) isn't news.
    */
-  saveDossier(save: DossierSave): WorklogEvent[] {
+  saveToilProject(save: ToilProjectSave): WorklogEvent[] {
     const at = save.finishedAt;
     let news: WorklogEvent[] = [];
     this.transaction(() => {
       // The last good picture, for what the trackers record no time for (a new blocker, a deployment that failed). The items
       // table keeps it through a failed sync, so a change made during the failure is still seen by the next good one.
-      const previous = this.db.prepare('SELECT name FROM dossiers WHERE name = ?').get(save.dossier);
-      const lastGood = (this.db.prepare('SELECT MAX(at) AS at FROM sync_runs WHERE dossier = ? AND ok = 1').get(save.dossier) as { at: string | null }).at;
+      const previous = this.db.prepare('SELECT name FROM toil_projects WHERE name = ?').get(save.toilProject);
+      const lastGood = (this.db.prepare('SELECT MAX(at) AS at FROM sync_runs WHERE toil_project = ? AND ok = 1').get(save.toilProject) as { at: string | null }).at;
       // A row last synced before this is refreshed to `at`: a quarter of the retention period back, so an unchanged row is
       // written about four times in a retention period instead of on every sync, and is never left older than the period.
       const refresh = new Date(Date.parse(at) - (this.retentionDays * DAY) / 4).toISOString();
-      const itemRows = this.db.prepare('SELECT id, item FROM items WHERE dossier = ? ORDER BY id').all(save.dossier) as unknown as Array<{ id: string; item: string }>;
-      const refRows = this.db.prepare('SELECT kind, id, ref FROM change_refs WHERE dossier = ?').all(save.dossier) as unknown as Array<{ kind: string; id: string; ref: string }>;
+      const itemRows = this.db.prepare('SELECT id, item FROM items WHERE toil_project = ? ORDER BY id').all(save.toilProject) as unknown as Array<{ id: string; item: string }>;
+      const refRows = this.db.prepare('SELECT kind, id, ref FROM change_refs WHERE toil_project = ?').all(save.toilProject) as unknown as Array<{ kind: string; id: string; ref: string }>;
       const before = previous ? { items: itemRows.map((r) => JSON.parse(r.item) as WorkItem), deployments: refRows.filter((c) => c.kind === 'deployment').sort(byId).map((c) => JSON.parse(c.ref) as Deployment) } : null;
-      const builds = (this.db.prepare("SELECT event FROM worklog_events WHERE dossier = ? AND kind LIKE 'build-%'").all(save.dossier) as unknown as Array<{ event: string }>).map((r) => JSON.parse(r.event) as WorklogEvent);
+      const builds = (this.db.prepare("SELECT event FROM worklog_events WHERE toil_project = ? AND kind LIKE 'build-%'").all(save.toilProject) as unknown as Array<{ event: string }>).map((r) => JSON.parse(r.event) as WorklogEvent);
       const facts = [...eventsFrom({ items: save.items, changes: save.changes }, builds), ...observedEvents(before, { items: save.items, deployments: save.deployments }, at, lastGood)];
-      const fact = this.db.prepare(`INSERT INTO worklog_events (dossier, key, day, at, kind, event, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (dossier, key) DO UPDATE SET day = excluded.day, at = excluded.at, kind = excluded.kind, event = excluded.event, synced_at = excluded.synced_at`);
-      const known = new Map((this.db.prepare('SELECT key, event, synced_at FROM worklog_events WHERE dossier = ?').all(save.dossier) as unknown as Array<{ key: string; event: string; synced_at: string }>).map((r) => [r.key, r]));
+      const fact = this.db.prepare(`INSERT INTO worklog_events (toil_project, key, day, at, kind, event, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (toil_project, key) DO UPDATE SET day = excluded.day, at = excluded.at, kind = excluded.kind, event = excluded.event, synced_at = excluded.synced_at`);
+      const known = new Map((this.db.prepare('SELECT key, event, synced_at FROM worklog_events WHERE toil_project = ?').all(save.toilProject) as unknown as Array<{ key: string; event: string; synced_at: string }>).map((r) => [r.key, r]));
       const since = lastGood ? Date.parse(lastGood) - NEWS_SKEW_MS : null;
       news = previous && since !== null ? facts.filter((e) => !known.has(e.key) && (e.observed !== null || Date.parse(e.at) >= since)) : [];
       for (const e of facts) {
         const text = JSON.stringify(e);
         const old = known.get(e.key);
         if (old && old.event === text && old.synced_at >= refresh) continue;
-        fact.run(save.dossier, e.key, dayOf(e.at)!, e.at, e.kind, text, at);
+        fact.run(save.toilProject, e.key, dayOf(e.at)!, e.at, e.kind, text, at);
       }
-      const run = this.db.prepare('INSERT OR REPLACE INTO sync_runs (dossier, area, at, ok, error) VALUES (?, ?, ?, ?, ?)');
-      for (const s of save.sources) run.run(save.dossier, s.area, at, s.ok ? 1 : 0, s.error);
+      const run = this.db.prepare('INSERT OR REPLACE INTO sync_runs (toil_project, area, at, ok, error) VALUES (?, ?, ?, ?, ?)');
+      for (const s of save.sources) run.run(save.toilProject, s.area, at, s.ok ? 1 : 0, s.error);
 
       // Responses: a row is rewritten only when its envelope changed. One the sync reused is not even compared; one that
       // came back the same is told apart by its digest, which leaves out how long the call took.
-      const stored = new Map((this.db.prepare('SELECT command, input_key, area, digest FROM responses WHERE dossier = ?').all(save.dossier) as unknown as Array<{ command: string; input_key: string; area: string; digest: string | null }>).map((r) => [`${r.command}\n${r.input_key}`, r]));
+      const stored = new Map((this.db.prepare('SELECT command, input_key, area, digest FROM responses WHERE toil_project = ?').all(save.toilProject) as unknown as Array<{ command: string; input_key: string; area: string; digest: string | null }>).map((r) => [`${r.command}\n${r.input_key}`, r]));
       const okAreas = save.sources.filter((s) => s.ok).map((s) => s.area);
-      const put = this.db.prepare('INSERT INTO responses (dossier, command, input_key, area, envelope, synced_at, digest) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (dossier, command, input_key) DO UPDATE SET area = excluded.area, envelope = excluded.envelope, synced_at = excluded.synced_at, digest = excluded.digest');
-      const touch = this.db.prepare('UPDATE responses SET synced_at = ? WHERE dossier = ? AND command = ? AND input_key = ? AND synced_at < ?');
+      const put = this.db.prepare('INSERT INTO responses (toil_project, command, input_key, area, envelope, synced_at, digest) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (toil_project, command, input_key) DO UPDATE SET area = excluded.area, envelope = excluded.envelope, synced_at = excluded.synced_at, digest = excluded.digest');
+      const touch = this.db.prepare('UPDATE responses SET synced_at = ? WHERE toil_project = ? AND command = ? AND input_key = ? AND synced_at < ?');
       const wanted = new Set<string>();
       for (const r of save.responses) {
         const key = inputKey(r.input, r.command);
@@ -745,64 +767,64 @@ export class Cache {
         const digest = r.unchanged && old?.digest ? old.digest : digestOf(r.envelope);
         if (old && old.digest === digest) {
           // A failed source's rows are outside the bulk refresh below, and the sync did read this one.
-          if (!okAreas.includes(old.area)) touch.run(at, save.dossier, r.command, key, refresh);
+          if (!okAreas.includes(old.area)) touch.run(at, save.toilProject, r.command, key, refresh);
           continue;
         }
-        put.run(save.dossier, r.command, key, areaOf(r.command), JSON.stringify(r.envelope), at, digest);
+        put.run(save.toilProject, r.command, key, areaOf(r.command), JSON.stringify(r.envelope), at, digest);
       }
       // A source whose sync worked drops the responses this sync didn't ask for; a failed one keeps its last good copy.
-      const drop = this.db.prepare('DELETE FROM responses WHERE dossier = ? AND command = ? AND input_key = ?');
-      for (const [id, r] of stored) if (!wanted.has(id) && okAreas.includes(r.area)) drop.run(save.dossier, id.slice(0, id.indexOf('\n')), id.slice(id.indexOf('\n') + 1));
-      if (okAreas.length) this.db.prepare(`UPDATE responses SET synced_at = ? WHERE dossier = ? AND synced_at < ? AND area IN (${okAreas.map(() => '?').join(', ')})`).run(at, save.dossier, refresh, ...okAreas);
+      const drop = this.db.prepare('DELETE FROM responses WHERE toil_project = ? AND command = ? AND input_key = ?');
+      for (const [id, r] of stored) if (!wanted.has(id) && okAreas.includes(r.area)) drop.run(save.toilProject, id.slice(0, id.indexOf('\n')), id.slice(id.indexOf('\n') + 1));
+      if (okAreas.length) this.db.prepare(`UPDATE responses SET synced_at = ? WHERE toil_project = ? AND synced_at < ? AND area IN (${okAreas.map(() => '?').join(', ')})`).run(at, save.toilProject, refresh, ...okAreas);
 
-      // Items, transitions and change refs are the dossier's whole picture as the sync saw it (the sync hands the loader a
+      // Items, transitions and change refs are the toil project's whole picture as the sync saw it (the sync hands the loader a
       // failed source's last good copy, so a failure never blanks them). Only a row that changed is written, a row that is
       // gone is deleted, and the rest are refreshed in one statement each.
       const oldItems = new Map(itemRows.map((r) => [r.id, r.item]));
       const nowItems = new Map(save.items.map((i) => [i.id, i]));
-      const item = this.db.prepare('INSERT OR REPLACE INTO items (dossier, id, area, connection, native_key, type, status_category, updated, item, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-      const dropTransitions = this.db.prepare('DELETE FROM transitions WHERE dossier = ? AND item_id = ?');
-      const transition = this.db.prepare('INSERT OR REPLACE INTO transitions (dossier, item_id, seq, from_status, to_status, from_category, to_category, at, by_name, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+      const item = this.db.prepare('INSERT OR REPLACE INTO items (toil_project, id, area, connection, native_key, type, status_category, updated, item, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+      const dropTransitions = this.db.prepare('DELETE FROM transitions WHERE toil_project = ? AND item_id = ?');
+      const transition = this.db.prepare('INSERT OR REPLACE INTO transitions (toil_project, item_id, seq, from_status, to_status, from_category, to_category, at, by_name, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
       for (const [id, i] of nowItems) {
         const text = JSON.stringify(i);
         if (oldItems.get(id) === text) continue;
-        item.run(save.dossier, i.id, i.source.area, i.source.connection, i.source.key, i.type, i.statusCategory, i.updated, text, at);
-        dropTransitions.run(save.dossier, id);
-        (i.history?.transitions ?? []).forEach((t, seq) => transition.run(save.dossier, i.id, seq, t.from, t.to, t.fromCategory, t.toCategory, t.at, t.by?.name ?? null, at));
+        item.run(save.toilProject, i.id, i.source.area, i.source.connection, i.source.key, i.type, i.statusCategory, i.updated, text, at);
+        dropTransitions.run(save.toilProject, id);
+        (i.history?.transitions ?? []).forEach((t, seq) => transition.run(save.toilProject, i.id, seq, t.from, t.to, t.fromCategory, t.toCategory, t.at, t.by?.name ?? null, at));
       }
-      const dropItem = this.db.prepare('DELETE FROM items WHERE dossier = ? AND id = ?');
-      for (const id of oldItems.keys()) if (!nowItems.has(id)) dropItem.run(save.dossier, id);
-      this.db.prepare('DELETE FROM transitions WHERE dossier = ? AND item_id NOT IN (SELECT id FROM items WHERE dossier = ?)').run(save.dossier, save.dossier);
+      const dropItem = this.db.prepare('DELETE FROM items WHERE toil_project = ? AND id = ?');
+      for (const id of oldItems.keys()) if (!nowItems.has(id)) dropItem.run(save.toilProject, id);
+      this.db.prepare('DELETE FROM transitions WHERE toil_project = ? AND item_id NOT IN (SELECT id FROM items WHERE toil_project = ?)').run(save.toilProject, save.toilProject);
 
       const nowRefs = new Map<string, { kind: string; id: string; values: Array<string | null>; text: string }>();
       for (const c of save.changes) nowRefs.set(`${c.kind}\n${c.id}`, { kind: c.kind, id: c.id, text: JSON.stringify(c), values: [c.source, c.command, c.state, c.outcome, c.at || null, JSON.stringify(c.items)] });
       for (const d of save.deployments) nowRefs.set(`deployment\n${d.id}`, { kind: 'deployment', id: d.id, text: JSON.stringify(d), values: [d.source, d.command, d.state, d.outcome, null, JSON.stringify(d.items)] });
       const oldRefs = new Map(refRows.map((r) => [`${r.kind}\n${r.id}`, r.ref]));
-      const change = this.db.prepare('INSERT OR REPLACE INTO change_refs (dossier, id, kind, area, command, state, outcome, at, items, ref, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-      for (const [key, c] of nowRefs) if (oldRefs.get(key) !== c.text) change.run(save.dossier, c.id, c.kind, ...c.values, c.text, at);
-      const dropRef = this.db.prepare('DELETE FROM change_refs WHERE dossier = ? AND kind = ? AND id = ?');
-      for (const key of oldRefs.keys()) if (!nowRefs.has(key)) dropRef.run(save.dossier, key.slice(0, key.indexOf('\n')), key.slice(key.indexOf('\n') + 1));
-      for (const table of ['items', 'transitions', 'change_refs']) this.db.prepare(`UPDATE ${table} SET synced_at = ? WHERE dossier = ? AND synced_at < ?`).run(at, save.dossier, refresh);
+      const change = this.db.prepare('INSERT OR REPLACE INTO change_refs (toil_project, id, kind, area, command, state, outcome, at, items, ref, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+      for (const [key, c] of nowRefs) if (oldRefs.get(key) !== c.text) change.run(save.toilProject, c.id, c.kind, ...c.values, c.text, at);
+      const dropRef = this.db.prepare('DELETE FROM change_refs WHERE toil_project = ? AND kind = ? AND id = ?');
+      for (const key of oldRefs.keys()) if (!nowRefs.has(key)) dropRef.run(save.toilProject, key.slice(0, key.indexOf('\n')), key.slice(key.indexOf('\n') + 1));
+      for (const table of ['items', 'transitions', 'change_refs']) this.db.prepare(`UPDATE ${table} SET synced_at = ? WHERE toil_project = ? AND synced_at < ?`).run(at, save.toilProject, refresh);
 
-      const source = this.db.prepare(`INSERT INTO sources (dossier, area, status, last_attempt_at, last_success_at, watermark, full_read_at, error, fix, calls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (dossier, area) DO UPDATE SET status = excluded.status, last_attempt_at = excluded.last_attempt_at,
+      const source = this.db.prepare(`INSERT INTO sources (toil_project, area, status, last_attempt_at, last_success_at, watermark, full_read_at, error, fix, calls) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (toil_project, area) DO UPDATE SET status = excluded.status, last_attempt_at = excluded.last_attempt_at,
           last_success_at = COALESCE(excluded.last_success_at, sources.last_success_at), watermark = COALESCE(excluded.watermark, sources.watermark),
           full_read_at = COALESCE(excluded.full_read_at, sources.full_read_at),
           error = excluded.error, fix = excluded.fix, calls = excluded.calls`);
-      for (const s of save.sources) source.run(save.dossier, s.area, s.ok ? 'ok' : 'failed', at, s.ok ? at : null, s.ok ? s.watermark : null, s.ok ? (s.fullReadAt ?? null) : null, s.error, s.fix, s.calls);
-      // A source the dossier no longer reads (its area left the dossier) goes with its data.
+      for (const s of save.sources) source.run(save.toilProject, s.area, s.ok ? 'ok' : 'failed', at, s.ok ? at : null, s.ok ? s.watermark : null, s.ok ? (s.fullReadAt ?? null) : null, s.error, s.fix, s.calls);
+      // A source the toil project no longer reads (its area left the toil project) goes with its data.
       const areas = save.sources.map((s) => s.area);
-      for (const old of this.db.prepare('SELECT area FROM sources WHERE dossier = ?').all(save.dossier) as unknown as Array<{ area: string }>) {
+      for (const old of this.db.prepare('SELECT area FROM sources WHERE toil_project = ?').all(save.toilProject) as unknown as Array<{ area: string }>) {
         if (!areas.includes(old.area)) {
-          this.db.prepare('DELETE FROM sources WHERE dossier = ? AND area = ?').run(save.dossier, old.area);
-          this.db.prepare('DELETE FROM responses WHERE dossier = ? AND area = ?').run(save.dossier, old.area);
+          this.db.prepare('DELETE FROM sources WHERE toil_project = ? AND area = ?').run(save.toilProject, old.area);
+          this.db.prepare('DELETE FROM responses WHERE toil_project = ? AND area = ?').run(save.toilProject, old.area);
         }
       }
 
       const failed = save.sources.filter((s) => !s.ok);
       const status = failed.length === 0 ? 'ok' : failed.length === save.sources.length ? 'failed' : 'partial';
       const error = failed.length ? failed.map((s) => `${s.area}: ${s.error ?? 'failed'}`).join(' ') : null;
-      this.db.prepare('INSERT INTO dossiers (name, last_sync_at, last_saved_at, status, error) VALUES (?, ?, ?, ?, ?) ON CONFLICT (name) DO UPDATE SET last_sync_at = excluded.last_sync_at, last_saved_at = excluded.last_saved_at, status = excluded.status, error = excluded.error').run(save.dossier, at, at, status, error);
+      this.db.prepare('INSERT INTO toil_projects (name, last_sync_at, last_saved_at, status, error) VALUES (?, ?, ?, ?, ?) ON CONFLICT (name) DO UPDATE SET last_sync_at = excluded.last_sync_at, last_saved_at = excluded.last_saved_at, status = excluded.status, error = excluded.error').run(save.toilProject, at, at, status, error);
     });
     this.prune();
     return news;
@@ -810,88 +832,88 @@ export class Cache {
 
   // The worklog (#308) ---------------------------------------------------------------
 
-  /** The facts a sync recorded for a dossier: one day's, or every one the cache holds. */
-  worklogEvents(dossier: string, day?: string): WorklogEvent[] {
+  /** The facts a sync recorded for a toil project: one day's, or every one the cache holds. */
+  worklogEvents(toilProject: string, day?: string): WorklogEvent[] {
     const rows = (day === undefined
-      ? this.db.prepare('SELECT event FROM worklog_events WHERE dossier = ? ORDER BY at, key').all(dossier)
-      : this.db.prepare('SELECT event FROM worklog_events WHERE dossier = ? AND day = ? ORDER BY at, key').all(dossier, day)) as unknown as Array<{ event: string }>;
+      ? this.db.prepare('SELECT event FROM worklog_events WHERE toil_project = ? ORDER BY at, key').all(toilProject)
+      : this.db.prepare('SELECT event FROM worklog_events WHERE toil_project = ? AND day = ? ORDER BY at, key').all(toilProject, day)) as unknown as Array<{ event: string }>;
     return rows.map((r) => JSON.parse(r.event) as WorklogEvent);
   }
 
   /** Every day the worklog has a page for: one with a fact, an agent run or a note, or a sync that found nothing. */
-  worklogDays(dossier: string): string[] {
-    return (this.db.prepare('SELECT day FROM worklog_events WHERE dossier = ? UNION SELECT day FROM agent_runs WHERE dossier = ? UNION SELECT day FROM notes WHERE dossier = ? UNION SELECT substr(at, 1, 10) FROM sync_runs WHERE dossier = ? ORDER BY 1').all(dossier, dossier, dossier, dossier) as unknown as Array<{ day: string }>).map((r) => r.day);
+  worklogDays(toilProject: string): string[] {
+    return (this.db.prepare('SELECT day FROM worklog_events WHERE toil_project = ? UNION SELECT day FROM agent_runs WHERE toil_project = ? UNION SELECT day FROM notes WHERE toil_project = ? UNION SELECT substr(at, 1, 10) FROM sync_runs WHERE toil_project = ? ORDER BY 1').all(toilProject, toilProject, toilProject, toilProject) as unknown as Array<{ day: string }>).map((r) => r.day);
   }
 
-  /** Each source's syncs of a dossier that the cache still holds, oldest first. */
-  syncRuns(dossier: string): SyncRun[] {
-    return (this.db.prepare('SELECT area, at, ok, error FROM sync_runs WHERE dossier = ? ORDER BY at, area').all(dossier) as unknown as Array<{ area: string; at: string; ok: number; error: string | null }>).map((r) => ({ area: r.area, at: r.at, ok: Number(r.ok) === 1, error: r.error }));
+  /** Each source's syncs of a toil project that the cache still holds, oldest first. */
+  syncRuns(toilProject: string): SyncRun[] {
+    return (this.db.prepare('SELECT area, at, ok, error FROM sync_runs WHERE toil_project = ? ORDER BY at, area').all(toilProject) as unknown as Array<{ area: string; at: string; ok: number; error: string | null }>).map((r) => ({ area: r.area, at: r.at, ok: Number(r.ok) === 1, error: r.error }));
   }
 
   /** Records an agent run, or its end: the same id replaces what was there. */
   saveRun(run: AgentRun) {
-    this.db.prepare('INSERT OR REPLACE INTO agent_runs (dossier, id, day, started_at, run) VALUES (?, ?, ?, ?, ?)').run(run.dossier, run.id, dayOf(run.startedAt)!, run.startedAt, JSON.stringify(run));
+    this.db.prepare('INSERT OR REPLACE INTO agent_runs (toil_project, id, day, started_at, run) VALUES (?, ?, ?, ?, ?)').run(run.toilProject, run.id, dayOf(run.startedAt)!, run.startedAt, JSON.stringify(run));
   }
 
-  runs(dossier: string, day?: string): AgentRun[] {
+  runs(toilProject: string, day?: string): AgentRun[] {
     const rows = (day === undefined
-      ? this.db.prepare('SELECT run FROM agent_runs WHERE dossier = ? ORDER BY started_at, id').all(dossier)
-      : this.db.prepare('SELECT run FROM agent_runs WHERE dossier = ? AND day = ? ORDER BY started_at, id').all(dossier, day)) as unknown as Array<{ run: string }>;
+      ? this.db.prepare('SELECT run FROM agent_runs WHERE toil_project = ? ORDER BY started_at, id').all(toilProject)
+      : this.db.prepare('SELECT run FROM agent_runs WHERE toil_project = ? AND day = ? ORDER BY started_at, id').all(toilProject, day)) as unknown as Array<{ run: string }>;
     return rows.map((r) => JSON.parse(r.run) as AgentRun);
   }
 
-  addNote(dossier: string, note: WorklogNote) {
-    this.db.prepare('INSERT INTO notes (dossier, id, day, at, note) VALUES (?, ?, ?, ?, ?)').run(dossier, note.id, dayOf(note.at)!, note.at, JSON.stringify(note));
+  addNote(toilProject: string, note: WorklogNote) {
+    this.db.prepare('INSERT INTO notes (toil_project, id, day, at, note) VALUES (?, ?, ?, ?, ?)').run(toilProject, note.id, dayOf(note.at)!, note.at, JSON.stringify(note));
   }
 
-  notes(dossier: string, day?: string): WorklogNote[] {
+  notes(toilProject: string, day?: string): WorklogNote[] {
     const rows = (day === undefined
-      ? this.db.prepare('SELECT note FROM notes WHERE dossier = ? ORDER BY at, id').all(dossier)
-      : this.db.prepare('SELECT note FROM notes WHERE dossier = ? AND day = ? ORDER BY at, id').all(dossier, day)) as unknown as Array<{ note: string }>;
+      ? this.db.prepare('SELECT note FROM notes WHERE toil_project = ? ORDER BY at, id').all(toilProject)
+      : this.db.prepare('SELECT note FROM notes WHERE toil_project = ? AND day = ? ORDER BY at, id').all(toilProject, day)) as unknown as Array<{ note: string }>;
     return rows.map((r) => JSON.parse(r.note) as WorklogNote);
   }
 
   // The analyses (#395) ---------------------------------------------------------------
 
-  /** Keeps one Analyze, and only the newest MAX_ANALYSES of its dossier. */
+  /** Keeps one Analyze, and only the newest MAX_ANALYSES of its toil project. */
   saveAnalysis(record: AnalysisRecord) {
     this.transaction(() => {
-      this.db.prepare('INSERT OR REPLACE INTO analyses (dossier, id, at, record) VALUES (?, ?, ?, ?)').run(record.dossier, record.id, record.at, JSON.stringify(record));
-      this.db.prepare('DELETE FROM analyses WHERE dossier = ? AND id NOT IN (SELECT id FROM analyses WHERE dossier = ? ORDER BY at DESC, id DESC LIMIT ?)').run(record.dossier, record.dossier, MAX_ANALYSES);
+      this.db.prepare('INSERT OR REPLACE INTO analyses (toil_project, id, at, record) VALUES (?, ?, ?, ?)').run(record.toilProject, record.id, record.at, JSON.stringify(record));
+      this.db.prepare('DELETE FROM analyses WHERE toil_project = ? AND id NOT IN (SELECT id FROM analyses WHERE toil_project = ? ORDER BY at DESC, id DESC LIMIT ?)').run(record.toilProject, record.toilProject, MAX_ANALYSES);
     });
   }
 
-  /** A dossier's analyses, oldest first. */
-  analyses(dossier: string): AnalysisRecord[] {
-    return (this.db.prepare('SELECT record FROM analyses WHERE dossier = ? ORDER BY at, id').all(dossier) as unknown as Array<{ record: string }>).map((r) => JSON.parse(r.record) as AnalysisRecord);
+  /** A toil project's analyses, oldest first. */
+  analyses(toilProject: string): AnalysisRecord[] {
+    return (this.db.prepare('SELECT record FROM analyses WHERE toil_project = ? ORDER BY at, id').all(toilProject) as unknown as Array<{ record: string }>).map((r) => JSON.parse(r.record) as AnalysisRecord);
   }
 
   /**
    * Deletes what is older than the retention period. Returns how many went.
-   * Everything a sync writes goes per dossier, together, by one date: `dossiers.last_saved_at`, the last time a sync
-   * saved data (a failed `dossiers show` moves `last_sync_at`, the last attempt, and leaves this alone, so a failing sync
-   * keeps nothing alive). A dossier is kept while last_saved_at >= now - retention. A dossier that is not kept loses its
+   * Everything a sync writes goes per toil project, together, by one date: `toil_projects.last_saved_at`, the last time a sync
+   * saved data (a failed `projects show` moves `last_sync_at`, the last attempt, and leaves this alone, so a failing sync
+   * keeps nothing alive). A toil project is kept while last_saved_at >= now - retention. A toil project that is not kept loses its
    * responses, items, transitions, change refs, worklog facts and sources, and then its row, in this one transaction, so
-   * a dossier is never half there. (One that only ever failed has no last_saved_at; its row goes by last_sync_at.) The
-   * rows' own synced_at values differ by up to a quarter of the period (saveDossier refreshes only the unchanged rows it
+   * a toil project is never half there. (One that only ever failed has no last_saved_at; its row goes by last_sync_at.) The
+   * rows' own synced_at values differ by up to a quarter of the period (saveToilProject refreshes only the unchanged rows it
    * finds old), so they can't decide on their own. The rest goes by its own date.
    *
-   * Worklog facts also go by their own date, 1.25 x retention. saveDossier only upserts a fact, so one that no sync produces
-   * any more (its item left the sync) would otherwise live as long as the dossier keeps saving. A fact a sync still
-   * produces is refreshed at a save whenever it is more than retention/4 old. While the dossier is kept its last save was
+   * Worklog facts also go by their own date, 1.25 x retention. saveToilProject only upserts a fact, so one that no sync produces
+   * any more (its item left the sync) would otherwise live as long as the toil project keeps saving. A fact a sync still
+   * produces is refreshed at a save whenever it is more than retention/4 old. While the toil project is kept its last save was
    * at or after now - retention, and at that save the fact's synced_at became at least save - retention/4, so it is at or
    * after now - 1.25 x retention and this rule never touches it. A fact nothing produces goes about 1.25 x retention after
-   * it was last seen. Once saves stop, the whole dossier goes at retention, before this rule matters.
+   * it was last seen. Once saves stop, the whole toil project goes at retention, before this rule matters.
    */
   prune(): number {
     const cutoff = new Date(this.now().getTime() - this.retentionDays * DAY).toISOString();
     let removed = 0;
     this.transaction(() => {
-      const kept = 'SELECT name FROM dossiers WHERE last_saved_at >= ?';
-      for (const table of ['responses', 'items', 'transitions', 'change_refs', 'worklog_events', 'sources']) removed += Number(this.db.prepare(`DELETE FROM ${table} WHERE dossier NOT IN (${kept})`).run(cutoff).changes);
+      const kept = 'SELECT name FROM toil_projects WHERE last_saved_at >= ?';
+      for (const table of ['responses', 'items', 'transitions', 'change_refs', 'worklog_events', 'sources']) removed += Number(this.db.prepare(`DELETE FROM ${table} WHERE toil_project NOT IN (${kept})`).run(cutoff).changes);
       const stale = new Date(this.now().getTime() - this.retentionDays * 1.25 * DAY).toISOString();
       removed += Number(this.db.prepare('DELETE FROM worklog_events WHERE synced_at < ?').run(stale).changes);
-      removed += Number(this.db.prepare('DELETE FROM dossiers WHERE last_saved_at < ? OR (last_saved_at IS NULL AND last_sync_at < ?)').run(cutoff, cutoff).changes);
+      removed += Number(this.db.prepare('DELETE FROM toil_projects WHERE last_saved_at < ? OR (last_saved_at IS NULL AND last_sync_at < ?)').run(cutoff, cutoff).changes);
       // A test's own migration list may stop short of the usage table; every real file has it.
       if (this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'usage'").get()) removed += Number(this.db.prepare('DELETE FROM usage WHERE at < ?').run(cutoff).changes);
       // The worklog's other records (schema 3): a sync, a run and a note by when it happened.
@@ -935,7 +957,7 @@ export class Cache {
   /** Row counts per table, for the tests and the wipe's report. */
   counts(): Record<string, number> {
     const out: Record<string, number> = {};
-    for (const table of ['responses', 'items', 'transitions', 'change_refs', 'sources', 'dossiers', 'usage', ...KEPT_TABLES]) out[table] = Number((this.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n);
+    for (const table of ['responses', 'items', 'transitions', 'change_refs', 'sources', 'toil_projects', 'usage', ...KEPT_TABLES]) out[table] = Number((this.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n);
     return out;
   }
 
@@ -952,7 +974,7 @@ export class Cache {
 }
 
 interface SourceRow {
-  dossier: string;
+  toil_project: string;
   area: string;
   status: string;
   last_attempt_at: string;
@@ -963,7 +985,7 @@ interface SourceRow {
   fix: string | null;
   calls: number;
 }
-interface DossierRow {
+interface ToilProjectRow {
   name: string;
   last_sync_at: string;
   last_saved_at?: string | null;

@@ -40,7 +40,7 @@ function lexicallyInside(child: string, parent: string): boolean {
  * Throws INVALID_INPUT when `path` is a network or device path, unless it's a
  * network path inside `workspace` and the workspace is itself a network path.
  * Touches nothing on disk. `what` names the value in the message ("The
- * folder", "The dossier file").
+ * folder", "The toil project file").
  */
 export function assertLocalPath(path: string, workspace?: string, what = 'The path'): void {
   const kind = remotePathKind(path);

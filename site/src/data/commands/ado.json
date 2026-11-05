@@ -917,9 +917,9 @@
     ]
   },
   {
-    "name": "check-dossier",
-    "tool": "ado_check_dossier",
-    "description": "Check the call's dossier against Azure DevOps: its projects and repositories exist",
+    "name": "check-toil-project",
+    "tool": "ado_check_toil_project",
+    "description": "Check the call's toil project against Azure DevOps: its projects and repositories exist",
     "writes": false,
     "connection": true,
     "flags": [

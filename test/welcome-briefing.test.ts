@@ -10,8 +10,8 @@ import { shownArgs } from '../src/welcome/views/result.js';
 
 /**
  * The welcome menu's Briefing (#494): the reads it composes from what the
- * dossier names, the runs that follow (each open pull request in full, then
- * util owi map, then dossiers brief), and the screen, with keys as terminal
+ * toil project names, the runs that follow (each open pull request in full, then
+ * util owi map, then toil projects brief), and the screen, with keys as terminal
  * hyperlinks where the terminal draws them and the URL printed where not.
  */
 
@@ -23,7 +23,7 @@ const runOf = (a: Action | undefined): Run => {
 };
 
 describe('the reads', () => {
-  it("reads each tracker's issues and each code host's open pull requests, as the dossier names them", () => {
+  it("reads each tracker's issues and each code host's open pull requests, as the toil project names them", () => {
     const { steps } = readSteps('payments', {
       jira: { inputs: { project: 'PAY' } },
       github: { inputs: { owner: 'imagile', repo: 'payments-web' } },
@@ -31,11 +31,11 @@ describe('the reads', () => {
       ado: { inputs: { project: 'Payments' } },
     });
     expect(steps.map((s) => s.args.join(' '))).toEqual([
-      'jira issue search --dossier payments --jql project = PAY ORDER BY Rank ASC',
-      'github issue list --dossier payments --state all',
-      'github pr list --dossier payments --state open',
-      'bitbucket pr list --dossier payments --state OPEN',
-      'ado work-item search --dossier payments --wiql SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project ORDER BY [System.Id]',
+      'jira issue search --toil-project payments --jql project = PAY ORDER BY Rank ASC',
+      'github issue list --toil-project payments --state all',
+      'github pr list --toil-project payments --state open',
+      'bitbucket pr list --toil-project payments --state OPEN',
+      'ado work-item search --toil-project payments --wiql SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project ORDER BY [System.Id]',
     ]);
   });
 
@@ -48,7 +48,7 @@ describe('the reads', () => {
     expect(args.at(-3)).toBe(String(MAX_WORK_ITEMS + 5));
     const map = runOf(gets.next!([result(args, env('ado work-item get-many', { value: [] }))], {} as never));
     const brief = runOf(map.next!([result(map.steps[0]!.args, env('util owi map', { items: [] }))], {} as never));
-    const go = brief.next!([result(brief.steps[0]!.args, env('dossiers brief', {}))], {} as never) as unknown as { params: { gaps: string } };
+    const go = brief.next!([result(brief.steps[0]!.args, env('projects brief', {}))], {} as never) as unknown as { params: { gaps: string } };
     expect(JSON.parse(go.params.gaps)).toEqual([`ado has ${MAX_WORK_ITEMS + 5} work items; the newest ${MAX_WORK_ITEMS} were read, since the search lists the oldest first.`]);
   });
 
@@ -61,7 +61,7 @@ describe('the reads', () => {
     ];
     const gets = runOf(run.next!(read, {} as never));
     expect(gets.title).toBe("Read settlement's work items and open pull requests in full");
-    expect(gets.steps.map((s) => s.args.join(' '))).toEqual(['ado work-item get-many 2302 2303 --dossier settlement', 'ado pr get 87 --dossier settlement --include reviews,checks']);
+    expect(gets.steps.map((s) => s.args.join(' '))).toEqual(['ado work-item get-many 2302 2303 --toil-project settlement', 'ado pr get 87 --toil-project settlement --include reviews,checks']);
     const map = runOf(gets.next!([result(gets.steps[0]!.args, env('ado work-item get-many', { value: [] }))], {} as never));
     const mapped = map.steps[0]!.args[4]!.split('\n').map((l) => (JSON.parse(l) as Envelope).meta.command);
     expect(mapped).toEqual(['ado pr list', 'ado work-item get-many']);
@@ -74,20 +74,20 @@ describe('the reads', () => {
       result(run.steps[1]!.args, env('bitbucket pr list', [{ id: 311 }, { id: 305 }])),
     ];
     const gets = runOf(run.next!(read, {} as never));
-    expect(gets.steps.map((s) => s.args.join(' '))).toEqual(['bitbucket pr get 311 --dossier payments --include reviews,checks', 'bitbucket pr get 305 --dossier payments --include reviews,checks']);
+    expect(gets.steps.map((s) => s.args.join(' '))).toEqual(['bitbucket pr get 311 --toil-project payments --include reviews,checks', 'bitbucket pr get 305 --toil-project payments --include reviews,checks']);
     const map = runOf(gets.next!([result(gets.steps[0]!.args, env('bitbucket pr get', { id: 311 }))], {} as never));
     const mapArgs = map.steps[0]!.args;
     expect(mapArgs.slice(0, 3)).toEqual(['util', 'owi', 'map']);
     expect(mapArgs.slice(-2)).toEqual(['--key-pattern', 'PAY-{n}=corp-jira']);
     expect(mapArgs[4]!.split('\n')).toHaveLength(3);
     const briefed = runOf(map.next!([result(mapArgs, env('util owi map', { items: [] }))], {} as never));
-    expect(briefed.steps[0]!.args.slice(0, 3)).toEqual(['dossiers', 'brief', 'payments']);
-    expect(briefed.next!([result(briefed.steps[0]!.args, env('dossiers brief', {}))], {} as never)).toEqual({ go: 'dossier-brief', params: { dossier: 'payments', gaps: '[]' } });
+    expect(briefed.steps[0]!.args.slice(0, 3)).toEqual(['projects', 'brief', 'payments']);
+    expect(briefed.next!([result(briefed.steps[0]!.args, env('projects brief', {}))], {} as never)).toEqual({ go: 'toil-project-brief', params: { toilProject: 'payments', gaps: '[]' } });
   });
 
   it('names a long --text on the result screen rather than printing it', () => {
     expect(shownArgs(['util', 'owi', 'map', '--text', `${'x'.repeat(200)}\n${'y'.repeat(10)}`])).toEqual(['util', 'owi', 'map', '--text', '<2 results from the steps above>']);
-    expect(shownArgs(['dossiers', 'brief', 'p', '--text', 'short'])).toEqual(['dossiers', 'brief', 'p', '--text', 'short']);
+    expect(shownArgs(['projects', 'brief', 'p', '--text', 'short'])).toEqual(['projects', 'brief', 'p', '--text', 'short']);
   });
 });
 

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { showData } from '../src/fixtures/dossiers.ts';
+import { showData } from '../src/fixtures/toil-projects.ts';
 import { fixtureExecute } from '../src/fixtures/execute.ts';
-import { loadDossier } from '../src/load.ts';
+import { loadToilProject } from '../src/load.ts';
 import { ADO_CI_RUNS } from '../src/fixtures/delivery.ts';
 import { resolveTargets, targetsOf, valuesOf } from '../src/targets.ts';
 
-describe('the targets of a dossier section', () => {
+describe('the targets of a Toil project section', () => {
   it('is one target naming nothing for plain values', () => {
     expect(targetsOf({ project: 'PAY', repo: 'api' }, ['project', 'repo'])).toEqual([{ inputs: {}, label: '' }]);
   });
@@ -33,24 +33,24 @@ describe('the targets of a dossier section', () => {
 });
 
 describe('a pipeline that lives in one of several Azure DevOps projects', () => {
-  const dossier = {
+  const toilProject = {
     name: 'pipes',
     description: 'Two projects, one pipeline.',
     repos: [{ name: 'api', remotes: [] }, { name: 'ui', remotes: [] }],
     ado: { connection: 'corp-ado', collection: 'DefaultCollection', project: { api: 'Payments', ui: 'Ledger' }, repo: { api: 'a', ui: 'b' }, builds: ['ledger-ci'], deployments: ['nowhere-deploy'] },
   };
-  const show = { command: 'dossiers show', input: { dossier: 'pipes' }, data: showData(dossier) };
-  const runs = (project: string, name: string) => ({ command: 'ado run list', input: { dossier: 'pipes', collection: 'DefaultCollection', project, name, top: 20 } });
+  const show = { command: 'projects show', input: { toilProject: 'pipes' }, data: showData(toilProject) };
+  const runs = (project: string, name: string) => ({ command: 'ado run list', input: { toilProject: 'pipes', collection: 'DefaultCollection', project, name, top: 20 } });
 
   it('is kept from the project that has it, with no failed call on the panel for the others', async () => {
     const fixture = fixtureExecute([show, { ...runs('Ledger', 'ledger-ci'), data: ADO_CI_RUNS }]);
-    const data = await loadDossier(fixture.execute, 'pipes');
+    const data = await loadToilProject(fixture.execute, 'pipes');
     expect(data.calls.builds.map((c) => [c.input.project, c.ok])).toEqual([['Ledger', true]]);
   });
 
   it("records one failure, the last project's, when none has the pipeline", async () => {
     const fixture = fixtureExecute([show]);
-    const data = await loadDossier(fixture.execute, 'pipes');
+    const data = await loadToilProject(fixture.execute, 'pipes');
     expect(data.calls.deployments.map((c) => [c.input.project, c.ok])).toEqual([['Ledger', false]]);
   });
 });
@@ -64,22 +64,22 @@ describe('a repo name a section leaves half-named', () => {
   });
 
   it("is said not to have had its pull requests read, and nothing Bitbucket doesn't give", async () => {
-    const dossier = { name: 'half', description: 'A repo with no project.', repos: [], bitbucket: { connection: 'corp-bitbucket', project: { api: 'PAY' }, repo: { api: 'pay-api', ui: 'pay-ui' } } };
-    const fixture = fixtureExecute([{ command: 'dossiers show', input: { dossier: 'half' }, data: showData(dossier) }]);
-    const data = await loadDossier(fixture.execute, 'half');
+    const toilProject = { name: 'half', description: 'A repo with no project.', repos: [], bitbucket: { connection: 'corp-bitbucket', project: { api: 'PAY' }, repo: { api: 'pay-api', ui: 'pay-ui' } } };
+    const fixture = fixtureExecute([{ command: 'projects show', input: { toilProject: 'half' }, data: showData(toilProject) }]);
+    const data = await loadToilProject(fixture.execute, 'half');
     expect(data.readTargets).toContainEqual({ area: 'bitbucket', label: 'bitbucket ui', work: true, pullRequests: false });
   });
 
   it('says of an Azure DevOps name only what it left unread: pull requests by repo, work items by project', async () => {
-    const dossier = { name: 'half-ado', description: 'A repo for one project only.', repos: [], ado: { connection: 'corp-ado', project: { api: 'P', web: 'Q' }, repo: { api: 'api' } } };
-    const fixture = fixtureExecute([{ command: 'dossiers show', input: { dossier: 'half-ado' }, data: showData(dossier) }]);
-    const data = await loadDossier(fixture.execute, 'half-ado');
+    const toilProject = { name: 'half-ado', description: 'A repo for one project only.', repos: [], ado: { connection: 'corp-ado', project: { api: 'P', web: 'Q' }, repo: { api: 'api' } } };
+    const fixture = fixtureExecute([{ command: 'projects show', input: { toilProject: 'half-ado' }, data: showData(toilProject) }]);
+    const data = await loadToilProject(fixture.execute, 'half-ado');
     expect(data.readTargets).toContainEqual({ area: 'ado', label: 'ado web', work: true, pullRequests: false });
   });
 });
 
-describe('a dossier with per-repo Jira, Bitbucket and Azure DevOps values', () => {
-  const dossier = {
+describe('a Toil project with per-repo Jira, Bitbucket and Azure DevOps values', () => {
+  const toilProject = {
     name: 'per-repo',
     description: 'Three trackers, two repos.',
     repos: [{ name: 'api', remotes: [] }, { name: 'ui', remotes: [] }],
@@ -89,16 +89,16 @@ describe('a dossier with per-repo Jira, Bitbucket and Azure DevOps values', () =
   };
 
   it('sends every read once per target, with its context inputs passed outright', async () => {
-    const fixture = fixtureExecute([{ command: 'dossiers show', input: { dossier: 'per-repo' }, data: showData(dossier) }]);
-    const data = await loadDossier(fixture.execute, 'per-repo');
+    const fixture = fixtureExecute([{ command: 'projects show', input: { toilProject: 'per-repo' }, data: showData(toilProject) }]);
+    const data = await loadToilProject(fixture.execute, 'per-repo');
     const inputs = (command: string) => fixture.calls.filter((c) => c.command === command).map((c) => c.input);
 
     expect(inputs('jira issue search').map((i) => String(i.jql).split(' AND ')[0])).toEqual(['project = PAY', 'project = LEDG']);
     expect(inputs('bitbucket pr list')).toEqual([
-      { dossier: 'per-repo', project: 'PAY', repo: 'pay-api', state: 'ALL' },
-      { dossier: 'per-repo', project: 'PAY', repo: 'pay-ui', state: 'ALL' },
+      { toilProject: 'per-repo', project: 'PAY', repo: 'pay-api', state: 'ALL' },
+      { toilProject: 'per-repo', project: 'PAY', repo: 'pay-ui', state: 'ALL' },
     ]);
-    const scope = (project: string) => ({ dossier: 'per-repo', collection: 'DefaultCollection', project });
+    const scope = (project: string) => ({ toilProject: 'per-repo', collection: 'DefaultCollection', project });
     expect(inputs('ado work-item iterations')).toEqual([scope('Payments'), scope('Ledger')]);
     expect(inputs('ado work-item search').map((i) => [i.collection, i.project])).toEqual([['DefaultCollection', 'Payments'], ['DefaultCollection', 'Ledger']]);
     expect(inputs('ado pr list')).toEqual([

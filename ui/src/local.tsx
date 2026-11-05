@@ -20,15 +20,15 @@ import { SyncPanel, lastSynced } from './sync-panel.tsx';
 import { httpAssignments } from './assign/client.ts';
 import { CALL_OPTIONS, type Execute } from './toil.ts';
 
-/** The sync status as the cards read it: each dossier's last sync and how it went. */
-const syncedBy = (s: SyncStatus | null) => Object.fromEntries((s?.dossiers ?? []).map((d) => [d.name, { at: d.lastSyncAt, status: d.status }]));
+/** The sync status as the cards read it: each toil project's last sync and how it went. */
+const syncedBy = (s: SyncStatus | null) => Object.fromEntries((s?.toilProjects ?? []).map((d) => [d.name, { at: d.lastSyncAt, status: d.status }]));
 
 const root = createRoot(document.getElementById('root')!);
 
 function Local({ session, execute, agent: firstAgent, names, status }: { session: Session; execute: Execute; agent: Agent; names: string[]; status: SyncStatus | null }) {
   const [synced, setSynced] = useState(() => lastSynced(status));
-  // Each dossier's last sync, for its card on the Dossiers view (#342).
-  const [byDossier, setByDossier] = useState(() => syncedBy(status));
+  // Each toil project's last sync, for its card on the Toil projects view (#342).
+  const [byToilProject, setByToilProject] = useState(() => syncedBy(status));
   // When the last sync finished, whatever it found (#494): Analyze after a sync runs on each new one.
   const [finished, setFinished] = useState<string | null>(() => status?.job.finishedAt ?? null);
   const [agent, setAgent] = useState(firstAgent);
@@ -56,21 +56,21 @@ function Local({ session, execute, agent: firstAgent, names, status }: { session
   const [serverStatus] = useState(() => () => httpServerStatus(session));
   // A running sync, for the theme's loader (#419), and the facts the last one recorded for the first time, for its moments.
   const [syncing, setSyncing] = useState<SyncStatus['job'] | null>(null);
-  const [news, setNews] = useState<{ id: string; byDossier: NonNullable<SyncStatus['job']['news']> } | null>(null);
+  const [news, setNews] = useState<{ id: string; byToilProject: NonNullable<SyncStatus['job']['news']> } | null>(null);
   const onStatus = useCallback((next: SyncStatus) => setSyncing(next.job.running ? next.job : null), []);
   // Sync from the command palette or the first-run checklist (#416): the panel runs it, as if its own button were pressed.
   const [syncAsked, setSyncAsked] = useState(0);
   const askSync = useCallback(() => setSyncAsked((n) => n + 1), []);
   const onChange = useCallback((next: SyncStatus) => {
     setSynced(lastSynced(next));
-    setByDossier(syncedBy(next));
+    setByToilProject(syncedBy(next));
     if (next.job.finishedAt) setFinished(next.job.finishedAt);
-    if (next.job.finishedAt && next.job.news?.length) setNews({ id: next.job.finishedAt, byDossier: next.job.news });
+    if (next.job.finishedAt && next.job.news?.length) setNews({ id: next.job.finishedAt, byToilProject: next.job.news });
     setGeneration((g) => g + 1);
   }, []);
   return (
     <>
-      <App key={generation} syncing={syncing} news={news} syncedAt={finished} serverStatus={serverStatus} execute={execute} agent={agent} config={config} {...(session.sample ? {} : { themeSetting: config })} feedback={feedback} modelUsage={modelUsage} assignments={assignments} worklog={worklog} analyses={analyses} {...(session.sync ? { synced: byDossier, onSync: askSync, afterDescribe: () => void sync?.status().then((s) => setByDossier(syncedBy(s)), () => undefined) } : {})} now={synced ?? session.now} preview={session.sample} versions={{ ui: session.version, toil: session.toil.version }} {...(settingsClient ? { agentSettings: { client: settingsClient, onChange: onAgent, ...(names[0] ? { dossier: names[0] } : {}) } } : {})} />
+      <App key={generation} syncing={syncing} news={news} syncedAt={finished} serverStatus={serverStatus} execute={execute} agent={agent} config={config} {...(session.sample ? {} : { themeSetting: config })} feedback={feedback} modelUsage={modelUsage} assignments={assignments} worklog={worklog} analyses={analyses} {...(session.sync ? { synced: byToilProject, onSync: askSync, afterDescribe: () => void sync?.status().then((s) => setByToilProject(syncedBy(s)), () => undefined) } : {})} now={synced ?? session.now} preview={session.sample} versions={{ ui: session.version, toil: session.toil.version }} {...(settingsClient ? { agentSettings: { client: settingsClient, onChange: onAgent, ...(names[0] ? { toilProject: names[0] } : {}) } } : {})} />
       {sync && <SyncPanel client={sync} onChange={onChange} onStatus={onStatus} request={syncAsked} />}
     </>
   );
@@ -79,8 +79,8 @@ function Local({ session, execute, agent: firstAgent, names, status }: { session
 async function start() {
   const session = await signIn();
   const execute = httpExecute(session);
-  const list = await execute('dossiers list', {}, CALL_OPTIONS);
-  const names = list.ok ? ((list.data as { dossiers?: Array<{ name?: unknown }> }).dossiers ?? []).map((d) => String(d.name)) : [];
+  const list = await execute('projects list', {}, CALL_OPTIONS);
+  const names = list.ok ? ((list.data as { toilProjects?: Array<{ name?: unknown }> }).toilProjects ?? []).map((d) => String(d.name)) : [];
   const agent = await httpAgent(session, names);
   const status = session.sync ? await httpSync(session).status().catch(() => null) : null;
   root.render(

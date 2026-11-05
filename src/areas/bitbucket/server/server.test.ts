@@ -5,12 +5,12 @@ import type { Route } from '../../../../test/harness/fake-fetch.js';
 import { API, BITBUCKET, comment, config as fixtureConfig, page, pr, REPO, repo, routes, SHA, user } from '../../../../test/fixtures/bitbucket.fixture.js';
 import { commandName, type AnyCommand } from '../../../core/command.js';
 import { execute } from '../../../core/run.js';
-import { checkDossier } from './check-dossier.js';
+import { checkToilProject } from './check-toil-project.js';
 import { commentCommands } from './comments.js';
 import { pullRequestCommands } from './pull-requests.js';
 import { reviewCommands } from './review.js';
 
-const commands = [...pullRequestCommands, ...commentCommands, ...reviewCommands, checkDossier];
+const commands = [...pullRequestCommands, ...commentCommands, ...reviewCommands, checkToilProject];
 
 /**
  * The exact request toil sends to Bitbucket Data Center and what it makes of

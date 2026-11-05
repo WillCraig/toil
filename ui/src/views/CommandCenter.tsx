@@ -1,11 +1,11 @@
 /**
- * The Command Center (#307): every work item in the dossier with its
+ * The Command Center (#307): every work item in the toil project with its
  * readiness verdict and, for each one that isn't ready, the rows that say
  * why, with filters by verdict, status, type, assignee and source. Every
  * verdict is src/model/readiness.ts over the cached OWI records, with no
  * model call and no live read.
  *
- * The plan is strict: only `ready` items are slated, in the dossier's own
+ * The plan is strict: only `ready` items are slated, in the toil project's own
  * order. Starting them is assign-to-agent's (#293): `startReady` on the
  * view's data (src/assign/start.ts) queues an implement assignment for each,
  * and the view says what it queued, or why it started nothing. Where there
@@ -22,7 +22,7 @@ import { Panel } from '../components/panel.tsx';
 import { Help } from '../components/help.tsx';
 import { VerdictChip, WhyNot } from '../components/readiness.tsx';
 import { useData } from '../data.ts';
-import { dateTime, dossierHref, personText, sourceLabel, STATUS_CATEGORY_LABEL } from '../format.ts';
+import { dateTime, toilProjectHref, personText, sourceLabel, STATUS_CATEGORY_LABEL } from '../format.ts';
 import { usePlain } from '../plain-words.ts';
 import { readinessAll, tally, VERDICT_LABEL, VERDICT_PLAIN, VERDICTS, type Readiness, type Verdict } from '../model/readiness.ts';
 import { Empty, EmptyButton } from '../components/empty.tsx';
@@ -60,15 +60,15 @@ const columns: Array<Column<Line>> = [
 ];
 
 export function CommandCenter() {
-  const { dossier, now, startReady } = useData();
+  const { toilProject, now, startReady } = useData();
   const plain = usePlain();
   const [started, setStarted] = useState<{ ok: boolean; text: string } | null>(null);
   const [starting, setStarting] = useState(false);
-  const settings = dossier.readiness;
+  const settings = toilProject.readiness;
   const lines = useMemo<Line[]>(() => {
-    const all = readinessAll(dossier.items, settings);
-    return dossier.items.map((item, i) => ({ item, readiness: all[i]! }));
-  }, [dossier, settings]);
+    const all = readinessAll(toilProject.items, settings);
+    return toilProject.items.map((item, i) => ({ item, readiness: all[i]! }));
+  }, [toilProject, settings]);
   const [verdict, setVerdict] = useState<'all' | Verdict>('all');
   const [status, setStatus] = useState('open');
   const [type, setType] = useState('all');
@@ -92,19 +92,19 @@ export function CommandCenter() {
       (assignee === 'all' || (assignee === 'none' ? !l.item.assignee : who(l.item) === assignee)) &&
       (source === 'all' || l.item.source.area === source),
   );
-  const calls = [...dossier.calls.dossier, ...dossier.calls.work];
+  const calls = [...toilProject.calls.toilProject, ...toilProject.calls.work];
 
   return (
     <>
       <div className="view-head">
         <p className="eyebrow">
-          <a href={dossierHref(dossier.name)}>{dossier.name}</a>
+          <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a>
         </p>
         <h1 tabIndex={-1} title={plain.title('Command Center')}>
           {plain.pw('Command Center', 'Ready to start?')}
         </h1>
         <p className="lede">
-          {plain.on ? `Every item in ${dossier.name}, marked ready or not and, if not, why, from the records read ${dateTime(now)}.` : <>Every work item in {dossier.name}, each with its readiness verdict and, where it isn't ready, why, from the records read {dateTime(now)}.</>} <Help topic="readiness" />
+          {plain.on ? `Every item in ${toilProject.name}, marked ready or not and, if not, why, from the records read ${dateTime(now)}.` : <>Every work item in {toilProject.name}, each with its readiness verdict and, where it isn't ready, why, from the records read {dateTime(now)}.</>} <Help topic="readiness" />
         </p>
         {settings.notes.map((n, i) => (
           <p key={i} role="note" className="failure">
@@ -121,7 +121,7 @@ export function CommandCenter() {
                 <VerdictChip verdict={v} />
               </h2>
               <p className="team-figure">{totals[v]}</p>
-              <p className="note">{v === 'ready' ? 'Every check passes.' : v === 'thin' ? plain.pw('Missing acceptance criteria, description or another check a person can waive.', 'Missing "done when" criteria, a description or another check a person can waive.') : plain.pw('Done already, blocked by an open item, or outside the dossier.', 'Done already, blocked by an open item, or outside the Toil project.')}</p>
+              <p className="note">{v === 'ready' ? 'Every check passes.' : v === 'thin' ? plain.pw('Missing acceptance criteria, description or another check a person can waive.', 'Missing "done when" criteria, a description or another check a person can waive.') : 'Done already, blocked by an open item, or outside the Toil project.'}</p>
             </Stack>
           </li>
         ))}
@@ -131,7 +131,7 @@ export function CommandCenter() {
         <h2 id="slate">Start every ready item</h2>
         <p>
           {slated.length
-            ? plain.text(`${count(slated.length, 'item is', 'items are')} ready and would be slated, in the dossier's order (plan ${plan.id}).`)
+            ? plain.text(`${count(slated.length, 'item is', 'items are')} ready and would be slated, in the Toil project's order (plan ${plan.id}).`)
             : 'No open item is ready, so nothing would be slated. The list below says what each one is missing.'}
         </p>
         {slated.length > 0 && (
@@ -183,7 +183,7 @@ export function CommandCenter() {
           Showing {count(shown.length, 'item')} of {lines.length}.
         </p>
         {shown.length ? (
-          <DataTable label="Items and their readiness" caption={`${dossier.name}'s items and their readiness`} columns={columns} rows={shown} rowKey={(l) => l.item.id} wide />
+          <DataTable label="Items and their readiness" caption={`${toilProject.name}'s items and their readiness`} columns={columns} rows={shown} rowKey={(l) => l.item.id} wide />
         ) : (
           <Empty
             message="No item matches these filters."

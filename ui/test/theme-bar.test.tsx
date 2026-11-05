@@ -24,8 +24,8 @@ import { THEMES, themeNamed } from '../src/themes.ts';
  * since jsdom can't compute it.
  */
 
-const item = (dossier: string, id: string) => `#/dossier/${dossier}/item/${encodeURIComponent(id)}`;
-const ROUTES = ['#/', '#/dossier/card-payments', '#/dossier/settlement', '#/dossier/checkout-web', item('card-payments', 'corp-jira:PAY-100'), item('settlement', 'corp-ado:2304'), '#/settings'];
+const item = (toilProject: string, id: string) => `#/project/${toilProject}/item/${encodeURIComponent(id)}`;
+const ROUTES = ['#/', '#/project/card-payments', '#/project/settlement', '#/project/checkout-web', item('card-payments', 'corp-jira:PAY-100'), item('settlement', 'corp-ado:2304'), '#/settings'];
 const SCHEMES = THEMES.flatMap((t) => Object.keys(t.schemes).map((scheme) => [t.name, scheme] as const));
 const STRICT = new Set(['plain', 'crate']);
 /** Each case renders a whole view and runs axe over it, which takes a few seconds on a slow CI runner (macOS on Node 24.14). */
@@ -38,7 +38,7 @@ async function open(hash: string, theme: string, scheme: string) {
   const view = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview />);
   await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
   // The dashboard's graph loads on its own; wait for it, so every target is on the page.
-  if (hash.startsWith('#/dossier/') && !hash.includes('/item/')) await waitFor(() => expect(screen.queryByText('Drawing the graph…')).toBeNull(), { timeout: 3000 });
+  if (hash.startsWith('#/project/') && !hash.includes('/item/')) await waitFor(() => expect(screen.queryByText('Drawing the graph…')).toBeNull(), { timeout: 3000 });
   return view;
 }
 
@@ -124,47 +124,47 @@ describe('a renamed word keeps the real one beside it', { timeout: SLOW }, () =>
     ['plain', 'Dependencies', 'Blocked'],
   ])('%s names the graph %s and its blockers %s', async (theme, title, blocked) => {
     const scheme = Object.keys(themeNamed(theme).schemes)[0]!;
-    await open('#/dossier/card-payments/dependencies', theme, scheme);
+    await open('#/project/card-payments/dependencies', theme, scheme);
     const graph = screen.getByRole('region', { name: title });
     // The graph loads on its own, after the rest of the tab.
     await waitFor(() => expect(within(graph).getAllByText(blocked).length).toBeGreaterThan(0), { timeout: 3000 });
   });
 
   it('names the board, the sprint and the agent in Harvest beside their own words', async () => {
-    await open('#/dossier/card-payments/board', 'harvest', 'light');
+    await open('#/project/card-payments/board', 'harvest', 'light');
     expect(screen.getByRole('region', { name: /^Farm plot \(Sprint 42 board\)$/ })).toBeTruthy();
     expect(document.querySelector('.sprint-chip')!.textContent).toMatch(/^Season calendar \(Sprint 42: day \d+ of \d+\)$/);
   });
 
   it('names the board, the sprint and the agent in Overworld beside their own words', async () => {
-    await open('#/dossier/card-payments/board', 'overworld', 'dark');
+    await open('#/project/card-payments/board', 'overworld', 'dark');
     expect(screen.getByRole('region', { name: /^Quest log \(Sprint 42 board\)$/ })).toBeTruthy();
     expect(document.querySelector('.sprint-chip')!.textContent).toMatch(/^Journey \(Sprint 42: day \d+ of \d+\)$/);
   });
 
   it('names the claims board and the cattle drive in Frontier beside their own words', async () => {
-    await open('#/dossier/card-payments/board', 'frontier', 'light');
+    await open('#/project/card-payments/board', 'frontier', 'light');
     expect(screen.getByRole('region', { name: /^Claims board \(Sprint 42 board\)$/ })).toBeTruthy();
     expect(document.querySelector('.sprint-chip')!.textContent).toMatch(/^Cattle drive \(Sprint 42: day \d+ of \d+\)$/);
   });
 
   it('names the campaign each card serves in Realm', async () => {
-    await open('#/dossier/card-payments/board', 'realm', 'light');
+    await open('#/project/card-payments/board', 'realm', 'light');
     const board = screen.getByRole('region', { name: /board/ });
     expect(within(board).getAllByText(/^Campaign \(Epic\): /).length).toBeGreaterThan(0);
   });
 
   it('reads the board, builds, people, analyses and an item as a tabletop campaign in Realm, beside the real words (#415)', async () => {
-    await open('#/dossier/card-payments/board', 'realm', 'light');
+    await open('#/project/card-payments/board', 'realm', 'light');
     const builds = screen.getByRole('region', { name: 'Saving throws (Builds)' });
     const rolls = [...builds.querySelectorAll('.outcome__roll')].map((r) => r.textContent);
     expect(rolls).toContain('Natural 20 (passed): ');
     expect(rolls).toContain('Critical fail (failed): ');
     cleanup();
-    await open('#/dossier/card-payments/people', 'realm', 'light');
+    await open('#/project/card-payments/people', 'realm', 'light');
     expect(screen.getByRole('heading', { level: 1, name: 'Party (People)' })).toBeTruthy();
     cleanup();
-    await open('#/dossier/card-payments/analyses', 'realm', 'light');
+    await open('#/project/card-payments/analyses', 'realm', 'light');
     expect(screen.getByRole('heading', { name: 'Quest log (Analyses)' })).toBeTruthy();
     cleanup();
     await open(item('card-payments', 'corp-jira:PAY-100'), 'realm', 'light');
@@ -173,7 +173,7 @@ describe('a renamed word keeps the real one beside it', { timeout: SLOW }, () =>
 
   it('keeps the real words alone in Realm with themed wording off', async () => {
     localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'realm', scheme: 'light', wording: false }));
-    window.location.hash = '#/dossier/card-payments/people';
+    window.location.hash = '#/project/card-payments/people';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview />);
     expect(await screen.findByRole('heading', { level: 1, name: 'People' })).toBeTruthy();
     expect(document.querySelector('.person-tag--roll')).toBeNull();
@@ -189,7 +189,7 @@ describe('the skins', { timeout: SLOW }, () => {
     ['frontier', 'light', 'Operator (Agent)'],
     ['overworld', 'dark', 'Sage (Agent)'],
   ])('answer in %s (%s) as %s', async (theme, scheme, name) => {
-    await open('#/dossier/settlement', theme, scheme);
+    await open('#/project/settlement', theme, scheme);
     await openChat('settlement');
     const starters = screen.getByRole('group', { name: 'Starter questions' });
     await userEvent.click(within(starters).getAllByRole('button')[0]!);
@@ -197,7 +197,7 @@ describe('the skins', { timeout: SLOW }, () => {
   });
 
   it('grow a crop on each Harvest card by its column, and hide the art from screen readers', async () => {
-    await open('#/dossier/card-payments/board', 'harvest', 'light');
+    await open('#/project/card-payments/board', 'harvest', 'light');
     const crops = [...document.querySelectorAll<HTMLImageElement>('.card .harvest-crop')];
     expect(crops.length).toBe(document.querySelectorAll('.card').length);
     for (const c of crops) expect(c.getAttribute('alt')).toBe('');
@@ -205,14 +205,14 @@ describe('the skins', { timeout: SLOW }, () => {
     expect([...stages].sort()).toEqual(['done', 'in_progress', 'todo']);
     // The calendar hangs on the sprint, which the Overview's burn-up opens (#394).
     cleanup();
-    await open('#/dossier/card-payments', 'harvest', 'light');
+    await open('#/project/card-payments', 'harvest', 'light');
     await userEvent.click(screen.getByRole('button', { name: /^Burn-up / }));
     await screen.findByRole('dialog');
     expect(document.querySelector('.harvest-calendar')?.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('carry loot on each Overworld card by its column, and a heart meter and gem counter on the board and the sprint, all hidden from screen readers', async () => {
-    await open('#/dossier/card-payments/board', 'overworld', 'dark');
+    await open('#/project/card-payments/board', 'overworld', 'dark');
     const loot = [...document.querySelectorAll<HTMLImageElement>('.card .ow-loot')];
     expect(loot.length).toBe(document.querySelectorAll('.card').length);
     for (const l of loot) expect(l.getAttribute('alt')).toBe('');
@@ -228,13 +228,13 @@ describe('the skins', { timeout: SLOW }, () => {
     expect(hearts.filter((h) => h === HEART.empty)).toHaveLength(7);
     expect(hud.querySelector('.ow-gems')!.textContent).toBe('3/21');
     cleanup();
-    await open('#/dossier/card-payments', 'overworld', 'dark');
+    await open('#/project/card-payments', 'overworld', 'dark');
     await userEvent.click(screen.getByRole('button', { name: /^Burn-up / }));
     expect((await screen.findByRole('dialog')).querySelector('.ow-hud')?.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('follow the sprint with the sky: --sprint-progress on the dashboard, gone off it', async () => {
-    const { unmount } = await open('#/dossier/card-payments', 'harvest', 'light');
+    const { unmount } = await open('#/project/card-payments', 'harvest', 'light');
     const p = Number(document.documentElement.style.getPropertyValue('--sprint-progress'));
     expect(p).toBeGreaterThan(0);
     expect(p).toBeLessThan(1);
@@ -269,7 +269,7 @@ describe('the skins', { timeout: SLOW }, () => {
   });
 
   it("roll an alignment for every Realm People card, the same each time, from the name only, and say what it is (#415)", async () => {
-    await open('#/dossier/card-payments/people', 'realm', 'light');
+    await open('#/project/card-payments/people', 'realm', 'light');
     const cards = [...document.querySelectorAll('.person-card')];
     const tags = [...document.querySelectorAll('.person-tag--roll')].map((t) => t.textContent);
     expect(tags.length).toBe(cards.length);
@@ -278,12 +278,12 @@ describe('the skins', { timeout: SLOW }, () => {
     expect(screen.getByRole('button', { name: 'About rolled alignments' })).toBeTruthy();
     const first = tags;
     cleanup();
-    await open('#/dossier/card-payments/people', 'realm', 'light');
+    await open('#/project/card-payments/people', 'realm', 'light');
     expect([...document.querySelectorAll('.person-tag--roll')].map((t) => t.textContent)).toEqual(first);
   });
 
   it("count the sprint's hit points in place of its meter in Realm, from the sprint's own figures", async () => {
-    await open('#/dossier/card-payments', 'realm', 'light');
+    await open('#/project/card-payments', 'realm', 'light');
     await userEvent.click(screen.getByRole('button', { name: /^Burn-up / }));
     const dialog = await screen.findByRole('dialog');
     const vitals = dialog.querySelector('.realm-vitals')!;
@@ -304,7 +304,7 @@ describe('the skins', { timeout: SLOW }, () => {
   });
 
   it('put a notched corner on Sprawl panels and the header, out of the accessibility tree, and the netrunner in a terminal window', async () => {
-    await open('#/dossier/settlement/board', 'sprawl', 'dark');
+    await open('#/project/settlement/board', 'sprawl', 'dark');
     const notches = [...document.querySelectorAll('.sprawl-notch')];
     expect(notches.length).toBeGreaterThanOrEqual(5);
     for (const n of notches) expect(n.getAttribute('aria-hidden')).toBe('true');
@@ -313,7 +313,7 @@ describe('the skins', { timeout: SLOW }, () => {
   });
 
   it('put HUD corners on Starship panels and the header, out of the accessibility tree', async () => {
-    await open('#/dossier/settlement/board', 'starship', 'dark');
+    await open('#/project/settlement/board', 'starship', 'dark');
     const corners = [...document.querySelectorAll('.hud-corners')];
     expect(corners.length).toBeGreaterThanOrEqual(5);
     for (const c of corners) expect(c.getAttribute('aria-hidden')).toBe('true');
@@ -323,11 +323,11 @@ describe('the skins', { timeout: SLOW }, () => {
 
 describe('the local app\'s sync panel', { timeout: SLOW }, () => {
   const AT = '2026-10-13T08:00:00.000Z';
-  const idle = { running: false, by: null, startedAt: AT, finishedAt: AT, dossier: null, dossiersDone: 1, dossiersTotal: 1, fetched: 0, reused: 0, requests: 0, pages: 0, retries: 0, messages: [], error: null };
+  const idle = { running: false, by: null, startedAt: AT, finishedAt: AT, toilProject: null, toilProjectsDone: 1, toilProjectsTotal: 1, fetched: 0, reused: 0, requests: 0, pages: 0, retries: 0, messages: [], error: null };
   const status: SyncStatus = {
     retentionDays: 30,
     job: idle,
-    dossiers: [
+    toilProjects: [
       {
         name: 'card-payments',
         lastSyncAt: AT,
@@ -377,7 +377,7 @@ describe('the header (#277)', { timeout: SLOW }, () => {
       await userEvent.click(menu);
       const dialog = await screen.findByRole('dialog', { name: 'Menu, on Settings' });
       expect(within(dialog).getByRole('link', { name: 'Settings' }).getAttribute('aria-current')).toBe('page');
-      expect(within(dialog).getByRole('link', { name: 'Dossiers' })).toBeTruthy();
+      expect(within(dialog).getByRole('link', { name: 'Toil projects' })).toBeTruthy();
       expect(within(dialog).getByRole('button', { name: /Theme/ })).toBeTruthy();
       await userEvent.keyboard('{Escape}');
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -398,7 +398,7 @@ describe('the header (#277)', { timeout: SLOW }, () => {
       return { top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
     };
     try {
-      await open('#/dossier/settlement', 'plain', 'light');
+      await open('#/project/settlement', 'plain', 'light');
       expect(screen.queryByRole('navigation', { name: 'Views' })).toBeNull();
       expect(screen.getByRole('button', { name: 'Menu' })).toBeTruthy();
     } finally {
@@ -406,7 +406,7 @@ describe('the header (#277)', { timeout: SLOW }, () => {
     }
     cleanup();
     // One row that fits keeps the views in the header.
-    await open('#/dossier/settlement', 'plain', 'light');
+    await open('#/project/settlement', 'plain', 'light');
     expect(screen.getByRole('navigation', { name: 'Views' })).toBeTruthy();
   });
 });

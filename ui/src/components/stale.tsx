@@ -20,7 +20,7 @@ export function StaleChip() {
   );
 }
 
-/** The badge and why, on one line: "Stale started on toil 0.1.0-alpha.3 · now alpha.4 · dossier changed". */
+/** The badge and why, on one line: "Stale started on toil 0.1.0-alpha.3 · now alpha.4 · toil project changed". */
 export function StaleNote({ stale, className = '' }: { stale: Staleness; className?: string }) {
   const plain = usePlain();
   // The reason is a fact, so it stays on the line in both wordings; plain words only add what the badge means.

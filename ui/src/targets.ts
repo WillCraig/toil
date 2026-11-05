@@ -1,5 +1,5 @@
 /**
- * The places an area's section sends a read to. A dossier section's context
+ * The places an area's section sends a read to. A toil project section's context
  * inputs (`project`, `repo`, `workspace`, ...) are each one value for every
  * repo or an object of repo name to value; Toil UI resolves with no repo
  * folder, so a per-repo value is never picked for it, and each read has to

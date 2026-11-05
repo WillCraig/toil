@@ -18,7 +18,7 @@ import { Loader, momentsOf, Splash, useMomentPlayer } from './Moments.tsx';
 import { MOMENT_KINDS, MOMENT_PLAIN, type MomentKind, type SplashData } from './schema.ts';
 
 /** The splash's preview is handed a sample sprint (#462), as the loader's is a sample read, so a theme's face shows. */
-const SAMPLE_SPLASH: SplashData = { dossier: 'card-payments', day: 7, days: 10, done: 4 };
+const SAMPLE_SPLASH: SplashData = { toilProject: 'card-payments', day: 7, days: 10, done: 4 };
 
 export function MomentsPreview() {
   const theme = useTheme();

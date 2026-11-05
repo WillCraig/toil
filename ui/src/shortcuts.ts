@@ -19,7 +19,7 @@ export interface Shortcut {
 }
 
 export const SHORTCUTS = {
-  palette: { keys: ['Mod', 'K'], where: 'Anywhere', what: 'Open the command palette: jump to a dossier, a tab, an item in any dossier or a setting, or run Sync, Analyze and Ask' },
+  palette: { keys: ['Mod', 'K'], where: 'Anywhere', what: 'Open the command palette: jump to a Toil project, a tab, an item in any Toil project or a setting, or run Sync, Analyze and Ask' },
   shortcuts: { keys: ['?'], where: 'Anywhere but a text field', what: 'Show these shortcuts' },
   paletteMove: { keys: ['↑'], or: [['↓']], where: 'In the command palette', what: 'Move between results' },
   paletteRun: { keys: ['Enter'], where: 'In the command palette', what: 'Open or run the highlighted result' },
@@ -28,8 +28,8 @@ export const SHORTCUTS = {
   cardPickUp: { keys: ['Space'], or: [['Enter']], where: 'On a board card', what: 'Pick the card up, or put it down to propose the move' },
   cardMove: { keys: ['←'], or: [['→']], where: 'On a board card you picked up', what: 'Move it to the previous or next column' },
   cardCancel: { keys: ['Escape'], where: 'On a board card you picked up', what: 'Put it back where it was' },
-  editSave: { keys: ['Enter'], where: "Editing a dossier's name or description", what: 'Save it' },
-  editCancel: { keys: ['Escape'], where: "Editing a dossier's name or description", what: 'Leave it as it was' },
+  editSave: { keys: ['Enter'], where: "Editing a Toil project's name or description", what: 'Save it' },
+  editCancel: { keys: ['Escape'], where: "Editing a Toil project's name or description", what: 'Leave it as it was' },
   wipeCancel: { keys: ['Escape'], where: 'Asked whether to wipe the cache', what: 'Keep the cache' },
   drawerClose: { keys: ['Escape'], where: "In an item's drawer", what: 'Close it, and go back to the view behind it' },
 } as const satisfies Record<string, Shortcut>;

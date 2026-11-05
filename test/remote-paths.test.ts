@@ -142,16 +142,16 @@ describe('every entry point that takes a path, end to end with the real node con
   const unc = `\\\\${PROBE}\\share\\x`;
   const cli: Array<[string, string[]]> = [
     ['a file a command reads (util md)', ['util', 'md', `${unc}.md`, '--to', 'wiki']],
-    ['--cwd on an area command, which picks the dossier and the git remotes', ['github', 'pr', 'get', '7', '--cwd', unc]],
-    ['--dossier as a file', ['github', 'pr', 'get', '7', '--dossier', `${unc}.json`]],
-    ['dossiers import', ['dossiers', 'import', `${unc}.json`]],
-    ['dossiers export --file', ['dossiers', 'export', 'payments', '--file', `${unc}.json`]],
-    ['dossiers export --repo', ['dossiers', 'export', 'payments', '--repo', unc]],
+    ['--cwd on an area command, which picks the toil project and the git remotes', ['github', 'pr', 'get', '7', '--cwd', unc]],
+    ['--toil-project as a file', ['github', 'pr', 'get', '7', '--toil-project', `${unc}.json`]],
+    ['toil projects import', ['projects', 'import', `${unc}.json`]],
+    ['toil projects export --file', ['projects', 'export', 'payments', '--file', `${unc}.json`]],
+    ['toil projects export --repo', ['projects', 'export', 'payments', '--repo', unc]],
     ['repos scan', ['repos', 'scan', unc]],
   ];
 
-  it('has a dossier of your own to export', async () => {
-    const made = await runCli(['dossiers', 'init', 'payments'], { commands, context: context(true).context });
+  it('has a toil project of your own to export', async () => {
+    const made = await runCli(['projects', 'init', 'payments'], { commands, context: context(true).context });
     expect(made.envelope?.ok, JSON.stringify(made.envelope?.error)).toBe(true);
   });
 
@@ -163,13 +163,13 @@ describe('every entry point that takes a path, end to end with the real node con
     expect(http.calls).toEqual([]);
   });
 
-  it('over MCP, util_md with a file, and an area tool with cwd or dossier, are refused the same way', async () => {
+  it('over MCP, util_md with a file, and an area tool with cwd or toil project, are refused the same way', async () => {
     const { http, context: ctx } = context(false);
     const session = await connectMcp({ commands, context: ctx, areas: ['util', 'github'] });
     const calls: Array<[string, Record<string, unknown>]> = [
       ['util_md', { file: `${unc}.md`, to: 'wiki' }],
       ['github_pr_get', { number: '7', cwd: unc }],
-      ['github_pr_get', { number: '7', dossier: `//${PROBE}/share/x.json` }],
+      ['github_pr_get', { number: '7', toilProject: `//${PROBE}/share/x.json` }],
     ];
     for (const [tool, args] of calls) {
       const result = await session.call(tool, args);

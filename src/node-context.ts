@@ -4,7 +4,7 @@ import { fileAuditLog } from './core/audit.js';
 import { commandName, needsConfig, type AnyCommand } from './core/command.js';
 import { emptyConfig, loadConfig, type AreaInfo } from './core/config.js';
 import type { Context } from './core/context.js';
-import { createDossierCatalog } from './core/dossier.js';
+import { createToilProjectCatalog } from './core/toil-project.js';
 import { alreadyExists, nodeFiles, resolveWorkspace } from './core/files.js';
 import { createGitRunner } from './core/git.js';
 import { findGitRepo, readGitContext, readGitRemotes } from './core/git-repo.js';
@@ -142,14 +142,14 @@ export function createNodeContext(o: NodeContextOptions): Context {
   });
   return {
     config,
-    // Dossiers: your own, listed folders, and the repository's, read fresh on
+    // Toil projects: your own, listed folders, and the repository's, read fresh on
     // every call, so an edit made while toil mcp runs applies from the next one.
-    // A relative cwd or dossier path means the CLI's working directory; under
+    // A relative cwd or toil project path means the CLI's working directory; under
     // MCP, whose own working directory means nothing, the workspace.
     ...(o.def && !needsConfig(o.def)
       ? {}
       : {
-          dossiers: createDossierCatalog({
+          toilProjects: createToilProjectCatalog({
             home: o.home,
             env: o.env,
             config,

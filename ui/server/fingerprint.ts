@@ -1,7 +1,7 @@
 /**
  * The install fingerprint, server side (#305). `origin()` is what a session
  * starting now runs on: the toil and Toil UI this server runs, the toil
- * tools it hands the agent, the dossier as toil reads it, and the prompts.
+ * tools it hands the agent, the toil project as toil reads it, and the prompts.
  * `current()` is the same but for the builds, which are read from disk: the
  * toil bundle `@imagile-dev/toil/api` resolves to and Toil UI's own bin. Each
  * of those is read again only when its modification time or size changes,
@@ -106,8 +106,8 @@ export class Fingerprints {
   private readonly files: FileAccess;
   private readonly skills: Record<string, string>;
   private readonly seen = new Map<string, { key: string; build: Build | null }>();
-  /** Each dossier's hash, by name, with the file it was read from. */
-  private readonly dossiers = new Map<string, { file: string; key: string; hash: string | null }>();
+  /** Each toil project's hash, by name, with the file it was read from. */
+  private readonly toilProjects = new Map<string, { file: string; key: string; hash: string | null }>();
 
   constructor(private readonly o: FingerprintOptions) {
     this.files = o.files ?? nodeFiles;
@@ -142,35 +142,35 @@ export class Fingerprints {
   }
 
   /**
-   * The dossier as toil reads it now, hashed; null when toil can't read it.
-   * Kept against the dossier file's modification time and size, so a check
+   * The toil project as toil reads it now, hashed; null when toil can't read it.
+   * Kept against the toil project file's modification time and size, so a check
    * every turn asks toil again (and writes an audit line) only when the file
    * changed.
    */
-  async dossier(name: string): Promise<string | null> {
-    const hit = this.dossiers.get(name);
+  async toilProject(name: string): Promise<string | null> {
+    const hit = this.toilProjects.get(name);
     if (hit) {
       const st = this.files.stat(hit.file);
       if (st && `${st.mtimeMs}:${st.size}` === hit.key) return hit.hash;
     }
-    const e = await this.o.execute('dossiers show', { dossier: name }, { readOnly: true, caller: CALLER });
+    const e = await this.o.execute('projects show', { toilProject: name }, { readOnly: true, caller: CALLER });
     if (!e.ok) return null;
-    const data = (e.data ?? {}) as { file?: unknown; dossier?: unknown };
-    const hash = sha256(data.dossier ?? data);
+    const data = (e.data ?? {}) as { file?: unknown; toilProject?: unknown };
+    const hash = sha256(data.toilProject ?? data);
     const st = typeof data.file === 'string' ? this.files.stat(data.file) : null;
-    if (st) this.dossiers.set(name, { file: data.file as string, key: `${st.mtimeMs}:${st.size}`, hash });
-    else this.dossiers.delete(name);
+    if (st) this.toilProjects.set(name, { file: data.file as string, key: `${st.mtimeMs}:${st.size}`, hash });
+    else this.toilProjects.delete(name);
     return hash;
   }
 
-  /** What a session about this dossier, with these prompts, starts on now. */
-  async origin(dossier: string, prompts: string): Promise<Fingerprint> {
-    return { ...this.o.running, skills: this.skills, dossier: await this.dossier(dossier), prompts };
+  /** What a session about this toil project, with these prompts, starts on now. */
+  async origin(toilProject: string, prompts: string): Promise<Fingerprint> {
+    return { ...this.o.running, skills: this.skills, toilProject: await this.toilProject(toilProject), prompts };
   }
 
   /** The same, with the builds on disk: what a session is held to at every check. */
-  async current(dossier: string, prompts: string): Promise<Fingerprint> {
-    return { ...this.disk(), skills: this.skills, dossier: await this.dossier(dossier), prompts };
+  async current(toilProject: string, prompts: string): Promise<Fingerprint> {
+    return { ...this.disk(), skills: this.skills, toilProject: await this.toilProject(toilProject), prompts };
   }
 
   /** Why renewing can't help while the server is out of date, with the command that restarts it; null when it isn't. */

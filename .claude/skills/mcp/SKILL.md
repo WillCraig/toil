@@ -64,10 +64,10 @@ token also gets the call's page and retry progress events (`src/core/progress.ts
 numbered from one counter per call so `progress` only goes up. `runCommand()` hands it
 the server's tool list as its targets. Resources (`src/mcp/resources.ts`) are
 descriptions, never data: `toil://connections` (name, area, default, writes, never a
-host or secret), `toil://dossiers[/<name>]` through the dossiers commands, served
+host or secret), `toil://projects[/<name>]` through the toil projects commands, served
 when those tools are, and `toil://skill/<area>` for each area served. A resource
 never reads from a service or a database, and follows `--areas` as the tools do. The
-one prompt, `analyze` (#494), is the `dossiers_analyze_prompt` tool's answer, run
+one prompt, `analyze` (#494), is the `projects_analyze_prompt` tool's answer, run
 through `runCommand()` and served exactly when that tool is; a new prompt follows the
 same rule, a tool's answer and never text the server writes itself.
 
@@ -90,18 +90,18 @@ factory, so the CLI and MCP resolve the workspace through the same function
 touches a file returns `NOT_CONFIGURED` with a fix; commands that touch no file are
 unaffected.
 
-## Dossier context over MCP
+## Toil project context over MCP
 
 A stdio server's own working directory means nothing, because it's wherever the
 client launched it. Every area command takes a `cwd` input on both front doors,
-which chooses the dossier (`docs/dossiers.md`) and the git context. Left out, it's
+which chooses the toil project (`docs/projects.md`) and the git context. Left out, it's
 the workspace: on the CLI the working directory, under MCP the client's root when the
 client reports exactly one, converted from its `file://` URI with Node's URL
 handling. A relative `cwd` resolves against the CLI's working directory, or the
-workspace under MCP. A dossier file is an explicit input too (`dossier`), so the two
-doors stay 1:1, and `meta.context.dossier.folder` says which default applied. A path
+workspace under MCP. A toil project file is an explicit input too (`toilProject`), so the two
+doors stay 1:1, and `meta.context.toilProject.folder` says which default applied. A path
 that doesn't exist on the server's side is `INVALID_INPUT` saying so, never a
-silent "no dossier".
+silent "no toil project".
 
 ## Verifying with a real client
 

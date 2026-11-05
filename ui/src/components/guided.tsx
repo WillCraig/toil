@@ -42,17 +42,17 @@ export function seenCounts(d: { items: unknown[]; pullRequests?: unknown[]; chan
 
 /** What the AI can see and what it can't do: the part of "Before you ask" one press further in. Who answers is the header's to say, and what it costs is the usage line's. */
 function BeforeBody() {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const plain = usePlain();
-  const systems = [...new Set(dossier.sources.map((s) => sourceLabel(s.area)))];
+  const systems = [...new Set(toilProject.sources.map((s) => sourceLabel(s.area)))];
   return (
     <dl className="guided-before__list">
       <div>
         <dt>What the AI can see</dt>
         <dd>
-          <p>{plain.text("This dossier's saved work:")}</p>
+          <p>{plain.text("This Toil project's saved work:")}</p>
           <ul data-seen="">
-            {seenCounts(dossier).map((c) => (
+            {seenCounts(toilProject).map((c) => (
               <li key={c}>{plain.text(c)}</li>
             ))}
           </ul>
@@ -100,12 +100,12 @@ export function BeforeYouAsk() {
 
 /** The chat's empty state: the question to answer, the questions to start from, and what the AI can and can't do. */
 export function GuidedStart({ noAgent, notice, details, link, busy, onPick }: { noAgent: boolean; notice?: string; details?: string; link?: string; busy: boolean; onPick: (q: GuidedQuestion, text: string) => void }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const plain = usePlain();
   return (
     <div className="guided" data-guided-start="">
       <div className="guided__main">
-        <h3 className="guided__title">{`What would you like to know about ${dossier.name}?`}</h3>
+        <h3 className="guided__title">{`What would you like to know about ${toilProject.name}?`}</h3>
         {notice && (
           <div className="agent-notice guided__notice" data-no-agent="">
             <p>
@@ -168,16 +168,16 @@ function Dots({ level }: { level: Level }) {
  * conversation rather than under every answer.
  */
 export function AnswerChecks({ answer, prompt, analyze, ms, safe }: { answer: Answer; prompt: string; analyze?: boolean; ms?: number; safe?: boolean }) {
-  const { dossier, now, viewedAt } = useData();
+  const { toilProject, now, viewedAt } = useData();
   const plain = usePlain();
   const q = analyze ? QUESTIONS.briefing : questionFor(prompt, plain.text);
-  const panels = (q?.needs ?? (Object.keys(dossier.calls ?? {}) as Panel[])).filter((p) => dossier.calls?.[p]?.some((c) => !c.ok));
+  const panels = (q?.needs ?? (Object.keys(toilProject.calls ?? {}) as Panel[])).filter((p) => toilProject.calls?.[p]?.some((c) => !c.ok));
   const lack = q?.lack;
-  const among = lack ? dossier.items.filter(lack.among) : [];
+  const among = lack ? toilProject.items.filter(lack.among) : [];
   const sure = howSure({
     failed: panels.map((p) => plain.text(PANEL_WORDS[p])),
     ageHours: ageHoursOf(now, viewedAt ?? new Date().toISOString()),
-    items: q?.base === 'pullRequests' ? (dossier.pullRequests ?? []).length : dossier.items.length,
+    items: q?.base === 'pullRequests' ? (toilProject.pullRequests ?? []).length : toilProject.items.length,
     scoped: !!q?.needs,
     unverified: answer.unverified?.length ? { count: answer.unverified.length, of: answer.citations.length } : null,
     noun: q?.base === 'pullRequests' ? plain.pw('pull request', 'code review') : undefined,

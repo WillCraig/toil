@@ -1538,7 +1538,7 @@ number of items. A pull request is one of `changes`:
   Size in Azure DevOps, then OriginalEstimate; a board number field named
   Estimate, Size or Story Points in GitHub, else a label such as `points: 3`
   (`field` is then `label:points: 3`). `field` says which. Teams with a field of
-  their own point `estimate` at it with `--field`, the same keys a dossier's
+  their own point `estimate` at it with `--field`, the same keys a toil project's
   `fields` uses; a GitHub team with its own estimate labels names them with
   `--field estimateLabel=size/{n}`.
 - **`iteration`** on a GitHub issue with no board value is its milestone: the

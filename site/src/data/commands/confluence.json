@@ -238,9 +238,9 @@
     ]
   },
   {
-    "name": "check-dossier",
-    "tool": "confluence_check_dossier",
-    "description": "Check the call's dossier against Confluence: its spaces exist",
+    "name": "check-toil-project",
+    "tool": "confluence_check_toil_project",
+    "description": "Check the call's toil project against Confluence: its spaces exist",
     "writes": false,
     "connection": true,
     "flags": []

@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { BITBUCKET_PR_GETS, BITBUCKET_PRS, GITHUB_CODEOWNERS, GITHUB_PR_GETS, GITHUB_PRS, OPENSHIFT } from '../src/fixtures/delivery.ts';
-import { showData } from '../src/fixtures/dossiers.ts';
+import { showData } from '../src/fixtures/toil-projects.ts';
 import { fixtureExecute, type Canned } from '../src/fixtures/execute.ts';
 import { dateTime } from '../src/format.ts';
-import { loadDossier, PR_INCLUDE } from '../src/load.ts';
+import { loadToilProject, PR_INCLUDE } from '../src/load.ts';
 import { adoDeployments, changeRef, included, iso } from '../src/model/delivery.ts';
 import { entry } from '../src/model/sprint.ts';
 import { trace } from '../src/model/trace.ts';
 import { healthOf, loaded } from './harness.ts';
 
-/** The models, on each dossier as the dashboard loads it through the fixture `execute()`. */
+/** The models, on each toil project as the dashboard loads it through the fixture `execute()`. */
 
 const ids = (h: Awaited<ReturnType<typeof healthOf>>['h'], kind: string) => h.items.filter((i) => h.entries.get(i.id)!.kind === kind).map((i) => i.id);
 const reasons = (h: Awaited<ReturnType<typeof healthOf>>['h']) => Object.fromEntries(h.risks.map((r) => [r.id, r.reasons.map((x) => x.code)]));
@@ -119,7 +119,7 @@ describe('traceability', () => {
 });
 
 describe('the delivery rules', () => {
-  it("names only the dossier's own items, of those its pull request's change names", async () => {
+  it("names only the Toil project's own items, of those its pull request's change names", async () => {
     const { data } = await loaded('checkout-web');
     const byId = new Map(data.items.map((i) => [i.id, i]));
     const c = data.pullRequests.find((p) => p.id === 'github:imagile/payments-web#52')!;
@@ -155,7 +155,7 @@ describe('review round 1 (#229)', () => {
     expect(dateTime(pr!.at)).toBe('at an unknown time');
   });
 
-  it('reads OpenShift once for a dossier with two code hosts, matching each deployment to its own repository', async () => {
+  it('reads OpenShift once for a Toil project with two code hosts, matching each deployment to its own repository', async () => {
     const mixed = {
       name: 'mixed',
       description: 'Two code hosts, one cluster.',
@@ -166,10 +166,10 @@ describe('review round 1 (#229)', () => {
     };
     const ns = (OPENSHIFT['payments-dev'] as { deployments: unknown[] }).deployments;
     const staging = (OPENSHIFT['checkout-staging'] as { deployments: unknown[] }).deployments;
-    const base = { dossier: 'mixed' };
+    const base = { toilProject: 'mixed' };
     const GH = { owner: 'imagile', repo: 'payments-web' };
     const canned: Canned[] = [
-      { command: 'dossiers show', input: base, data: showData(mixed) },
+      { command: 'projects show', input: base, data: showData(mixed) },
       { command: 'bitbucket pr list', input: { ...base, state: 'ALL' }, data: BITBUCKET_PRS },
       ...Object.entries(BITBUCKET_PR_GETS).map(([id, data]) => ({ command: 'bitbucket pr get', input: { ...base, id: Number(id), include: PR_INCLUDE }, data })),
       // No board named, so the repository's issues are read; this test is about deployments, so there are none.
@@ -180,7 +180,7 @@ describe('review round 1 (#229)', () => {
       { command: 'openshift deployment list', input: { ...base, env: 'dev', namespace: 'mixed-dev' }, data: { namespace: 'mixed-dev', kind: 'Deployment', count: 2, deployments: [...ns, ...staging] } },
     ];
     const fixture = fixtureExecute(canned);
-    const data = await loadDossier(fixture.execute, 'mixed');
+    const data = await loadToilProject(fixture.execute, 'mixed');
     expect(fixture.calls.filter((c) => !c.ok)).toEqual([]);
     expect(fixture.calls.filter((c) => c.command === 'openshift deployment list')).toHaveLength(1);
     expect(data.deployments.map((d) => [d.name, d.commit, d.includes])).toEqual([

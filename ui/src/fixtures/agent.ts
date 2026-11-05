@@ -1,5 +1,5 @@
 /**
- * The scripted Agent: canned answers about each dossier, citing the work
+ * The scripted Agent: canned answers about each toil project, citing the work
  * items they rest on, with the pull requests, builds and deployments named by
  * the ids the commands returned. Nothing here calls a model. test/agent.test.ts
  * recomputes every figure and citation from what the dashboard loads through
@@ -44,7 +44,7 @@ const agentProposal = (p: Omit<Proposal, 'id' | 'from'>): Proposal => ({ id: `ag
 export const SCRIPTS: Record<string, Record<string, Script>> = {
   'card-payments': {
     risk: {
-      label: "What's at risk in this dossier?",
+      label: "What's at risk in this Toil project?",
       parts: [
         `It is day 7 of 10 of Sprint 42: 3 of 21 points are done and 18 remain.`,
         `${J(101)}'s pull request #311 fails its Jenkins build, and ${J(102)} and ${J(103)} are blocked behind it, holding 11 points back.`,
@@ -56,7 +56,7 @@ export const SCRIPTS: Record<string, Record<string, Script>> = {
           title: 'Estimate PAY-107 at 3 points',
           reason: `${J(107)} was added mid-sprint with no estimate, so the sprint's points leave it out. It is a retry of one call, about the size of ${J(105)}.`,
           command: 'jira issue update',
-          input: { dossier: 'card-payments', key: 'PAY-107', field: ['Story Points=3'] },
+          input: { toilProject: 'card-payments', key: 'PAY-107', field: ['Story Points=3'] },
           note: 'A suggested size. Agree it with the team before applying.',
         }),
       ],
@@ -65,7 +65,7 @@ export const SCRIPTS: Record<string, Record<string, Script>> = {
       label: 'What needs attention first?',
       parts: [
         `${J(102)} is blocked by ${J(101)} and holds up ${J(103)}, and nothing has changed on it for 8 days.`,
-        `${J(104)} has been in progress for 13.9 days, longer than 85% of this dossier's finished items took (11 days). It came over from Sprint 41 and hasn't been updated for 5.9 days.`,
+        `${J(104)} has been in progress for 13.9 days, longer than 85% of this Toil project's finished items took (11 days). It came over from Sprint 41 and hasn't been updated for 5.9 days.`,
         `${J(101)}'s latest build failed, and it blocks ${J(102)}: fixing that build unblocks the chain.`,
       ],
     },
@@ -80,7 +80,7 @@ export const SCRIPTS: Record<string, Record<string, Script>> = {
     people: {
       label: "Who's overloaded or blocked?",
       parts: [
-        `Nobody is over the dossier's limit of 2 items in progress. J. Smith has ${J(101)} in progress for 6.9 days, and A. Chen has ${J(104)} in review for 5.9 days.`,
+        `Nobody is over the Toil project's limit of 2 items in progress. J. Smith has ${J(101)} in progress for 6.9 days, and A. Chen has ${J(104)} in review for 5.9 days.`,
         `A. Chen is blocked: ${J(102)} waits on ${J(101)}, still in progress with J. Smith, whose pull request ${BB(311)} now waits on J. Smith after A. Chen asked for changes.`,
         `One review waits on J. Smith: ${BB(305)}, open 3.9 working days. A. Chen's Bitbucket account isn't mapped to her yet; the People view suggests it.`,
       ],
@@ -96,7 +96,7 @@ export const SCRIPTS: Record<string, Record<string, Script>> = {
   },
   settlement: {
     risk: {
-      label: "What's at risk in this dossier?",
+      label: "What's at risk in this Toil project?",
       parts: [
         `It is day 7 of 9 of Sprint 42: 1 of 16 points is done and 15 remain. The points leave out ${A(2305)}, which is estimated in hours.`,
         `${A(2303)} can't start until ${A(2302)} is done, and 2302's pull request #87 is still building.`,
@@ -109,7 +109,7 @@ export const SCRIPTS: Record<string, Record<string, Script>> = {
           title: 'Move 2303 to Sprint 43',
           reason: `${A(2303)} can't start until ${A(2302)} is done, with two working days left in the sprint.`,
           command: 'ado work-item update',
-          input: { dossier: 'settlement', id: 2303, field: ['System.IterationPath=Payments\\Sprint 43'] },
+          input: { toilProject: 'settlement', id: 2303, field: ['System.IterationPath=Payments\\Sprint 43'] },
           note: null,
         }),
       ],
@@ -117,7 +117,7 @@ export const SCRIPTS: Record<string, Record<string, Script>> = {
     attention: {
       label: 'What needs attention first?',
       parts: [
-        `${A(2304)} has been in progress for 15 days, longer than 85% of this dossier's finished items took (8.3 days). It came over from Sprint 41 and hasn't been updated for 5.9 days.`,
+        `${A(2304)} has been in progress for 15 days, longer than 85% of this Toil project's finished items took (8.3 days). It came over from Sprint 41 and hasn't been updated for 5.9 days.`,
         `${A(2303)} is blocked by ${A(2302)}, and nothing has changed on it for 7.9 days.`,
         `${A(2302)} blocks ${A(2303)} and hasn't been updated for 7 days.`,
       ],
@@ -133,7 +133,7 @@ export const SCRIPTS: Record<string, Record<string, Script>> = {
     people: {
       label: "Who's overloaded or blocked?",
       parts: [
-        `This dossier sets no limit and lists nobody yet, so each account stands on its own. D. Okafor has ${A(2302)} in progress for 7 days, and M. Lind has ${A(2304)} for 15 days.`,
+        `This Toil project sets no limit and lists nobody yet, so each account stands on its own. D. Okafor has ${A(2302)} in progress for 7 days, and M. Lind has ${A(2304)} for 15 days.`,
         `D. Okafor's pull request ${AZ(87)} waits on D. Okafor: J. Park asked for changes 0.8 working days ago.`,
         `Nobody's own items are blocked. ${A(2303)} is blocked by ${A(2302)}, but nobody is assigned to it.`,
       ],
@@ -148,7 +148,7 @@ export const SCRIPTS: Record<string, Record<string, Script>> = {
   },
   'checkout-web': {
     risk: {
-      label: "What's at risk in this dossier?",
+      label: "What's at risk in this Toil project?",
       parts: [
         `It is day 7 of 10 of Sprint 42: 1 of 11 points is done and 10 remain.`,
         `${G(43)} was added after the sprint started, and its draft pull request #53 fails the e2e-safari check.`,
@@ -184,7 +184,7 @@ export const SCRIPTS: Record<string, Record<string, Script>> = {
     people: {
       label: "Who's overloaded or blocked?",
       parts: [
-        `Nobody is over the dossier's limit of 2. Bo W. has ${G(42)} in review; GitHub records no move into that status, so how long it has sat there is unknown.`,
+        `Nobody is over the Toil project's limit of 2. Bo W. has ${G(42)} in review; GitHub records no move into that status, so how long it has sat there is unknown.`,
         `Two reviews wait on Ada D.: ${SDK(12)} and ${GH(52)}, each open 1.3 working days.`,
         `${GH(51)}, which Ada D. wrote with Claude, waits on its failing checks, for 2 working days. Nothing assigned to anyone is blocked.`,
       ],
@@ -429,9 +429,9 @@ export const ANALYZE_BRIEFING: Record<string, { recommendation: string; reasons:
 };
 
 /** The scripted Analyze answer: the briefing block, then the evidence as plain text. */
-export function analyzeParts(dossier: string): string[] {
-  const script = SCRIPTS[dossier] ?? {};
-  const top = ANALYZE_BRIEFING[dossier];
+export function analyzeParts(toilProject: string): string[] {
+  const script = SCRIPTS[toilProject] ?? {};
+  const top = ANALYZE_BRIEFING[toilProject];
   const evidence = ANALYZE_PARTS.flatMap((part) => script[part]?.parts ?? []);
   if (!top) return evidence;
   const briefing = {
@@ -466,7 +466,7 @@ export function scriptedJob(prompt: string): Answer | null {
       'Nothing was read here, so nothing below is checked. After round 3 the loop stops and the pull request is marked needs-human.',
     ],
     'map-codebase': [
-      `Architecture of ${target || 'the dossier'}, as the scripted preview would draw it: containers from the dossier's repositories, components from the folders the pull requests touch, each element marked observed (read from a command) or inferred (with the reason).`,
+      `Architecture of ${target || 'the Toil project'}, as the scripted preview would draw it: containers from the Toil project's repositories, components from the folders the pull requests touch, each element marked observed (read from a command) or inferred (with the reason).`,
       ['```mermaid', 'C4Container', '  title Preview only, nothing read', '  Person(user, "User")', '  Container(app, "App", "TypeScript", "inferred")', '  Rel(user, app, "uses")', '```'].join(String.fromCharCode(10)),
     ],
   };
@@ -479,31 +479,31 @@ export function scriptedJob(prompt: string): Answer | null {
 }
 
 export function scriptedAgent({ delay = 0 }: ScriptedOptions = {}): Agent {
-  const answer = (dossier: string, prompt: string, style?: AskStyle, chat?: ChatTurn): Answer => {
+  const answer = (toilProject: string, prompt: string, style?: AskStyle, chat?: ChatTurn): Answer => {
     const job = scriptedJob(prompt);
     if (job) return job;
-    const script = SCRIPTS[dossier] ?? {};
-    if (prompt === ANALYZE && SCRIPTS[dossier]) {
-      const parts: AnswerPart[] = analyzeParts(dossier).map((text) => ({ text }));
-      return { prompt: 'Analyze', parts, citations: citationsOf(parts), by: 'scripted', adapter: 'scripted', model: null, proposals: script.risk?.proposals ?? [], ...(chat ? { usage: sampleAnswerUsage(chat.id, chat.turn, dossier) } : {}) };
+    const script = SCRIPTS[toilProject] ?? {};
+    if (prompt === ANALYZE && SCRIPTS[toilProject]) {
+      const parts: AnswerPart[] = analyzeParts(toilProject).map((text) => ({ text }));
+      return { prompt: 'Analyze', parts, citations: citationsOf(parts), by: 'scripted', adapter: 'scripted', model: null, proposals: script.risk?.proposals ?? [], ...(chat ? { usage: sampleAnswerUsage(chat.id, chat.turn, toilProject) } : {}) };
     }
     const guided = GUIDED_SCRIPT[prompt];
     const id = script[prompt] ? prompt : guided && script[guided] ? guided : Object.entries(script).find(([, s]) => s.label === prompt)?.[0];
     const entry = id ? script[id] : undefined;
     // The voiced risk answer when the voice is on and the theme has one; Plain, and the voice off, read the standard.
-    const voiced = id === 'risk' && style?.voice ? VOICED[dossier]?.[style.theme] : undefined;
-    // The sample speaks the words the page does: with plain words on, its dossier is a Toil project, as the rest of the screen says.
+    const voiced = id === 'risk' && style?.voice ? VOICED[toilProject]?.[style.theme] : undefined;
+    // The sample speaks the words the page does: with plain words on, its toil project is a Toil project, as the rest of the screen says.
     const parts: AnswerPart[] = (voiced ?? entry?.parts ?? (STANDUP_WRITE_UP.test(prompt) ? SCRIPTED_WRITE_UP : [UNSCRIPTED])).map((text) => ({ text: samplePlain() && !voiced ? plainify(text) : text }));
     // In a chat, the answer carries sample usage figures (#295), marked as made up, so the footer has something to show.
-    return { prompt: guided && entry ? prompt : (entry?.label ?? prompt), parts, citations: citationsOf(parts), by: 'scripted', adapter: 'scripted', model: null, proposals: entry?.proposals ?? [], ...(chat ? { usage: sampleAnswerUsage(chat.id, chat.turn, dossier) } : {}) };
+    return { prompt: guided && entry ? prompt : (entry?.label ?? prompt), parts, citations: citationsOf(parts), by: 'scripted', adapter: 'scripted', model: null, proposals: entry?.proposals ?? [], ...(chat ? { usage: sampleAnswerUsage(chat.id, chat.turn, toilProject) } : {}) };
   };
   return {
     label: SCRIPTED_LABEL,
     adapters: async () => SAMPLE_ADAPTERS,
-    starters: (dossier: string): Starter[] => Object.entries(SCRIPTS[dossier] ?? {}).map(([id, s]) => ({ id, label: s.label })),
-    ask: async (dossier, prompt, style, chat) => answer(dossier, prompt, style, chat),
-    async *stream(dossier, prompt, signal, style, chat) {
-      const { usage, ...whole } = answer(dossier, prompt, style, chat);
+    starters: (toilProject: string): Starter[] => Object.entries(SCRIPTS[toilProject] ?? {}).map(([id, s]) => ({ id, label: s.label })),
+    ask: async (toilProject, prompt, style, chat) => answer(toilProject, prompt, style, chat),
+    async *stream(toilProject, prompt, signal, style, chat) {
+      const { usage, ...whole } = answer(toilProject, prompt, style, chat);
       const parts: AnswerPart[] = [];
       for (const part of whole.parts) {
         let text = '';

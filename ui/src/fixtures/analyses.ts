@@ -16,12 +16,12 @@
 
 import { citationsOf, type AnswerPart } from '../agent.ts';
 import { memoryAnalyses, type AnalysesApi } from '../analyses.ts';
-import { loadDossier } from '../load.ts';
+import { loadToilProject } from '../load.ts';
 import { recordOf, snapshotOf, type AnalysisRecord, type AnalysisSnapshot } from '../model/analysis.ts';
 import { analyzeParts } from './agent.ts';
 import { FIXTURE_NOW, fixtureExecute } from './execute.ts';
 
-const DOSSIER = 'card-payments';
+const TOIL_PROJECT = 'card-payments';
 const HOUR = 3_600_000;
 const at = (hoursBefore: number) => new Date(Date.parse(FIXTURE_NOW) - hoursBefore * HOUR).toISOString();
 const J = (n: number) => `corp-jira:PAY-${n}`;
@@ -47,15 +47,15 @@ const EARLIER_PARTS = [
 
 /** The sample's records, worked out from the sample's own items. */
 export async function sampleAnalysisRecords(): Promise<AnalysisRecord[]> {
-  const data = await loadDossier(fixtureExecute().execute, DOSSIER);
+  const data = await loadToilProject(fixtureExecute().execute, TOIL_PROJECT);
   const now = snapshotOf(data.items, FIXTURE_NOW);
   const answer = (texts: string[]) => {
     const parts: AnswerPart[] = texts.map((text) => ({ text }));
     return { prompt: 'Analyze', parts, citations: citationsOf(parts), by: 'scripted', adapter: 'scripted', model: null, proposals: [] };
   };
   return [
-    recordOf(answer(EARLIER_PARTS), { id: 'sample-analysis-1', dossier: DOSSIER, startedAt: at(90.5), at: at(90), snapshot: earlier(now) }),
-    recordOf(answer(analyzeParts(DOSSIER)), { id: 'sample-analysis-2', dossier: DOSSIER, startedAt: at(0.6), at: at(0.5), snapshot: now }),
+    recordOf(answer(EARLIER_PARTS), { id: 'sample-analysis-1', toilProject: TOIL_PROJECT, startedAt: at(90.5), at: at(90), snapshot: earlier(now) }),
+    recordOf(answer(analyzeParts(TOIL_PROJECT)), { id: 'sample-analysis-2', toilProject: TOIL_PROJECT, startedAt: at(0.6), at: at(0.5), snapshot: now }),
   ];
 }
 
@@ -64,8 +64,8 @@ export function fixtureAnalyses(): AnalysesApi {
   let ready: Promise<AnalysesApi> | undefined;
   const api = () => (ready ??= sampleAnalysisRecords().then((seed) => memoryAnalyses(seed)));
   return {
-    list: async (dossier) => (await api()).list(dossier),
-    get: async (dossier, id) => (await api()).get(dossier, id),
-    record: async (dossier, answer, when) => (await api()).record!(dossier, answer, when),
+    list: async (toilProject) => (await api()).list(toilProject),
+    get: async (toilProject, id) => (await api()).get(toilProject, id),
+    record: async (toilProject, answer, when) => (await api()).record!(toilProject, answer, when),
   };
 }

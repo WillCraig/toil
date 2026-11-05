@@ -6,7 +6,7 @@ import { fixtureConfig } from '../src/fixtures/config.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
 import { systemPrompt } from '../server/agents/prompts.ts';
 import { promptStyle } from '../server/agents/voices.ts';
-import { CHECKBOXES, DOSSIER, QUESTION, SAMPLE_INSTRUCTIONS, START, STANDARD_PROMPT, THEMES, cited } from '../scripts/showcase.ts';
+import { CHECKBOXES, TOIL_PROJECT, QUESTION, SAMPLE_INSTRUCTIONS, START, STANDARD_PROMPT, THEMES, cited } from '../scripts/showcase.ts';
 import { openChat } from './chat.ts';
 
 /**
@@ -27,7 +27,7 @@ describe('what the showcase reads from Toil UI', () => {
     expect(THEMES.map((t) => t.name)).toEqual(['plain', 'crate', 'harvest', 'starship', 'realm', 'sprawl', 'frontier', 'overworld']);
     for (const t of THEMES) {
       const style = promptStyle({ theme: t.name, voice: true }, { instructions: SAMPLE_INSTRUCTIONS, voice: null });
-      expect(t.prompt.full).toBe(systemPrompt(DOSSIER, FIXTURE_NOW, style));
+      expect(t.prompt.full).toBe(systemPrompt(TOIL_PROJECT, FIXTURE_NOW, style));
       expect(t.prompt.full.startsWith(t.prompt.rules)).toBe(true);
       expect(Boolean(t.prompt.style)).toBe(t.voice);
       if (t.prompt.style) expect(t.prompt.full).toContain(`Style:\n${t.prompt.style.voice}\n\n${t.prompt.style.rule}`);
@@ -44,8 +44,8 @@ describe('what the showcase reads from Toil UI', () => {
   });
 
   it('shows the scripted answers, in each voice the theme has', () => {
-    expect(QUESTION).toBe(SCRIPTS[DOSSIER]!.risk!.label);
-    for (const t of THEMES) expect(t.answer).toEqual(VOICED[DOSSIER]?.[t.name] ?? null);
+    expect(QUESTION).toBe(SCRIPTS[TOIL_PROJECT]!.risk!.label);
+    for (const t of THEMES) expect(t.answer).toEqual(VOICED[TOIL_PROJECT]?.[t.name] ?? null);
     expect(THEMES.find((t) => t.name === 'plain')!.answer).toBeNull();
   });
 
@@ -63,12 +63,12 @@ describe('what the showcase reads from Toil UI', () => {
 
 describe('the controls the showcase\'s tour presses', () => {
   it('has the board heading on the Board tab, the Ask bar, the starter it asks, the agent switcher and the chat form', async () => {
-    window.location.hash = `#/dossier/${DOSSIER}/board`;
+    window.location.hash = `#/project/${TOIL_PROJECT}/board`;
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
     expect(document.querySelector('#board')).not.toBeNull();
     expect(document.querySelector('[data-ask-bar]')).not.toBeNull();
-    const pane = await openChat(DOSSIER);
+    const pane = await openChat(TOIL_PROJECT);
     expect(pane.getAttribute('role')).toBe('dialog');
     const starters = within(pane).getByRole('group', { name: 'Starter questions' });
     expect(within(starters).getAllByRole('button').some((b) => b.textContent?.startsWith('Are we going to finish the sprint?'))).toBe(true);

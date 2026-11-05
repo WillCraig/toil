@@ -19,7 +19,7 @@
     {
       "allows": [],
       "old": "github commands putting owner, repo, label and ref into request paths as typed, so a /, ?, # or % in one of them is path or query syntax rather than part of the name (#72 items 4 and 13)",
-      "toil": "Every value is encoded as one path segment (core's apiPath), so a label area/api or a ref release/1.4 is sent as area%2Fapi and release%2F1.4. --owner and --repo are refused with INVALID_INPUT if they hold /, \\, ?, #, % or a control character, however they arrive: the flag, a dossier, an env var, the connection's setting or the git remote",
+      "toil": "Every value is encoded as one path segment (core's apiPath), so a label area/api or a ref release/1.4 is sent as area%2Fapi and release%2F1.4. --owner and --repo are refused with INVALID_INPUT if they hold /, \\, ?, #, % or a control character, however they arrive: the flag, a toil project, an env var, the connection's setting or the git remote",
       "why": "An id names one resource: a label or ref must reach that label or ref, and an owner or repo can never hold those characters on GitHub.",
       "principle": "2"
     },

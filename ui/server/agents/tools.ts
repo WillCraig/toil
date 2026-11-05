@@ -1,5 +1,5 @@
 /**
- * The agent's tools (#251, #291, #292): read-only, scoped to one dossier, and the
+ * The agent's tools (#251, #291, #292): read-only, scoped to one toil project, and the
  * same list for every adapter. Nine read the cache a sync filled
  * (`owi_query`, `owi_get`, `owi_history`, and `owi_similar`, the scorer `toil
  * util owi similar` runs; `pr_query`, `pr_get` and `pr_metrics`, the pull
@@ -34,12 +34,12 @@ import { CALLER } from '../store.ts';
 import { addDays, appliedText, dayOf, isDay, OUTCOME_TEXT, timeOf, type WorklogPage } from '../../src/model/worklog.ts';
 import { BUCKETS, BUCKET_TITLE, defaultRange, whenText, type StandupLine, type StandupReport } from '../../src/model/standup.ts';
 
-/** What the cache tools read: one dossier's synced rows. */
+/** What the cache tools read: one toil project's synced rows. */
 export interface AgentData {
   items(): WorkItem[];
   transitions(itemId: string): TransitionRow[];
   changes(): ChangeRow[];
-  /** When the dossier was last synced, or null if never. */
+  /** When the toil project was last synced, or null if never. */
   syncedAt(): string | null;
   /** One UTC day's worklog page (#308), as the Worklog view builds it; absent where there is no worklog. */
   worklog?(day: string): Promise<WorklogPage>;
@@ -48,34 +48,34 @@ export interface AgentData {
 }
 
 /**
- * The dossier itself, as `dossiers show` prints it now: its `people` and
+ * The toil project itself, as `projects show` prints it now: its `people` and
  * `wipLimit` among the rest. It's toil's own config on this machine, which the
  * cache never holds (server/store.ts reads it live), so the people tools ask
  * toil for it, read-only, on each call.
  */
-export type ReadDossier = () => Promise<{ dossier: unknown; error: string | null }>;
+export type ReadToilProject = () => Promise<{ toilProject: unknown; error: string | null }>;
 
-/** The pull requests among a dossier's change rows, as the OWI changes they were made from. */
+/** The pull requests among a toil project's change rows, as the OWI changes they were made from. */
 export const pullRequestsOf = (rows: ChangeRow[]): Change[] => rows.flatMap((r) => (r.kind === 'pull-request' && 'change' in r.ref && r.ref.change ? [r.ref.change] : []));
 
-/** A dossier's rows in the SQLite cache, or null when it has never synced. */
-export function cacheData(cache: Pick<Cache, 'states' | 'items' | 'transitions' | 'changes'>, dossier: string): AgentData | null {
-  const state = cache.states().find((s) => s.name === dossier);
+/** A toil project's rows in the SQLite cache, or null when it has never synced. */
+export function cacheData(cache: Pick<Cache, 'states' | 'items' | 'transitions' | 'changes'>, toilProject: string): AgentData | null {
+  const state = cache.states().find((s) => s.name === toilProject);
   if (!state) return null;
   return {
-    items: () => cache.items(dossier),
-    transitions: (id) => cache.transitions(dossier, id),
-    changes: () => cache.changes(dossier),
+    items: () => cache.items(toilProject),
+    transitions: (id) => cache.transitions(toilProject, id),
+    changes: () => cache.changes(toilProject),
     syncedAt: () => state.lastSavedAt,
   };
 }
 
-/** `dossiers show` through toil, read-only and labelled as Toil UI: the people tools' `ReadDossier`. */
-export function dossierReader(execute: Execute, dossier: string): ReadDossier {
+/** `projects show` through toil, read-only and labelled as Toil UI: the people tools' `ReadToilProject`. */
+export function toilProjectReader(execute: Execute, toilProject: string): ReadToilProject {
   return async () => {
-    const e = await execute('dossiers show', { dossier }, { readOnly: true, caller: CALLER });
-    if (!e.ok) return { dossier: null, error: `toil dossiers show ${dossier} failed: ${e.error.message}${e.error.fix ? ` ${e.error.fix}` : ''}` };
-    return { dossier: typeof e.data === 'object' && e.data !== null ? ((e.data as { dossier?: unknown }).dossier ?? null) : null, error: null };
+    const e = await execute('projects show', { toilProject }, { readOnly: true, caller: CALLER });
+    if (!e.ok) return { toilProject: null, error: `toil projects show ${toilProject} failed: ${e.error.message}${e.error.fix ? ` ${e.error.fix}` : ''}` };
+    return { toilProject: typeof e.data === 'object' && e.data !== null ? ((e.data as { toilProject?: unknown }).toilProject ?? null) : null, error: null };
   };
 }
 
@@ -105,11 +105,11 @@ export interface ReadCommand {
 
 /**
  * The live lookups the agent may make: the dashboards' own reads plus a
- * single item's fetch. `dossiers list` is left out: an answer is about one
- * dossier.
+ * single item's fetch. `projects list` is left out: an answer is about one
+ * toil project.
  */
 export const LIVE_COMMANDS: readonly string[] = [
-  'dossiers show',
+  'projects show',
   'jira issue search',
   'jira issue get',
   'jira issue history',
@@ -146,8 +146,8 @@ export const LIVE_COMMANDS: readonly string[] = [
   'util c4 mermaid',
 ];
 
-/** Fields a live tool never offers: the dossier is fixed, and a file or folder on this machine is not the agent's to name. */
-export const HIDDEN_FIELDS = new Set(['dossier', 'cwd', 'connection', 'select', 'file']);
+/** Fields a live tool never offers: the toilProject is fixed, and a file or folder on this machine is not the agent's to name. */
+export const HIDDEN_FIELDS = new Set(['toilProject', 'cwd', 'connection', 'select', 'file']);
 const hidden = (field: string) => HIDDEN_FIELDS.has(field) || /File$/.test(field) || field === 'out' || field === 'allowWrite';
 
 /** The bounds on what one tool call returns (Bounds). */
@@ -245,7 +245,7 @@ function prBrief(c: Change, byId: Map<string, WorkItem>, now: string) {
     changedLines: size.lines,
     files: size.files,
     workItems: linked(c, byId),
-    namesOutsideDossier: c.workItems.filter((id) => !byId.has(id)),
+    namesOutsideToilProject: c.workItems.filter((id) => !byId.has(id)),
     flags: flagsOf(c, byId, now).map((f) => ({ flag: f.flag, label: PR_FLAG_LABEL[f.flag], evidence: f.text })),
     created: c.created,
     firstReviewAt: c.firstReviewAt,
@@ -259,9 +259,9 @@ function prBrief(c: Change, byId: Map<string, WorkItem>, now: string) {
 /** A sample as a tool returns it: the median in working days, its sample size, and how many were unknown. */
 const sampleOut = (s: Sample) => ({ median: s.median === null ? null : round1(s.median), p85: s.p85 === null ? null : round1(s.p85), n: s.n, unknown: s.unknown });
 
-/** The pull request tools for one dossier: query, get and metrics over the synced OWI changes. */
-export function prTools(dossier: string, data: AgentData, ledger: Ledger, now: () => string = () => new Date().toISOString()): ToolSpec[] {
-  const note = () => ({ dossier, syncedAt: data.syncedAt() });
+/** The pull request tools for one toil project: query, get and metrics over the synced OWI changes. */
+export function prTools(toilProject: string, data: AgentData, ledger: Ledger, now: () => string = () => new Date().toISOString()): ToolSpec[] {
+  const note = () => ({ toilProject, syncedAt: data.syncedAt() });
   const byIdOf = () => new Map(data.items().map((i) => [i.id, i]));
   const vouchPr = (b: { id: string; workItems: string[] }) => {
     ledger.add(b.id);
@@ -270,7 +270,7 @@ export function prTools(dossier: string, data: AgentData, ledger: Ledger, now: (
   return [
     {
       name: 'pr_query',
-      description: `Lists the pull requests Toil UI's cache holds for the dossier "${dossier}" (GitHub, Bitbucket and Azure DevOps), as OWI changes, open ones longest-waiting first. Each says what it waits on (review, changes, checks, merge or draft) and for how many working days, why, its reviewers and their state, checks (PASSING, FAILING, PENDING, NONE, or null when not read), mergeable, size (XS to XL by changed lines), the dossier's work items it names, its flags, and authorKind (HUMAN, AGENT or BOT) with the signal that set it. All filters must match. Returns at most ${MAX_PRS} and says when there were more.`,
+      description: `Lists the pull requests Toil UI's cache holds for the Toil project "${toilProject}" (GitHub, Bitbucket and Azure DevOps), as OWI changes, open ones longest-waiting first. Each says what it waits on (review, changes, checks, merge or draft) and for how many working days, why, its reviewers and their state, checks (PASSING, FAILING, PENDING, NONE, or null when not read), mergeable, size (XS to XL by changed lines), the Toil project's work items it names, its flags, and authorKind (HUMAN, AGENT or BOT) with the signal that set it. All filters must match. Returns at most ${MAX_PRS} and says when there were more.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -314,12 +314,12 @@ export function prTools(dossier: string, data: AgentData, ledger: Ledger, now: (
     },
     {
       name: 'pr_get',
-      description: `One pull request from the cache for "${dossier}", by its change id (such as github:imagile/payments-web#52, from pr_query): everything pr_query says, plus every review in order, and each named work item's title and status.`,
+      description: `One pull request from the cache for "${toilProject}", by its change id (such as github:imagile/payments-web#52, from pr_query): everything pr_query says, plus every review in order, and each named work item's title and status.`,
       inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'The change id.' } }, required: ['id'], additionalProperties: false },
       async run(input) {
         const id = str(input.id);
         const c = id ? pullRequestsOf(data.changes()).find((x) => x.id === id) : undefined;
-        if (!c) return { ...note(), error: `The cache holds no pull request ${JSON.stringify(id ?? '')} in ${dossier}. Use pr_query to find ids.` };
+        if (!c) return { ...note(), error: `The cache holds no pull request ${JSON.stringify(id ?? '')} in ${toilProject}. Use pr_query to find ids.` };
         const byId = byIdOf();
         const b = prBrief(c, byId, now());
         vouchPr(b);
@@ -339,7 +339,7 @@ export function prTools(dossier: string, data: AgentData, ledger: Ledger, now: (
     },
     {
       name: 'pr_metrics',
-      description: `Flow metrics for the pull requests in the cache for "${dossier}", for the last weeks (Monday to Sunday UTC, the current week included), split by authorKind (HUMAN, AGENT, BOT) and for ALL: pickup (opened to first review), review (first review to approval) and merge (approval to merge) as medians and 85th percentiles in working days, review rounds per merged pull request, sizes opened (XS to XL), and merged per week. Every figure has n, its sample size, and unknown, how many lacked the data; quote n with every figure.`,
+      description: `Flow metrics for the pull requests in the cache for "${toilProject}", for the last weeks (Monday to Sunday UTC, the current week included), split by authorKind (HUMAN, AGENT, BOT) and for ALL: pickup (opened to first review), review (first review to approval) and merge (approval to merge) as medians and 85th percentiles in working days, review rounds per merged pull request, sizes opened (XS to XL), and merged per week. Every figure has n, its sample size, and unknown, how many lacked the data; quote n with every figure.`,
       inputSchema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 26, description: 'Default 6.' } }, additionalProperties: false },
       async run(input) {
         const weeks = Number.isInteger(input.weeks) ? Math.min(26, Math.max(1, input.weeks as number)) : 6;
@@ -378,7 +378,7 @@ function personBrief(c: Card) {
     overLimit: c.overLimit,
     openPullRequests: c.prs.map((p) => ({ id: p.change.id, title: p.change.title, waitingOn: p.wait.on, waitingWorkingDays: p.wait.days === null ? null : round1(p.wait.days), writtenWithAgent: p.withAgent })),
     reviewsWaitingOnThem: c.reviews.map((r) => ({ id: r.change.id, title: r.change.title, openWorkingDays: r.days })),
-    blocked: c.blocked.map((b) => ({ id: b.item.id, title: b.item.title, blockedBy: b.by.map((x) => ({ id: x.id, status: x.item ? x.item.status : null, inDossier: x.item !== null })) })),
+    blocked: c.blocked.map((b) => ({ id: b.item.id, title: b.item.title, blockedBy: b.by.map((x) => ({ id: x.id, status: x.item ? x.item.status : null, inToilProject: x.item !== null })) })),
   };
 }
 
@@ -394,20 +394,20 @@ function vouchCard(ledger: Ledger, c: Card) {
   for (const a of c.activity) ledger.add(a.kind === 'moved' ? a.item.id : a.change.id);
 }
 
-/** The two people tools for one dossier (#292): everyone's load, and one person's plate in full. */
-export function peopleTools(dossier: string, data: AgentData, ledger: Ledger, readDossier: ReadDossier, now: () => string = () => new Date().toISOString()): ToolSpec[] {
-  const note = () => ({ dossier, syncedAt: data.syncedAt() });
+/** The two people tools for one toil project (#292): everyone's load, and one person's plate in full. */
+export function peopleTools(toilProject: string, data: AgentData, ledger: Ledger, readToilProject: ReadToilProject, now: () => string = () => new Date().toISOString()): ToolSpec[] {
+  const note = () => ({ toilProject, syncedAt: data.syncedAt() });
   const view = async () => {
-    const shown = await readDossier();
-    const team = readPeople(shown.dossier);
+    const shown = await readToilProject();
+    const team = readPeople(shown.toilProject);
     if (shown.error) team.notes.unshift(`${shown.error} So nobody is mapped, and no limit is known.`);
-    return { team, view: people({ dossier, entries: team.people, wipLimit: team.wipLimit, items: data.items(), changes: pullRequestsOf(data.changes()), now: now() }) };
+    return { team, view: people({ toilProject, entries: team.people, wipLimit: team.wipLimit, items: data.items(), changes: pullRequestsOf(data.changes()), now: now() }) };
   };
   const LOAD = 'This is load, not performance: never rank, score or compare people; say what is on each plate and what blocks it, citing ids.';
   return [
     {
       name: 'people_list',
-      description: `The people of the dossier "${dossier}" (its people list, agents included as kind agent) and the accounts in its data it doesn't map, each with their current load from Toil UI's cache: items in progress with days in their status, open pull requests and what each waits on, reviews waiting on them, and blocked items with what blocks them. Also the dossier's work-in-progress limit and who is over it, the team's review queue, unassigned items in the current sprint, and accounts that share an email with someone (suggested matches, never applied). ${LOAD}`,
+      description: `The people of the Toil project "${toilProject}" (its people list, agents included as kind agent) and the accounts in its data it doesn't map, each with their current load from Toil UI's cache: items in progress with days in their status, open pull requests and what each waits on, reviews waiting on them, and blocked items with what blocks them. Also the Toil project's work-in-progress limit and who is over it, the team's review queue, unassigned items in the current sprint, and accounts that share an email with someone (suggested matches, never applied). ${LOAD}`,
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       async run() {
         const { team, view: v } = await view();
@@ -437,7 +437,7 @@ export function peopleTools(dossier: string, data: AgentData, ledger: Ledger, re
     },
     {
       name: 'person_get',
-      description: `One person's plate in the dossier "${dossier}", from people_list's key or by name or account (such as Pat Example, or github:pat-ex): everything people_list says about them plus their recent activity (status moves, their pull requests merged, reviews they gave) over the last 14 days. ${LOAD}`,
+      description: `One person's plate in the Toil project "${toilProject}", from people_list's key or by name or account (such as Pat Example, or github:pat-ex): everything people_list says about them plus their recent activity (status moves, their pull requests merged, reviews they gave) over the last 14 days. ${LOAD}`,
       inputSchema: { type: 'object', properties: { person: { type: 'string', description: "people_list's key, a name, or an account as area:id." } }, required: ['person'], additionalProperties: false },
       async run(input) {
         const wanted = str(input.person)?.toLowerCase();
@@ -447,7 +447,7 @@ export function peopleTools(dossier: string, data: AgentData, ledger: Ledger, re
           cards.find((c) => c.who.key.toLowerCase() === wanted) ??
           cards.find((c) => c.who.name.toLowerCase() === wanted) ??
           cards.find((c) => c.who.identities.some((i) => `${i.area}:${i.id}`.toLowerCase() === wanted || i.id.toLowerCase() === wanted));
-        if (!card) return { ...note(), error: `Nobody in ${dossier} is ${JSON.stringify(input.person ?? '')}. Use people_list for the names and keys.`, people: cards.map((c) => ({ key: c.who.key, name: c.who.name })) };
+        if (!card) return { ...note(), error: `Nobody in ${toilProject} is ${JSON.stringify(input.person ?? '')}. Use people_list for the names and keys.`, people: cards.map((c) => ({ key: c.who.key, name: c.who.name })) };
         vouchCard(ledger, card);
         return {
           ...note(),
@@ -490,26 +490,26 @@ const verdictBrief = (item: WorkItem, r: Readiness) => ({
 });
 
 /**
- * The two readiness tools for one dossier (#307): every item's verdict, and
+ * The two readiness tools for one toil project (#307): every item's verdict, and
  * one item's five rows, worked out by src/model/readiness.ts from the cache
- * and the dossier's settings, as the Command Center and the item page work
+ * and the toil project's settings, as the Command Center and the item page work
  * them out. No live read: the item page's workflow check is a person's to
  * press.
  */
-export function readinessTools(dossier: string, data: AgentData, ledger: Ledger, readDossier: ReadDossier): ToolSpec[] {
-  const note = () => ({ dossier, syncedAt: data.syncedAt() });
+export function readinessTools(toilProject: string, data: AgentData, ledger: Ledger, readToilProject: ReadToilProject): ToolSpec[] {
+  const note = () => ({ toilProject, syncedAt: data.syncedAt() });
   const RULE =
     'Verdicts come from the cached records with no model call: ready means all five checks pass (acceptance criteria, description, done state, blockers, scope); thin means something a person could waive is missing; blocked means it cannot be worked on as it is. Only ready items are slated for an agent. Cite every item by its id.';
   const settingsNow = async () => {
-    const shown = await readDossier();
-    const settings = readReadiness(shown.dossier);
+    const shown = await readToilProject();
+    const settings = readReadiness(shown.toilProject);
     if (shown.error) settings.notes.unshift(`${shown.error} So no source, repository or readiness setting is known, and every item fails scope.`);
     return settings;
   };
   return [
     {
       name: 'readiness_list',
-      description: `Every work item in the dossier "${dossier}" with its readiness verdict for agent work (ready, thin or blocked) and, for each that isn't ready, which of the five checks (${Object.values(CHECK_LABEL).join(', ')}) didn't pass and why, from Toil UI's cache. Done items are left out unless includeDone is true. Also the count of each verdict among open items, and the dossier's readiness settings. ${RULE}`,
+      description: `Every work item in the Toil project "${toilProject}" with its readiness verdict for agent work (ready, thin or blocked) and, for each that isn't ready, which of the five checks (${Object.values(CHECK_LABEL).join(', ')}) didn't pass and why, from Toil UI's cache. Done items are left out unless includeDone is true. Also the count of each verdict among open items, and the Toil project's readiness settings. ${RULE}`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -548,13 +548,13 @@ export function readinessTools(dossier: string, data: AgentData, ledger: Ledger,
     },
     {
       name: 'readiness_get',
-      description: `One work item's readiness in "${dossier}", by its OWI id: its verdict and all five rows (each pass, thin or fail, with its reason and where the answer came from). ${RULE}`,
+      description: `One work item's readiness in "${toilProject}", by its OWI id: its verdict and all five rows (each pass, thin or fail, with its reason and where the answer came from). ${RULE}`,
       inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'The OWI id.' } }, required: ['id'], additionalProperties: false },
       async run(input) {
         const id = str(input.id);
         const items = data.items();
         const item = id ? items.find((i) => i.id === id) : undefined;
-        if (!item) return { ...note(), error: `The cache holds no item ${JSON.stringify(id ?? '')} in ${dossier}. Use readiness_list or owi_query to find ids.` };
+        if (!item) return { ...note(), error: `The cache holds no item ${JSON.stringify(id ?? '')} in ${toilProject}. Use readiness_list or owi_query to find ids.` };
         const settings = await settingsNow();
         const r = readiness({ item, settings, byId: new Map(items.map((i) => [i.id, i])) });
         vouchReadiness(ledger, r);
@@ -564,13 +564,13 @@ export function readinessTools(dossier: string, data: AgentData, ledger: Ledger,
   ];
 }
 
-/** The four work item cache tools for one dossier. */
-export function cacheTools(dossier: string, data: AgentData, ledger: Ledger): ToolSpec[] {
-  const note = () => ({ dossier, syncedAt: data.syncedAt() });
+/** The four work item cache tools for one toil project. */
+export function cacheTools(toilProject: string, data: AgentData, ledger: Ledger): ToolSpec[] {
+  const note = () => ({ toilProject, syncedAt: data.syncedAt() });
   return [
     {
       name: 'owi_query',
-      description: `Lists the work items Toil UI's cache holds for the dossier "${dossier}", as OWI records (no native payload). Filter by any of the fields; all filters must match. Text matches the id or title, case-insensitively. Returns at most ${MAX_QUERY} items and says when there were more.`,
+      description: `Lists the work items Toil UI's cache holds for the Toil project "${toilProject}", as OWI records (no native payload). Filter by any of the fields; all filters must match. Text matches the id or title, case-insensitively. Returns at most ${MAX_QUERY} items and says when there were more.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -607,12 +607,12 @@ export function cacheTools(dossier: string, data: AgentData, ledger: Ledger): To
     },
     {
       name: 'owi_get',
-      description: `One work item from the cache for "${dossier}", by its OWI id (such as jira:PAY-101), with its body and the pull requests, builds and deployments linked to it.`,
+      description: `One work item from the cache for "${toilProject}", by its OWI id (such as jira:PAY-101), with its body and the pull requests, builds and deployments linked to it.`,
       inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'The OWI id.' } }, required: ['id'], additionalProperties: false },
       async run(input) {
         const id = str(input.id);
         const item = id ? data.items().find((i) => i.id === id) : undefined;
-        if (!item) return { ...note(), error: `The cache holds no item ${JSON.stringify(id ?? '')} in ${dossier}. Use owi_query to find ids.` };
+        if (!item) return { ...note(), error: `The cache holds no item ${JSON.stringify(id ?? '')} in ${toilProject}. Use owi_query to find ids.` };
         vouch(ledger, item);
         const changes = data
           .changes()
@@ -624,7 +624,7 @@ export function cacheTools(dossier: string, data: AgentData, ledger: Ledger): To
     },
     {
       name: 'owi_similar',
-      description: `Finds likely duplicate work items in the cache for "${dossier}", scored the way toil util owi similar scores them: pass query (some text, such as the title of an item about to be filed) or id (an OWI id, to find what duplicates that item). Returns at most limit matches scoring 0.35 or more, best first, each with score (0 to 1) and why: the shared title and body terms, how alike the titles are by trigram, shared labels, the same parent and a direct link. Lexical: it finds shared words, not shared meaning.`,
+      description: `Finds likely duplicate work items in the cache for "${toilProject}", scored the way toil util owi similar scores them: pass query (some text, such as the title of an item about to be filed) or id (an OWI id, to find what duplicates that item). Returns at most limit matches scoring 0.35 or more, best first, each with score (0 to 1) and why: the shared title and body terms, how alike the titles are by trigram, shared labels, the same parent and a direct link. Lexical: it finds shared words, not shared meaning.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -641,7 +641,7 @@ export function cacheTools(dossier: string, data: AgentData, ledger: Ledger): To
         const limit = Math.min(MAX_SIMILAR, Math.max(1, Number.isInteger(input.limit) ? (input.limit as number) : DEFAULT_SIMILAR));
         const index = new SimilarityIndex(data.items());
         const found = query ? index.query(query, { limit }) : index.item(id!, { limit });
-        if (!found) return { ...note(), error: `The cache holds no item ${JSON.stringify(id)} in ${dossier}. Use owi_query to find ids.` };
+        if (!found) return { ...note(), error: `The cache holds no item ${JSON.stringify(id)} in ${toilProject}. Use owi_query to find ids.` };
         if (id) ledger.add(id);
         const matches = found.matches.map((m) => ({ id: m.id, title: m.title, score: m.score, why: { summary: m.why.summary, titleTerms: m.why.titleTerms, bodyTerms: m.why.bodyTerms, trigram: m.why.trigram, labels: m.why.labels, parent: m.why.parent, link: m.why.link } }));
         for (const m of matches) ledger.add(m.id);
@@ -650,12 +650,12 @@ export function cacheTools(dossier: string, data: AgentData, ledger: Ledger): To
     },
     {
       name: 'owi_history',
-      description: `The status transitions the cache holds for one work item in "${dossier}" (from, to, when, by whom), oldest first.`,
+      description: `The status transitions the cache holds for one work item in "${toilProject}" (from, to, when, by whom), oldest first.`,
       inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'The OWI id.' } }, required: ['id'], additionalProperties: false },
       async run(input) {
         const id = str(input.id);
         const item = id ? data.items().find((i) => i.id === id) : undefined;
-        if (!item) return { ...note(), error: `The cache holds no item ${JSON.stringify(id ?? '')} in ${dossier}. Use owi_query to find ids.` };
+        if (!item) return { ...note(), error: `The cache holds no item ${JSON.stringify(id ?? '')} in ${toilProject}. Use owi_query to find ids.` };
         ledger.add(item.id);
         return { ...note(), id: item.id, transitions: data.transitions(item.id).map((t) => ({ from: t.from, to: t.to, fromCategory: t.fromCategory, toCategory: t.toCategory, at: t.at, by: t.by })) };
       },
@@ -671,10 +671,10 @@ export type MapIds = (envelope: Envelope) => string[];
 
 /**
  * `toil mcp`'s read tools for live lookups, one per command in `LIVE_COMMANDS`
- * that the registry has and says never writes. The dossier is fixed to this
+ * that the registry has and says never writes. The toil project is fixed to this
  * one; every call is read-only with Toil UI's caller label.
  */
-export function liveTools(dossier: string, registry: readonly ReadCommand[], execute: Execute, mapIds: MapIds, ledger: Ledger): ToolSpec[] {
+export function liveTools(toilProject: string, registry: readonly ReadCommand[], execute: Execute, mapIds: MapIds, ledger: Ledger): ToolSpec[] {
   const tools: ToolSpec[] = [];
   for (const name of LIVE_COMMANDS) {
     const command = registry.find((c) => c.name === name);
@@ -685,11 +685,11 @@ export function liveTools(dossier: string, registry: readonly ReadCommand[], exe
     tools.push({
       name: command.tool,
       command: command.name,
-      description: `Live, read-only: toil ${command.name} for the dossier "${dossier}", straight from the tracker rather than the cache. ${command.description}`,
+      description: `Live, read-only: toil ${command.name} for the Toil project "${toilProject}", straight from the tracker rather than the cache. ${command.description}`,
       inputSchema: { type: 'object', properties, ...(required.length ? { required } : {}), additionalProperties: false },
       async run(input, signal) {
         const clean = Object.fromEntries(Object.entries(input).filter(([k]) => k in properties));
-        const envelope = await execute(command.name, { ...clean, ...('dossier' in (schema.properties ?? {}) ? { dossier } : {}) }, { readOnly: true, caller: CALLER, ...(signal ? { signal } : {}) });
+        const envelope = await execute(command.name, { ...clean, ...('toilProject' in (schema.properties ?? {}) ? { toilProject } : {}) }, { readOnly: true, caller: CALLER, ...(signal ? { signal } : {}) });
         if (envelope.ok) for (const id of mapIds(envelope)) ledger.add(id);
         const text = JSON.stringify(envelope.ok ? { data: envelope.data, warnings: envelope.meta.warnings ?? [] } : { error: envelope.error });
         return text.length > MAX_LIVE_CHARS ? { cut: `The result was ${text.length} characters, cut to ${MAX_LIVE_CHARS}; ask for fewer with limit or a narrower query.`, json: text.slice(0, MAX_LIVE_CHARS) } : JSON.parse(text);
@@ -705,7 +705,7 @@ export function liveTools(dossier: string, registry: readonly ReadCommand[], exe
  * registry and runs nothing; the command itself is never callable.
  */
 export function proposalTool(registry: readonly ReadCommand[]): ToolSpec {
-  const hiddenHere = new Set(['dossier', 'cwd', 'select', 'allowWrite']);
+  const hiddenHere = new Set(['toilProject', 'cwd', 'select', 'allowWrite']);
   return {
     name: 'proposal_fields',
     description: "The input fields of one toil write command (such as jira issue update or ado work-item update), for a proposal's input. It reads toil's command list and runs nothing: you can't call a write command, only propose one.",
@@ -725,13 +725,13 @@ export function proposalTool(registry: readonly ReadCommand[]): ToolSpec {
 }
 
 /** The worklog tool (#308): one day's page, every line with its time and the ids it names. Days are UTC. */
-export function worklogTool(dossier: string, data: AgentData, ledger: Ledger, now: () => string = () => new Date().toISOString()): ToolSpec[] {
+export function worklogTool(toilProject: string, data: AgentData, ledger: Ledger, now: () => string = () => new Date().toISOString()): ToolSpec[] {
   const worklog = data.worklog;
   if (!worklog) return [];
   return [
     {
       name: 'worklog_day',
-      description: `The worklog page for one UTC day of the dossier "${dossier}": the work items that changed status (from, to, who, when), were added to or dropped from a sprint, or got a new blocker; the pull requests opened, reviewed, merged or declined; the builds and deployments that failed or recovered; the agent runs (questions asked in Toil UI) with their proposals and whether toil's audit log shows a person applied them; and the notes a person added. Each line has its UTC time and cite, the ids to cite it by. gaps says what the cache can't vouch for on that day: quote it when it matters to the answer. Built by code from the cache, facts only.`,
+      description: `The worklog page for one UTC day of the Toil project "${toilProject}": the work items that changed status (from, to, who, when), were added to or dropped from a sprint, or got a new blocker; the pull requests opened, reviewed, merged or declined; the builds and deployments that failed or recovered; the agent runs (questions asked in Toil UI) with their proposals and whether toil's audit log shows a person applied them; and the notes a person added. Each line has its UTC time and cite, the ids to cite it by. gaps says what the cache can't vouch for on that day: quote it when it matters to the answer. Built by code from the cache, facts only.`,
       inputSchema: { type: 'object', properties: { day: { type: 'string', description: 'The UTC day, yyyy-mm-dd. Default: yesterday.' } }, additionalProperties: false },
       async run(input) {
         const today = dayOf(now())!;
@@ -744,7 +744,7 @@ export function worklogTool(dossier: string, data: AgentData, ledger: Ledger, no
           return { time: timeOf(e.at), kind: e.kind, about: e.label, title: e.title, text: e.text, by: e.by, cite: e.cites, ...(e.observed ? { firstSeenBySync: true, previousSync: e.observed.previousSync } : {}) };
         });
         return {
-          dossier,
+          toilProject,
           day,
           timeZone: 'UTC',
           gaps: page.gaps,
@@ -766,13 +766,13 @@ export function worklogTool(dossier: string, data: AgentData, ledger: Ledger, no
 }
 
 /** The stand-up tool (#345): a range of days folded into a stand-up, every line numbered, with the ids it names. */
-export function standupTool(dossier: string, data: AgentData, ledger: Ledger, now: () => string = () => new Date().toISOString()): ToolSpec[] {
+export function standupTool(toilProject: string, data: AgentData, ledger: Ledger, now: () => string = () => new Date().toISOString()): ToolSpec[] {
   const standup = data.standup;
   if (!standup) return [];
   return [
     {
       name: 'standup_report',
-      description: `The stand-up report for the dossier "${dossier}" over a range of UTC days, built by code from the worklog: team lines first (the sprint's working days left, scope added to or dropped from a sprint, builds and deployments that broke or recovered), then each person, agents included, with what they got done, what is in progress, what is blocked and what is next in the sprint. Every line has its fact number (F1, F2, ...) and cite, the ids to cite it by. gaps says what the worklog can't vouch for in the range. Default range: since the last working day, through today.`,
+      description: `The stand-up report for the Toil project "${toilProject}" over a range of UTC days, built by code from the worklog: team lines first (the sprint's working days left, scope added to or dropped from a sprint, builds and deployments that broke or recovered), then each person, agents included, with what they got done, what is in progress, what is blocked and what is next in the sprint. Every line has its fact number (F1, F2, ...) and cite, the ids to cite it by. gaps says what the worklog can't vouch for in the range. Default range: since the last working day, through today.`,
       inputSchema: {
         type: 'object',
         properties: { from: { type: 'string', description: 'The first UTC day, yyyy-mm-dd. Default: the last working day before today.' }, to: { type: 'string', description: 'The last UTC day, yyyy-mm-dd. Default: today.' } },
@@ -795,14 +795,14 @@ export function standupTool(dossier: string, data: AgentData, ledger: Ledger, no
           return { fact: l.fact, when: whenText(report, l), about: l.label, title: l.title, text: l.text, cite: l.cites };
         };
         return {
-          dossier,
+          toilProject,
           from: report.from,
           to: report.to,
           timeZone: 'UTC',
           asOfSync: report.asOf,
           gaps: report.gaps,
           team: report.team.map(line),
-          people: report.people.map((p) => ({ name: p.name, kind: p.kind, inDossierPeople: p.mapped, ...Object.fromEntries(BUCKETS.map((b) => [BUCKET_TITLE[b], p.lines[b].map(line)])) })),
+          people: report.people.map((p) => ({ name: p.name, kind: p.kind, inToilProjectPeople: p.mapped, ...Object.fromEntries(BUCKETS.map((b) => [BUCKET_TITLE[b], p.lines[b].map(line)])) })),
         };
       },
     },

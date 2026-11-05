@@ -1,11 +1,11 @@
 /**
- * The dossier's briefing (#494): what its home page reads, one layer at a
+ * The toil project's briefing (#494): what its home page reads, one layer at a
  * time. Analyze writes it when the latest Analyze is current and answered with
  * a briefing block; otherwise toil's briefing by code does (src/core/brief/),
  * with the same reasons and no why-and-next-step, and the page says which
  * (principle 4). Two checks keep an agent's briefing honest: every item it
- * names must be one of the dossier's, and every item the code flagged that it
- * didn't mention, or left out because of the dossier's focus, is listed one
+ * names must be one of the toil project's, and every item the code flagged that it
+ * didn't mention, or left out because of the toil project's focus, is listed one
  * step in, so nothing drops off the page unsaid (the maintainer's decision on
  * #494). Pure, so the page, the drawer and the tests agree. An executive
  * summary that admits to an appendix.
@@ -44,11 +44,11 @@ export interface BriefingView {
   reasons: BriefingReason[];
   onTrack: string;
   changed: string[];
-  /** Items the dossier's "leave out" hid, by Analyze's account. */
+  /** Items the toil project's "leave out" hid, by Analyze's account. */
   leftOut: Array<{ id: string; why: string }>;
   /** Items the code flagged that Analyze put under no reason and didn't leave out. */
   notMentioned: BriefItem[];
-  /** Ids Analyze named that aren't the dossier's: shown as named, flagged. */
+  /** Ids Analyze named that aren't the toil project's: shown as named, flagged. */
   unknown: string[];
   /** What the page must say about the briefing itself: a block that didn't fit, ids its tools never returned. Shown, never folded. */
   problems: string[];
@@ -63,7 +63,7 @@ export interface BriefingInput {
   pullRequests: readonly Change[];
   now: string;
   settings: BriefSettings;
-  /** The dossier's analyses, newest first. */
+  /** The toil project's analyses, newest first. */
   analyses: readonly AnalysisSummary[];
 }
 

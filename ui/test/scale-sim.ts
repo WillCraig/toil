@@ -197,13 +197,13 @@ export async function simulate(kind: 'jira' | 'ado', total: number, live: number
       request(Math.max(1, Math.ceil(feed.length / FEED_BATCH_SIZE)));
       return ok(command, feed.map(asFeed));
     }
-    // The dossier itself, and the pull requests, builds and deployments around it: the preview's canned answers.
+    // The toil project itself, and the pull requests, builds and deployments around it: the preview's canned answers.
     request();
     return toil.execute(command, input, options);
   };
 
   const sync = new SyncService({ cache, execute, mapOwi, now });
-  const dossier = kind === 'jira' ? 'card-payments' : 'settlement';
+  const toilProject = kind === 'jira' ? 'card-payments' : 'settlement';
   const db = (cache as unknown as { db: { prepare(sql: string): { get(): { n: number } } } }).db;
   const changes = () => Number(db.prepare('SELECT total_changes() AS n').get().n);
   const responses = () => new Map((db as unknown as { prepare(sql: string): { all(): Array<{ k: string; envelope: string }> } }).prepare("SELECT command || '|' || input_key AS k, envelope FROM responses").all().map((r) => [r.k, r.envelope] as const));
@@ -217,17 +217,17 @@ export async function simulate(kind: 'jira' | 'ado', total: number, live: number
       const before = changes();
       const stored = responses();
       const started = performance.now();
-      const job = await sync.run(ctx, dossier);
+      const job = await sync.run(ctx, toilProject);
       const seconds = (performance.now() - started) / 1000;
       if (job.error) throw new Error(job.error);
       const failed = cache.states().flatMap((d) => d.sources.filter((s) => s.status === 'failed').map((s) => `${s.area}: ${s.error}`));
       if (failed.length) throw new Error(failed.join('; '));
       let responseBytesWritten = 0;
       for (const [k, envelope] of responses()) if (stored.get(k) !== envelope) responseBytesWritten += Buffer.byteLength(envelope);
-      return { toilCalls, requests, tracker: { ...tracker }, rowsWritten: changes() - before, responseBytesWritten, items: cache.items(dossier).length, seconds };
+      return { toilCalls, requests, tracker: { ...tracker }, rowsWritten: changes() - before, responseBytesWritten, items: cache.items(toilProject).length, seconds };
     },
     wholeHistories() {
-      const cached = cache.items(dossier) as unknown as Array<{ source: { key: string }; history?: { transitions: Array<{ from: string | null; to: string; at: string }> } }>;
+      const cached = cache.items(toilProject) as unknown as Array<{ source: { key: string }; history?: { transitions: Array<{ from: string | null; to: string; at: string }> } }>;
       // A whole history starts at revision 1: a first move from nothing to New, on the day the item was created.
       const whole = cached.filter((i) => {
         const first = i.history?.transitions[0];

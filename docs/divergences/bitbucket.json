@@ -32,7 +32,7 @@
     {
       "allows": [],
       "old": "Project key, repository slug, user slug, commit and the pr diff --file path put into request paths as typed (only repo default-reviewers encoded project and repo), so an id with path syntax in it, such as a / ? or #, changed or cut the path",
-      "toil": "Each id is encoded as one path segment, and the --file path one segment at a time, with a . or .. part refused as INVALID_INPUT; project and repo holding /, \\, ?, #, % or a control character are refused as INVALID_INPUT before anything is sent, wherever the value came from (flag, connection, dossier, env or git remote)",
+      "toil": "Each id is encoded as one path segment, and the --file path one segment at a time, with a . or .. part refused as INVALID_INPUT; project and repo holding /, \\, ?, #, % or a control character are refused as INVALID_INPUT before anything is sent, wherever the value came from (flag, connection, toil project, env or git remote)",
       "why": "An id names one resource. Bitbucket project keys are letters, digits and _ (a personal project is ~ and a URL-safe user slug) and repository slugs are letters, digits, -, _ and ., so no real key or slug holds those characters, and a file name holding # or ? is still that file.",
       "principle": "2"
     },

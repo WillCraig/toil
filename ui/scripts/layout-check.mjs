@@ -16,16 +16,16 @@
 //     settings tabs) wrapping onto a second;
 //   - the header folded into its Menu at 1440 pixels or wider, where every
 //     theme's full row fits on the sample data (#387; `headerFits`, off for
-//     real data, whose dossier names and links may genuinely fill the row);
+//     real data, whose toil project names and links may genuinely fill the row);
 //   - an open modal whose backdrop doesn't dim the page;
 //   - and, in the strict themes (Plain and Crate, light and dark), any axe
 //     violation at WCAG 2.2 AA. The other themes' axe findings are reported,
 //     never failed (the maintainer's bar, AGENT_DECISIONS.md, #267).
 //
 // Each view is checked as it opens and with its hidden parts showing: every
-// <details> open, each dossier card's Show pressed, the header menu and the
-// Feedback dialog open, every dossier name and description open for editing, the Assign dialog open from an item and the inbox, the Agents
-// drawer, the dossier switcher, a metric's full chart and the board's needs-attention filter (#394), the focused Ask view open
+// <details> open, each toil project card's Show pressed, the header menu and the
+// Feedback dialog open, every toil project name and description open for editing, the Assign dialog open from an item and the inbox, the Agents
+// drawer, the toil project switcher, a metric's full chart and the board's needs-attention filter (#394), the focused Ask view open
 // from the Ask bar (#343) with its (i) popover, its agent switcher, an answer, its Suggestions menu and
 // Analyze's pulse check, a help (i)'s tooltip and popover (#346), the Agent page's full prompt and its Install dialog shown (#344), a worklog day rebuilt and
 // the calendar on an earlier month, a stand-up written up, and every failing
@@ -34,7 +34,7 @@
 // is on, so an animation caught mid-flight can't fail a run; `npm run smoke` then runs
 // MOTION_ROUTES again with motion on, where the moments play.
 //
-// On a dossier's Board tab the board is also dragged as a hand drags it
+// On a toil project's Board tab the board is also dragged as a hand drags it
 // (#393): real mouse input through the DevTools protocol, a finger at 375
 // pixels, with moves in between. Mid-drag the copy of the card must be under
 // the pointer and the card itself still in its column; after the drop a
@@ -46,7 +46,7 @@
 // --sample`). By hand, against any build:
 //
 //   npx vite preview --port 4173            (after `npx vite build`, in ui/)
-//   node scripts/layout-check.mjs --base http://127.0.0.1:4173/ [--theme crate] [--route '#/settings/dossiers'] [--width 375] [--motion full] [--shots <dir>] [--json <file>]
+//   node scripts/layout-check.mjs --base http://127.0.0.1:4173/ [--theme crate] [--route '#/settings/projects'] [--width 375] [--motion full] [--shots <dir>] [--json <file>]
 //
 // Repo tooling only; nothing here ships. It measures twice and files once.
 /* global document, window, getComputedStyle, CSS -- inspect(), covered(), dragPlan(), hitTest() and dragMid() run in the page */
@@ -67,57 +67,57 @@ export function themeRuns() {
   return manifests.flatMap((m) => Object.keys(m.schemes).map((scheme) => ({ theme: m.name, scheme, strict: m.name === 'plain' || m.name === 'crate' })));
 }
 
-const item = (dossier, id) => `#/dossier/${dossier}/item/${encodeURIComponent(id)}`;
+const item = (toilProject, id) => `#/project/${toilProject}/item/${encodeURIComponent(id)}`;
 export const ROUTES = [
   '#/',
-  '#/dossier/card-payments',
-  '#/dossier/settlement',
-  '#/dossier/checkout-web',
+  '#/project/card-payments',
+  '#/project/settlement',
+  '#/project/checkout-web',
   // An item's drawer (#494): beside the briefing from 1200px, over it below that, and over the Board, whose card key opens it.
-  '#/dossier/card-payments?item=corp-jira%3APAY-101',
-  '#/dossier/card-payments/board?item=corp-jira%3APAY-104',
-  // How Analyze briefs a dossier (#494), with its prompt preview open among the details.
-  '#/settings/dossiers/card-payments/analyze',
-  // The dossier's own tabs (#394): the Board with its needs-attention flags, the longest titles' board, Dependencies, and Analyses.
-  // Dependencies carries the blocker Gantt and its table (#396): a three-item chain with failing checks, a one-link Azure DevOps chain, and a dossier with no blocker.
-  '#/dossier/card-payments/board',
-  '#/dossier/checkout-web/board',
-  '#/dossier/card-payments/dependencies',
-  '#/dossier/settlement/dependencies',
-  '#/dossier/checkout-web/dependencies',
-  '#/dossier/card-payments/analyses',
+  '#/project/card-payments?item=corp-jira%3APAY-101',
+  '#/project/card-payments/board?item=corp-jira%3APAY-104',
+  // How Analyze briefs a toil project (#494), with its prompt preview open among the details.
+  '#/settings/projects/card-payments/analyze',
+  // The toil project's own tabs (#394): the Board with its needs-attention flags, the longest titles' board, Dependencies, and Analyses.
+  // Dependencies carries the blocker Gantt and its table (#396): a three-item chain with failing checks, a one-link Azure DevOps chain, and a toil project with no blocker.
+  '#/project/card-payments/board',
+  '#/project/checkout-web/board',
+  '#/project/card-payments/dependencies',
+  '#/project/settlement/dependencies',
+  '#/project/checkout-web/dependencies',
+  '#/project/card-payments/analyses',
   // The history of analyses (#395): one opened again, top-down, with its evidence folded and what changed since the one before.
-  '#/dossier/card-payments/analyses/sample-analysis-2',
-  '#/dossier/checkout-web/prs',
-  '#/dossier/card-payments/prs',
-  '#/dossier/card-payments/job/review?target=github%3Aimagile%2Fpayments-web%2343',
-  '#/dossier/card-payments/job/ship',
-  '#/dossier/card-payments/job/diagram',
-  // The People view (#292): mapped people with a suggested match, people plus agents and an unmapped account, a dossier listing nobody, and the board filtered to one person.
-  '#/dossier/card-payments/people',
-  '#/dossier/checkout-web/people',
-  '#/dossier/settlement/people',
-  `#/dossier/card-payments/board/${encodeURIComponent('person:J. Smith')}`,
+  '#/project/card-payments/analyses/sample-analysis-2',
+  '#/project/checkout-web/prs',
+  '#/project/card-payments/prs',
+  '#/project/card-payments/job/review?target=github%3Aimagile%2Fpayments-web%2343',
+  '#/project/card-payments/job/ship',
+  '#/project/card-payments/job/diagram',
+  // The People view (#292): mapped people with a suggested match, people plus agents and an unmapped account, a toilProject listing nobody, and the board filtered to one person.
+  '#/project/card-payments/people',
+  '#/project/checkout-web/people',
+  '#/project/settlement/people',
+  `#/project/card-payments/board/${encodeURIComponent('person:J. Smith')}`,
   // The readiness gate (#307): the Command Center with one ready item, with none, and with a ready GitHub feature; an item blocked by another.
-  '#/dossier/card-payments/command-center',
-  '#/dossier/settlement/command-center',
-  '#/dossier/checkout-web/command-center',
+  '#/project/card-payments/command-center',
+  '#/project/settlement/command-center',
+  '#/project/checkout-web/command-center',
   item('card-payments', 'corp-jira:PAY-102'),
-  '#/dossier/card-payments/worklog',
-  '#/dossier/card-payments/worklog/2026-10-12',
-  '#/dossier/checkout-web/worklog/2026-10-11',
-  // The stand-up (#345): since the last working day, with people, agents and unmapped accounts, and one day of another dossier named by one day in the URL, and a URL that names no day.
-  '#/dossier/card-payments/worklog/standup',
-  '#/dossier/settlement/worklog/standup/2026-10-12',
-  '#/dossier/checkout-web/worklog/standup/yesterday',
+  '#/project/card-payments/worklog',
+  '#/project/card-payments/worklog/2026-10-12',
+  '#/project/checkout-web/worklog/2026-10-11',
+  // The stand-up (#345): since the last working day, with people, agents and unmapped accounts, and one day of another toil project named by one day in the URL, and a URL that names no day.
+  '#/project/card-payments/worklog/standup',
+  '#/project/settlement/worklog/standup/2026-10-12',
+  '#/project/checkout-web/worklog/standup/yesterday',
   item('card-payments', 'corp-jira:PAY-100'),
   item('settlement', 'corp-ado:2304'),
   // Agent assignments (#293): one that needs you (a report, a question, proposals with diffs), one that failed at its time limit, one working.
-  '#/dossier/card-payments/assignment/sample-needsyou-0002',
-  '#/dossier/card-payments/assignment/sample-failed-0000004',
-  '#/dossier/card-payments/assignment/sample-working-0001',
+  '#/project/card-payments/assignment/sample-needsyou-0002',
+  '#/project/card-payments/assignment/sample-failed-0000004',
+  '#/project/card-payments/assignment/sample-working-0001',
   '#/settings/connections',
-  '#/settings/dossiers',
+  '#/settings/projects',
   '#/settings/toil',
   '#/settings/usage',
   '#/settings/agent-usage',
@@ -125,15 +125,15 @@ export const ROUTES = [
 ];
 export const WIDTHS = [375, 768, 1440];
 /**
- * The views checked a second time with motion on (#419): where the theme's moments play (the dossier entrance and
+ * The views checked a second time with motion on (#419): where the theme's moments play (the toil project entrance and
  * its tabs, the previews of the splash, a loading screen and the sprint recap under Settings, General). The full set
  * runs with reduced motion, which is also Theme motion off, so both are proven.
  */
-export const MOTION_ROUTES = ['#/', '#/dossier/card-payments', '#/dossier/card-payments/board', '#/dossier/card-payments/prs', '#/settings/toil'];
+export const MOTION_ROUTES = ['#/', '#/project/card-payments', '#/project/card-payments/board', '#/project/card-payments/prs', '#/settings/toil'];
 
 /**
- * The first run (#416): the Dossiers view on a home with no dossiers, which verify:ui opens under this
- * address so it gets the checklist's states and not the sample home's. The App reads it as the Dossiers view.
+ * The first run (#416): the Toil projects view on a home with no toil projects, which verify:ui opens under this
+ * address so it gets the checklist's states and not the sample home's. The App reads it as the Toil projects view.
  */
 export const FIRST_RUN_ROUTE = '#/?first-run';
 /** What counts as a card. LAYOUT_CARDS widens it, to measure a build from before the Card primitive. */
@@ -333,27 +333,27 @@ function states(route, width, sample = true) {
   // The command palette and the shortcuts sheet (#416): open, with an item search typed, and the sheet. Ctrl+K and ? are
   // dispatched, with Meta too, so the same press opens it on a Mac; a second Ctrl+K closes the palette if Escape only cleared it.
   // The checklist itself, in place of the empty view: three steps, and the sample-data command beside them.
-  if (route === FIRST_RUN_ROUTE) out.push({ name: 'first-run', setup: `(async () => { const deadline = Date.now() + 5000; while (!document.querySelector('[data-first-run]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const steps = document.querySelectorAll('[data-first-run] .first-run__step').length; return steps === 3 ? 1 : steps ? 'the first-run checklist has ' + steps + ' steps, not 3' : 'no first-run checklist on a home with no dossiers'; })()` });
-  if (route === '#/' || route === FIRST_RUN_ROUTE || route === '#/dossier/card-payments/board' || route === '#/settings/connections') {
+  if (route === FIRST_RUN_ROUTE) out.push({ name: 'first-run', setup: `(async () => { const deadline = Date.now() + 5000; while (!document.querySelector('[data-first-run]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const steps = document.querySelectorAll('[data-first-run] .first-run__step').length; return steps === 3 ? 1 : steps ? 'the first-run checklist has ' + steps + ' steps, not 3' : 'no first-run checklist on a home with no Toil projects'; })()` });
+  if (route === '#/' || route === FIRST_RUN_ROUTE || route === '#/project/card-payments/board' || route === '#/settings/connections') {
     const toggle = `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, metaKey: true, bubbles: true }))`;
     const openPalette = `(async () => { ${toggle}; const deadline = Date.now() + 5000; while (!document.querySelector('[data-palette-item]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('[data-palette-item]') ? 1 : 0; })()`;
     const closePalette = `(() => { if (document.querySelector('[data-palette]')) ${toggle}; })()`;
     out.push({ name: 'palette', clearOverlays: true, setup: openPalette, undo: 'Escape', undoJs: closePalette });
     const typed = `(async () => { if (!(await ${openPalette})) return 0; const i = document.querySelector('[data-palette-input]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'e'); i.dispatchEvent(new Event('input', { bubbles: true })); const deadline = Date.now() + 5000; while (!document.querySelector('[data-palette-item="items"]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('[data-palette-item="items"]') ? 1 : 'typed e, and no item came up'; })()`;
-    if (route === '#/' || route === '#/dossier/card-payments/board') out.push({ name: 'palette-search', clearOverlays: true, setup: typed, undoJs: closePalette });
+    if (route === '#/' || route === '#/project/card-payments/board') out.push({ name: 'palette-search', clearOverlays: true, setup: typed, undoJs: closePalette });
     const sheet = `(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', shiftKey: true, bubbles: true })); const deadline = Date.now() + 5000; while (!document.querySelector('[data-shortcuts]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('[data-shortcuts]') ? 1 : 0; })()`;
     if (route === '#/' || route === FIRST_RUN_ROUTE) out.push({ name: 'shortcuts', clearOverlays: true, setup: sheet, undo: 'Escape', undoJs: clickAll('[data-shortcuts-close]', null, 0) });
   }
   // The bell and What's new (#417): the bell's list open, from the header at every width, and What's new opened from
   // Help, which is inside the Menu on a narrow screen. The list shows the latest releases when nothing is new.
-  if (route === '#/' || route === '#/dossier/card-payments') {
+  if (route === '#/' || route === '#/project/card-payments') {
     const waitSel = (sel) => `(async () => { const deadline = Date.now() + 5000; while (!document.querySelector(${JSON.stringify(sel)}) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector(${JSON.stringify(sel)}) ? 1 : 0; })()`;
     out.push({ name: 'bell', clearOverlays: true, setup: `(async () => { if (!(await ${clickAll('[data-bell]')})) return 0; return await ${waitSel('[data-bell-list]')}; })()`, undo: 'Escape' });
     if (route === '#/') out.push({ name: 'whats-new', clearOverlays: true, setup: `(async () => { if ((await ${inMenu('[data-help-link]')}) < 1) return 0; if (!(await ${clickAll('[data-whats-new-open]')})) return 'Help has no What\\'s new'; return await ${waitSel('[data-whats-new]')}; })()`, undo: 'Escape', undoJs: clickAll('[data-whats-new-close]', null, 0) });
   }
   // Help (#346), checked before the Ask states so no overlay of theirs is still closing: the first (i) on the page with its tooltip showing, as a keyboard user who
   // tabbed to it sees it, and pressed, with its popover and Read more link open. On the views with the most of them, at every width.
-  if (route === '#/dossier/card-payments' || route === '#/settings/connections' || route === '#/settings/toil' || route === '#/dossier/card-payments/people') {
+  if (route === '#/project/card-payments' || route === '#/settings/connections' || route === '#/settings/toil' || route === '#/project/card-payments/people') {
     const first = `[...document.querySelectorAll('main [data-help]')].find((b) => b.getClientRects().length)`;
     const waitFor = (sel) => `(async () => { const deadline = Date.now() + 5000; while (!document.querySelector(${JSON.stringify(sel)}) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector(${JSON.stringify(sel)}) ? 1 : 0; })()`;
     // A real Tab first (`key`), so React Aria reads the focus that follows as a keyboard user's: it ignores keys a
@@ -363,9 +363,9 @@ function states(route, width, sample = true) {
     out.push({ name: 'help-tooltip', clearOverlays: true, key: 'Tab', setup: `(async () => { const b = ${first}; if (!b) return 0; b.scrollIntoView({ block: 'center' }); let seen = 0, scrolls = 0; const count = () => scrolls++; addEventListener('scroll', count, true); const watch = new MutationObserver(() => { if (document.querySelector('.help-tooltip')) seen++; }); watch.observe(document.body, { childList: true, subtree: true }); try { for (let i = 0; i < 3; i++) { b.blur(); b.focus(); const deadline = Date.now() + 2000; while (!document.querySelector('.help-tooltip') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (document.querySelector('.help-tooltip') && document.activeElement === b) return 1; } } finally { watch.disconnect(); removeEventListener('scroll', count, true); } const a = document.activeElement; return 'no tooltip after three focuses: focus on ' + (a ? a.tagName.toLowerCase() + (a.className ? '.' + String(a.className).split(' ').join('.') : '') + ' ' + (a.getAttribute('aria-label') ?? '') : 'nothing') + ', tooltip seen ' + seen + ' time(s), ' + scrolls + ' scroll event(s), ' + document.querySelectorAll('[role=dialog]').length + ' dialog(s) open'; })()`, undo: 'Escape', undoJs: 'document.activeElement?.blur()' });
     out.push({ name: 'help-popover', clearOverlays: true, setup: `(async () => { const b = ${first}; if (!b) return 0; b.scrollIntoView({ block: 'center' }); b.click(); return await ${waitFor('.help-popover [data-read-more]')}; })()`, undo: 'Escape' });
   }
-  if (route === '#/settings/dossiers') out.push({ name: 'shown', setup: clickAll('.conn-card button', '/^Show$/'), undoJs: clickAll('.conn-card button', '/^Hide$/') });
+  if (route === '#/settings/projects') out.push({ name: 'shown', setup: clickAll('.conn-card button', '/^Show$/'), undoJs: clickAll('.conn-card button', '/^Hide$/') });
   // Set up this repo (#333): the sample's plan, with its table, check problems and the form for the missing connection.
-  if (route === '#/settings/dossiers') {
+  if (route === '#/settings/projects') {
     const plan = `document.querySelector('[aria-labelledby="repo-setup"] .shown')`;
     out.push({ name: 'repo-setup', setup: `(async () => { const n = await ${clickAll('form.change button', '/^Check this repo$/')}; await new Promise((r) => setTimeout(r, 300)); ${plan}?.scrollIntoView({ block: 'start' }); return n; })()`, undoJs: 'window.scrollTo(0, 0)' });
   }
@@ -373,7 +373,7 @@ function states(route, width, sample = true) {
   // agent switcher (#344). Each is closed with Escape, then the view with its Close button.
   const openAsk = `await ${clickAll('[data-ask-bar]')};`;
   const closeAsk = clickAll('[data-ask-close]');
-  if (/^#\/dossier\/[^/]+$/.test(route)) {
+  if (/^#\/project\/[^/]+$/.test(route)) {
     // The page stays open from one width to the next, so the chat may already hold the answer an earlier width asked
     // for: then its questions are the Suggestions button instead of the guided start.
     const ready = `document.querySelector('.ask-focus [data-guided-start], .ask-focus [data-ask-suggestions]')`;
@@ -387,34 +387,34 @@ function states(route, width, sample = true) {
   if (/\/command-center$/.test(route)) out.push({ name: 'verdict-filter', setup: clickAll('.readiness-filters > div.choice:first-of-type .choice-button'), undo: 'Escape' });
   // An answered question (#295): its usage footer, and the chat's running total and context meter in the pane's head.
   // Then, once a question has its answer, the Suggestions menu the starters fold into (#343).
-  // Analyze (#343) on the next dossier: its pulse check, pressed in the bar, in the focused view.
+  // Analyze (#343) on the next toil project: its pulse check, pressed in the bar, in the focused view.
   // Done means the new turn is in the view, the Stop button gone and its usage shown inside its "how sure" fold (#552; the chat's own total waits for a second answer, since one answer's usage is the chat's); the closed view holds no turns, so they're counted from the bar.
   const answered = (press) => `(async () => { const asked = Number(/(\\d+) questions? in this chat/.exec(document.querySelector('.ask-bar')?.textContent ?? '')?.[1] ?? 0); if (!(await ${press})) return 0; const done = () => { const turns = document.querySelectorAll('.ask-focus .turn'); return turns.length > asked && !document.querySelector('[data-ask-stop]') && turns[turns.length - 1].querySelector('[data-how-sure] [data-usage-footer]') && (turns.length < 2 || document.querySelector('[data-chat-usage]')) && document.querySelector('[data-ask-status]'); }; const deadline = Date.now() + 15000; while (!done() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return done() ? 1 : 0; })()`;
-  if (route === '#/dossier/card-payments') {
+  if (route === '#/project/card-payments') {
     const firstQuestion = `(async () => { ${openAsk} const deadline = Date.now() + 5000; while (!document.querySelector('.ask-focus [data-question], [data-ask-suggestions]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const chip = document.querySelector('.ask-focus [data-question="finish"]'); if (chip) return (chip.click(), 1); if (!(await ${clickAll('[data-ask-suggestions]')})) return 0; return await ${clickAll('[role="menuitem"]:first-child')}; })()`;
     out.push({ name: 'answered', setup: answered(firstQuestion), undoJs: closeAsk });
     out.push({ name: 'ask-suggestions', setup: `(async () => { ${openAsk} return await ${clickAll('[data-ask-suggestions]')}; })()`, undo: 'Escape', undoJs: closeAsk });
   }
   // Analyze is the guided start's first question (#552), or the same words in the Suggestions menu once the chat has begun.
   const briefing = `(async () => { ${openAsk} const deadline = Date.now() + 5000; while (!document.querySelector('.ask-focus [data-question], [data-ask-suggestions]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const q = document.querySelector('.ask-focus [data-question="briefing"]'); if (q) return (q.click(), 1); if (!(await ${clickAll('[data-ask-suggestions]')})) return 0; return await ${clickAll('[role="menuitem"]', '/^Give me the full briefing/')}; })()`;
-  if (route === '#/dossier/settlement') out.push({ name: 'analyzed', setup: answered(briefing), undoJs: closeAsk });
+  if (route === '#/project/settlement') out.push({ name: 'analyzed', setup: answered(briefing), undoJs: closeAsk });
   // The Assign dialog from an item's page, and Start on the Agents lane's inbox (#293).
   // Escape alone can leave it open on a slow runner (focus not yet inside it), which then holds focus through every
   // state at the next width; its own Cancel or Close closes it for certain.
   const closeAssign = clickAll('[role="dialog"] button', '/^(Cancel|Close)$/', 0);
   if (route.includes('/item/')) out.push({ name: 'assign-open', setup: clickAll('[data-assign-open]'), undo: 'Escape', undoJs: closeAssign });
   // The Agents panel (#394, #552) is closed at every width until its button is pressed: a drawer below 1200px (SIDEBAR_WIDE in
-  // src/views/DossierShell.tsx), a column beside the view from there up, which the same button closes again.
+  // src/views/ToilProjectShell.tsx), a column beside the view from there up, which the same button closes again.
   const sidebarWide = width >= 1200;
   const closeDrawer = `(async () => { await ${clickAll('[data-agents-close]', null, 0)}; const open = document.querySelector('[data-agents-open][aria-expanded="true"]'); if (open) open.click(); return 1; })()`;
-  if (route === '#/dossier/card-payments') {
+  if (route === '#/project/card-payments') {
     const start = `(async () => { if (!(await ${clickAll('[data-agents-open]')})) return 0; return await ${clickAll('[data-inbox-start]')}; })()`;
     out.push({ name: 'inbox-start', setup: start, undo: 'Escape', undoJs: `(async () => { await ${closeAssign}; await ${closeDrawer}; })()` });
   }
-  // The dossier's frame (#394): the Agents drawer open below 1200px, the dossier switcher, and a metric's full chart from the Overview.
-  if (/^#\/dossier\/[^/]+$/.test(route)) out.push({ name: sidebarWide ? 'agents-panel' : 'agents-drawer', setup: clickAll('[data-agents-open]'), undo: 'Escape', undoJs: closeDrawer });
-  if (route === '#/dossier/card-payments') {
-    out.push({ name: 'dossier-switch', setup: clickAll('[data-dossier-switch]'), undo: 'Escape' });
+  // The toil project's frame (#394): the Agents drawer open below 1200px, the toil project switcher, and a metric's full chart from the Overview.
+  if (/^#\/project\/[^/]+$/.test(route)) out.push({ name: sidebarWide ? 'agents-panel' : 'agents-drawer', setup: clickAll('[data-agents-open]'), undo: 'Escape', undoJs: closeDrawer });
+  if (route === '#/project/card-payments') {
+    out.push({ name: 'toil-project-switch', setup: clickAll('[data-toil-project-switch]'), undo: 'Escape' });
     for (const m of ['burnup', 'pr-wait']) out.push({ name: `chart-${m}`, setup: clickAll(`[data-metric="${m}"]`), undo: 'Escape', undoJs: clickAll('[data-chart-close]', null, 0) });
   }
   // The history (#395), set open rather than clicked, since the check has already opened every <details> once: an entry's what-changed opened; an analysis with its evidence unfolded, and a citation chip's detail as a keyboard user who tabbed to it sees it.
@@ -425,7 +425,7 @@ function states(route, width, sample = true) {
     const chip = `[...document.querySelectorAll('main .cite-link')].find((c) => c.getClientRects().length)`;
     out.push({ name: 'cite-tooltip', clearOverlays: true, key: 'Tab', setup: `(async () => { const c = ${chip}; if (!c) return 0; c.scrollIntoView({ block: 'center' }); for (let i = 0; i < 3; i++) { c.blur(); c.focus(); const deadline = Date.now() + 2000; while (!document.querySelector('.cite-tooltip') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (document.querySelector('.cite-tooltip')) return 1; } return 'no tooltip after three focuses on the first citation chip'; })()`, undo: 'Escape', undoJs: 'document.activeElement?.blur()' });
   }
-  if (route === '#/dossier/card-payments/board') out.push({ name: 'attention-only', setup: clickAll('[data-attention-only]'), undoJs: clickAll('[data-attention-only]') });
+  if (route === '#/project/card-payments/board') out.push({ name: 'attention-only', setup: clickAll('[data-attention-only]'), undoJs: clickAll('[data-attention-only]') });
   // A failing command's recent audit lines, opened under it on the Usage page (#309).
   // Real data may genuinely have no failed command, and a state that opens nothing is a problem, so only the sample (which always has some) is held to it.
   if (sample && route === '#/settings/usage') out.push({ name: 'audit-lines', setup: `(async () => { const n = ${clickAll('[data-usage-lines]', '/Show recent failures/')}; await new Promise((r) => setTimeout(r, 300)); return n; })()`, undoJs: clickAll('[data-usage-lines]', '/Hide recent failures/') });
@@ -435,8 +435,8 @@ function states(route, width, sample = true) {
   // The stand-up (#345): the agent's write-up shown, with the fact lines it names marked in the report.
   if (/\/worklog\/standup/.test(route)) out.push({ name: 'written-up', setup: `(async () => { const n = ${clickAll('[data-standup-writeup]')}; await new Promise((r) => setTimeout(r, 300)); return n; })()` });
   if (/\/worklog$/.test(route)) out.push({ name: 'previous-month', setup: clickAll('.calendar-nav button', '/Previous month/'), undoJs: clickAll('.calendar-nav button', '/Next month/') });
-  // A dossier's name and description open for editing in place (#342), every pencil on the page at once: the longest the cards and the dashboard's header get.
-  if (route === '#/' || route === '#/dossier/settlement') out.push({ name: 'editing', setup: clickAll('[data-edit]'), undoJs: "document.querySelectorAll('.edit-field').forEach((i) => i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))" });
+  // A toil project's name and description open for editing in place (#342), every pencil on the page at once: the longest the cards and the dashboard's header get.
+  if (route === '#/' || route === '#/project/settlement') out.push({ name: 'editing', setup: clickAll('[data-edit]'), undoJs: "document.querySelectorAll('.edit-field').forEach((i) => i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))" });
   // Theme moments (#419), from their previews under Settings, General: a loading screen as the theme draws it, the
   // launch splash, and the sprint recap card, the largest moment. The recap is decoration, hidden from screen readers,
   // so it is shown to the check (aria-hidden lifted) for its layout and axe. With Theme motion off (the reduced-motion
@@ -670,7 +670,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
       }
       // The board dragged with real input (#393), from the view as it opened.
       // On the Board tab (#394), where the board now lives.
-      if (/^#\/dossier\/[^/]+\/board$/.test(route)) {
+      if (/^#\/project\/[^/]+\/board$/.test(route)) {
         const drag = await dragCheck(page, width, (name) => shoot(`${slug}__${name}`), async () => ({
           findings: await page.evaluate(`(${inspect})(${JSON.stringify(CARDS)}, ${headerFits})`),
           violations: run.strict ? await axeRun(page, axeSource) : [],

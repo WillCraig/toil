@@ -56,11 +56,11 @@ function Hud() {
 }
 
 function Panel({ id, children }: { id: string; children: ReactNode }) {
-  // A panel can sit outside a dossier, so the meter only asks for the sprint inside one.
-  const inDossier = useContext(DataContext) !== null;
+  // A panel can sit outside a toil project, so the meter only asks for the sprint inside one.
+  const inToilProject = useContext(DataContext) !== null;
   return (
     <>
-      {(id === 'sprint' || id === 'board') && inDossier && <Hud />}
+      {(id === 'sprint' || id === 'board') && inToilProject && <Hud />}
       {children}
     </>
   );

@@ -9,7 +9,7 @@ import { DataContext, type Data } from '../src/data.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { memoryAnalyses } from '../src/analyses.ts';
 import { FIXTURE_NOW } from '../src/fixtures/execute.ts';
-import type { DossierData } from '../src/load.ts';
+import type { ToilProjectData } from '../src/load.ts';
 import { SkinProvider, skinsFor } from '../src/skins.tsx';
 import { CommandCenter } from '../src/views/CommandCenter.tsx';
 import { Dashboard } from '../src/views/Dashboard.tsx';
@@ -21,7 +21,7 @@ import { loaded } from './harness.ts';
 /**
  * Empty states that act (#417, principle 11): every empty panel offers the
  * action that fills it. Two checks: every view draws its empty panels through
- * `Empty`, whose action is required, and an empty dossier's views, rendered,
+ * `Empty`, whose action is required, and an empty toil project's views, rendered,
  * show an action or a link (never only an (i)) in every empty panel.
  */
 
@@ -43,13 +43,13 @@ describe('every empty panel', () => {
     expect(direct).toEqual([]);
   });
 
-  // An empty dossier: the sample's card-payments with every item, pull request, build and deployment taken away.
-  const empty = async (): Promise<DossierData> => {
+  // An empty toil project: the sample's card-payments with every item, pull request, build and deployment taken away.
+  const empty = async (): Promise<ToilProjectData> => {
     const { data } = await loaded('card-payments');
     return { ...data, items: [], pullRequests: [], changes: [], deployments: [], people: [], codeowners: {} };
   };
-  const shell = (dossier: DossierData, theme: string, children: ReactNode, sync?: () => void) => {
-    const data: Data = { dossier, byId: new Map(), prById: new Map(), agent: scriptedAgent(), now: FIXTURE_NOW, analyses: memoryAnalyses(), ...(sync ? { sync } : {}) };
+  const shell = (toilProject: ToilProjectData, theme: string, children: ReactNode, sync?: () => void) => {
+    const data: Data = { toilProject, byId: new Map(), prById: new Map(), agent: scriptedAgent(), now: FIXTURE_NOW, analyses: memoryAnalyses(), ...(sync ? { sync } : {}) };
     return render(
       <SkinProvider value={skinsFor(theme)}>
         <DataContext value={data}>
@@ -81,7 +81,7 @@ describe('every empty panel', () => {
     });
   }
 
-  it("offers Sync now where the page can sync, and the dossier's setup where it can't", async () => {
+  it("offers Sync now where the page can sync, and the Toil project's setup where it can't", async () => {
     const d = await empty();
     let synced = 0;
     const { unmount } = shell(d, 'plain', <PullRequests />, () => synced++);
@@ -89,12 +89,12 @@ describe('every empty panel', () => {
     expect(synced).toBe(1);
     unmount();
     shell(d, 'plain', <PullRequests />);
-    expect((await screen.findByRole('link', { name: /Add a repository/ })).getAttribute('href')).toBe('#/settings/dossiers/card-payments/repos');
+    expect((await screen.findByRole('link', { name: /Add a repository/ })).getAttribute('href')).toBe('#/settings/projects/card-payments/repos');
   });
 
-  it('points a missing pipeline at Dossier setup, at its sources', async () => {
+  it('points a missing pipeline at Toil project setup, at its sources', async () => {
     shell(await empty(), 'plain', <Dashboard tab="board" />);
-    expect((await screen.findByRole('link', { name: /Link a pipeline/ })).getAttribute('href')).toBe('#/settings/dossiers/card-payments/sources');
-    expect(screen.getByRole('link', { name: /Add an environment/ }).getAttribute('href')).toBe('#/settings/dossiers/card-payments/sources');
+    expect((await screen.findByRole('link', { name: /Link a pipeline/ })).getAttribute('href')).toBe('#/settings/projects/card-payments/sources');
+    expect(screen.getByRole('link', { name: /Add an environment/ }).getAttribute('href')).toBe('#/settings/projects/card-payments/sources');
   });
 });

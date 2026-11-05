@@ -6,7 +6,7 @@
 //     at 30 fps by design, and raw presented-frame gaps read as 33 ms frames there;
 //   - Chrome's frame reporter (PipelineReporter, from a trace) gives the frames it dropped, and its
 //     Animation events the animations it couldn't composite;
-//   - the splash plays over a dossier opening, with every API call slowed by 250 ms so the first
+//   - the splash plays over a toil project opening, with every API call slowed by 250 ms so the first
 //     read outlasts the splash's 300 ms wait, from showing to 500 ms after it hands over; the
 //     loading screen preview for 3 s; the sprint recap from showing to gone;
 //   - each run opens a fresh browser per theme and plays it twice: the first pass warms Chrome's
@@ -133,14 +133,14 @@ async function until(tab, test, ms) {
 async function splashPass(browser, base, theme) {
   const tab = await openTab(browser);
   // Every API call slowed by 250 ms, so the first read outlasts the splash's 300 ms wait and the
-  // splash hands over to a dossier opening, as it does on a real first read.
+  // splash hands over to a toil project opening, as it does on a real first read.
   await tab.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
   const off = tab.on((msg) => {
     if (msg.method === 'Fetch.requestPaused') setTimeout(() => tab.send('Fetch.continueRequest', { requestId: msg.params.requestId }).catch(() => undefined), 250);
   });
   try {
     const { out, events } = await traced(browser.cdp, async () => {
-      await tab.send('Page.navigate', { url: themed(base, theme, '#/dossier/card-payments') });
+      await tab.send('Page.navigate', { url: themed(base, theme, '#/project/card-payments') });
       await until(tab, (m) => m?.some((x) => x.k === 'splash' && !x.on), 15_000);
       // Past the page's own splash:end mark, 500 ms after the handover, so the trace holds it.
       await wait(800);

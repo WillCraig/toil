@@ -22,8 +22,8 @@ const dir = join(import.meta.dirname, '..', 'skills', 'toil');
 const workflowsDir = join(dir, 'workflows');
 /** Every Markdown file of the skill, as a path from its folder: the pages beside SKILL.md, and the workflow pages. */
 const allFiles = [...readdirSync(dir).filter((f) => f.endsWith('.md')), ...readdirSync(workflowsDir).map((f) => `workflows/${f}`)];
-/** The files in the skill that belong to no area: the index, what every command shares, dossiers, installing toil, and the MCP server. */
-const GENERAL = ['SKILL.md', 'core.md', 'dossiers.md', 'install.md', 'mcp.md', 'setup.md', 'upgrading.md'];
+/** The files in the skill that belong to no area: the index, what every command shares, toil projects, installing toil, and the MCP server. */
+const GENERAL = ['SKILL.md', 'core.md', 'projects.md', 'install.md', 'mcp.md', 'setup.md', 'upgrading.md'];
 const integrations = join(import.meta.dirname, '..', 'site', 'src', 'data', 'integrations');
 
 /** The `key: value` lines between a file's opening `---` fences. */
@@ -302,7 +302,7 @@ describe('workflow pages', () => {
       text,
       meta,
       needs: json('needs') as { all?: string[]; any?: string[]; optional?: string[] },
-      inputs: json('inputs') as Array<{ name?: unknown; dossier?: unknown }>,
+      inputs: json('inputs') as Array<{ name?: unknown; toilProject?: unknown }>,
       writes: json('writes') as string[],
     };
   };
@@ -350,7 +350,7 @@ describe('workflow pages', () => {
         expect(['reviewer', 'author', 'any']).toContain(page.meta.role);
         expect(['unit', 'live']).toContain(page.meta.verification);
         expect(page.meta.loop === 'none' || /^[1-9]\d*$/.test(page.meta.loop!), 'loop is none or a round limit').toBe(true);
-        expect(Array.isArray(page.inputs) && page.inputs.every((i) => typeof i.name === 'string' && typeof i.dossier === 'boolean'), 'inputs: [{ name, dossier }]').toBe(true);
+        expect(Array.isArray(page.inputs) && page.inputs.every((i) => typeof i.name === 'string' && typeof i.toilProject === 'boolean'), 'inputs: [{ name, toil project }]').toBe(true);
         expect(page.inputs.length).toBeGreaterThan(0);
       });
 

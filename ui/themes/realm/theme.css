@@ -3,7 +3,7 @@
    everything, soot at the window's far edges, a dungeon map at the foot of
    every page, an iron band for the header, leather-bound folios riveted at
    the corners for the panels, wax-sealed tabs for their headings, one
-   illuminated capital for the dossier's title, an item's fields as a
+   illuminated capital for the toil project's title, an item's fields as a
    character sheet, a d20 that rolls while a view loads, camp fires on the
    worklog's rest days, and the dependency graph as an engraved war-table
    map, where epics fly a banner, a blocker is a keep and the road it holds
@@ -104,7 +104,7 @@
 }
 
 /* Soot in the margins beside the page's column, where no text ever sits:
-   1280px wide on most pages, 1680px on a dossier's, whose soot waits for a
+   1280px wide on most pages, 1680px on a toil project's, whose soot waits for a
    window wide enough to have margins. */
 @media (min-width: 1360px) {
   [data-theme="realm"] body {
@@ -115,7 +115,7 @@
       var(--bg);
   }
 
-  [data-theme="realm"] body:has(.dossier-shell) {
+  [data-theme="realm"] body:has(.toil-project-shell) {
     background:
       linear-gradient(var(--realm-wash), var(--realm-wash)),
       url("./assets/vellum.webp") 0 0 / 512px 512px,
@@ -124,7 +124,7 @@
 }
 
 @media (min-width: 1760px) {
-  [data-theme="realm"] body:has(.dossier-shell) {
+  [data-theme="realm"] body:has(.toil-project-shell) {
     background:
       linear-gradient(90deg, var(--realm-soot), var(--realm-soot-clear) calc(50% - 840px), var(--realm-soot-clear) calc(50% + 840px), var(--realm-soot)) fixed,
       linear-gradient(var(--realm-wash), var(--realm-wash)),
@@ -193,7 +193,7 @@
   font-size: clamp(1.75rem, 1.35rem + 1.4vw, 2.35rem);
 }
 
-/* One illuminated capital, on the dossier's title only: vellum on an oxblood
+/* One illuminated capital, on the toil project's title only: vellum on an oxblood
    field in a tarnished-gold frame. The title makes room above it, so the
    eyebrow never touches it. */
 [data-theme="realm"] .view-head:has(> .sources) > h1 {

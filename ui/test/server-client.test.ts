@@ -22,10 +22,10 @@ describe('signIn', () => {
     const fetch = vi.fn(async () => new Response(JSON.stringify(SESSION), { status: 200 }));
     vi.stubGlobal('fetch', fetch);
     const replaceState = vi.fn();
-    const session = await signIn('./', { search: '?token=abc', pathname: '/', hash: '#/dossier/x' }, { replaceState });
+    const session = await signIn('./', { search: '?token=abc', pathname: '/', hash: '#/project/x' }, { replaceState });
     expect(session.session).toBe('sid-1');
     expect(fetch).toHaveBeenCalledWith('./api/session', expect.objectContaining({ method: 'POST', credentials: 'omit', body: JSON.stringify({ token: 'abc' }) }));
-    expect(replaceState).toHaveBeenCalledWith(null, '', '/#/dossier/x');
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/#/project/x');
   });
 
   it('keeps a theme in the address while dropping the token (#277)', async () => {
@@ -98,15 +98,15 @@ describe('signIn', () => {
 
 describe('httpExecute', () => {
   it('sends the session id and CSRF token as headers, and no cookie', async () => {
-    const envelope = { ok: true, data: { dossiers: [] }, error: null, meta: { command: 'dossiers list', durationMs: 0, version: 'x', contractVersion: 1 } };
+    const envelope = { ok: true, data: { toilProjects: [] }, error: null, meta: { command: 'projects list', durationMs: 0, version: 'x', contractVersion: 1 } };
     const fetch = vi.fn(async () => new Response(JSON.stringify(envelope), { status: 200 }));
     vi.stubGlobal('fetch', fetch);
-    expect(await httpExecute(SESSION)('dossiers list', {}, { readOnly: true, caller: 'toil-ui' })).toEqual(envelope);
+    expect(await httpExecute(SESSION)('projects list', {}, { readOnly: true, caller: 'toil-ui' })).toEqual(envelope);
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('./api/execute');
     expect(init.credentials).toBe('omit');
     expect(init.headers).toEqual({ 'X-Toil-UI-Session': 'sid-1', 'Content-Type': 'application/json', 'X-Toil-UI-CSRF': 'csrf-1' });
-    expect(JSON.parse(String(init.body))).toEqual({ command: 'dossiers list', input: {} });
+    expect(JSON.parse(String(init.body))).toEqual({ command: 'projects list', input: {} });
   });
 });
 
@@ -126,7 +126,7 @@ describe('httpAgent streaming (#251)', () => {
     const seen = [];
     for await (const a of agent.stream!('card-payments', 'q')) seen.push(a.parts[0]!.text);
     expect(seen).toEqual(['a', 'ab']);
-    expect(JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ dossier: 'card-payments', prompt: 'q', stream: true });
+    expect(JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ toilProject: 'card-payments', prompt: 'q', stream: true });
   });
 
   it("throws the server's message and fix when the agent fails partway, and when the stream just stops", async () => {

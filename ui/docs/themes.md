@@ -32,7 +32,7 @@ The theme is also toil's own setting, `"theme"` in `~/.toil/config.json`, which 
 
 Plain uses toil's own type, so it looks like toil without leaving the accessibility baseline.
 
-- **Fredoka**, toil's wordmark face, is Plain's display face: page and panel headings, and the big figures (the sprint's numbers, the team's counts, an item's rank and its days in progress). It's used at 600 only, the weight the wordmark already loads, so no figure is drawn in a faked bold. Plain adds Fredoka's Latin Extended file at that weight, which the browser fetches only when a heading needs it, so a dossier named Łódź keeps one face.
+- **Fredoka**, toil's wordmark face, is Plain's display face: page and panel headings, and the big figures (the sprint's numbers, the team's counts, an item's rank and its days in progress). It's used at 600 only, the weight the wordmark already loads, so no figure is drawn in a faked bold. Plain adds Fredoka's Latin Extended file at that weight, which the browser fetches only when a heading needs it, so a Toil project named Łódź keeps one face.
 - **IBM Plex Sans** is the body, at 400 and 600. Its open shapes and tall lowercase stay clear at the small sizes the notes and tables use (13 to 14px), it tells `I`, `l` and `1` apart, and its soft curves sit well beside Fredoka's rounded ones. It's already bundled for Crate, so it costs Plain nothing new. Nunito Sans and Inter were the alternatives: Nunito Sans is rounder still but lighter and narrower at small sizes, and Inter reads well but is sharper beside Fredoka; either would be a new font to bundle.
 - **Mono** stays the system's monospace, for commands and ids, where the platform's own face is the one people read code in.
 
@@ -43,14 +43,14 @@ Fonts don't change contrast: Plain keeps its colours, and its pages pass the axe
 A theme has up to three layers.
 
 - **Visuals** are what every theme has: colours, fonts, borders, art, and motion. They never change a word.
-- **Wording** is the theme's own microcopy, from the `lexicon` in its `theme.json`: the lede on the dossier list, the small eyebrow above a page's title, the notes under the dashboard's panels, the empty states, the loading lines, the Ask pane's notes, and the chat's placeholder, welcome and status words (#343). Crate's empty board column reads "Bay empty." and Realm's reads "None stand here." A theme's word for a sprint, a board or an epic is always shown beside the real one, as in Realm's "Campaign (Epic)" or "Ledger (Sprint 42: day 7 of 10)". A theme may also rename the People and Analyses headings, an item's priority, the Builds panel, how a build ended, and the sprint's points done and left: Realm reads them as "Party (People)", "Quest log (Analyses)", "Initiative (Priority)" on an item's fields, "Saving throws (Builds)", "Natural 20 (passed)" or "Critical fail (failed)" beside the build's own state, "Experience points (Done)" on the sprint's tally and "Hit points (Points left)", which takes the place of the sprint's meter. The Settings pages and the Sync panel keep the standard text. With plain words on (the default), the lede, eyebrow, placeholder, welcome and status words read in plain words instead; turn plain words off under Settings, General to see the theme's.
+- **Wording** is the theme's own microcopy, from the `lexicon` in its `theme.json`: the lede on the Toil project list, the small eyebrow above a page's title, the notes under the dashboard's panels, the empty states, the loading lines, the Ask pane's notes, and the chat's placeholder, welcome and status words (#343). Crate's empty board column reads "Bay empty." and Realm's reads "None stand here." A theme's word for a sprint, a board or an epic is always shown beside the real one, as in Realm's "Campaign (Epic)" or "Ledger (Sprint 42: day 7 of 10)". A theme may also rename the People and Analyses headings, an item's priority, the Builds panel, how a build ended, and the sprint's points done and left: Realm reads them as "Party (People)", "Quest log (Analyses)", "Initiative (Priority)" on an item's fields, "Saving throws (Builds)", "Natural 20 (passed)" or "Critical fail (failed)" beside the build's own state, "Experience points (Done)" on the sprint's tally and "Hit points (Points left)", which takes the place of the sprint's meter. The Settings pages and the Sync panel keep the standard text. With plain words on (the default), the lede, eyebrow, placeholder, welcome and status words read in plain words instead; turn plain words off under Settings, General to see the theme's.
 - **Voice** is the register the agent answers in, from the `voice` in the theme's `theme.json`. Crate answers like a terse dockworker, Harvest like a patient farmhand, Starship like a ship's log, Realm like a dungeon master narrating a grim campaign to the party, dramatic but brief with every figure and citation as the data gives it, Frontier like a dry telegraph operator who also keeps the engine running, Sprawl like a netrunner on a job: work items are gigs, the sprint is the run, a pull request is a payload waiting on the fixer, a build is an ICE check, a deployment is jacking in to prod, and a blocker is black ICE, and Overworld like an old sage in a cave: brief, warm and a little cryptic, with the facts kept plain.
 
 Wording never touches these, in any theme:
 
 - the name of a button, a link or a form field, so what you, a script or voice control looks for is always there, and every control's accessible name matches its visible words (WCAG 2.5.3);
 - a heading a screen reader or a test finds a section by, apart from the renamed words shown beside the real ones;
-- a command such as `toil dossiers init`, an item's id, a number, a date, an error or its fix, or a not-found notice such as an item the dossier doesn't have.
+- a command such as `toil projects init`, an item's id, a number, a date, an error or its fix, or a not-found notice such as an item the Toil project doesn't have.
 
 ## Rolled alignments
 
@@ -87,16 +87,16 @@ The page sends the server only the theme's name and whether the voice is on. The
 This is the whole prompt for a question about card-payments in Crate, with the voice on and one general instruction, "Answer in British English. Lead with risks.":
 
 ````text
-You are the analyst inside Toil UI, answering a question about the dossier "card-payments": one body of work, its tracker items, pull requests, builds and deployments. It is 2026-10-13T08:00:00.000Z.
+You are the analyst inside Toil UI, answering a question about the Toil project "card-payments": one body of work, its tracker items, pull requests, builds and deployments. It is 2026-10-13T08:00:00.000Z.
 
 Rules:
-1. Use only your tools. owi_query, owi_get, owi_similar and owi_history read the work items Toil UI last synced for "card-payments"; owi_similar finds likely duplicates, so run it before proposing a new item. pr_query, pr_get and pr_metrics read its pull requests. people_list and person_get read what is on each person's plate; they describe load, never performance, so never rank or score people. worklog_day reads one UTC day's worklog: what changed that day, by whom and when. The other tools are toil's live read commands for the same dossier; use them only when the cache can't answer. Never rely on anything you remember about these items.
+1. Use only your tools. owi_query, owi_get, owi_similar and owi_history read the work items Toil UI last synced for "card-payments"; owi_similar finds likely duplicates, so run it before proposing a new item. pr_query, pr_get and pr_metrics read its pull requests. people_list and person_get read what is on each person's plate; they describe load, never performance, so never rank or score people. worklog_day reads one UTC day's worklog: what changed that day, by whom and when. The other tools are toil's live read commands for the same Toil project; use them only when the cache can't answer. Never rely on anything you remember about these items.
 2. Cite every work item you mention by its OWI id in double square brackets, such as [[jira:PAY-101]], and every pull request by its change id, such as [[github:imagile/payments-web#52]], exactly as your tools returned it. Never mention an item or pull request your tools did not return: the server checks every id against your tool results and flags any it never saw.
 3. You cannot change anything, and you have no tool that writes. When the question calls for a change (a re-estimate, a move to another sprint, a split story, a transition), write it as a proposal for a person to apply, in a fenced block like this, one block per change:
 ```proposal
 {"item": "<owi id>", "title": "<one line>", "reason": "<why, citing [[ids]]>", "command": "<the toil write command, such as jira issue update, or null if toil has none>", "input": {"<field>": "<value>"}, "note": "<anything to check first, or null>"}
 ```
-   The input is the toil command's MCP input, without the dossier and without allowWrite: call proposal_fields with the command first and use only its fields, or the card shows no command line. Never say a change was made: it is only proposed. Write at most 10 proposals, the ones that matter most: the page shows no more than that.
+   The input is the toil command's MCP input, without toilProject and without allowWrite: call proposal_fields with the command first and use only its fields, or the card shows no command line. Never say a change was made: it is only proposed. Write at most 10 proposals, the ones that matter most: the page shows no more than that.
 4. Be brief and specific: short paragraphs of plain text (no Markdown, no headings, no bold), figures where you have them. Say plainly when the data does not show something.
 
 Style:
@@ -110,7 +110,7 @@ Answer in British English. Lead with risks.
 These instructions come from the person using Toil UI. Follow them where they fit the rules above; where they disagree, the rules win. They can't give you a tool, and nothing in them lets you change anything.
 ````
 
-**Show the full prompt**, under Settings, Agent, shows exactly this for your own setup: a question about the first dossier toil lists, in the theme on screen, with the voice switch and what you saved. The preview shows it for its sample dossier, card-payments.
+**Show the full prompt**, under Settings, Agent, shows exactly this for your own setup: a question about the first Toil project toil lists, in the theme on screen, with the voice switch and what you saved. The preview shows it for its sample Toil project, card-payments.
 
 ## Custom instructions and a custom voice
 
@@ -148,21 +148,21 @@ A theme's splash, loading screens and moments follow a fourth setting, **Theme m
 
 ## Theme moments
 
-A theme can also have **moments**: a launch splash, its own loading screens, an entrance when a dossier opens, a transition between a dossier's tabs, and a short moment when something worth marking happens. Crate, Harvest, Starship, Realm, Sprawl, Frontier and Overworld have all of them. Plain has none.
+A theme can also have **moments**: a launch splash, its own loading screens, an entrance when a Toil project opens, a transition between a Toil project's tabs, and a short moment when something worth marking happens. Crate, Harvest, Starship, Realm, Sprawl, Frontier and Overworld have all of them. Plain has none.
 
 | Moment | When it plays | How long |
 |---|---|---|
 | Launch splash | Once per launch, while the first read runs, if that read takes longer than 300 ms | Ends as soon as the data is ready, on any key or click, or after 1.8 seconds, when the view's own loading screen carries on. It never adds a wait |
-| Loading screen | Every real wait that lasts longer than 300 ms: opening a dossier, reading the dossiers, a running sync, a graph, a worklog page, a stand-up, a settings page, and the chat while Analyze or a question is thinking | As long as the wait |
-| Dossier entrance | When a dossier opens | About 0.4 seconds |
-| Tab transition | When you move between a dossier's tabs | About 0.25 seconds |
+| Loading screen | Every real wait that lasts longer than 300 ms: opening a Toil project, reading the Toil projects, a running sync, a graph, a worklog page, a stand-up, a settings page, and the chat while Analyze or a question is thinking | As long as the wait |
+| Toil project entrance | When a Toil project opens | About 0.4 seconds |
+| Tab transition | When you move between a Toil project's tabs | About 0.25 seconds |
 | Event moment | Once, when a sync records one of these for the first time: an item done, a build passed or failed, a blocker cleared, a pull request merged, or a sprint's end | Under a second each, at most three a sync. The sprint's end is a recap card with its figures, which stays five seconds so you can read them |
 
-The splash can't wait for the sprint it's opening, so the browser remembers the sprint each dossier was in the last time its page loaded here. When Toil UI opens on that dossier's page while the sprint is still running, the splash knows the sprint's day, how many of its items were done, and the dossier's name, and a theme can show them: Realm's d20 lands on the sprint's day ("day 7 of 10" is a 7), capped at 20. Opened anywhere else, on sample data, after the sprint has ended, or in a browser that keeps nothing, the splash is as it always is, and the die shows its 20.
+The splash can't wait for the sprint it's opening, so the browser remembers the sprint each Toil project was in the last time its page loaded here. When Toil UI opens on that Toil project's page while the sprint is still running, the splash knows the sprint's day, how many of its items were done, and the Toil project's name, and a theme can show them: Realm's d20 lands on the sprint's day ("day 7 of 10" is a 7), capped at 20. Opened anywhere else, on sample data, after the sprint has ended, or in a browser that keeps nothing, the splash is as it always is, and the die shows its 20.
 
-A loading screen shows the theme's art, its progress motif, and the real progress in words: what toil is reading and how many of its calls have been answered, or a sync's dossiers, requests and pages. In a game theme, a line of the theme's own flavour text changes every few seconds under it, while **Themed wording** is on. Waits shorter than 300 ms show nothing at all, so a quick read never flashes a loading screen.
+A loading screen shows the theme's art, its progress motif, and the real progress in words: what toil is reading and how many of its calls have been answered, or a sync's Toil projects, requests and pages. In a game theme, a line of the theme's own flavour text changes every few seconds under it, while **Themed wording** is on. Waits shorter than 300 ms show nothing at all, so a quick read never flashes a loading screen.
 
-An event moment comes from the facts the worklog keeps (**Worklog** in [Toil UI](https://imagile-dev.github.io/toil/docs/ui/)): each sync records what it sees, and a moment plays only for a fact that sync recorded for the first time. A dossier's first sync plays nothing, since everything in its history would be new, and neither does a fact from before the last good sync. The moment says the plain word ("Done", "Build failed") and, while **Themed wording** is on, the theme's word beside it, as in "Signed off (Done)".
+An event moment comes from the facts the worklog keeps (**Worklog** in [Toil UI](https://imagile-dev.github.io/toil/docs/ui/)): each sync records what it sees, and a moment plays only for a fact that sync recorded for the first time. A Toil project's first sync plays nothing, since everything in its history would be new, and neither does a fact from before the last good sync. The moment says the plain word ("Done", "Build failed") and, while **Themed wording** is on, the theme's word beside it, as in "Signed off (Done)".
 
 You can see every moment of the theme you're in from **Preview the theme's moments**, a menu under **Settings, General**, Theme: the launch splash, a loading screen, and each event moment. With Theme motion off, the splash and the moments are greyed out in it. A preview's progress text is a sample, and says so, and the splash's preview is handed a sample sprint's day, so Realm's die shows a 7.
 
@@ -182,7 +182,7 @@ Every moment moves only by `transform` and `opacity`, which the browser composit
 
 ### Toil tips
 
-Every loading screen carries a **toil tip** under its progress, the way a game's loading screen does: one line about toil or Toil UI, such as pressing M on a board card or what `toil dossiers onboard` sets up, with a **Read more** link to the docs section that says the rest. A tip changes about every six seconds while the wait lasts, and a tip you've seen this session doesn't come round again until you've seen them all.
+Every loading screen carries a **toil tip** under its progress, the way a game's loading screen does: one line about toil or Toil UI, such as pressing M on a board card or what `toil projects onboard` sets up, with a **Read more** link to the docs section that says the rest. A tip changes about every six seconds while the wait lasts, and a tip you've seen this session doesn't come round again until you've seen them all.
 
 The theme frames a tip, never words it: Crate's are a "Foreman's note", Harvest's come "From the almanac", Realm's "From the rulebook", Sprawl's are "Word on the street", Frontier's come "Off the wire", Overworld's are "The sage's counsel", and Plain's are a "Tip". The tip itself reads the same in every theme, in plain words, as a notification does. **Toil tips on loading screens**, under Settings, General, turns them off, in this browser.
 
@@ -228,14 +228,14 @@ Pictures are named by their key in the theme's `assets`, never by a path, so the
 | `splash` | `art` (a picture or a sprite sheet, below), `motif` (how it arrives), an optional `loop` (how it moves while the wait lasts, at full only), `line`, the theme's greeting under the name, and an optional `face` (below) | No splash |
 | `loader` | `art` and its `loop`; `track`, the progress motif: `count` copies of the asset `art` at `size` pixels, moved by `motif`; and `flavour`, up to 12 lines that change while the wait lasts | The theme's Loading skin, with the progress text and a tip |
 | `tips` | `label`, the frame on a tip: "Foreman's note" | "Tip" |
-| `entrance` | The motif a dossier arrives with | It simply appears |
+| `entrance` | The motif a Toil project arrives with | It simply appears |
 | `tabs` | The motif a tab arrives with | It simply appears |
 | `events` | One entry per kind: `item-done`, `build-passed`, `build-failed`, `blocker-cleared`, `pr-merged`, `sprint-ended`. Each has `art`, `width`, `height`, `motif`, and `label`, the theme's word, shown beside the plain one | A kind left out plays nothing |
 | `recap` | `label`, the heading of the sprint-end recap card | The `sprint-ended` event's label |
 
 A **picture** is `{ "art": "<asset key>", "width": <px>, "height": <px> }`, the size it's drawn at in CSS pixels, from 8 to 640. A **sprite sheet** adds `"frames": <n>`: that many frames side by side in one image, each `width` wide, which the `frames` loop steps through by moving the strip, never by repainting it.
 
-A splash's **face** is a number written on its art, which arrives with it: `{ "value": "sprint-day" | "items-done", "max": <n> }`, the value capped at `max`. The engine puts it in a `.m-face` span over the art, centred, and the theme's `theme.css` places it on its picture's own face. It shows only when the splash has the value; without it the art shows as drawn, so draw the art with the face it should show when there's no data. Whatever the splash knows, it also carries as data attributes on `.splash`, for a theme's stylesheet: `data-sprint-day`, `data-sprint-days`, `data-items-done` and `data-dossier`. They're plain numbers and a name, and a theme can't ask for anything else.
+A splash's **face** is a number written on its art, which arrives with it: `{ "value": "sprint-day" | "items-done", "max": <n> }`, the value capped at `max`. The engine puts it in a `.m-face` span over the art, centred, and the theme's `theme.css` places it on its picture's own face. It shows only when the splash has the value; without it the art shows as drawn, so draw the art with the face it should show when there's no data. Whatever the splash knows, it also carries as data attributes on `.splash`, for a theme's stylesheet: `data-sprint-day`, `data-sprint-days`, `data-items-done` and `data-toil-project`. They're plain numbers and a name, and a theme can't ask for anything else.
 
 The motifs are the engine's, so every theme moves the same few ways and each one moves only by `transform` and `opacity`:
 
@@ -245,7 +245,7 @@ The motifs are the engine's, so every theme moves the same few ways and each one
 | A loop while the wait lasts (`splash.loop`, `loader.loop`) | `bob`, `sway`, `roll`, `pulse`, `tumble` (a full turn that settles, as a die rolls), `frames` (a sprite sheet) |
 | A loader's progress track (`loader.track.motif`) | `march`, `grow`, `blink` |
 
-A theme's `theme.css` may colour and frame the engine's parts (`.splash`, `.loader`, `.loader__art`, `.loader-tip`, `.moment`), scoped to the theme like the rest of its stylesheet, but adds no animation of its own outside `@media (prefers-reduced-motion: no-preference)`. One element carries one animation: the engine plays an arrival on `.splash__art`, `.moment`, `.moment__art`, the dossier and its tab, and a looping picture loops on the `img` inside its art, so a theme's own animation never goes on any of those, and the tests fail if it does. Moment art lives in the theme's `assets/moments/` folder and counts toward the theme's budget: 64 KB a file and 320 KB for the whole theme. Art is CSS, SVG, sprite sheets and still images only, never video, and nothing is fetched from anywhere but the app itself.
+A theme's `theme.css` may colour and frame the engine's parts (`.splash`, `.loader`, `.loader__art`, `.loader-tip`, `.moment`), scoped to the theme like the rest of its stylesheet, but adds no animation of its own outside `@media (prefers-reduced-motion: no-preference)`. One element carries one animation: the engine plays an arrival on `.splash__art`, `.moment`, `.moment__art`, the Toil project and its tab, and a looping picture loops on the `img` inside its art, so a theme's own animation never goes on any of those, and the tests fail if it does. Moment art lives in the theme's `assets/moments/` folder and counts toward the theme's budget: 64 KB a file and 320 KB for the whole theme. Art is CSS, SVG, sprite sheets and still images only, never video, and nothing is fetched from anywhere but the app itself.
 
 A pull request that adds or changes a theme's moments measures them before it opens: `npm run moments:measure -w ui -- --theme <name>` times the splash, loading screen and recap, and fails on any frame over 20 ms, and `npm run screens:sheet -w ui -- --theme <name>` makes the contact sheets to attach, at 375 and 1440px with Theme motion full, subtle and off. Both are run by hand on a quiet machine, never in CI; [Measuring theme moments](https://imagile-dev.github.io/toil/docs/ui/#measuring-theme-moments) in Toil UI's docs says how.
 

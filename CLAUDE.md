@@ -138,7 +138,10 @@ gets made again in the next place it applies.
     and stay. A product's Data Center and Cloud deployments are one area and one
     tree, not two to learn: the connection's `deployment` picks the API (#495). →
     **Command Shape** and **Deployment Variants** (`integrations` skill); every
-    integration area follows it (#290, #297).
+    integration area follows it (#290, #297). One term for one thing, too: what earlier
+    versions called a dossier is a **toil project** everywhere (`toil projects`,
+    `--toil-project`, `TOIL_PROJECT*`), and never a bare "project", which is Jira's,
+    Azure DevOps's and SonarQube's `--project` (the maintainer's call, 2026-11-04, #555).
 11. **Quiet screens: show what's needed to act, disclose the rest progressively.**
     A screen carries the data and the controls someone needs right now, and little
     else. Each screen has one focus, the thing to read first; everything else is a
@@ -307,12 +310,12 @@ GitHub Actions; its build tooling is out of scope.
   `skills.folders`), the `skills` commands that read or change config, and the toil
   skill itself (`bundled.ts`, and `skill install | show` in `skill-commands.ts`); the
   `skills` area's own commands are in `src/areas/skills/`
-- `src/dossiers/` — `toil dossiers list | show | check | context` (`commands.ts`),
+- `src/projects/` — `toil projects list | show | check | context` (`commands.ts`),
   `init | add-repo | link | env | field | person | wip-limit | analyze set | describe | export | import | unlink | remove` (`build.ts`),
   `onboard` (`onboard.ts`), and `brief | analyze show | analyze prompt` (`brief.ts`); the
-  model, resolution and writing are `src/core/dossier.ts`, and the briefing's lenses,
+  model, resolution and writing are `src/core/toil-project.ts`, and the briefing's lenses,
   its reader and the Analyze prompt are `src/core/brief/`, which Toil UI reads too
-- `src/repos/` — `toil repos scan`, discovery for dossiers
+- `src/repos/` — `toil repos scan`, discovery for toil projects
 - `src/audit/` — `toil audit list | stats | path`, reading the audit log
   `src/core/audit.ts` keeps; `stats.ts` is the summary's arithmetic
 - `src/feedback/` — `toil feedback bug|feature`, CLI only, and the disclaimer every
@@ -340,7 +343,7 @@ GitHub Actions; its build tooling is out of scope.
   `dist/api.d.ts`; what it exports follows the
   command contract (`skills/toil/core.md`, **Using toil from a program**)
 - `src/mcp/` — the MCP server (`toil mcp`, stdio); tools generated from the registry,
-  and the read-only resources (`resources.ts`): connections, dossiers and each area's
+  and the read-only resources (`resources.ts`): connections, toil projects and each area's
   skill page, which `scripts/gen-areas.mjs` builds into `src/skill-pages.generated.ts`
 - `src/welcome/` — the splash and menu that bare `toil` opens on an interactive
   terminal. Plain ANSI over Node's own `readline`, no package. Anything else (args,
@@ -349,8 +352,8 @@ GitHub Actions; its build tooling is out of scope.
   One file of views per menu module under `views/`, registered in `views/index.ts`;
   every action runs a real `toil` command in-process and shows the line it ran (a
   `--text` that carries earlier steps' output is named, with the pipe to type
-  instead). Its Dossiers module can brief a dossier (`views/briefing.ts`, #494):
-  each read, then `util owi map`, then `dossiers brief`, with every key an OSC 8
+  instead). Its Toil projects module can brief a toil project (`views/briefing.ts`, #494):
+  each read, then `util owi map`, then `projects brief`, with every key an OSC 8
   hyperlink where the terminal draws them (`TermCaps.hyperlinks`) and the URL
   printed where not; service text goes to the screen with its control characters
   stripped. Its Services module (`views/services.ts`) runs any area command that way: a
@@ -380,7 +383,7 @@ GitHub Actions; its build tooling is out of scope.
   `ship` skill runs, and the review workflow's merge-only check (`review/`) (dev
   tooling; none of it ships)
 - `skills/toil/` — the one skill shipped to users, and the site's docs: `SKILL.md` is a
-  small index (a test caps it) of `core.md`, `dossiers.md`, the per-area files,
+  small index (a test caps it) of `core.md`, `toil projects.md`, the per-area files,
   `install.md` and `mcp.md`. `scripts/gen-areas.mjs` embeds every file in the bundle, `toil skill
   install` writes it into an agent's skills folder (`src/skills/bundled.ts`), and toil
   rewrites that copy, and only that copy, when a command changes the config file or
@@ -401,7 +404,7 @@ GitHub Actions; its build tooling is out of scope.
   skill
 - `ui/` — Toil UI (#206), the separate package `@imagile-dev/toil-ui` (beta, local
   only), the root's npm workspace with its own release (`toil-ui-v…`): a React and
-  Vite front end, with one dashboard per dossier, and its local server in
+  Vite front end, with one dashboard per toil project, and its local server in
   `ui/server/` (`node:http`, the `toil-ui` bin), which pins `@imagile-dev/toil`
   exactly and has no other runtime dependency. The app is built on toil's own
   `execute()` and an `Agent` interface, and imports a few of toil's pure modules
@@ -410,9 +413,9 @@ GitHub Actions; its build tooling is out of scope.
   the toil it needs; the server answers both behind its `Store`
   and `Agent` interfaces, behind a launch token. It reads by default and writes only
   what a person presses: a worklog export, through `util encode --out` and toil's file
-  service (#308), and the connection and dossier changes Settings runs through toil's
+  service (#308), and the connection and toil project changes Settings runs through toil's
   own commands (`CONFIG_COMMANDS`, #253), each behind its own write gate, including a
-  dossier's name and description (`dossiers describe`, #342). Each agent run starts
+  toil project's name and description (`projects describe`, #342). Each agent run starts
   that agent's own CLI through its SDK (#251). The server itself spawns one thing:
   `npm install` of an agent SDK the repo already pins, from Settings → Agent, shown
   first and run on a press, in `ui/server/agents/install.ts`, the only server file
@@ -427,7 +430,7 @@ GitHub Actions; its build tooling is out of scope.
   375, 768 and 1440px to the layout check in headless Chrome
   (`ui/scripts/layout-check.mjs`), with reduced motion, then the views where the
   theme moments play again with motion on (#419). The decisions are in
-  `AGENT_DECISIONS.md`, **#206 preview**, **#228 dossier dashboard** and **#249 UI
+  `AGENT_DECISIONS.md`, **#206 preview**, **#228 toil project dashboard** and **#249 UI
   server**
 - `functions/feedback/` — the feedback backend behind the site's form and its curl
   endpoint (an Azure Function, Node.js), its own private package like `site/`, never
@@ -459,12 +462,12 @@ is a flag on the area's group (`toil github --owner o pr get 7`, accepted before
 after the leaf) and a field on every one of its MCP tools, and a `command` input
 belongs to the commands that list it in their own `context`, which also marks any
 input `required`. Core resolves each in one order: the call's own value, then the
-dossier that applies to the call, then the git remotes where the area declares how
+toil project that applies to the call, then the git remotes where the area declares how
 to read them (`origin` first, then the others; the first one on the connection's host
 that the area's parser accepts), then the connection's `setting`, then the area's
-`default`. A dossier value held per repo that matches no repo of the dossier does not fall through to
+`default`. A toil project value held per repo that matches no repo of the toil project does not fall through to
 git or the connection: a command that needs it is `INVALID_INPUT`, any other leaves it unresolved with
-a `DOSSIER_REPO_UNMATCHED` warning (#540). A command that reads one from a
+a `TOIL_PROJECT_REPO_UNMATCHED` warning (#540). A command that reads one from a
 file the call named (an `--input-file`) reports it with `ctx.supply`, which ranks
 it just below the call's own value. An input with `selectsConnection`
 picks the connection (`--env staging` selects the one named `staging` or whose `env`
@@ -475,38 +478,38 @@ the connection, each input, and where each came from. `--help` and each MCP fiel
 say where an input defaults from, in that order.
 
 **`--env` is one concept:** "which environment", everywhere. It's the context input
-on areas that have environments (`openshift`, `dynatrace`), and the dossier's
-environment is the same input: an explicit `--env` wins, otherwise the dossier
+on areas that have environments (`openshift`, `dynatrace`), and the toil project's
+environment is the same input: an explicit `--env` wins, otherwise the toil project
 supplies it through the resolver. There is no separate global `--env`. An
 environment the area doesn't know is a loud `INVALID_INPUT` listing the ones it has,
 never a guess.
 
-**A write on a connection that the dossier or the git remote chose is refused** until
-the user adopts that binding (`WRITE_DISABLED`, naming the connection). A dossier in
-the user's own folder, `~/.toil/dossiers/`, is adopted; a checked-in, listed or loose
-one isn't, and adopting it means copying it there (`toil dossiers import`, which the
+**A write on a connection that the toil project or the git remote chose is refused** until
+the user adopts that binding (`WRITE_DISABLED`, naming the connection). A toil project in
+the user's own folder, `~/.toil/projects/`, is adopted; a checked-in, listed or loose
+one isn't, and adopting it means copying it there (`toil projects import`, which the
 fix names along with `--connection`). Reads may follow the
 suggestion; once adopted, writes work normally. A connection the user named, selected
 with an explicit input, or set as the default is theirs already. **A write takes its
 target only from sources the user owns**, too: one whose target context inputs
-(`owner`, `repo`, `project`) came from an unadopted dossier is `WRITE_DISABLED`
-when the command reads one, before the write is sent, on any connection; passing them, or adopting the dossier,
-clears it. Field aliases and transition pins still apply from any dossier (#302).
+(`owner`, `repo`, `project`) came from an unadopted toil project is `WRITE_DISABLED`
+when the command reads one, before the write is sent, on any connection; passing them, or adopting the toil project,
+clears it. Field aliases and transition pins still apply from any toil project (#302).
 
-**Dossiers** (`docs/dossiers.md`, `src/core/dossier.ts`) are read on every call to an
-area command, from `~/.toil/dossiers/`, the folders in `dossierPaths` or
-`TOIL_DOSSIER_PATHS`, and `.toil/dossiers/` in the call's repository. Core adds two
-inputs to every area command for them, after `connection`: `dossier` (`--dossier
-<name|file>`, else `TOIL_DOSSIER`) and `cwd` (`--cwd <dir>`, else the workspace), the
-folder whose repository picks the dossier and the git context. `run` never sees
+**Toil projects** (`docs/projects.md`, `src/core/toil-project.ts`) are read on every call to an
+area command, from `~/.toil/projects/`, the folders in `projectPaths` or
+`TOIL_PROJECT_PATHS`, and `.toil/projects/` in the call's repository. Core adds two
+inputs to every area command for them, after `connection`: `toil project` (`--toil project
+<name|file>`, else `TOIL_PROJECT`) and `cwd` (`--cwd <dir>`, else the workspace), the
+folder whose repository picks the toil project and the git context. `run` never sees
 either. A section supplies its area's context inputs by name, and picks the
 connection by `connection` or by `host`, a selector toil compares and never
 contacts. Every problem found reading one is in `meta.warnings`, by file and key path.
-An area command sees a dossier only through two read-only views: `ctx.dossierFields()`,
-its field aliases, for a `--field`, and `ctx.dossierView()`, its sections, for
-`<area> check-dossier` (`src/core/check-dossier.ts`). Asking either consults the dossier.
-Over MCP the dossier commands refuse any change that would make a section select a
-connection with writes on, and any import or export of a dossier that does: a person
+An area command sees a toil project only through two read-only views: `ctx.toilProjectFields()`,
+its field aliases, for a `--field`, and `ctx.toilProjectView()`, its sections, for
+`<area> check-toil-project` (`src/core/check-toil-project.ts`). Asking either consults the toil project.
+Over MCP the toil project commands refuse any change that would make a section select a
+connection with writes on, and any import or export of a toil project that does: a person
 makes that binding on the CLI (`ConfigAccess.via` says which door).
 
 **Cross-area credentials are paired explicitly** (*principle 9*). `defineArea({
@@ -688,10 +691,10 @@ a breaking change.
 - **Three front doors, one `execute()`.** The CLI, MCP, and `@imagile-dev/toil/api`
   (`via: 'api'`, `src/api.ts`), which sends MCP's fields and is held to MCP's rules:
   it serves what MCP serves, applies `offMcpWhen`, words input errors in field names,
-  and is refused what the dossier commands refuse over MCP. Its `readOnly` option
+  and is refused what the toil project commands refuse over MCP. Its `readOnly` option
   refuses any call that changes anything before anything resolves: `writes` /
   `writesWhen`, and `writesLocal` / `writesLocalWhen` for a local write (toil's config,
-  the store, dossiers, a skills folder, a profile, a workspace file). Every `config`
+  the store, toil projects, a skills folder, a profile, a workspace file). Every `config`
   and `cli-only` command must declare `writesLocal` (`defineConfigCommand` requires
   it, since they write with node:fs); any other command's `ctx.files` writes are
   refused under readOnly as a backstop, and the parity suite runs every example under
@@ -762,13 +765,13 @@ a breaking change.
   by intent (`--to review`, `src/core/transition-intent.ts`). **`meta.lint`** is
   `{ engine, rules }`, set with `ctx.setLint()` by the `db` commands that run caller
   SQL (the `databases` skill).
-- **`meta.context`**, on area commands only, says where the call acted: `{ dossier,
-  connection, inputs, shared }`. `dossier`, when one applied, names it, where it
+- **`meta.context`**, on area commands only, says where the call acted: `{ toil project,
+  connection, inputs, shared }`. `toil project`, when one applied, names it, where it
   lives, what chose it and how the folder matched it. `connection` and each of `inputs` is `{ value, source }`
   (`connection` also carries `deployment` for an area whose `variants` are keyed on it), the
   source one of `input`, `file` (a value the command read from a file the call
-  named, through `ctx.supply`), `dossier`, `git`, `connection` or `default`, plus `via` (the
-  input that selected the connection), `host` (the dossier's host selector that did)
+  named, through `ctx.supply`), `toil project`, `git`, `connection` or `default`, plus `via` (the
+  input that selected the connection), `host` (the toil project's host selector that did)
   or `default` (`named`, `area-name` or `only`).
   `shared` lists settings taken from another area's connection, with where each
   lived, never the value. It's set on a failure too, as far as resolution got.
@@ -841,10 +844,10 @@ switch on writes or send the user's credentials to a host of its choosing
 vars and the user's own config.
 
 Knowledge about a body of work (its repos, Jira keys and fields, boards,
-environments) belongs in **dossiers** (`docs/dossiers.md`). A dossier holds no secret
+environments) belongs in **toil projects** (`docs/projects.md`). A toil project holds no secret
 and no `writes`, and it can't create a connection: it only selects among the reader's
 own connections, by name or by a host that toil uses purely as a selector and never
-contacts. That's why a dossier may be checked into a repository when config may not.
+contacts. That's why a toil project may be checked into a repository when config may not.
 
 Env var names map onto areas through the registry, using the longest match, so
 `TOIL_FOO_BAR_TOKEN` is `foo-bar.token`, not `foo.barToken`. The
@@ -854,7 +857,7 @@ are refused with `CONFIG_INVALID` naming the new form (`TOIL_JIRA_*` with
 that matches no registered area is ignored, never guessed at, so a variable can't
 change meaning when an area is added. `envName()` and `parseEnvName()` in
 `src/core/config.ts` are the only places the mapping lives. These names are reserved
-and never map onto an area: `TOIL_CONN_*`, `TOIL_DOSSIER*`, `TOIL_ENV`, `TOIL_CONFIG*`,
+and never map onto an area: `TOIL_CONN_*`, `TOIL_PROJECT*`, `TOIL_ENV`, `TOIL_CONFIG*`,
 `TOIL_TIMEOUT_MS`, `TOIL_WORKSPACE`, `TOIL_FEEDBACK_URL`, `TOIL_THEME`, `TOIL_STRICT_ENV`.
 
 **The config file is versioned.** `"version"` is a whole number; a file without one
@@ -1114,7 +1117,7 @@ IDs use `abc12345` or `abc12345-0000-0000-0000-000000000000`; email uses
 - **Every major item starts with a GitHub issue, created before the branch.** Keep it
   concise: a short paragraph on what and why, and one "Done when" line.
   - **What counts as a major item:** the foundation, the site, the gateway,
-    dossiers, **each integration area** (labelled `integration`) and **each database
+    toil projects, **each integration area** (labelled `integration`) and **each database
     provider** (labelled `database`).
   - **What never gets its own issue:** individual commands or features inside an
     area. They're part of their area's issue, never sub-issues.

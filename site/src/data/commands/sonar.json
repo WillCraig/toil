@@ -70,9 +70,9 @@
     ]
   },
   {
-    "name": "check-dossier",
-    "tool": "sonar_check_dossier",
-    "description": "Check the call's dossier against SonarQube: its project keys exist",
+    "name": "check-toil-project",
+    "tool": "sonar_check_toil_project",
+    "description": "Check the call's toil project against SonarQube: its project keys exist",
     "writes": false,
     "connection": true,
     "flags": []

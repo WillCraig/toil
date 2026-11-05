@@ -1,6 +1,6 @@
 /**
  * The blocker Gantt (#396): every item that blocks or is blocked, as a bar on
- * the sprint's timeline, made of what the dossier already holds and nothing
+ * the sprint's timeline, made of what the toil project already holds and nothing
  * fetched for it. A bar's segments are its time in progress (its
  * transitions), its time blocked (its `blocks` links, until the blocker
  * finished) and its failing checks (its pull requests' builds and checks).
@@ -216,7 +216,7 @@ export function blockerGantt(input: GanttInput): Gantt {
   const g = dependencyGraph(p.items);
   const rank = new Map(g.nodes.map((n) => [n.id, n.rank]));
   const unfinished = (id: string) => p.byId.has(id) && p.byId.get(id)!.statusCategory !== 'DONE';
-  // Every blocks link between two items the dossier holds, where one end is still open: a done blocker shows when the wait ended.
+  // Every blocks link between two items the toil project holds, where one end is still open: a done blocker shows when the wait ended.
   const edges = g.edges.filter((e) => e.type === 'blocks' && p.byId.has(e.source) && p.byId.has(e.target) && e.source !== e.target && (unfinished(e.source) || unfinished(e.target)));
   const held = heldBy(p);
   const chain = criticalChain(held, p);

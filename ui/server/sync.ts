@@ -2,11 +2,11 @@
  * The sync job (#250, #206 point 2: sync through toil, not around it). It
  * calls toil's own commands in-process through `@imagile-dev/toil/api`'s
  * `execute()`, read-only and named `toil-ui` in the audit log, so
- * connections, the credential store, dossiers, bounds and the audit log all
+ * connections, the credential store, toil projects, bounds and the audit log all
  * apply unchanged and Toil UI holds no credential of its own.
  *
- * **What it asks for is what the dashboards ask for.** Each dossier is loaded
- * with the views' own loader (src/load.ts), driven by `dossiers show`, through
+ * **What it asks for is what the dashboards ask for.** Each toil project is loaded
+ * with the views' own loader (src/load.ts), driven by `projects show`, through
  * an `execute()` that goes to toil, so the cache holds exactly the calls the
  * views will make and they render from it unchanged. On the way, that
  * `execute()` makes the sync incremental:
@@ -52,12 +52,12 @@
  * Every call follows `meta.page.nextCursor` to the end, up to `MAX_PAGES`,
  * and says so when it stops there (Bounds). Work items go through `mapOwi`.
  *
- * **A failing source never blanks the others.** Each area a dossier reads is
+ * **A failing source never blanks the others.** Each area a toil project reads is
  * a source with its own state. When a call fails, the loader is handed that
  * call's last good copy, so the dashboard keeps it; the source is marked
  * failed with toil's message and fix, its watermark stays where it was so the
- * next sync asks again, and the views show its data as stale. A dossier
- * whose `dossiers show` fails keeps everything it had.
+ * next sync asks again, and the views show its data as stale. A toil project
+ * whose `projects show` fails keeps everything it had.
  *
  * Progress comes from `execute()`'s own events (requests, pages, retries) and
  * is polled by the page (GET api/sync). One job runs at a time. A relay race
@@ -66,10 +66,10 @@
 
 import type { ProgressEvent } from '@imagile-dev/toil/api';
 import { mergeFeed } from '../src/ado-revisions.ts';
-import { loadDossier, windowFor, type LoaderMapOwi } from '../src/load.ts';
+import { loadToilProject, windowFor, type LoaderMapOwi } from '../src/load.ts';
 import type { Envelope } from '../src/toil.ts';
 import type { WorklogEvent } from '../src/model/worklog.ts';
-import { areaOf, type Cache, type DossierState, type SourceResult } from './cache.ts';
+import { areaOf, type Cache, type ToilProjectState, type SourceResult } from './cache.ts';
 import type { RequestContext } from './context.ts';
 import { CALLER } from './store.ts';
 
@@ -83,7 +83,7 @@ export type SyncExecute = (
 /** The OWI mapper the sync hands the loader: the API's, from the toil Toil UI runs with. */
 export type MapOwi = LoaderMapOwi;
 
-/** The most new facts a job keeps for one dossier's moments (#419); the page plays a few at most anyway. */
+/** The most new facts a job keeps for one toil project's moments (#419); the page plays a few at most anyway. */
 export const MAX_NEWS = 50;
 
 /** The most pages one call follows before it stops and says so. */
@@ -101,10 +101,10 @@ export interface SyncJob {
   by: string | null;
   startedAt: string | null;
   finishedAt: string | null;
-  /** The dossier being synced now. */
-  dossier: string | null;
-  dossiersDone: number;
-  dossiersTotal: number;
+  /** The toil project being synced now. */
+  toilProject: string | null;
+  toilProjectsDone: number;
+  toilProjectsTotal: number;
   /** Calls sent to toil, and calls answered from the last copy because nothing changed. */
   fetched: number;
   reused: number;
@@ -113,19 +113,19 @@ export interface SyncJob {
   retries: number;
   /** The newest progress lines, oldest first. */
   messages: string[];
-  /** What stopped the job as a whole (the dossier list failed, it was cancelled). Source failures are on the sources. */
+  /** What stopped the job as a whole (the toil project list failed, it was cancelled). Source failures are on the sources. */
   error: string | null;
   /**
-   * The facts this job recorded for the first time, by dossier (#419): the
+   * The facts this job recorded for the first time, by toil project (#419): the
    * page plays its theme moments from these once the job ends. Up to
-   * MAX_NEWS a dossier, newest kept.
+   * MAX_NEWS a toil project, newest kept.
    */
-  news?: Array<{ dossier: string; events: WorklogEvent[] }>;
+  news?: Array<{ toilProject: string; events: WorklogEvent[] }>;
 }
 
 export interface SyncStatus {
   job: SyncJob;
-  dossiers: DossierState[];
+  toilProjects: ToilProjectState[];
   retentionDays: number;
 }
 
@@ -221,7 +221,7 @@ interface Source {
 }
 
 interface Run {
-  dossier: string;
+  toilProject: string;
   startedAt: string;
   sources: Map<string, Source>;
   responses: Array<{ command: string; input: Rec; envelope: Envelope }>;
@@ -235,12 +235,12 @@ export interface SyncOptions {
   maxPages?: number;
   /**
    * When the job ends, however it ended: the worklog (#308) folds every
-   * dossier's pages again, since the cache's retention ran for all of them.
+   * toil project's pages again, since the cache's retention ran for all of them.
    * A failure is said in the job's messages and never fails the sync.
    */
   onFinished?: () => Promise<void>;
-  /** A dossier toil no longer has was forgotten (#494): whatever else Toil UI kept under its name goes too. */
-  onForget?: (dossier: string) => void;
+  /** A toil project toil no longer has was forgotten (#494): whatever else Toil UI kept under its name goes too. */
+  onForget?: (toilProject: string) => void;
 }
 
 export class SyncService {
@@ -266,14 +266,14 @@ export class SyncService {
   }
 
   status(): SyncStatus {
-    return { job: structuredClone(this.job), dossiers: this.cache.states(), retentionDays: this.cache.retentionDays };
+    return { job: structuredClone(this.job), toilProjects: this.cache.states(), retentionDays: this.cache.retentionDays };
   }
 
   get running(): boolean {
     return this.current !== null;
   }
 
-  /** Holds that keep a sync from starting: a dossier being renamed (#342). */
+  /** Holds that keep a sync from starting: a toil project being renamed (#342). */
   private holds = 0;
 
   /** Keeps any sync from starting until the returned function is called. */
@@ -286,19 +286,19 @@ export class SyncService {
     };
   }
 
-  /** Starts a sync of every dossier, or of one, and returns at once; poll `status()`. Throws SyncBusy while one runs. */
-  start(ctx: RequestContext, dossier?: string): SyncJob {
-    void this.run(ctx, dossier).catch(() => {});
+  /** Starts a sync of every toil project, or of one, and returns at once; poll `status()`. Throws SyncBusy while one runs. */
+  start(ctx: RequestContext, toilProject?: string): SyncJob {
+    void this.run(ctx, toilProject).catch(() => {});
     return structuredClone(this.job);
   }
 
   /** Runs a sync to the end. */
-  run(ctx: RequestContext, dossier?: string): Promise<SyncJob> {
+  run(ctx: RequestContext, toilProject?: string): Promise<SyncJob> {
     if (this.current) throw new SyncBusy();
-    if (this.holds) throw new SyncBusy('A dossier is being renamed, so the sync waits until it is done.');
+    if (this.holds) throw new SyncBusy('A Toil project is being renamed, so the sync waits until it is done.');
     this.controller = new AbortController();
     this.job = { ...idle(), running: true, by: ctx.viewer.id, startedAt: this.now().toISOString() };
-    this.current = this.sync(dossier, this.controller.signal).finally(() => {
+    this.current = this.sync(toilProject, this.controller.signal).finally(() => {
       this.current = null;
       this.controller = null;
     });
@@ -326,14 +326,14 @@ export class SyncService {
   private async sync(only: string | undefined, signal: AbortSignal): Promise<SyncJob> {
     const job = this.job;
     try {
-      const list = await this.call('dossiers list', {}, signal);
-      if (!list.ok) throw new Error(`dossiers list failed: ${list.error.message}${list.error.fix ? ` ${list.error.fix}` : ''}`);
-      const names = recs((list.data as Rec).dossiers)
+      const list = await this.call('projects list', {}, signal);
+      if (!list.ok) throw new Error(`projects list failed: ${list.error.message}${list.error.fix ? ` ${list.error.fix}` : ''}`);
+      const names = recs((list.data as Rec).toilProjects)
         .filter((d) => d.shadowedBy === null || d.shadowedBy === undefined)
         .map((d) => String(d.name));
-      if (only !== undefined && !names.includes(only)) throw new Error(`toil has no dossier named ${JSON.stringify(only)}. Run toil dossiers list to see them.`);
-      // A dossier toil no longer has is forgotten, with everything synced for it.
-      if (only === undefined) for (const old of this.cache.dossierNames()) if (!names.includes(old)) {
+      if (only !== undefined && !names.includes(only)) throw new Error(`toil has no Toil project named ${JSON.stringify(only)}. Run toil projects list to see them.`);
+      // A toil project toil no longer has is forgotten, with everything synced for it.
+      if (only === undefined) for (const old of this.cache.toilProjectNames()) if (!names.includes(old)) {
         this.cache.forget(old);
         try {
           this.onForget?.(old);
@@ -342,14 +342,14 @@ export class SyncService {
         }
       }
       const targets = only === undefined ? names : [only];
-      job.dossiersTotal = targets.length;
-      if (!targets.length) this.say('No dossiers to sync: add one with toil dossiers add.');
+      job.toilProjectsTotal = targets.length;
+      if (!targets.length) this.say('No Toil projects to sync: add one with toil projects add.');
       for (const name of targets) {
         if (signal.aborted) throw new Error('The sync was cancelled.');
-        job.dossier = name;
+        job.toilProject = name;
         this.say(`${name}: syncing`);
-        await this.syncDossier(name, signal);
-        job.dossiersDone++;
+        await this.syncToilProject(name, signal);
+        job.toilProjectsDone++;
       }
     } catch (e) {
       job.error = e instanceof Error ? e.message : String(e);
@@ -361,7 +361,7 @@ export class SyncService {
         this.say(`Couldn't update the worklog: ${e instanceof Error ? e.message : String(e)}`);
       }
       job.running = false;
-      job.dossier = null;
+      job.toilProject = null;
       job.finishedAt = this.now().toISOString();
     }
     return structuredClone(job);
@@ -383,7 +383,7 @@ export class SyncService {
         return {
           ok: false,
           data: null,
-          error: { code: 'INVALID_INPUT', message: `${command} still had more after ${this.maxPages} pages, so the sync stopped there rather than keep only part of it.`, fix: 'Narrow the dossier\'s query (a Jira project with fewer issues, a WIQL with a date bound), then sync again.' },
+          error: { code: 'INVALID_INPUT', message: `${command} still had more after ${this.maxPages} pages, so the sync stopped there rather than keep only part of it.`, fix: 'Narrow the Toil project\'s query (a Jira project with fewer issues, a WIQL with a date bound), then sync again.' },
           meta: env.meta,
         } as Envelope;
       }
@@ -397,14 +397,14 @@ export class SyncService {
     return env;
   }
 
-  private async syncDossier(name: string, signal: AbortSignal) {
-    const run: Run = { dossier: name, startedAt: this.now().toISOString(), sources: new Map(), responses: [] };
+  private async syncToilProject(name: string, signal: AbortSignal) {
+    const run: Run = { toilProject: name, startedAt: this.now().toISOString(), sources: new Map(), responses: [] };
     const syncing = (command: string, input: Record<string, unknown> = {}) => this.answer(run, command, input, signal);
     let loaded;
     try {
-      loaded = await loadDossier(syncing, name, { mapOwi: this.mapOwi, windowDays: windowFor(this.cache.retentionDays), now: this.now });
+      loaded = await loadToilProject(syncing, name, { mapOwi: this.mapOwi, windowDays: windowFor(this.cache.retentionDays), now: this.now });
     } catch (e) {
-      // `dossiers show` failed: the dossier keeps everything it had.
+      // `projects show` failed: the toil project keeps everything it had.
       const message = e instanceof Error ? e.message : String(e);
       this.cache.saveFailure(name, this.now().toISOString(), message);
       this.say(`${name}: failed, ${message}`);
@@ -419,8 +419,8 @@ export class SyncService {
       fullReadAt: s.error === null && s.searches > 0 && s.fullSearches === s.searches ? run.startedAt : null,
       calls: s.calls,
     }));
-    const news = this.cache.saveDossier({
-      dossier: name,
+    const news = this.cache.saveToilProject({
+      toilProject: name,
       startedAt: run.startedAt,
       finishedAt: this.now().toISOString(),
       responses: run.responses,
@@ -429,7 +429,7 @@ export class SyncService {
       deployments: loaded.deployments,
       sources,
     });
-    if (news.length) (this.job.news ??= []).push({ dossier: name, events: [...news].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).slice(-MAX_NEWS) });
+    if (news.length) (this.job.news ??= []).push({ toilProject: name, events: [...news].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).slice(-MAX_NEWS) });
     const failed = sources.filter((s) => !s.ok);
     this.say(`${name}: ${loaded.items.length} items, ${loaded.changes.length} changes, ${loaded.deployments.length} deployments${failed.length ? `; ${failed.map((s) => s.area).join(', ')} failed, showing the last good copy` : ''}`);
   }
@@ -448,8 +448,8 @@ export class SyncService {
    * failed call answered by its last good copy so nothing blanks.
    */
   private async answer(run: Run, command: string, input: Rec, signal: AbortSignal): Promise<Envelope> {
-    // The dossier itself is read fresh, and isn't a source: it's toil's own config.
-    if (command === 'dossiers show' || command === 'dossiers list') return this.call(command, input, signal);
+    // The toil project itself is read fresh, and isn't a source: it's toil's own config.
+    if (command === 'projects show' || command === 'projects list') return this.call(command, input, signal);
     const area = areaOf(command);
     const source = this.source(run, area);
     source.calls++;
@@ -460,20 +460,20 @@ export class SyncService {
       return env;
     }
     source.error ??= { message: `${command}: ${env.error.message}`, fix: env.error.fix ?? null };
-    this.say(`${run.dossier}: ${command} failed, ${env.error.message}`);
-    const last = this.cache.response(run.dossier, command, input);
+    this.say(`${run.toilProject}: ${command} failed, ${env.error.message}`);
+    const last = this.cache.response(run.toilProject, command, input);
     return last ? last.envelope : env;
   }
 
   private async fetch(run: Run, source: Source, command: string, input: Rec, signal: AbortSignal): Promise<Envelope> {
-    const { dossier } = run;
-    const state = this.cache.source(dossier, source.area);
+    const { toilProject } = run;
+    const state = this.cache.source(toilProject, source.area);
     const watermark = state?.watermark ?? null;
 
     const search = SEARCHES[command];
     if (search) {
       source.searches++;
-      const last = this.cache.response(dossier, command, input);
+      const last = this.cache.response(toilProject, command, input);
       if (!watermark || !last?.envelope.ok) {
         const whole = await this.call(command, input, signal);
         if (whole.ok) source.fullSearches++;
@@ -484,7 +484,7 @@ export class SyncService {
       const listOf = (data: unknown) => recs(search.list === null ? data : (data as Rec)[search.list]);
       const fresh = listOf(delta.data);
       source.changed = new Set([...(source.changed ?? []), ...fresh.map(search.id)]);
-      this.say(`${dossier}: ${command} since ${watermark}: ${fresh.length} changed`);
+      this.say(`${toilProject}: ${command} since ${watermark}: ${fresh.length} changed`);
       let merged = mergeById(listOf(last.envelope.data), fresh, search.id);
       // A search "since" never lists what was deleted or moved away, so once in a while the source is listed whole and what it no longer has is dropped.
       let removed = 0;
@@ -497,10 +497,10 @@ export class SyncService {
           removed = merged.length - kept.length;
           merged = kept;
           source.fullSearches++;
-          if (removed) this.say(`${dossier}: ${command} listed whole: ${removed} no longer there`);
+          if (removed) this.say(`${toilProject}: ${command} listed whole: ${removed} no longer there`);
         } else {
           // The delta stands and the watermark moves on; fullReadAt stays where it was, so the next sync lists the source whole again.
-          this.say(`${dossier}: ${command} listed whole failed, ${whole.error.message}; keeping the changes since ${watermark}, trying again next sync`);
+          this.say(`${toilProject}: ${command} listed whole failed, ${whole.error.message}; keeping the changes since ${watermark}, trying again next sync`);
         }
       }
       if (!fresh.length && !removed) return reuse(last.envelope);
@@ -512,21 +512,21 @@ export class SyncService {
     }
 
     if (command === ADO_FEED) {
-      const last = this.cache.response(dossier, command, input);
+      const last = this.cache.response(toilProject, command, input);
       if (!watermark || !last?.envelope.ok || !Array.isArray(last.envelope.data)) return this.call(command, input, signal);
       // The delta lays new revisions over old ones and never refreshes what it already holds (a renamed iteration, a changed display name), so once in a while the feed is read whole, on the day the search is listed whole.
       const fullReadAt = state?.fullReadAt ?? null;
       if (fullReadAt === null || Date.parse(run.startedAt) - Date.parse(fullReadAt) >= RECONCILE_MS) {
         const whole = await this.call(command, input, signal);
         if (whole.ok && Array.isArray(whole.data)) {
-          this.say(`${dossier}: ${command} read whole: ${whole.data.length} revisions`);
+          this.say(`${toilProject}: ${command} read whole: ${whole.data.length} revisions`);
           return whole;
         }
-        this.say(`${dossier}: ${command} read whole failed${whole.ok ? '' : `, ${whole.error.message}`}; keeping the changes since ${watermark}, trying again next sync`);
+        this.say(`${toilProject}: ${command} read whole failed${whole.ok ? '' : `, ${whole.error.message}`}; keeping the changes since ${watermark}, trying again next sync`);
       }
       const delta = await this.call(command, { ...input, updatedSince: watermark }, signal);
       if (!delta.ok || !Array.isArray(delta.data)) return delta;
-      this.say(`${dossier}: ${command} since ${watermark}: ${delta.data.length} revisions`);
+      this.say(`${toilProject}: ${command} since ${watermark}: ${delta.data.length} revisions`);
       // Only the work items this run lists matter; the search ran before the feed, so its answer is in the run.
       const search = run.responses.find((r) => r.command === ADO_SEARCH && r.envelope.ok);
       const keep = search ? new Set(recs((search.envelope.data as Rec).workItems).map((w) => Number(w.id))) : undefined;
@@ -537,19 +537,19 @@ export class SyncService {
 
     const prId = PR_LISTS[command];
     if (prId) {
-      const last = this.cache.response(dossier, command, input);
+      const last = this.cache.response(toilProject, command, input);
       if (!watermark || !last?.envelope.ok) return this.call(command, input, signal);
       const delta = await this.call(command, { ...input, updatedSince: watermark }, signal);
       if (!delta.ok) return delta;
       const fresh = recs(delta.data);
       source.changedPrs = new Set([...(source.changedPrs ?? []), ...fresh.map(prId)]);
-      this.say(`${dossier}: ${command} since ${watermark}: ${fresh.length} changed`);
+      this.say(`${toilProject}: ${command} since ${watermark}: ${fresh.length} changed`);
       return { ...delta, data: mergeById(recs(last.envelope.data), fresh, prId) };
     }
 
     const getField = PR_GETS[command];
     if (getField !== undefined && source.changedPrs !== null && !source.changedPrs.has(String(input[getField]))) {
-      const last = this.cache.response(dossier, command, input);
+      const last = this.cache.response(toilProject, command, input);
       if (last?.envelope.ok && closedPr(last.envelope.data)) {
         this.job.reused++;
         return reuse(last.envelope);
@@ -559,12 +559,12 @@ export class SyncService {
     if (command === BOARD) {
       const env = await this.call(command, input, signal);
       if (!env.ok) return env;
-      const last = this.cache.response(dossier, command, input);
+      const last = this.cache.response(toilProject, command, input);
       if (last?.envelope.ok && watermark) {
         const before = new Map(recs(last.envelope.data).map((i) => [numberOf(i), updatedOf(i)]));
         const changed = recs(env.data).filter((i) => before.get(numberOf(i)) !== updatedOf(i) || !before.has(numberOf(i))).map(numberOf);
         source.changed = new Set([...(source.changed ?? []), ...changed]);
-        this.say(`${dossier}: ${command}: ${changed.length} changed since the last sync`);
+        this.say(`${toilProject}: ${command}: ${changed.length} changed since the last sync`);
       }
       return env;
     }
@@ -573,7 +573,7 @@ export class SyncService {
     if (batch && Array.isArray(input[batch.field]) && (input[batch.field] as unknown[]).length > 1) {
       const wanted = (input[batch.field] as unknown[]).map(String);
       // The loader asks in slices, and where a slice ends moves as items come and go, so every stored slice is the last copy, not only the newest.
-      const stored = this.cache.all(dossier, command).filter((r) => r.envelope.ok);
+      const stored = this.cache.all(toilProject, command).filter((r) => r.envelope.ok);
       const last = stored[0];
       const changed = source.changed;
       if (changed === null || !last) return this.call(command, input, signal);
@@ -601,7 +601,7 @@ export class SyncService {
 
     const field = HISTORIES[command];
     if (field !== undefined && source.changed !== null && !source.changed.has(String(input[field]))) {
-      const last = this.cache.response(dossier, command, input);
+      const last = this.cache.response(toilProject, command, input);
       if (last?.envelope.ok) {
         this.job.reused++;
         return reuse(last.envelope);
@@ -615,5 +615,5 @@ const numberOf = (item: Rec) => (isRec(item.content) ? String(item.content.numbe
 const updatedOf = (item: Rec) => (isRec(item.content) && typeof item.content.updatedAt === 'string' ? item.content.updatedAt : typeof item.updatedAt === 'string' ? item.updatedAt : null);
 
 function idle(): SyncJob {
-  return { running: false, by: null, startedAt: null, finishedAt: null, dossier: null, dossiersDone: 0, dossiersTotal: 0, fetched: 0, reused: 0, requests: 0, pages: 0, retries: 0, messages: [], error: null, news: [] };
+  return { running: false, by: null, startedAt: null, finishedAt: null, toilProject: null, toilProjectsDone: 0, toilProjectsTotal: 0, fetched: 0, reused: 0, requests: 0, pages: 0, retries: 0, messages: [], error: null, news: [] };
 }

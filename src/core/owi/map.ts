@@ -155,7 +155,7 @@ export function documentsFrom(values: unknown[], options: DocumentOptions = {}):
   return { documents, skipped };
 }
 
-/** `fields` as `name=value` entries (the CLI's repeatable --field) or an object (a dossier section's `fields`), checked. */
+/** `fields` as `name=value` entries (the CLI's repeatable --field) or an object (a toil project section's `fields`), checked. */
 export function fieldOverrides(fields: string[] | Record<string, string> | undefined): FieldOverrides {
   const entries = Array.isArray(fields)
     ? fields.map((entry) => {

@@ -10,7 +10,7 @@
  * - **Splash**: the launch intro, once per launch, only while the first read
  *   runs. It never adds a wait: it ends when the data is ready or on any key
  *   or click.
- * - **useEnter**: the dossier entrance and the tab transitions.
+ * - **useEnter**: the toil project entrance and the tab transitions.
  * - **MomentsProvider**: the event moments, fired once each from the facts a
  *   sync recorded for the first time (src/moments/events.ts), one after
  *   another, each under a second; the sprint recap stays long enough to read.
@@ -238,7 +238,7 @@ export function faceOf(splash: Pick<SplashMoment, 'face'>, data: SplashData | nu
 }
 
 /** The splash's values as data attributes, for a theme's CSS: plain numbers and a name, nothing it could run. */
-const dataAttributes = (data: SplashData | null) => (data ? { 'data-sprint-day': data.day, 'data-sprint-days': data.days, 'data-items-done': data.done, 'data-dossier': data.dossier } : {});
+const dataAttributes = (data: SplashData | null) => (data ? { 'data-sprint-day': data.day, 'data-sprint-days': data.days, 'data-items-done': data.done, 'data-toil-project': data.toilProject } : {});
 
 /** The splash plays once per launch, however often the App remounts after a sync. */
 let launched = false;
@@ -253,7 +253,7 @@ export function resetSplash() {
  * or after its 1.8 seconds, when the view's own loader carries on. A theme
  * with no splash, or Theme motion off, has none: the loader covers the wait.
  * `preview` holds it until a key or click, for Settings and the checks.
- * `data` is what it may know of the dossier opening (#462, src/moments/splash-data.ts): with none, the
+ * `data` is what it may know of the toil project opening (#462, src/moments/splash-data.ts): with none, the
  * splash is exactly as it was.
  */
 export function Splash({ ready, detail = null, data = null, preview = false, onDone }: { ready: boolean; detail?: string | null; data?: SplashData | null; preview?: boolean; onDone?: () => void }) {
@@ -305,7 +305,7 @@ export function Splash({ ready, detail = null, data = null, preview = false, onD
           {m.splash.line}
         </p>
         <p className="splash__progress" role="status">
-          {preview ? 'Preview of the launch splash. Press any key or click to close it.' : `Starting Toil UI. ${detail ?? 'Reading the dossiers…'}`}
+          {preview ? 'Preview of the launch splash. Press any key or click to close it.' : `Starting Toil UI. ${detail ?? 'Reading the Toil projects…'}`}
         </p>
         {tip && <TipLine tip={tip} label={tipsLabel(m)} />}
       </div>
@@ -315,7 +315,7 @@ export function Splash({ ready, detail = null, data = null, preview = false, onD
 
 /**
  * Plays a one-shot motif on an element when `key` changes (and, with
- * `onMount`, when it first appears): the dossier entrance and the tab
+ * `onMount`, when it first appears): the toil project entrance and the tab
  * transitions. Off plays nothing.
  */
 export function useEnter(ref: RefObject<HTMLElement | null>, motif: EnterMotif | undefined, key: string, { onMount = true, ms = 320 } = {}) {

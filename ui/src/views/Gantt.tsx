@@ -27,11 +27,11 @@ const DAY = 86_400_000;
 const t = (iso: string) => Date.parse(iso);
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-/** The dossier's Gantt, worked out once per dossier and clock. */
+/** The toil project's Gantt, worked out once per toil project and clock. */
 export function useGantt(): Gantt {
-  const { dossier, now } = useData();
+  const { toilProject, now } = useData();
   const { health, insights } = useDerived();
-  return useMemo(() => blockerGantt({ prepared: insights, health, readiness: dossier.readiness, now }), [insights, health, dossier.readiness, now]);
+  return useMemo(() => blockerGantt({ prepared: insights, health, readiness: toilProject.readiness, now }), [insights, health, toilProject.readiness, now]);
 }
 
 /** The width the drawing has to work with, followed as the box resizes; a fixed guess where nothing measures (tests). */
@@ -327,7 +327,7 @@ function ChainLine({ g }: { g: Gantt }) {
 /** The Dependencies tab's Gantt: the chart, its key, what is estimated, and the table. */
 export function BlockerGantt() {
   const g = useGantt();
-  if (!g.bars.length) return <p className="note">Nothing in this dossier blocks anything that is still open.</p>;
+  if (!g.bars.length) return <p className="note">Nothing in this Toil project blocks anything that is still open.</p>;
   return (
     <div className="gantt-panel">
       <ChainLine g={g} />

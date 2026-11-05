@@ -58,7 +58,7 @@ describe('version 3: jira-cloud became jira with deployment cloud', () => {
     expect(config.warnings).toEqual([expect.objectContaining({ code: 'CONFIG_DEFAULT_KEPT', message: expect.stringContaining('"imagile-cloud"') })]);
     expect(config.warnings[0]!.message).toContain('corp-jira');
     expect(config.warnings[0]!.message).toContain('toil connections migrate');
-    expect(config.warnings[0]!.message).toContain('version 3');
+    expect(config.warnings[0]!.message).toContain('version 4');
   });
 
   it("doesn't let a Cloud default reach Data Center connections: it moves onto the Cloud connections instead", () => {
@@ -95,10 +95,10 @@ describe('version 3: jira-cloud became jira with deployment cloud', () => {
     expect(load().defaults.jira).toEqual({ connection: 'corp-jira', project: 'DC' });
   });
 
-  it('is what an edit writes back: version 3, folded, other keys kept', () => {
+  it('is what an edit writes back: version 4, folded, other keys kept', () => {
     writeJson({ version: 2, extra: 1, connections: { 'imagile-cloud': cloud }, defaults: { 'jira-cloud': { connection: 'imagile-cloud' } } });
     const edit = readConfigForEdit(file());
-    expect(edit).toEqual({ version: 3, extra: 1, connections: { 'imagile-cloud': { ...cloud, area: 'jira', deployment: 'cloud' } }, defaults: { jira: { connection: 'imagile-cloud' } } });
+    expect(edit).toEqual({ version: 4, extra: 1, connections: { 'imagile-cloud': { ...cloud, area: 'jira', deployment: 'cloud' } }, defaults: { jira: { connection: 'imagile-cloud' } } });
     writeConfigFile(file(), edit);
     expect(load().connections['imagile-cloud']).toMatchObject({ area: 'jira', deployment: 'cloud' });
   });
@@ -233,7 +233,7 @@ describe('confluence-cloud became confluence with deployment cloud', () => {
     writeJson({ version: 3, connections: { 'wiki-cloud': wiki, 'imagile-cloud': cloud }, defaults: { 'confluence-cloud': { connection: 'wiki-cloud' }, 'jira-cloud': { connection: 'imagile-cloud' } } });
     const once = readConfigForEdit(file());
     expect(once).toEqual({
-      version: 3,
+      version: 4,
       connections: { 'wiki-cloud': folded, 'imagile-cloud': { ...cloud, area: 'jira', deployment: 'cloud' } },
       defaults: { confluence: { connection: 'wiki-cloud' }, jira: { connection: 'imagile-cloud' } },
     });

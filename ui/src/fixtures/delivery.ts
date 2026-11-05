@@ -130,7 +130,7 @@ export const ADO_DEPLOY_RUNS = [
 // Pull requests: Sprint 42's, shared with toil's own OWI fixture ---------------------
 
 /**
- * Each dossier's pull requests, as `pr list` and `pr get --include
+ * Each toil project's pull requests, as `pr list` and `pr get --include
  * reviews,checks,commits,files` print them, from the OWI pull request
  * fixture (test/fixtures/owi/pull-requests.ts), so the preview shows exactly
  * what toil's mapper is tested on. GitHub's check runs are the builds

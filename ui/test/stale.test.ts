@@ -32,7 +32,7 @@ const BASE: Fingerprint = {
   toil: { version: '0.1.0-alpha.3', commit: 'a'.repeat(40) },
   toilUi: { version: '0.1.0-alpha.2', commit: 'b'.repeat(40) },
   skills: { github: 'g1', jira: 'j1', util: 'u1' },
-  dossier: 'd1',
+  toilProject: 'd1',
   prompts: 'p1',
 };
 
@@ -44,10 +44,10 @@ describe('the fingerprint', () => {
   });
 
   it("says what changed in the issue's own words, in a fixed order", () => {
-    const now: Fingerprint = { ...BASE, toil: { version: '0.1.0-alpha.4', commit: 'c'.repeat(40) }, skills: { ...BASE.skills, jira: 'j2', util: 'u2' }, dossier: 'd2' };
+    const now: Fingerprint = { ...BASE, toil: { version: '0.1.0-alpha.4', commit: 'c'.repeat(40) }, skills: { ...BASE.skills, jira: 'j2', util: 'u2' }, toilProject: 'd2' };
     expect(staleness(BASE, now)).toEqual({
-      reasons: ['toil 0.1.0-alpha.3 · now alpha.4', 'skills changed: jira, util', 'dossier changed'],
-      text: 'started on toil 0.1.0-alpha.3 · now alpha.4 · skills changed: jira, util · dossier changed',
+      reasons: ['toil 0.1.0-alpha.3 · now alpha.4', 'skills changed: jira, util', 'Toil project changed'],
+      text: 'started on toil 0.1.0-alpha.3 · now alpha.4 · skills changed: jira, util · Toil project changed',
     });
   });
 
@@ -95,7 +95,7 @@ describe('the builds on disk', () => {
       head: (p) => (reads++, files.get(p)!.text),
     };
     const running = { toil: { version: '0.1.0-alpha.3', commit: null }, toilUi: { version: '0.1.0-alpha.2', commit: null } };
-    const fp = new Fingerprints({ running, toilBundle: '/toil/toil-lib.js', uiBundle: '/ui/missing.js', registry: registry.commands, execute: dossierExecute(() => ({ name: 'x' })), restart: 'node toil-ui.js', files: access });
+    const fp = new Fingerprints({ running, toilBundle: '/toil/toil-lib.js', uiBundle: '/ui/missing.js', registry: registry.commands, execute: toilProjectExecute(() => ({ name: 'x' })), restart: 'node toil-ui.js', files: access });
     expect(fp.server().stale).toBeNull();
     fp.server();
     expect(reads).toBe(1);
@@ -107,20 +107,20 @@ describe('the builds on disk', () => {
     expect((await fp.current('card-payments', 'p')).toil.version).toBe('0.1.0-alpha.4');
   });
 
-  it('asks toil for the dossier again only when its file changed', async () => {
+  it('asks toil for the Toil project again only when its file changed', async () => {
     let mtimeMs = 1;
     let calls = 0;
     let content: Record<string, unknown> = { name: 'card-payments', wipLimit: 3 };
-    const execute: Execute = async (command) => (calls++, { ok: true, data: { file: '/home/you/.toil/dossiers/card-payments.json', dossier: content }, error: null, meta: { command, durationMs: 0, version: '0', contractVersion: 1 } }) as unknown as Envelope;
+    const execute: Execute = async (command) => (calls++, { ok: true, data: { file: '/home/you/.toil/projects/card-payments.json', toilProject: content }, error: null, meta: { command, durationMs: 0, version: '0', contractVersion: 1 } }) as unknown as Envelope;
     const access: FileAccess = { stat: () => ({ mtimeMs, size: 10 }), head: () => '' };
     const running = { toil: { version: '1', commit: null }, toilUi: { version: '1', commit: null } };
     const fp = new Fingerprints({ running, toilBundle: null, uiBundle: null, registry: registry.commands, execute, restart: 'node x', files: access });
-    const first = await fp.dossier('card-payments');
-    expect(await fp.dossier('card-payments')).toBe(first);
+    const first = await fp.toilProject('card-payments');
+    expect(await fp.toilProject('card-payments')).toBe(first);
     expect(calls).toBe(1);
     content = { name: 'card-payments', wipLimit: 4 };
     mtimeMs = 2;
-    expect(await fp.dossier('card-payments')).not.toBe(first);
+    expect(await fp.toilProject('card-payments')).not.toBe(first);
     expect(calls).toBe(2);
   });
 
@@ -139,9 +139,9 @@ describe('the builds on disk', () => {
   });
 });
 
-/** An execute() that answers `dossiers show` with the dossier the test holds now, and counts the calls. */
-function dossierExecute(dossier: () => unknown): Execute {
-  return async (command) => ({ ok: true, data: command === 'dossiers show' ? { dossier: dossier() } : {}, error: null, meta: { command, durationMs: 0, version: '0', contractVersion: 1 } }) as unknown as Envelope;
+/** An execute() that answers `projects show` with the toil project the test holds now, and counts the calls. */
+function toilProjectExecute(toilProject: () => unknown): Execute {
+  return async (command) => ({ ok: true, data: command === 'projects show' ? { toilProject: toilProject() } : {}, error: null, meta: { command, durationMs: 0, version: '0', contractVersion: 1 } }) as unknown as Envelope;
 }
 
 describe("a chat's session", () => {
@@ -163,7 +163,7 @@ describe("a chat's session", () => {
   function host(disk: string | null = null) {
     const dataDir = mkdtempSync(join(folder, 'host-'));
     writeFileSync(agentSettingsFile(dataDir), JSON.stringify({ adapter: 'codex', model: null, cliPath: null, endpoint: null }));
-    let dossier: Record<string, unknown> = { name: 'card-payments', jira: { project: 'PAY' } };
+    let toilProject: Record<string, unknown> = { name: 'card-payments', jira: { project: 'PAY' } };
     const gates: Array<() => void> = [];
     const runtime: Runtime = {
       name: 'codex',
@@ -179,13 +179,13 @@ describe("a chat's session", () => {
     const files: FileAccess = { stat: (p) => (p === '/toil/toil-lib.js' && disk ? { mtimeMs: 1, size: 1 } : null), head: () => `const __TOIL_VERSION__ = "${disk}"; // x-release-please-version
 const __TOIL_COMMIT__ = null; // toil-build-commit
 ` };
-    const fingerprints = new Fingerprints({ running, toilBundle: '/toil/toil-lib.js', uiBundle: null, registry: registry.commands, execute: dossierExecute(() => dossier), restart: 'node toil-ui.js', files });
-    const h = new AgentHost({ dataDir, version: 't', data: () => data, registry: registry.commands, execute: dossierExecute(() => dossier), mapIds: () => [], serveTools: () => ({ url: '', token: '', close() {} }), fallback: noAgent(), env: { PATH: '/usr/bin' }, platform: 'linux', importer: async () => ({}), installed: () => true, isFile: (p) => p === '/usr/bin/codex', now: () => FIXTURE_NOW, runtimes: [runtime], fingerprints });
+    const fingerprints = new Fingerprints({ running, toilBundle: '/toil/toil-lib.js', uiBundle: null, registry: registry.commands, execute: toilProjectExecute(() => toilProject), restart: 'node toil-ui.js', files });
+    const h = new AgentHost({ dataDir, version: 't', data: () => data, registry: registry.commands, execute: toilProjectExecute(() => toilProject), mapIds: () => [], serveTools: () => ({ url: '', token: '', close() {} }), fallback: noAgent(), env: { PATH: '/usr/bin' }, platform: 'linux', importer: async () => ({}), installed: () => true, isFile: (p) => p === '/usr/bin/codex', now: () => FIXTURE_NOW, runtimes: [runtime], fingerprints });
     const release = async () => {
       while (!gates.length) await new Promise((r) => setTimeout(r, 1));
       gates.shift()!();
     };
-    return { h, release, edit: (d: Record<string, unknown>) => void (dossier = d) };
+    return { h, release, edit: (d: Record<string, unknown>) => void (toilProject = d) };
   }
 
   async function asked(h: AgentHost, release: () => Promise<void>, chat = 'chat-0000-0001', turn = 1) {
@@ -204,10 +204,10 @@ const __TOIL_COMMIT__ = null; // toil-build-commit
     const first = await asked(h, release);
     expect(first.session).toEqual({ startedAt: FIXTURE_NOW, stale: null, renewals: 0 });
     edit({ name: 'card-payments', jira: { project: 'PAY', board: 7 } });
-    // The next turn runs on the dossier as it is now, but the chat started before the change: it says so.
+    // The next turn runs on the toil project as it is now, but the chat started before the change: it says so.
     const second = await asked(h, release, 'chat-0000-0001', 2);
-    expect(second.session!.stale!.text).toBe('dossier changed since it started');
-    expect((await h.session('chat-0000-0001'))!.stale!.reasons).toEqual(['dossier changed']);
+    expect(second.session!.stale!.text).toBe('Toil project changed since it started');
+    expect((await h.session('chat-0000-0001'))!.stale!.reasons).toEqual(['Toil project changed']);
   });
 
   it("goes stale when the person's own instructions change, and renews onto them", async () => {
@@ -286,7 +286,7 @@ describe("an assignment's staleness and renewal", () => {
   });
 
   it("says why each state can't renew", () => {
-    const stale = { reasons: ['dossier changed'], text: 'dossier changed since it started' };
+    const stale = { reasons: ['Toil project changed'], text: 'Toil project changed since it started' };
     expect(renewRefusal({ state: 'working', stale, renewedBy: null })).toContain('never interrupts');
     expect(renewRefusal({ state: 'queued', stale, renewedBy: null })).toContain("hasn't started");
     expect(renewRefusal({ state: 'failed', stale, renewedBy: null })).toBeNull();
@@ -309,9 +309,9 @@ describe('a run that fails after it started', () => {
   it('keeps its fingerprint, so it can go stale and be renewed', async () => {
     const { AssignmentQueue, RunStopped } = await import('../src/assign/queue.ts');
     const { memoryKeeper } = await import('../server/assign/files.ts');
-    const { loadDossier } = await import('../src/load.ts');
+    const { loadToilProject } = await import('../src/load.ts');
     const { fixtureExecute } = await import('../src/fixtures/execute.ts');
-    const items = (await loadDossier(fixtureExecute().execute, 'card-payments')).items;
+    const items = (await loadToilProject(fixtureExecute().execute, 'card-payments')).items;
     let current = SAMPLE_FINGERPRINT_NOW;
     const q = new AssignmentQueue({
       keeper: memoryKeeper(),
@@ -319,7 +319,7 @@ describe('a run that fails after it started', () => {
         adapters: () => [{ name: 'codex', label: 'Codex', problem: null, implement: null }],
         preferred: () => 'codex',
         run: async (ctx) => {
-          ctx.started?.({ at: FIXTURE_NOW, toil: 't', toilUi: 't', adapter: 'codex', model: null, skills: [], tools: [], dossier: { name: 'card-payments', fingerprint: null }, item: { id: ctx.item.id, updated: null, fingerprint: 'f' }, prompt: 'p', fingerprint: SAMPLE_FINGERPRINT_NOW });
+          ctx.started?.({ at: FIXTURE_NOW, toil: 't', toilUi: 't', adapter: 'codex', model: null, skills: [], tools: [], toilProject: { name: 'card-payments', fingerprint: null }, item: { id: ctx.item.id, updated: null, fingerprint: 'f' }, prompt: 'p', fingerprint: SAMPLE_FINGERPRINT_NOW });
           throw new RunStopped('error', 'The CLI stopped.', null);
         },
       },
@@ -332,11 +332,11 @@ describe('a run that fails after it started', () => {
       now: () => FIXTURE_NOW,
       newId: () => 'fail-0000000001',
     });
-    await q.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' });
+    await q.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' });
     while ((await q.read('fail-0000000001')).state !== 'failed') await new Promise((r) => setTimeout(r, 2));
     expect((await q.read('fail-0000000001')).stale).toBeNull();
-    current = { ...SAMPLE_FINGERPRINT_NOW, dossier: 'changed' };
-    expect((await q.read('fail-0000000001')).stale!.text).toBe('dossier changed since it started');
+    current = { ...SAMPLE_FINGERPRINT_NOW, toilProject: 'changed' };
+    expect((await q.read('fail-0000000001')).stale!.text).toBe('Toil project changed since it started');
     expect(renewRefusal(await q.read('fail-0000000001'))).toBeNull();
   });
 });

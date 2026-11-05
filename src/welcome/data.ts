@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { CONNECTION_FIELD, CWD_FIELD, DOSSIER_FIELD } from '../core/area.js';
+import { CONNECTION_FIELD, CWD_FIELD, TOIL_PROJECT_FIELD } from '../core/area.js';
 import type { AnyCommand } from '../core/command.js';
 import { loadConfig, type AreaInfo } from '../core/config.js';
 import { fieldSchema } from '../core/schema.js';
@@ -59,7 +59,7 @@ export function gatherWelcomeData(o: WelcomeDataOptions): WelcomeData {
   };
 }
 
-const CORE_FIELDS = new Set([CONNECTION_FIELD, DOSSIER_FIELD, CWD_FIELD]);
+const CORE_FIELDS = new Set([CONNECTION_FIELD, TOIL_PROJECT_FIELD, CWD_FIELD]);
 
 /**
  * An area's commands as the Services browser lists them: the ones under its

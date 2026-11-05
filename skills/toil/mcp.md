@@ -40,18 +40,18 @@ port.
   notification for each page a listing reads and each rate-limited (429) request
   toil waits to retry, with the same message the CLI writes to stderr
   (`core.md`, **Progress**). The envelope is the same either way.
-- **Prompts**: `analyze` briefs one dossier (its one argument, `dossier`, defaults to
+- **Prompts**: `analyze` briefs one toil project (its one argument, `toilProject`, defaults to
   the one the folder matches): what needs a person, why, and what to do first, read
   through toil's tools, with every work item and pull request linked. It's what the
-  `dossiers_analyze_prompt` tool returns, served when that tool is (`dossiers.md`,
+  `projects_analyze_prompt` tool returns, served when that tool is (`projects.md`,
   **Analyze**).
 - **Resources**: besides tools, the server serves read-only resources that describe
   toil's own context, so a client can read it without a tool call. None reads from a
   service, and none holds a secret. They follow `--areas` as the tools do.
   - `toil://connections`: each connection's `name`, `area`, `isDefault` and
     `writes`, for the areas served. Never a host or a credential.
-  - `toil://dossiers` and `toil://dossiers/<name>`: what the `dossiers_list` and
-    `dossiers_show` tools return, served when those tools are.
+  - `toil://projects` and `toil://projects/<name>`: what the `projects_list` and
+    `projects_show` tools return, served when those tools are.
   - `toil://skill/<area>`: this skill's page for each area served, such as
     `toil://skill/jira` for `jira.md`.
   - `toil://skill/workflows/<job>`: the workflow pages (`review`, `ship`,

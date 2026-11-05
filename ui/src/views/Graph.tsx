@@ -35,7 +35,7 @@ function ItemBox({ data }: NodeProps<ItemNode>) {
           {n.blocked && <span className="gflag">{term('blocked', 'Blocked')}</span>}
         </>
       ) : (
-        <p className="note">Not in this dossier</p>
+        <p className="note">Not in this Toil project</p>
       )}
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </div>
@@ -82,10 +82,10 @@ class Drawing extends Component<{ children: ReactNode }, { error: string | null 
 }
 
 export function Graph() {
-  const { dossier, byId, sync } = useData();
+  const { toilProject, byId, sync } = useData();
   const words = useWords();
-  const g = dependencyGraph(dossier.items);
-  if (!g.nodes.length) return <Empty message={words('empty.links')} action={<TrackerAction dossier={dossier.name} sync={sync} />} />;
+  const g = dependencyGraph(toilProject.items);
+  if (!g.nodes.length) return <Empty message={words('empty.links')} action={<TrackerAction toilProject={toilProject.name} sync={sync} />} />;
 
   const nodes: ItemNode[] = g.nodes.map((n) => ({ id: n.id, type: 'item', position: { x: n.rank * 260, y: n.row * 130 }, data: { node: n } }));
   const edges: Edge[] = g.edges.map((e) => {

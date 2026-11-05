@@ -34,7 +34,7 @@ const list = (v: unknown) => (Array.isArray(v) ? v : []);
  * A scanner finds where each top-level value ends, outside strings.
  */
 function values(text: string): unknown[] {
-  if (text.trim() === '') throw new ToilError('INVALID_INPUT', 'The input is empty.', { fix: 'Pipe OWI records in (toil jira issue search … | toil util owi map | toil dossiers brief), or pass the file that holds them.' });
+  if (text.trim() === '') throw new ToilError('INVALID_INPUT', 'The input is empty.', { fix: 'Pipe OWI records in (toil jira issue search … | toil util owi map | toil projects brief), or pass the file that holds them.' });
   const out: unknown[] = [];
   let depth = 0;
   let inString = false;
@@ -84,7 +84,7 @@ export function readBriefRecords(text: string): BriefRecords {
   const walk = (value: unknown, at: string, depth: number): void => {
     if (isEnvelope(value)) {
       if (value.meta.command !== 'util owi map') {
-        throw new ToilError('INVALID_INPUT', `${at === 'the input' ? 'The input' : at} is the output of "${value.meta.command}", not OWI records.`, { fix: `Map it first: pipe it through toil util owi map, then into toil dossiers brief.` });
+        throw new ToilError('INVALID_INPUT', `${at === 'the input' ? 'The input' : at} is the output of "${value.meta.command}", not OWI records.`, { fix: `Map it first: pipe it through toil util owi map, then into toil projects brief.` });
       }
       if (value.ok !== true) return void out.skipped.push({ at, reason: 'the util owi map call failed, so it holds no records' });
       return walk(value.data, at, depth);

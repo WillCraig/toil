@@ -4,12 +4,12 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-/** The Ask bar of the dossier on screen. */
-export const askBar = (dossier: string) => screen.getByRole('region', { name: `Ask about ${dossier}` });
+/** The Ask bar of the toil project on screen. */
+export const askBar = (toilProject: string) => screen.getByRole('region', { name: `Ask about ${toilProject}` });
 
 /** Presses into the Ask bar and returns the focused view's dialog. */
-export async function openChat(dossier: string): Promise<HTMLElement> {
-  const bar = await screen.findByRole('region', { name: `Ask about ${dossier}` });
+export async function openChat(toilProject: string): Promise<HTMLElement> {
+  const bar = await screen.findByRole('region', { name: `Ask about ${toilProject}` });
   await userEvent.click(within(bar).getByRole('textbox', { name: 'Your question' }));
-  return screen.findByRole('dialog', { name: `Ask about ${dossier}` });
+  return screen.findByRole('dialog', { name: `Ask about ${toilProject}` });
 }

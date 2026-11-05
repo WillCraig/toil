@@ -80,7 +80,7 @@ const MAINTAINER_FIRST = ['site/', 'functions/', 'infra/'];
  */
 export const CORE_SAFETY = [
   // The write gate, execute() and what a call resolves.
-  'run', 'call-context', 'context', 'command', 'area', 'connection', 'deployments', 'dossier', 'check-dossier',
+  'run', 'call-context', 'context', 'command', 'area', 'connection', 'deployments', 'toil-project', 'check-toil-project',
   // Secrets and the credential store.
   'keychain', 'secret-input', 'secret-shapes', 'prompt', 'token',
   // Files, local paths and git.
@@ -104,7 +104,7 @@ export const SAFETY_ELSEWHERE_CORE = new Set([
   'test/workflow-wiring.test.ts', 'test/merge-only.test.ts', 'test/repo-hygiene.test.ts',
 ]);
 export const SAFETY_CORE_FOLDERS = [
-  'src/os/', 'src/shims/', 'src/mcp/', 'src/core/query/', 'src/connections/', 'src/skills/', 'src/setup/', 'src/feedback/', 'src/dossiers/',
+  'src/os/', 'src/shims/', 'src/mcp/', 'src/core/query/', 'src/connections/', 'src/skills/', 'src/setup/', 'src/feedback/', 'src/projects/',
   // The shipped skill: every page ships to users' agents as instructions, and most say how a write gate works.
   'skills/toil/',
 ];

@@ -9,7 +9,7 @@
 
 import { insights, type Prepared } from './insights.ts';
 
-/** Each open blocker, with the open items it blocks directly, in the dossier's order. */
+/** Each open blocker, with the open items it blocks directly, in the toil project's order. */
 export function heldBy(p: Prepared): Map<string, string[]> {
   const held = new Map<string, string[]>();
   for (const item of p.items) {

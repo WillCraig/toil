@@ -12,7 +12,7 @@ import type { SyncStatus } from '../src/server-client.ts';
 
 /** The notification history behind the header's bell (#417). */
 
-const entry = (n: number): Omit<HistoryEntry, 'seq'> => ({ id: `assignment:a${n}:done`, at: `2026-10-13T08:${String(n % 60).padStart(2, '0')}:00.000Z`, kind: 'done', title: `Codex finished ${n}`, line: `PAY-${n}: finished`, href: `#/dossier/card-payments/assignment/a${n}` });
+const entry = (n: number): Omit<HistoryEntry, 'seq'> => ({ id: `assignment:a${n}:done`, at: `2026-10-13T08:${String(n % 60).padStart(2, '0')}:00.000Z`, kind: 'done', title: `Codex finished ${n}`, line: `PAY-${n}: finished`, href: `#/project/card-payments/assignment/a${n}` });
 
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.useRealTimers());
@@ -60,12 +60,12 @@ describe('the history', () => {
     expect(store.get().entries).toEqual([]);
   });
 
-  it("words a sync's result, linking to the dossier that failed", () => {
-    const status = (over: Partial<SyncStatus['job']>, dossiers: SyncStatus['dossiers']) => ({ job: { running: false, finishedAt: '2026-10-13T08:00:00.000Z', ...over }, dossiers }) as unknown as SyncStatus;
+  it("words a sync's result, linking to the Toil project that failed", () => {
+    const status = (over: Partial<SyncStatus['job']>, toilProjects: SyncStatus['toilProjects']) => ({ job: { running: false, finishedAt: '2026-10-13T08:00:00.000Z', ...over }, toilProjects }) as unknown as SyncStatus;
     const ok = { name: 'card-payments', status: 'ok', sources: [{ area: 'jira', status: 'ok' }] };
     const bad = { name: 'settlement', status: 'ok', sources: [{ area: 'ado', status: 'failed' }] };
-    expect(syncEntry(status({}, [ok] as never))).toMatchObject({ id: 'sync:2026-10-13T08:00:00.000Z', kind: 'sync', title: 'Sync finished', line: '1 dossier up to date', href: '#/' });
-    expect(syncEntry(status({}, [ok, bad] as never))).toMatchObject({ kind: 'sync-failed', title: 'Sync finished; 1 source failed', line: 'settlement: Azure DevOps', href: '#/dossier/settlement' });
+    expect(syncEntry(status({}, [ok] as never))).toMatchObject({ id: 'sync:2026-10-13T08:00:00.000Z', kind: 'sync', title: 'Sync finished', line: '1 Toil project up to date', href: '#/' });
+    expect(syncEntry(status({}, [ok, bad] as never))).toMatchObject({ kind: 'sync-failed', title: 'Sync finished; 1 source failed', line: 'settlement: Azure DevOps', href: '#/project/settlement' });
     expect(syncEntry(status({ error: 'toil could not start' }, [] as never))).toMatchObject({ kind: 'sync-failed', title: 'The sync stopped', line: 'toil could not start' });
   });
 });
@@ -78,7 +78,7 @@ describe('the bell', () => {
     await userEvent.click(bell);
     const list = await screen.findByRole('dialog', { name: /^Notifications/ });
     const links = within(list).getAllByRole('link', { name: /Codex finished/ });
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['#/dossier/card-payments/assignment/a2', '#/dossier/card-payments/assignment/a1']);
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['#/project/card-payments/assignment/a2', '#/project/card-payments/assignment/a1']);
     expect(links[0]!.textContent).toMatch(/^Unread: /);
     await userEvent.click(within(list).getByRole('button', { name: 'Mark all read' }));
     expect(screen.getByRole('button', { name: 'Notifications', hidden: true })).toBeTruthy();
@@ -104,14 +104,14 @@ describe('the bell', () => {
       return null;
     };
     render(
-      <NotifyProvider assignments={undefined} dossier={null} mine={() => new Set()}>
+      <NotifyProvider assignments={undefined} toilProject={null} mine={() => new Set()}>
         <Grab />
         <Bell />
       </NotifyProvider>,
     );
-    act(() => notify!.report({ key: 'chat:1:0', state: 'stale', notable: 'stale', agent: 'The chat', item: null, itemTitle: null, why: 'toil changed', dossier: 'card-payments', href: '#/dossier/card-payments', mine: true }, 'fresh'));
+    act(() => notify!.report({ key: 'chat:1:0', state: 'stale', notable: 'stale', agent: 'The chat', item: null, itemTitle: null, why: 'toil changed', toilProject: 'card-payments', href: '#/project/card-payments', mine: true }, 'fresh'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Notifications, 1 unread' })).toBeTruthy(), { timeout: 6000 });
-    expect(history.get().entries[0]).toMatchObject({ id: 'chat:1:0:stale', kind: 'stale', title: 'The chat went stale', line: 'card-payments: toil changed', href: '#/dossier/card-payments' });
+    expect(history.get().entries[0]).toMatchObject({ id: 'chat:1:0:stale', kind: 'stale', title: 'The chat went stale', line: 'card-payments: toil changed', href: '#/project/card-payments' });
     expect(notify!.notices).toEqual([]);
   }, 10_000);
 

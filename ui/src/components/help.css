@@ -68,7 +68,7 @@
 .help-popover__dialog p { margin: 0; overflow-wrap: anywhere; }
 .help-popover__dialog a { display: inline-flex; align-items: center; min-height: 44px; color: var(--link); }
 .help-popover__title { font-size: 1rem; margin: 0; }
-/* The pencil as a link: the same 2rem box as the in-place editor's pencil (dossier-head.css), with no underline. */
+/* The pencil as a link: the same 2rem box as the in-place editor's pencil (toil-project-head.css), with no underline. */
 [data-theme] .btn.edit-link, .btn.edit-link {
   display: inline-flex;
   align-items: center;

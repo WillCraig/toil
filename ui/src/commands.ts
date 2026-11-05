@@ -1,11 +1,11 @@
 /**
  * What the command palette (#416) asks of a view that owns the thing it acts
  * on: the Ask bar focuses itself, runs Analyze or answers with another agent,
- * a dossier's page opens the Assign dialog for an item, and its frame opens the Agents panel. The palette sits
+ * a toil project's page opens the Assign dialog for an item, and its frame opens the Agents panel. The palette sits
  * above every view, so it can't call into one directly; it sends the request
  * here and the view that is showing picks it up. Nothing is queued: a request
  * no view is listening for is dropped, which is why the palette offers these
- * only on a dossier's pages. An internal memo, routed to whoever is at their desk.
+ * only on a toil project's pages. An internal memo, routed to whoever is at their desk.
  */
 
 import { useEffect, useRef } from 'react';

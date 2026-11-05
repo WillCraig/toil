@@ -1,5 +1,5 @@
 // Starts the Toil UI built from this clone against your own home: your
-// ~/.toil config, connections, credential store entries and dossiers, as they
+// ~/.toil config, connections, credential store entries and toil projects, as they
 // are. dev-real.mjs is the one to use for a clean, throwaway home; this one is
 // for trying unreleased changes on your own work.
 //

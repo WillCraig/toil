@@ -38,7 +38,7 @@ export const githubArea = defineArea({
   secrets: ['token'],
   // GitHub Actions sets both on every runner, so a workflow needs no toil-specific setup.
   fallbacks: { token: ['GITHUB_TOKEN'], baseUrl: ['GITHUB_API_URL'] },
-  // github.com's API is on api.github.com, so a dossier's host: github.com selects that connection.
+  // github.com's API is on api.github.com, so a toil project's host: github.com selects that connection.
   siteApis: { 'github.com': 'https://api.github.com' },
   context: {
     owner: {

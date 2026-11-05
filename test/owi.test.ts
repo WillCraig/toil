@@ -378,7 +378,7 @@ describe('the self-check', () => {
 });
 
 describe('@imagile-dev/toil/api', () => {
-  it('exports mapOwi, owiVersion and owiSchema, mapping envelopes with a dossier-style fields object', async () => {
+  it('exports mapOwi, owiVersion and owiSchema, mapping envelopes with a toil-project-style fields object', async () => {
     const api = await import('../src/api.js');
     expect(api.owiVersion).toBe(OWI_VERSION);
     expect(api.owiSchema).toEqual(schema);
@@ -472,7 +472,7 @@ describe('GitHub without a board (#298): milestones, estimate labels and body li
     expect(backlog.unmapped.find((u) => u.field === 'iteration')!.reason).toContain('no milestone');
   });
 
-  it('runs every milestone iterationDays to its due date when the dossier says how long sprints are', async () => {
+  it('runs every milestone iterationDays to its due date when the toil project says how long sprints are', async () => {
     const { data } = await map({ text: json([list]), field: ['iterationDays=10'] });
     expect(byId(data.items, id(7)).iteration).toMatchObject({ start: '2026-10-16T00:00:00.000Z', end: '2026-10-26T00:00:00.000Z' });
   });
@@ -506,7 +506,7 @@ describe('GitHub without a board (#298): milestones, estimate labels and body li
     expect(data.items[0].estimate?.value ?? null).toBe(value);
   });
 
-  it("reads the dossier's own estimateLabel, literally, and lists two estimate labels rather than pick one", async () => {
+  it("reads the toil project's own estimateLabel, literally, and lists two estimate labels rather than pick one", async () => {
     const own = await map({ text: json(one(ghIssue(1, { labels: [{ name: 'Size/3' }, { name: 'points: 8' }] }))), field: ['estimateLabel=size/{n}', 'estimateUnit=days'] });
     expect(own.data.items[0].estimate).toEqual({ value: 3, unit: 'days', field: 'label:Size/3' });
     const literal = await map({ text: json(one(ghIssue(1, { labels: [{ name: 'sizeX3' }] }))), field: ['estimateLabel=size.{n}'] });

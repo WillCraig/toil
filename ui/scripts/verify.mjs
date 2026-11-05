@@ -9,13 +9,13 @@
 //      the layout and axe check (scripts/layout-check.mjs) in every theme and
 //      scheme at 375, 768 and 1440px. Needs nothing but a browser, so CI can
 //      run it. Then the first run (#416): toil-ui on an empty home, whose
-//      Dossiers view must show the three-step checklist, through the same check.
+//      Toil projects view must show the three-step checklist, through the same check.
 //   2. Real data, from a source (`--source github`, the default): the private
 //      sandbox imagile-dev/toil-sandbox, in the isolated home dev-real.mjs
 //      uses (scripts/real-home.mjs) at <clone>/.scratch/verify/home, made fresh
 //      each run, with the token from `gh auth token` in toil-ui's environment
-//      only. It syncs the `sandbox` dossier through toil, then runs the same
-//      check over the real-data routes (home, the dossier with its Board and Dependencies tabs, its worklog and stand-up, one of its items,
+//      only. It syncs the `sandbox` toil project through toil, then runs the same
+//      check over the real-data routes (home, the toil project with its Board and Dependencies tabs, its worklog and stand-up, one of its items,
 //      and every settings page in the layout check's list). With `--ask` it also asks an agent
 //      (Codex unless `--adapter copilot` or `--adapter claude`, on `--model` when given) one starter
 //      question, then Analyze as its follow-up, and checks that an answer arrived, that the server verified
@@ -24,7 +24,7 @@
 //      `codex mcp list` in Toil UI's own Codex home shows only toil_ui (Codex
 //      only), and that the answer's usage, as the SDK reported it, is in the
 //      usage ledger unchanged (#295). Then the history of analyses (#395): the
-//      Analyze kept top-down, the dossier's WIP limit changed in the scratch
+//      Analyze kept top-down, the toil project's WIP limit changed in the scratch
 //      home, Analyze again, both listed with what changed, and the Analyses tab
 //      and the second one opened through the layout check. Without a GitHub sign-in this part is
 //      skipped, and the report says so plainly.
@@ -87,7 +87,7 @@ const agentLabel = ADAPTERS[adapter].label;
 const askStep = `Ask (${agentLabel})`;
 
 /**
- * Where real data comes from. Each source sets up its dossier in the scratch
+ * Where real data comes from. Each source sets up its toil project in the scratch
  * home and hands back toil-ui's environment, or says why it can't (`skip`).
  * Another tracker is one more entry of the same shape: `--source ado` runs
  * the same sync, layout check and Ask against an Azure DevOps Services board
@@ -101,8 +101,8 @@ const SOURCES = {
       const gh = githubToken();
       if (!gh.token) return { skip: `${gh.problem}. Sign in with gh auth login, or set TOIL_GITHUB_TOKEN, to run it.` };
       const env = { ...realHomeEnv(home, gh.token), TOIL_UI_DATA_DIR: join(home, '.toil-ui') };
-      const dossier = prepareRealHome({ home, repo: 'imagile-dev/toil-sandbox', self: false, env, log: say });
-      return { env, dossier, detail: `token from ${gh.from}, in toil-ui's environment only` };
+      const toilProject = prepareRealHome({ home, repo: 'imagile-dev/toil-sandbox', self: false, env, log: say });
+      return { env, toilProject, detail: `token from ${gh.from}, in toil-ui's environment only` };
     },
   },
   ado: {
@@ -111,8 +111,8 @@ const SOURCES = {
       const missing = adoProblem(process.env, project);
       if (missing) return { skip: `${missing}.` };
       const env = { ...realHomeEnv(home, null, process.env, { ado: true }), TOIL_UI_DATA_DIR: join(home, '.toil-ui') };
-      const dossier = prepareAdoHome({ home, project, env, log: say });
-      return { env, dossier, detail: "TOIL_ADO_BASE_URL and TOIL_ADO_PAT in toil-ui's environment only" };
+      const toilProject = prepareAdoHome({ home, project, env, log: say });
+      return { env, toilProject, detail: "TOIL_ADO_BASE_URL and TOIL_ADO_PAT in toil-ui's environment only" };
     },
   },
 };
@@ -197,9 +197,9 @@ async function layout(part, launchUrl, routes) {
   const urlFor = (theme, scheme, route) => `${launchUrl}&theme=${theme}&scheme=${scheme}${route}`;
   const runs = themeRuns();
   const log = (line) => say(`  layout (${part}): ${line}`);
-  // A real dossier's name and links may genuinely fill the header's row at 1440px, so only the sample's must fit (#387).
+  // A real toil project's name and links may genuinely fill the header's row at 1440px, so only the sample's must fit (#387).
   const headerFits = part !== 'real';
-  // The analyses part reads the real dossier, whose Analyze answers are a real agent's: states that need the sample's content are not held to it.
+  // The analyses part reads the real toil project, whose Analyze answers are a real agent's: states that need the sample's content are not held to it.
   const sample = part !== 'real' && part !== 'analyses';
   const strict = await checkLayout({ urlFor, routes, runs: runs.filter((r) => r.strict), shots: join(out, 'shots', part), log, headerFits, sample });
   const other = await checkLayout({ urlFor, routes, runs: runs.filter((r) => !r.strict), log, headerFits, sample });
@@ -210,12 +210,12 @@ async function layout(part, launchUrl, routes) {
   step(`Layout and axe, ${part}`, found.length ? 'fail' : 'pass', `${checked} views and states, ${routes.length} routes in ${runs.length} theme schemes at ${WIDTHS.join(', ')}px: ${found.length} problem(s), ${strict.reported.length + other.reported.length} report-only axe finding(s) outside Plain and Crate`);
 }
 
-/** The dossier page's first work item, as a route, read from the page itself. */
-async function firstItemRoute(launchUrl, dossier) {
+/** The toil project page's first work item, as a route, read from the page itself. */
+async function firstItemRoute(launchUrl, toilProject) {
   const { page, close } = await openBrowser(findChrome());
   try {
     await page.size(1440);
-    await page.goto(`${launchUrl}&theme=plain&scheme=light#/dossier/${encodeURIComponent(dossier)}`);
+    await page.goto(`${launchUrl}&theme=plain&scheme=light#/project/${encodeURIComponent(toilProject)}`);
     return await page.evaluate(`new Promise((resolve) => {
       const started = Date.now();
       const tick = () => {
@@ -270,7 +270,7 @@ async function streamedAsk(api, body) {
  * plus the model it named, and for Codex its home's MCP servers. Copilot and
  * Claude are held to the same checks as Codex, the reference (#317, #318).
  */
-async function askAgent(api, dossier, home, dataDir, env, launchUrl) {
+async function askAgent(api, toilProject, home, dataDir, env, launchUrl) {
   if (!sdkInstalled(adapter)) {
     const install = sdkInstall(adapter);
     problems.push(`Ask: ${ADAPTERS[adapter].package} isn't installed in this clone. Install it with ${install} and run again.`);
@@ -286,7 +286,7 @@ async function askAgent(api, dossier, home, dataDir, env, launchUrl) {
   }
   const before = auditLines(home).length;
   const started = Date.now();
-  const res = await streamedAsk(api, { dossier, prompt: starter, theme: 'plain', voice: false, chat: { id: 'verify-ui', turn: 1 } });
+  const res = await streamedAsk(api, { toilProject, prompt: starter, theme: 'plain', voice: false, chat: { id: 'verify-ui', turn: 1 } });
   const seconds = Math.round((Date.now() - started) / 1000);
   if (res.status !== 200 || res.error || !res.done) {
     const e = res.error ?? { message: 'the stream ended without done' };
@@ -350,28 +350,28 @@ async function askAgent(api, dossier, home, dataDir, env, launchUrl) {
   // Analyze (#343), as the chat's second question, carrying the first: the pulse check, cited.
   const history = [{ prompt: answer.prompt, answer: answer.parts.map((p) => p.text).join('\n\n'), by: answer.by }];
   const pulseStarted = Date.now();
-  const pulse = await streamedAsk(api, { dossier, prompt: 'analyze', theme: 'plain', voice: false, chat: { id: 'verify-ui', turn: 2 }, history });
+  const pulse = await streamedAsk(api, { toilProject, prompt: 'analyze', theme: 'plain', voice: false, chat: { id: 'verify-ui', turn: 2 }, history });
   const pulseSeconds = Math.round((Date.now() - pulseStarted) / 1000);
   const p = pulse.answer;
   const pulseOk = pulse.status === 200 && !pulse.error && p && (p.parts.length || p.briefing) && p.citations.length && !(p.unverified ?? []).length && p.carried === 1;
   if (!pulseOk) fail(`Analyze: ${pulse.error?.message ?? `${p?.parts.length ?? 0} paragraph(s), ${p?.citations.length ?? 0} cited, ${(p?.unverified ?? []).length} unverified, carried ${p?.carried ?? 0}`}`);
   step('Ask: Analyze, as a follow-up', pulseOk ? 'pass' : 'fail', p ? `${p.briefing ? `a briefing (${p.briefing.reasons.length} reason(s)), ` : ''}${p.parts.length} paragraph(s) in ${pulseSeconds}s, ${p.citations.length} cited, ${(p.unverified ?? []).length} unverified, carried ${p.carried ?? 0} earlier turn; starts: ${p.parts.map((x) => x.text.split(/[:.]/)[0].slice(0, 30)).join(' / ')}` : (pulse.error?.message ?? 'no answer'));
-  if (p) await analysisHistory(api, dossier, home, env, launchUrl, p, [...history, { prompt: p.prompt, answer: p.parts.map((x) => x.text).join('\n\n'), by: p.by }]);
+  if (p) await analysisHistory(api, toilProject, home, env, launchUrl, p, [...history, { prompt: p.prompt, answer: p.parts.map((x) => x.text).join('\n\n'), by: p.by }]);
 }
 
 /**
  * The history of analyses (#395): the Analyze just asked was kept, read back
  * with its briefing (#494: a recommendation, and its first three reasons as the
- * history's issues); then the dossier's
+ * history's issues); then the toil project's
  * WIP limit changes in the scratch home, Analyze runs again, and the history
  * lists both, newest first, the second saying what changed since the first.
  * The Analyses tab and the second one opened go through the layout check,
  * shot like every other view.
  */
-async function analysisHistory(api, dossier, home, env, launchUrl, first, history) {
+async function analysisHistory(api, toilProject, home, env, launchUrl, first, history) {
   const fail = (what) => problems.push(`Analyses: ${what}`);
   const one = async (id) => {
-    const res = id ? await api.get(`analyses/one?dossier=${encodeURIComponent(dossier)}&id=${encodeURIComponent(id)}`) : null;
+    const res = id ? await api.get(`analyses/one?toilProject=${encodeURIComponent(toilProject)}&id=${encodeURIComponent(id)}`) : null;
     return res?.status === 200 ? res.json() : null;
   };
   const shapeOf = (r) => (r ? `recommendation ${r.recommendation ? `"${r.recommendation.replace(/\[\[[^\]]*:([^\]]+)\]\]/g, '$1').slice(0, 90)}${r.recommendation.length > 90 ? '…' : ''}"` : 'missing'}, ${r.issues.length} issue(s)${r.issues.length ? ` (${r.issues.map((i) => i.title ?? 'untitled').join(', ')})` : ''}, ${r.citations.length} cited` : 'not kept');
@@ -381,31 +381,31 @@ async function analysisHistory(api, dossier, home, env, launchUrl, first, histor
   else if (!topDown(kept)) fail(`the first Analyze isn't top-down: ${shapeOf(kept.record)}.`);
   step('Analyses: the first kept, top-down', topDown(kept) ? 'pass' : 'fail', shapeOf(kept?.record));
 
-  // Something changes between the two: the dossier's WIP limit, in the scratch home, through toil's own command.
+  // Something changes between the two: the toil project's WIP limit, in the scratch home, through toil's own command.
   const toil = toilIn(home, env);
-  const shown = toil('dossiers', 'show', dossier);
-  const was = shown.ok ? shown.data?.dossier?.wipLimit ?? null : null;
+  const shown = toil('projects', 'show', toilProject);
+  const was = shown.ok ? shown.data?.toilProject?.wipLimit ?? null : null;
   const limit = was === 1 ? 2 : 1;
-  const set = toil('dossiers', 'wip-limit', dossier, String(limit), '--replace');
-  if (!set.ok) fail(`toil dossiers wip-limit ${dossier} ${limit} --replace failed: ${set.error.message}`);
-  step('Analyses: the dossier changed between them', set.ok ? 'pass' : 'fail', `toil dossiers wip-limit ${dossier} ${limit} --replace, from ${was ?? 'none'}`);
+  const set = toil('projects', 'wip-limit', toilProject, String(limit), '--replace');
+  if (!set.ok) fail(`toil projects wip-limit ${toilProject} ${limit} --replace failed: ${set.error.message}`);
+  step('Analyses: the Toil project changed between them', set.ok ? 'pass' : 'fail', `toil projects wip-limit ${toilProject} ${limit} --replace, from ${was ?? 'none'}`);
 
   const started = Date.now();
-  const again = await streamedAsk(api, { dossier, prompt: 'analyze', theme: 'plain', voice: false, chat: { id: 'verify-ui', turn: 3 }, history });
+  const again = await streamedAsk(api, { toilProject, prompt: 'analyze', theme: 'plain', voice: false, chat: { id: 'verify-ui', turn: 3 }, history });
   const seconds = Math.round((Date.now() - started) / 1000);
   const second = await one(again.answer?.analysis);
   if (again.error || !second) fail(`the second Analyze ${again.error ? `failed: ${again.error.message}` : "wasn't kept"}.`);
   else if (!topDown(second)) fail(`the second Analyze isn't top-down: ${shapeOf(second.record)}.`);
   step('Analyses: Analyze again, kept', second && topDown(second) ? 'pass' : 'fail', `in ${seconds}s; ${shapeOf(second?.record)}${(again.answer?.unverified ?? []).length ? `, ${again.answer.unverified.length} unverified` : ''}`);
 
-  const list = (await api.get(`analyses?dossier=${encodeURIComponent(dossier)}`)).json();
+  const list = (await api.get(`analyses?toilProject=${encodeURIComponent(toilProject)}`)).json();
   const c = Array.isArray(list) ? list[0]?.changes : null;
   const ordered = Array.isArray(list) && list.length >= 2 && list[0].id === second?.record.id && list[1].id === kept?.record.id && c?.previous?.id === kept?.record.id;
   if (!ordered) fail(`the history doesn't list the second analysis first, compared with the first: ${JSON.stringify(Array.isArray(list) ? list.slice(0, 2).map((a) => ({ id: a.id, previous: a.changes.previous?.id ?? null })) : list)}.`);
   const said = c ? [`${c.newlyBlocked.length} newly blocked`, `${c.cleared.length} cleared`, `points moved on ${c.points.length}`, c.sprint ? 'the sprint moved' : 'the sprint the same', `${c.cited.length} newly cited`, `${c.dropped.length} dropped`, c.recommendationChanged ? 'a new recommendation' : 'the same recommendation'].join(', ') : 'nothing to compare';
   step('Analyses: the history and what changed', ordered ? 'pass' : 'fail', `${Array.isArray(list) ? list.length : 0} kept, newest first; since the one before: ${said}`);
 
-  if (second) await layout('analyses', launchUrl, [`#/dossier/${dossier}`, `#/dossier/${dossier}/analyses`, `#/dossier/${dossier}/analyses/${encodeURIComponent(second.record.id)}`]);
+  if (second) await layout('analyses', launchUrl, [`#/project/${toilProject}`, `#/project/${toilProject}/analyses`, `#/project/${toilProject}/analyses/${encodeURIComponent(second.record.id)}`]);
 }
 
 const startedAt = new Date();
@@ -458,7 +458,7 @@ try {
     rmSync(work, { recursive: true, force: true, maxRetries: 5 });
   }
 
-  // 1b. The first run (#416): toil-ui on a home with no connections and no dossiers, and no TOIL_* variable from this
+  // 1b. The first run (#416): toil-ui on a home with no connections and no toil projects, and no TOIL_* variable from this
   // shell, so it shows the checklist. It reads only toil's own empty config, so it needs no network either.
   const fresh = join(tmpdir(), `toil-ui-verify-first-${process.pid}`);
   const freshEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('TOIL_')));
@@ -488,10 +488,10 @@ try {
     step(`Real data (${source.label})`, 'skip', `skipped: ${ready.skip}`);
     if (ask) step(askStep, 'skip', 'skipped with the real data it would read');
   } else {
-    step(`Real data (${source.label})`, 'pass', `home ${relative(root, home)}, dossier ${ready.dossier}, ${ready.detail}`);
+    step(`Real data (${source.label})`, 'pass', `home ${relative(root, home)}, Toil project ${ready.toilProject}, ${ready.detail}`);
     const real = await launch([], ready.env);
     try {
-      const started = await real.api.post('sync', { dossier: ready.dossier });
+      const started = await real.api.post('sync', { toilProject: ready.toilProject });
       if (started.status !== 202) throw new Error(`starting the sync answered ${started.status}: ${started.body}`);
       let status;
       const deadline = Date.now() + 10 * 60_000;
@@ -499,19 +499,19 @@ try {
         await new Promise((r) => setTimeout(r, 500));
         status = (await real.api.get('sync')).json();
       } while (status.job.running && Date.now() < deadline);
-      const state = status.dossiers.find((d) => d.name === ready.dossier);
+      const state = status.toilProjects.find((d) => d.name === ready.toilProject);
       const failed = state?.sources.filter((s) => s.status !== 'ok') ?? [];
       const synced = !status.job.running && !status.job.error && state?.status === 'ok';
-      if (!synced) problems.push(`sync: ${status.job.running ? 'still running after 10 minutes' : status.job.error ?? `${ready.dossier} is ${state?.status ?? 'missing'}: ${failed.map((s) => `${s.area}: ${s.error}`).join('; ')}`}`);
-      step(`Sync ${ready.dossier}`, synced ? 'pass' : 'fail', `${status.job.fetched} call(s) to toil, ${status.job.requests} request(s), ${status.job.pages} page(s), ${status.job.retries} retr${status.job.retries === 1 ? 'y' : 'ies'}; ${state?.sources.map((s) => `${s.area} ${s.status}`).join(', ') ?? 'no dossier state'}`);
+      if (!synced) problems.push(`sync: ${status.job.running ? 'still running after 10 minutes' : status.job.error ?? `${ready.toilProject} is ${state?.status ?? 'missing'}: ${failed.map((s) => `${s.area}: ${s.error}`).join('; ')}`}`);
+      step(`Sync ${ready.toilProject}`, synced ? 'pass' : 'fail', `${status.job.fetched} call(s) to toil, ${status.job.requests} request(s), ${status.job.pages} page(s), ${status.job.retries} retr${status.job.retries === 1 ? 'y' : 'ies'}; ${state?.sources.map((s) => `${s.area} ${s.status}`).join(', ') ?? 'no Toil project state'}`);
 
-      const item = await firstItemRoute(real.launchUrl, ready.dossier);
-      if (!item) problems.push(`real data: the ${ready.dossier} dossier page links no work item, so no item view was checked.`);
+      const item = await firstItemRoute(real.launchUrl, ready.toilProject);
+      if (!item) problems.push(`real data: the ${ready.toilProject} Toil project page links no work item, so no item view was checked.`);
       // The settings pages come from the layout check's own list, so a page added there is checked on real data too.
-      const routes = ['#/', `#/dossier/${ready.dossier}`, `#/dossier/${ready.dossier}/board`, `#/dossier/${ready.dossier}/dependencies`, `#/dossier/${ready.dossier}/worklog`, `#/dossier/${ready.dossier}/worklog/standup`, ...(item ? [item] : []), ...ROUTES.filter((r) => r.startsWith('#/settings/'))];
+      const routes = ['#/', `#/project/${ready.toilProject}`, `#/project/${ready.toilProject}/board`, `#/project/${ready.toilProject}/dependencies`, `#/project/${ready.toilProject}/worklog`, `#/project/${ready.toilProject}/worklog/standup`, ...(item ? [item] : []), ...ROUTES.filter((r) => r.startsWith('#/settings/'))];
       await layout('real', real.launchUrl, routes);
 
-      if (ask) await askAgent(real.api, ready.dossier, home, ready.env.TOIL_UI_DATA_DIR, ready.env, real.launchUrl);
+      if (ask) await askAgent(real.api, ready.toilProject, home, ready.env.TOIL_UI_DATA_DIR, ready.env, real.launchUrl);
       else step(askStep, 'skip', `not asked; pass --ask to ask ${agentLabel} one starter question`);
     } finally {
       await real.stop();

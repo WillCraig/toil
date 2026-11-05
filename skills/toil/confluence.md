@@ -33,12 +33,12 @@ shape**, unchanged; `meta.context.connection.deployment` says which one ran. Wha
 | `page history` | the history object | every version (`number`, `createdAt`, `authorId`, `message`, `minorEdit`) |
 | `page update` with no body | sends none | sends the current body back unchanged (v2 requires one) |
 | Comments | top-level comments | footer comments only, top level, plus `bodyText` |
-| Only here | `check-dossier` | |
+| Only here | `check-toil-project` | |
 
 A call the connection's deployment can't serve fails **before any request** with
 `UNSUPPORTED`, saying which deployment and what to do: `--expand` on `page get`,
 `--markdown` on `page create` or `page update`, `--offset` or `--cursor` on the other
-deployment, or `check-dossier` on a Cloud connection. The error names the connections you
+deployment, or `check-toil-project` on a Cloud connection. The error names the connections you
 have that can run it. Paging stays two flags because they are two ideas: an offset is where
 to start counting, a cursor is a token only the server can read.
 
@@ -150,7 +150,7 @@ is refused the same way.
 | `page attach` ✎ | `<id> --file --comment` | The attachments created |
 | `attachment download` | `<attachment-id> --dir` | `{ saved, filename, size }`; saves to `.toil/` by default |
 | `attachment delete` ✎ | `<attachment-id>` | `{ deleted }`; the attachment goes to the trash |
-| `check-dossier` (Data Center) | `--dossier <name\|file>` (or the folder's dossier) | `{ dossier, connection, env, ok, checked, checks, unchecked }`: each space the dossier names (`space`, `spaces`), found or not; exit 1 when one is missing |
+| `check-toil-project` (Data Center) | `--toil-project <name\|file>` (or the folder's toil project) | `{ toil project, connection, env, ok, checked, checks, unchecked }`: each space the toil project names (`space`, `spaces`), found or not; exit 1 when one is missing |
 
 Over MCP the same commands are tools named after the path, with spaces and hyphens
 as underscores (`confluence_page_get`, `confluence_attachment_download`), taking
@@ -278,7 +278,7 @@ now, and the old names are gone, not deprecated:
   default connection. When that connection is Cloud and `TOIL_CONFLUENCE_DEPLOYMENT` isn't set,
   the call fails with `CONFIG_INVALID` naming the variables, so Data Center values and a token
   never land on a Cloud site by accident.
-- **Dossiers:** a `confluence-cloud` section is read as `confluence` (also under an
-  environment and in a person's `ids`), with a `DOSSIER_RENAMED_AREA` warning to rename it.
-  With both, `confluence` wins. A dossier has one `confluence` section, so it picks one
+- **Toil projects:** a `confluence-cloud` section is read as `confluence` (also under an
+  environment and in a person's `ids`), with a `TOIL_PROJECT_RENAMED_AREA` warning to rename it.
+  With both, `confluence` wins. A toil project has one `confluence` section, so it picks one
   Confluence connection.

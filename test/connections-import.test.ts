@@ -479,13 +479,13 @@ describe('toil connections import', () => {
   });
 
   it('never overwrites a connection of the same name, and keeps what else the file holds', async () => {
-    writeConfig({ version: 3, connections: { 'team-reporting': { area: 'db', engine: 'postgres', host: 'other.imagile.dev', database: 'x', user: 'me' } }, defaults: {}, dossierPaths: ['/keep/me'] });
+    writeConfig({ version: 3, connections: { 'team-reporting': { area: 'db', engine: 'postgres', host: 'other.imagile.dev', database: 'x', user: 'me' } }, defaults: {}, projectPaths: ['/keep/me'] });
     const run = await cli(['connections', 'import', '--from', 'pgadmin', sample('pgadmin-servers.json'), '--save']);
     expect(run.envelope.data).toMatchObject({ saved: true, counts: { connections: 2, exists: 1 }, exists: [{ name: 'team-reporting' }] });
     const saved = readConfig();
     expect(saved.connections['team-reporting']).toMatchObject({ host: 'other.imagile.dev' });
     expect(Object.keys(saved.connections).sort()).toEqual(['local-postgresql', 'team-pgadmin-8', 'team-reporting']);
-    expect((saved as Data).dossierPaths).toEqual(['/keep/me']);
+    expect((saved as Data).projectPaths).toEqual(['/keep/me']);
   });
 
   it('warns that passwords were dropped, in meta.warnings, and writes none of them', async () => {

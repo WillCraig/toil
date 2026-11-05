@@ -97,7 +97,7 @@ const histories = [
 ];
 
 export const routes: Route[] = [
-  // check-dossier's project lookup. Invented from the docs: GET /rest/api/3/project/{key}.
+  // check-toil-project's project lookup. Invented from the docs: GET /rest/api/3/project/{key}.
   { method: 'GET', path: `${API}/project/PROJ`, respond: json({ id: '10000', key: 'PROJ', name: 'Project' }) },
   // The attachment-only read first: same path as issue get, with a query.
   { method: 'GET', path: `${API}/issue/PROJ-123`, query: { fields: 'attachment' }, respond: json({ id: '10123', key: 'PROJ-123', fields: { attachment: [attachment] } }) },

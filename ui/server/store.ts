@@ -7,7 +7,7 @@
  * - `sqliteStore`: the SQLite cache (#250), answering the views' calls from
  *   what a sync stored (server/sync.ts). `toil-ui` picks it.
  * - `toilStore`: toil itself, in-process through `@imagile-dev/toil/api`, with
- *   the user's own connections and dossiers, every call live. Every call is
+ *   the user's own connections and toil projects, every call live. Every call is
  *   `caller: 'toil-ui'` in the audit log.
  * - `fixtureStore`: the preview's fixture `execute()` and its sample data, for
  *   `toil-ui --sample`, the site preview and the tests.
@@ -86,13 +86,13 @@ export function toilStore(execute: Execute): Store {
   };
 }
 
-/** The commands a cache answers by passing them to toil: the dossiers are toil's own config on this machine, read fresh, and the readiness gate's workflow reads are live by design. */
-const LIVE_COMMANDS = new Set<string>(['dossiers list', 'dossiers show', ...WORKFLOW_READS]);
+/** The commands a cache answers by passing them to toil: the toil projects are toil's own config on this machine, read fresh, and the readiness gate's workflow reads are live by design. */
+const LIVE_COMMANDS = new Set<string>(['projects list', 'projects show', ...WORKFLOW_READS]);
 
 /**
  * The SQLite cache (#250): the views' calls answered from what the last sync
  * stored (server/sync.ts), so a dashboard opens without reaching a tracker.
- * The dossiers themselves are toil's own config on this machine and go to
+ * The toil projects themselves are toil's own config on this machine and go to
  * toil, read-only. A call the sync never stored gets a refusal saying to
  * sync; a call whose source failed on its latest sync gets the last good copy
  * with a `STALE` warning. `config` calls go to toil's write rules unchanged.
@@ -106,22 +106,22 @@ export function sqliteStore(cache: () => Cache, execute: Execute, toil: { versio
     async execute(ctx, command, input, access, how) {
       if (access !== 'read' || LIVE_COMMANDS.has(command)) return execute(command, input, toilOptions(ctx, access, how));
       const meta = { command, durationMs: 0, version: toil.version, contractVersion: toil.contractVersion };
-      const dossier = typeof input.dossier === 'string' ? input.dossier : null;
+      const toilProject = typeof input.toilProject === 'string' ? input.toilProject : null;
       // The dashboard's own search names a window of days; the sync stored the cache's. Only the window may differ (src/load.ts), so another project's search is never answered.
-      const stored = dossier ? cache().response(dossier, command, withWindow(input, windowFor(cache().retentionDays))) : null;
+      const stored = toilProject ? cache().response(toilProject, command, withWindow(input, windowFor(cache().retentionDays))) : null;
       if (!stored) {
         return {
           ok: false,
           data: null,
           error: {
             code: 'NOT_FOUND',
-            message: dossier ? `Toil UI hasn't synced ${command} for ${dossier} yet.` : `Toil UI answers ${command} from its cache, which is kept per dossier, and this call named none.`,
+            message: toilProject ? `Toil UI hasn't synced ${command} for ${toilProject} yet.` : `Toil UI answers ${command} from its cache, which is kept per Toil project, and this call named none.`,
             fix: 'Press Sync now in the Sync panel at the foot of the page; the dashboards read what the sync stores.',
           },
           meta,
         } as Envelope;
       }
-      const source = cache().source(dossier!, stored.area);
+      const source = cache().source(toilProject!, stored.area);
       if (source?.status !== 'failed') return stored.envelope;
       const warning = { code: 'STALE', message: `The latest sync of ${stored.area} failed (${source.error ?? 'no message'}), so this is the copy synced ${source.lastSuccessAt ?? stored.syncedAt}.` };
       return { ...stored.envelope, meta: { ...stored.envelope.meta, warnings: [...(stored.envelope.meta.warnings ?? []), warning] } } as Envelope;

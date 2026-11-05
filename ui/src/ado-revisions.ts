@@ -18,10 +18,10 @@
  *
  * **What else has to look the same.** `mapOwi` reads a revision's `rev`,
  * `System.ChangedDate`, `System.ChangedBy`, `System.State` and the iteration
- * path (`System.IterationPath`, or the dossier's own field). The feed sends
+ * path (`System.IterationPath`, or the toil project's own field). The feed sends
  * people as `Name <email>` text where `work-item history` sends an identity
  * object, and `mapOwi` reads both to the same person. An item is left to
- * `work-item history` too when the dossier points `mapOwi` at a field of its
+ * `work-item history` too when the toil project points `mapOwi` at a field of its
  * own for the iteration (the feed sends reportable fields only, and nothing
  * here can tell an empty one from a missing one), when a revision has no
  * `System.ChangedDate`, or when `System.ChangedBy` is text that is not `Name
@@ -75,7 +75,7 @@ function wholeRevisions(revisions: Rec[] | undefined, rev: unknown): Rec[] | nul
  * The feed split into what `mapOwi` has always been given. `items` are the
  * work items `get-many` returned (each with its `id` and `rev`), `historyCommand`
  * names the command the envelopes stand in for, and `iterationOverride` is the
- * dossier's own iteration field, when it sets one: any such field sends every
+ * toil project's own iteration field, when it sets one: any such field sends every
  * item to `work-item history`.
  */
 export function splitRevisionFeed(feed: Envelope | null, items: Rec[], historyCommand: string, iterationOverride?: string): SplitFeed {

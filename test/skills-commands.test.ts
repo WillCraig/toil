@@ -145,7 +145,7 @@ describe('toil skills marketplace add', () => {
     expect(store.entries.get('corp-skills.token')).toBe(TOKEN);
     const clone = join(home, '.agents', 'marketplaces', 'skills');
     expect(readJson(file)).toEqual({
-      version: 3,
+      version: 4,
       connections: { 'corp-skills': { area: 'skills', repoUrl: REPO, localPath: clone, token: 'keychain:corp-skills.token' } },
       defaults: { skills: { connection: 'corp-skills' } },
     });
@@ -492,7 +492,7 @@ describe('toil skills status, marketplace list, plugins and remove', () => {
     expect((await cli(['skills', 'marketplace', 'sync', 'all', '--allow-write'], context({ git: fakeGit(), secrets: store }))).envelope?.ok).toBe(true);
     const run = await cli(['skills', 'marketplace', 'remove', 'corp'], context({ secrets: store }));
     expect(run.envelope?.data).toEqual({ removed: { name: 'corp', repoUrl: REPO, localPath: join(home, '.agents', 'marketplaces', 'skills').replace(/\\/g, '/') }, keychainEntryDeleted: true, remaining: 0 });
-    expect(readJson(file)).toEqual({ version: 3, connections: { 'corp-jira': { area: 'jira', baseUrl: 'https://jira.imagile.dev' } }, defaults: {}, bounds: { files: 'workspace' } });
+    expect(readJson(file)).toEqual({ version: 4, connections: { 'corp-jira': { area: 'jira', baseUrl: 'https://jira.imagile.dev' } }, defaults: {}, bounds: { files: 'workspace' } });
     expect(store.entries.has('corp.token')).toBe(false);
     expect(existsSync(join(home, '.agents', 'marketplaces', 'skills', '.git'))).toBe(true);
     expect(existsSync(userSkills('code-review'))).toBe(true);

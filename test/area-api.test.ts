@@ -66,14 +66,14 @@ describe('context inputs', () => {
     sessions.push(session);
     const tools = (await session.client.listTools()).tools;
     const props = (name: string) => Object.keys(tools.find((t) => t.name === name)!.inputSchema.properties ?? {}).sort();
-    expect(props('demo_context_get_widget')).toEqual(['board', 'connection', 'cwd', 'dossier', 'env', 'id', 'outputFormat', 'project', 'select', 'summaryFile']);
+    expect(props('demo_context_get_widget')).toEqual(['board', 'connection', 'cwd', 'env', 'id', 'outputFormat', 'project', 'select', 'summaryFile', 'toilProject']);
     expect(props('demo_context_echo_filters')).not.toContain('board');
 
     const viaMcp = await session.call('demo_context_echo_filters', { board: 'ops' });
     expect(viaMcp.envelope.error?.code).toBe('INVALID_INPUT');
   });
 
-  it('orders the sources: the call, then the dossier, then the git remote, then the connection', async () => {
+  it('orders the sources: the call, then the toil project, then the git remote, then the connection', async () => {
     let reads = 0;
     const gitRemote: GitRemoteReader = async () => {
       reads++;
@@ -89,8 +89,8 @@ describe('context inputs', () => {
     expect(fromGit.meta.context?.inputs?.project).toEqual({ value: 'GIT', source: 'git' });
     expect(reads).toBe(1);
 
-    const fromDossier = await run({ id: 'W-1' }, { gitRemote, dossier: (area: string, key: string) => (area === 'demo-context' && key === 'project' ? 'DOS' : undefined) });
-    expect(fromDossier.meta.context?.inputs?.project).toEqual({ value: 'DOS', source: 'dossier' });
+    const fromToilProject = await run({ id: 'W-1' }, { gitRemote, toilProject: (area: string, key: string) => (area === 'demo-context' && key === 'project' ? 'DOS' : undefined) });
+    expect(fromToilProject.meta.context?.inputs?.project).toEqual({ value: 'DOS', source: 'toil-project' });
 
     reads = 0;
     const explicit = await run({ id: 'W-1', project: 'MINE' }, { gitRemote });
@@ -211,21 +211,21 @@ describe('choosing the connection', () => {
     expect((await run({ id: 'W-1' })).meta.context?.connection).toEqual({ value: 'prod', source: 'default', default: 'named' });
   });
 
-  it('takes the connection from the dossier below the call and above an input the git remote selects', async () => {
-    const dossier = (_area: string, key: string) => (key === 'connection' ? 'stage' : undefined);
-    expect((await run({ id: 'W-1' }, two, { dossier })).meta.context?.connection).toEqual({ value: 'stage', source: 'dossier' });
-    expect((await run({ id: 'W-1', connection: 'prod' }, two, { dossier })).meta.context?.connection).toEqual({ value: 'prod', source: 'input' });
+  it('takes the connection from the toil project below the call and above an input the git remote selects', async () => {
+    const toilProject = (_area: string, key: string) => (key === 'connection' ? 'stage' : undefined);
+    expect((await run({ id: 'W-1' }, two, { toilProject })).meta.context?.connection).toEqual({ value: 'stage', source: 'toil-project' });
+    expect((await run({ id: 'W-1', connection: 'prod' }, two, { toilProject })).meta.context?.connection).toEqual({ value: 'prod', source: 'input' });
   });
 
   it('lets a selecting value from a lower source give way to the connection a higher one chose', async () => {
-    const dossier = (_area: string, key: string) => (key === 'env' ? 'staging' : undefined);
-    const envelope = await run({ id: 'W-1', connection: 'prod' }, two, { dossier });
+    const toilProject = (_area: string, key: string) => (key === 'env' ? 'staging' : undefined);
+    const envelope = await run({ id: 'W-1', connection: 'prod' }, two, { toilProject });
     expect(envelope.meta.context?.connection).toEqual({ value: 'prod', source: 'input' });
-    // Not the dossier's "staging", which would describe the other connection.
+    // Not the toil project's "staging", which would describe the other connection.
     expect(envelope.meta.context?.inputs?.env).toBeUndefined();
     expect(envelope.data).toMatchObject({ project: 'PRD', env: null });
-    // With nothing higher, the dossier's env picks the connection.
-    expect((await run({ id: 'W-1' }, two, { dossier })).meta.context?.connection).toEqual({ value: 'stage', source: 'dossier', via: 'env' });
+    // With nothing higher, the toil project's env picks the connection.
+    expect((await run({ id: 'W-1' }, two, { toilProject })).meta.context?.connection).toEqual({ value: 'stage', source: 'toil-project', via: 'env' });
   });
 
   it('says which kind of default it used', async () => {
@@ -249,8 +249,8 @@ describe('choosing the connection', () => {
       code: 'INVALID_INPUT',
       message: 'demo-context has no env "qa" (from the call). It knows: production (connection prod), staging (connection stage).',
     });
-    const fromDossier = await run({ id: 'W-1' }, two, { dossier: (_a: string, key: string) => (key === 'env' ? 'qa' : undefined) });
-    expect(fromDossier.error).toMatchObject({ message: expect.stringContaining('(from your dossier)'), fix: expect.stringContaining('or correct your dossier') });
+    const fromToilProject = await run({ id: 'W-1' }, two, { toilProject: (_a: string, key: string) => (key === 'env' ? 'qa' : undefined) });
+    expect(fromToilProject.error).toMatchObject({ message: expect.stringContaining('(from your toil project)'), fix: expect.stringContaining('or correct your toil project') });
 
     const twins = configOf({ a: { area: 'demo-context', env: 'staging', token: 't' }, b: { area: 'demo-context', env: 'staging', token: 't' }, demo: { area: 'demo', token: 't' } }, { demo: { connection: 'demo' } });
     expect((await run({ id: 'W-1', env: 'staging', project: 'P' }, twins)).error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('a, b') });
@@ -353,7 +353,7 @@ describe('settings shared from another area', () => {
   });
 });
 
-describe('writes on a connection the dossier or the git remote chose', () => {
+describe('writes on a connection the toil project or the git remote chose', () => {
   const two = configOf(
     {
       prod: { area: 'demo-context', env: 'production', project: 'PRD', token: 'p', writes: true },
@@ -367,26 +367,26 @@ describe('writes on a connection the dossier or the git remote chose', () => {
     const envelope = await execute(renameWidget, { id: 'W-1', name: 'N', allowWrite: true, ...input }, { ...context, config: two, ...extra });
     return { envelope, calls: http.calls };
   };
-  const dossier = (_area: string, key: string) => (key === 'env' ? 'staging' : undefined);
+  const toilProject = (_area: string, key: string) => (key === 'env' ? 'staging' : undefined);
 
   it('refuses until the binding is adopted, naming the connection and how to choose it', async () => {
-    const refused = await write({}, { dossier });
+    const refused = await write({}, { toilProject });
     expect(refused.envelope.error).toEqual({
       code: 'WRITE_DISABLED',
-      message: 'demo-context rename-widget changes data in demo-context, and connection stage was chosen by your dossier, not by you.',
-      fix: 'Pass --connection stage to choose it yourself, or adopt the dossier once with toil dossiers import, which copies it into your own folder.',
+      message: 'demo-context rename-widget changes data in demo-context, and connection stage was chosen by your toil project, not by you.',
+      fix: 'Pass --connection stage to choose it yourself, or adopt the toil project once with toil projects import, which copies it into your own folder.',
     });
     expect(refused.calls).toHaveLength(0);
 
-    const adopted = await write({}, { dossier, adopted: (area: string, name: string) => area === 'demo-context' && name === 'stage' });
+    const adopted = await write({}, { toilProject, adopted: (area: string, name: string) => area === 'demo-context' && name === 'stage' });
     expect(adopted.envelope.ok).toBe(true);
     expect(adopted.calls[0]?.url).toContain('/projects/STG/');
   });
 
-  it('lets reads follow the dossier, and writes follow an explicit choice or the default', async () => {
+  it('lets reads follow the toil project, and writes follow an explicit choice or the default', async () => {
     const { context } = testContext({ routes: demoContextRoutes });
-    expect((await execute(getWidget, { id: 'W-1' }, { ...context, config: two, dossier })).ok).toBe(true);
-    expect((await write({ connection: 'stage' }, { dossier })).envelope.ok).toBe(true);
+    expect((await execute(getWidget, { id: 'W-1' }, { ...context, config: two, toilProject })).ok).toBe(true);
+    expect((await write({ connection: 'stage' }, { toilProject })).envelope.ok).toBe(true);
     expect((await write({ env: 'staging' })).envelope.ok).toBe(true);
     expect((await write({})).envelope.ok).toBe(true);
   });

@@ -1,14 +1,14 @@
 /**
  * The settings pages' sample data, for the site preview and `toil-ui
- * --sample`: what `toil connections list`, `dossiers list`, `dossiers show`,
- * `dossiers check`, `dossiers onboard --plan` and `connections test` print for the preview's own
- * connections and dossiers, what `audit stats` and `audit list` print for a
+ * --sample`: what `toil connections list`, `projects list`, `projects show`,
+ * `projects check`, `projects onboard --plan` and `connections test` print for the preview's own
+ * connections and toil projects, what `audit stats` and `audit list` print for a
  * sample month (usage.ts), and the areas' connection fields as the registry
  * describes them (config-areas.json, which test/config.test.ts holds equal to
  * the real registry). Every change is refused, saying why: the preview has
  * no configuration to change, so nothing on these pages changes anything.
  *
- * The connections are the ones the preview's dossiers name. `github` is made
+ * The connections are the ones the preview's toil projects name. `github` is made
  * by env vars alone, the way CI defines one, so the pages show it read-only.
  * A sandbox with the furniture glued down.
  */
@@ -16,7 +16,7 @@
 import { CONFIG_COMMANDS, CONFIG_READS, DEFAULT_TIMEOUT_MS, type AreaInfo, type ConfigApi, type ConnectionsData, type SettingsInfo } from '../config.ts';
 import type { Envelope } from '../toil.ts';
 import AREAS from './config-areas.json' with { type: 'json' };
-import { DOSSIERS, fileOf, listData, showData } from './dossiers.ts';
+import { TOIL_PROJECTS, fileOf, listData, showData } from './toil-projects.ts';
 import { callKey } from './execute.ts';
 import { usageCanned } from './usage.ts';
 
@@ -52,13 +52,13 @@ export const PROBES: Record<string, string> = {
 };
 
 /**
- * Set up this repo's sample: `dossiers onboard --plan` in a clone of
+ * Set up this repo's sample: `projects onboard --plan` in a clone of
  * payments-web, whose checked-in checkout-web selects each area by host. Three
  * areas have a connection and read; the SDK's Bitbucket server has none yet,
- * so it offers one on that host, and dossiers check says the same.
+ * so it offers one on that host, and projects check says the same.
  */
 export const ONBOARD_PLAN = {
-  dossier: { name: 'checkout-web', source: 'repo', file: '/home/you/code/payments-web/.toil/dossiers/checkout-web.json' },
+  toilProject: { name: 'checkout-web', source: 'repo', file: '/home/you/code/payments-web/.toil/projects/checkout-web.json' },
   ownCopy: null,
   plan: true,
   ok: false,
@@ -71,7 +71,7 @@ export const ONBOARD_PLAN = {
       selects: { host: 'bitbucket-sdk.imagile.dev' },
       status: 'missing',
       connection: null,
-      problem: { code: 'NOT_CONFIGURED', message: 'You have no bitbucket connection on bitbucket-sdk.imagile.dev.', fix: 'Run toil dossiers onboard checkout-web in a terminal, or toil connections add bitbucket --area bitbucket with a base URL on bitbucket-sdk.imagile.dev (https://bitbucket-sdk.imagile.dev).' },
+      problem: { code: 'NOT_CONFIGURED', message: 'You have no bitbucket connection on bitbucket-sdk.imagile.dev.', fix: 'Run toil projects onboard checkout-web in a terminal, or toil connections add bitbucket --area bitbucket with a base URL on bitbucket-sdk.imagile.dev (https://bitbucket-sdk.imagile.dev).' },
       suggest: { name: 'bitbucket', baseUrl: 'https://bitbucket-sdk.imagile.dev' },
       test: null,
     },
@@ -80,7 +80,7 @@ export const ONBOARD_PLAN = {
   ],
   check: {
     ok: false,
-    problems: [{ level: 'error', code: 'DOSSIER_HOST_UNMATCHED', path: 'bitbucket.host', message: 'Dossier checkout-web uses the bitbucket connection on bitbucket-sdk.imagile.dev, and you have no bitbucket connection with that host.' }],
+    problems: [{ level: 'error', code: 'TOIL_PROJECT_HOST_UNMATCHED', path: 'bitbucket.host', message: 'Toil project checkout-web uses the bitbucket connection on bitbucket-sdk.imagile.dev, and you have no bitbucket connection with that host.' }],
   },
 };
 
@@ -103,22 +103,22 @@ interface Answer {
 
 export const CONFIG_CANNED: Answer[] = [
   { command: 'connections list', input: {}, data: FIXTURE_CONNECTIONS },
-  { command: 'dossiers list', input: {}, data: listData() },
-  ...DOSSIERS.map((d) => ({ command: 'dossiers show', input: { dossier: d.name }, data: showData(d) })),
-  ...DOSSIERS.map((d) => ({ command: 'dossiers check', input: { dossier: d.name }, data: { name: d.name, file: fileOf(d.name), source: 'user', ok: true, problems: [] } })),
+  { command: 'projects list', input: {}, data: listData() },
+  ...TOIL_PROJECTS.map((d) => ({ command: 'projects show', input: { toilProject: d.name }, data: showData(d) })),
+  ...TOIL_PROJECTS.map((d) => ({ command: 'projects check', input: { toilProject: d.name }, data: { name: d.name, file: fileOf(d.name), source: 'user', ok: true, problems: [] } })),
   ...FIXTURE_CONNECTIONS.connections.map((c) => ({
     command: 'connections test',
     input: { name: c.name },
     data: { name: c.name, area: c.area, host: c.host, live: true, authenticated: true, request: PROBES[c.area] ?? null },
   })),
   ...usageCanned(),
-  { command: 'dossiers onboard', input: { plan: true }, data: ONBOARD_PLAN },
+  { command: 'projects onboard', input: { plan: true }, data: ONBOARD_PLAN },
   // No theme set: toil's default, Crate, which is Toil UI's too (#467).
   { command: 'theme list', input: {}, data: THEME_LIST },
 ];
 
 /** A plan with no pin asks nothing and changes nothing, so the preview answers it as it answers a read. */
-const answersLikeARead = (command: string, input: Record<string, unknown>) => command === 'dossiers onboard' && input.plan === true && input.pin === undefined;
+const answersLikeARead = (command: string, input: Record<string, unknown>) => command === 'projects onboard' && input.plan === true && input.pin === undefined;
 
 /** The Usage page sends `until` as the moment it opened; the sample month answers whatever moment that is. */
 const answerInput = (command: string, input: Record<string, unknown>) => (command === 'audit stats' ? Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'until')) : input);

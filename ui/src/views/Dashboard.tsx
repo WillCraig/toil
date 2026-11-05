@@ -1,8 +1,8 @@
 /**
- * A dossier's own tabs (#228, #252, #253, #394): the Overview, the Board with
+ * A toil project's own tabs (#228, #252, #253, #394): the Overview, the Board with
  * its stories, pull requests, builds and deployments side by side, the
  * dependency graph, and Analyze's pulse checks. The frame around them, the
- * top row, the tabs and the Agents sidebar, is ./DossierShell.tsx; the chat
+ * top row, the tabs and the Agents sidebar, is ./ToilProjectShell.tsx; the chat
  * is the Ask bar in its top row (components/ask.tsx, #343). Every panel was
  * filled by toil commands (src/load.ts) and says which ones.
  * The one page the weekly status meeting was trying to be, now with tabs.
@@ -16,7 +16,7 @@ import { DataTable, type Column } from '../components/layout.tsx';
 import { Panel } from '../components/panel.tsx';
 import { Help } from '../components/help.tsx';
 import { useData, useDerived } from '../data.ts';
-import { STATUS_CATEGORY_LABEL, boardHref, dateTime, dossierEditHref, estimateText, peopleHref } from '../format.ts';
+import { STATUS_CATEGORY_LABEL, boardHref, dateTime, toilProjectEditHref, estimateText, peopleHref } from '../format.ts';
 import { Empty, EmptyLink } from '../components/empty.tsx';
 import { needingAttention } from '../model/insights.ts';
 import { assignedTo, cardByKey, people } from '../model/people.ts';
@@ -128,22 +128,22 @@ function traceColumns(builds: ChangeRef[], plain = false): Array<Column<TraceRow
 
 /**
  * The board filtered to one person (#292), from the People view: their
- * items on this board, by every identity the dossier gives them, or nobody's
- * when the key names no one the dossier's data shows.
+ * items on this board, by every identity the toil project gives them, or nobody's
+ * when the key names no one the toil project's data shows.
  */
 function useBoardFilter(person: string | undefined) {
-  const { dossier, now } = useData();
+  const { toilProject, now } = useData();
   return useMemo(() => {
     if (!person) return null;
-    const view = people({ dossier: dossier.name, entries: dossier.people ?? [], wipLimit: dossier.wipLimit ?? null, items: dossier.items, changes: dossier.pullRequests ?? [], now });
+    const view = people({ toilProject: toilProject.name, entries: toilProject.people ?? [], wipLimit: toilProject.wipLimit ?? null, items: toilProject.items, changes: toilProject.pullRequests ?? [], now });
     const card = cardByKey(view, person);
-    return { name: card?.who.name ?? null, items: card ? assignedTo(view, person, dossier.items, dossier.people ?? []) : [] };
-  }, [person, dossier, now]);
+    return { name: card?.who.name ?? null, items: card ? assignedTo(view, person, toilProject.items, toilProject.people ?? []) : [] };
+  }, [person, toilProject, now]);
 }
 
 export type DashboardTab = 'overview' | 'board' | 'dependencies' | 'analyses';
 
-/** The dossier's own tabs (#394). The rest (pull requests, people, the worklog) are views of their own in the same frame. */
+/** The toil project's own tabs (#394). The rest (pull requests, people, the worklog) are views of their own in the same frame. */
 export function Dashboard({ tab = 'overview', person, analysis }: { tab?: DashboardTab; person?: string; analysis?: string } = {}) {
   const { health: h } = useDerived();
   useSprintProgress(h);
@@ -160,7 +160,7 @@ export function Dashboard({ tab = 'overview', person, analysis }: { tab?: Dashbo
  * deployments, and the builds and deployments themselves.
  */
 function BoardTab({ person }: { person?: string }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const filter = useBoardFilter(person);
   const term = useTerm();
   const words = useWords();
@@ -168,19 +168,19 @@ function BoardTab({ person }: { person?: string }) {
   const [gapsOnly, setGapsOnly] = useState(false);
   const [attentionOnly, setAttentionOnly] = useState(false);
   const { health: h, insights: prepared } = useDerived();
-  const onBoard = h?.items ?? dossier.items;
+  const onBoard = h?.items ?? toilProject.items;
   const flagged = needingAttention(onBoard, prepared);
   const mine = filter ? onBoard.filter((i) => filter.items.includes(i)) : onBoard;
   const cards = attentionOnly ? mine.filter((i) => flagged.includes(i)) : mine;
-  const rows = trace(onBoard, dossier.changes, dossier.deployments);
+  const rows = trace(onBoard, toilProject.changes, toilProject.deployments);
   const shown = gapsOnly ? rows.filter((r) => r.flags.length) : rows;
-  const builds = dossier.changes.filter((c) => c.kind === 'build');
-  const all = [...dossier.calls.work, ...dossier.calls.prs, ...dossier.calls.builds, ...dossier.calls.deployments];
+  const builds = toilProject.changes.filter((c) => c.kind === 'build');
+  const all = [...toilProject.calls.work, ...toilProject.calls.prs, ...toilProject.calls.builds, ...toilProject.calls.deployments];
 
   return (
     <div className="tab-panels">
-      <Panel id="board" title={term('board', h ? `${h.sprint.name} board` : 'Board')} calls={dossier.calls.work} alerts={false}>
-        {(dossier.readTargets ?? []).filter((t) => !t.work).map((t) => (
+      <Panel id="board" title={term('board', h ? `${h.sprint.name} board` : 'Board')} calls={toilProject.calls.work} alerts={false}>
+        {(toilProject.readTargets ?? []).filter((t) => !t.work).map((t) => (
           <p key={t.label} className="note">
             {t.label}: work items not read
           </p>
@@ -213,7 +213,7 @@ function BoardTab({ person }: { person?: string }) {
       </Panel>
 
       <div className="panel-grid">
-        <Panel id="builds" title={term('builds', 'Builds')} calls={dossier.calls.builds}>
+        <Panel id="builds" title={term('builds', 'Builds')} calls={toilProject.calls.builds}>
           {builds.length ? (
             <ul className="rows">
               {builds.map((c) => (
@@ -226,19 +226,19 @@ function BoardTab({ person }: { person?: string }) {
               ))}
             </ul>
           ) : (
-            <Empty message={words('empty.builds')} action={<EmptyLink edit href={dossierEditHref(dossier.name, 'sources')}>Link a pipeline</EmptyLink>} help="dossier-setup" />
+            <Empty message={words('empty.builds')} action={<EmptyLink edit href={toilProjectEditHref(toilProject.name, 'sources')}>Link a pipeline</EmptyLink>} help="toil-project-setup" />
           )}
         </Panel>
 
-        <Panel id="deployments" title="Deployments" calls={dossier.calls.deployments}>
-          {dossier.deployments.length ? (
+        <Panel id="deployments" title="Deployments" calls={toilProject.calls.deployments}>
+          {toilProject.deployments.length ? (
             <ul className="rows">
-              {dossier.deployments.map((d) => (
+              {toilProject.deployments.map((d) => (
                 <DeploymentRow key={d.id} d={d} />
               ))}
             </ul>
           ) : (
-            <Empty message={words('empty.deployments')} action={<EmptyLink edit href={dossierEditHref(dossier.name, 'sources')}>Add an environment</EmptyLink>} help="dossier-setup" />
+            <Empty message={words('empty.deployments')} action={<EmptyLink edit href={toilProjectEditHref(toilProject.name, 'sources')}>Add an environment</EmptyLink>} help="toil-project-setup" />
           )}
         </Panel>
       </div>
@@ -248,16 +248,16 @@ function BoardTab({ person }: { person?: string }) {
 
 /** The Dependencies tab: the blocker Gantt on the sprint's timeline (#396), then the dependency graph, with every relation listed in words under it. */
 function DependenciesTab() {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const term = useTerm();
   const plain = usePlain();
   const words = useWords();
   return (
     <div className="tab-panels">
-      <Panel id="gantt" title="Blocker timeline" calls={[...dossier.calls.work, ...dossier.calls.prs, ...dossier.calls.builds]} alerts={false}>
+      <Panel id="gantt" title="Blocker timeline" calls={[...toilProject.calls.work, ...toilProject.calls.prs, ...toilProject.calls.builds]} alerts={false}>
         <BlockerGantt />
       </Panel>
-      <Panel id="graph" title={term('dependencies', plain.pw('Dependencies', 'What blocks what'))} calls={dossier.calls.work} alerts={false}>
+      <Panel id="graph" title={term('dependencies', plain.pw('Dependencies', 'What blocks what'))} calls={toilProject.calls.work} alerts={false}>
         <Suspense fallback={<Loader size="panel" message={words('loading.graph')} />}>
           <Graph />
         </Suspense>
@@ -268,7 +268,7 @@ function DependenciesTab() {
 
 /** What the filtered board says: whose items, how many of theirs are on it, and the way back to everyone's. The shell moves focus here. */
 function BoardFilter({ name, shown, all }: { name: string | null; shown: number; all: number }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const line = useRef<HTMLParagraphElement>(null);
   // Opened straight from a link or a reload, the shell moves no focus, so the board panel, heading and all, is brought into view here.
   useEffect(() => {
@@ -278,22 +278,22 @@ function BoardFilter({ name, shown, all }: { name: string | null; shown: number;
   return (
     <p id="board-filter" ref={line} className="board-filter" tabIndex={-1}>
       {name === null ? (
-        <>The People view's link named nobody this dossier's data shows, so no items are shown. </>
+        <>The People view's link named nobody this Toil project's data shows, so no items are shown. </>
       ) : (
         <>
           Showing {name}'s items: {on(shown)} on this board{all > shown ? `, of ${on(all)} assigned to them in all` : ''}.{' '}
         </>
       )}
-      <a href={boardHref(dossier.name)}>Show everyone's</a> · <a href={peopleHref(dossier.name)}>Back to People</a>
+      <a href={boardHref(toilProject.name)}>Show everyone's</a> · <a href={peopleHref(toilProject.name)}>Back to People</a>
     </p>
   );
 }
 
 /**
- * How far through its sprint the dossier is, from 0 on day one to 1 on the
+ * How far through its sprint the toil project is, from 0 on day one to 1 on the
  * last, as `--sprint-progress` on the page, for a theme's sky to follow
  * (Harvest's dawn to dusk). It is decoration: the top row says the day
- * in words. Off the dossier's tabs, there is no sprint, and the property goes.
+ * in words. Off the toil project's tabs, there is no sprint, and the property goes.
  */
 function useSprintProgress(h: Health | null) {
   const progress = h && h.days.total > 1 ? Math.min(1, Math.max(0, (h.days.gone - 1) / (h.days.total - 1))) : null;

@@ -20,6 +20,7 @@ export const REDIRECTS = {
   '/connect/bitbucket-cloud/': '/connect/bitbucket/',
   '/docs/integrations/ado-cloud/': '/connect/ado/',
   '/connect/ado-cloud/': '/connect/ado/',
+  '/docs/dossiers/': '/docs/projects/',
 };
 
 /** Every page under `from` moved to the same name under `to`: `/docs/integrations/jira/` is `/connect/jira/`. */

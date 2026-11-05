@@ -7,7 +7,7 @@ import { commands } from '../src/registry.js';
 import { toolName } from '../src/core/command.js';
 import { selectCommands } from '../src/mcp/server.js';
 import { emptyConfig } from '../src/core/config.js';
-import { dossierDisk } from './harness/dossiers.js';
+import { toilProjectDisk } from './harness/toil-projects.js';
 
 /**
  * Bitbucket is one area for Data Center and Cloud (#495): one command tree and
@@ -24,7 +24,7 @@ describe('one tree for both deployments', () => {
     const paths = bitbucket.map((def) => def.path.join(' '));
     expect(new Set(paths).size).toBe(paths.length);
     expect(commands.some((def) => def.path[0] === 'bitbucket-cloud')).toBe(false);
-    expect(paths).toEqual(expect.arrayContaining(['bitbucket pr list', 'bitbucket pr create-many', 'bitbucket check-dossier', 'bitbucket repo list', 'bitbucket pipeline list', 'bitbucket api']));
+    expect(paths).toEqual(expect.arrayContaining(['bitbucket pr list', 'bitbucket pr create-many', 'bitbucket check-toil-project', 'bitbucket repo list', 'bitbucket pipeline list', 'bitbucket api']));
     expect(bitbucket.map(toolName).filter((name) => name.startsWith('bitbucket_cloud'))).toEqual([]);
   });
 
@@ -53,18 +53,18 @@ describe('one tree for both deployments', () => {
   });
 });
 
-describe('a per-repo dossier project when the folder is none of the dossier’s repos (#540)', () => {
-  const dossier = { name: 'pay', repos: [{ name: 'api', remotes: ['https://bitbucket.imagile.dev/scm/pay/api.git'] }], bitbucket: { project: { api: 'PAY' } } };
+describe('a per-repo toil project project when the folder is none of the toil project’s repos (#540)', () => {
+  const toilProject = { name: 'pay', repos: [{ name: 'api', remotes: ['https://bitbucket.imagile.dev/scm/pay/api.git'] }], bitbucket: { project: { api: 'PAY' } } };
 
   it('is refused on Data Center, which needs the project, and only noted on Cloud, which never takes it', async () => {
-    const disk = dossierDisk({ 'home/.toil/dossiers/pay.json': dossier });
+    const disk = toilProjectDisk({ 'home/.toil/projects/pay.json': toilProject });
     try {
       const t = ctx();
-      const context = { ...t.context, dossiers: disk.catalog(t.context.config) };
-      const dataCenter = await runCli(['bitbucket', 'pr', 'list', '--dossier', 'pay', '--repo', 'toil', '--connection', 'bitbucket'], { commands, context });
+      const context = { ...t.context, toilProjects: disk.catalog(t.context.config) };
+      const dataCenter = await runCli(['bitbucket', 'pr', 'list', '--toil-project', 'pay', '--repo', 'toil', '--connection', 'bitbucket'], { commands, context });
       expect(dataCenter.envelope?.ok).toBe(false);
       expect(dataCenter.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('sets bitbucket project per repo') });
-      const cloud = await runCli(['bitbucket', 'pr', 'list', '--dossier', 'pay', '--ws', 'imagile', '--repo', 'toil', '--connection', 'bitbucket-cloud'], { commands, context });
+      const cloud = await runCli(['bitbucket', 'pr', 'list', '--toil-project', 'pay', '--ws', 'imagile', '--repo', 'toil', '--connection', 'bitbucket-cloud'], { commands, context });
       expect(cloud.envelope?.ok, cloud.stdout).toBe(true);
     } finally {
       disk.cleanup();
@@ -117,7 +117,7 @@ describe('where a call acts: --project is Data Center’s, --ws is Cloud’s', (
     expect(run.envelope?.meta.context?.inputs?.project).toEqual({ value: 'TOIL', source: 'input' });
   });
 
-  it('never fills Cloud’s project from a Data Center default, the connection’s own project setting or the environment: only the call or a dossier', async () => {
+  it('never fills Cloud’s project from a Data Center default, the connection’s own project setting or the environment: only the call or a toil project', async () => {
     const t = ctx();
     t.context.config.defaults.bitbucket = { connection: 'bitbucket', project: 'PAY' };
     t.context.config.connections['bitbucket-cloud'] = { ...t.context.config.connections['bitbucket-cloud']!, project: 'PAY' };

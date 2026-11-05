@@ -26,7 +26,7 @@ import { pageOf, pagingFields, pagingOptions } from '../paging.js';
  * approvals fewer than the process it replaces and two more than it needs.
  */
 
-/** What a transition's errors name: the exact flag, and where a dossier pins an intent for a type. */
+/** What a transition's errors name: the exact flag, and where a toil project pins an intent for a type. */
 const TRANSITION_HELP = { explicit: '--transition <name-or-id>', pinKey: 'jira.transitions' };
 
 const key = z.string().describe('Issue key, e.g. PROJ-123');
@@ -39,9 +39,9 @@ function readIssueFile(path: string | undefined, ctx: client.JiraContext): Issue
 
 /**
  * The project for issue create, in this order: --project, then "project" in
- * --input-file, then the dossier, then the connection's
- * project, which is the order the contract specifies, with the dossier slotted in.
- * Core resolves the flag, the dossier and the connection; the file is read by
+ * --input-file, then the toil project, then the connection's
+ * project, which is the order the contract specifies, with the toil project slotted in.
+ * Core resolves the flag, the toil project and the connection; the file is read by
  * the command, so its step goes through ctx.supply, and meta.context reports
  * source `file`. The file's value is used as written, as the contract's `??`
  * specifies: an empty one still wins and gets issue create's own error.
@@ -170,8 +170,8 @@ export const createIssue = jiraArea.command({
     { inputFile: 'issue.json', fieldsFile: 'fields.json', field: ['Story Points=5', 'customfield_10050=@ac.md'], priority: 'Low', allowWrite: true },
   ],
   run: async (input, ctx) => {
-    // A dossier's field aliases join the connection's names, only when the call names a field (src/core/dossier.ts).
-    const fieldMap = withAliases(buildFieldMap(ctx.connection.customFields), input.field?.length ? ctx.dossierFields() : {});
+    // A toil project's field aliases join the connection's names, only when the call names a field (src/core/toil-project.ts).
+    const fieldMap = withAliases(buildFieldMap(ctx.connection.customFields), input.field?.length ? ctx.toilProjectFields() : {});
     try {
       const flags = defined({
         summary: input.summary,
@@ -244,8 +244,8 @@ export const updateIssue = jiraArea.command({
     { key: 'PROJ-123', inputFile: 'update.json', fieldsFile: 'fields.json', field: ['Story Points=8'], allowWrite: true },
   ],
   run: async (input, ctx) => {
-    // A dossier's field aliases join the connection's names, only when the call names a field (src/core/dossier.ts).
-    const fieldMap = withAliases(buildFieldMap(ctx.connection.customFields), input.field?.length ? ctx.dossierFields() : {});
+    // A toil project's field aliases join the connection's names, only when the call names a field (src/core/toil-project.ts).
+    const fieldMap = withAliases(buildFieldMap(ctx.connection.customFields), input.field?.length ? ctx.toilProjectFields() : {});
     try {
       const flags = defined({ summary: input.summary, description: input.description, priority: input.priority, assignee: input.assignee, labels: input.labels });
       const { builtin, custom } = gatherFields(ctx, input, flags, fieldMap);
@@ -271,7 +271,7 @@ export const transitionIssue = jiraArea.command({
   path: ['jira', 'issue', 'transition'],
   description: 'Transition a Jira issue to a new status',
   toolDescription:
-    "Moves a Jira issue through its workflow. Give to with an intent (start, review, done, reopen) or a status name, and toil resolves it against the transitions this issue offers right now, by its own issue type's workflow: a pin in the dossier first, then an exact status name, then the intent's status category, then a single transition named for it. No match, or more than one, is refused with the transitions the issue does offer; meta.transition says what it resolved to. Or give transition with a transition name (case-insensitive) or id. Use jira_issue_transitions to see the transitions.",
+    "Moves a Jira issue through its workflow. Give to with an intent (start, review, done, reopen) or a status name, and toil resolves it against the transitions this issue offers right now, by its own issue type's workflow: a pin in the toil project first, then an exact status name, then the intent's status category, then a single transition named for it. No match, or more than one, is refused with the transitions the issue does offer; meta.transition says what it resolved to. Or give transition with a transition name (case-insensitive) or id. Use jira_issue_transitions to see the transitions.",
   input: z.object({
     key,
     transition: z.string().optional().describe('Transition name or id'),
@@ -293,7 +293,7 @@ export const transitionIssue = jiraArea.command({
     if ((input.to === undefined) === (input.transition === undefined)) throw oneOfTransition(TRANSITION_HELP, input.to !== undefined);
     if (input.to !== undefined) {
       const { item, candidates } = jiraMoves(input.key, await client.issueWithTransitions(ctx, input.key));
-      const pins = intentOf(input.to) ? ctx.dossierTransitions() : {};
+      const pins = intentOf(input.to) ? ctx.toilProjectTransitions() : {};
       const { candidate, report } = resolveTransition(input.to, item, candidates, pins, TRANSITION_HELP);
       await client.transitionIssue(ctx, input.key, candidate.id);
       ctx.setTransition(report);

@@ -8,7 +8,7 @@
 /**
  * The readiness gate's live reads (#307): an item's workflow, read on a
  * person's press from its page. A sync never stores them, so the cache passes
- * them to toil, read-only, like the dossiers.
+ * them to toil, read-only, like the toil projects.
  */
 export const WORKFLOW_READS = ['jira issue transitions', 'ado work-item states'] as const;
 
@@ -18,8 +18,8 @@ export const WORKFLOW_READS = ['jira issue transitions', 'ado work-item states']
  * call the fixture answers, so a new panel's command is added here on purpose.
  */
 export const READ_COMMANDS: ReadonlySet<string> = new Set([
-  'dossiers list',
-  'dossiers show',
+  'projects list',
+  'projects show',
   'jira issue search',
   'jira issue history',
   'ado work-item iterations',

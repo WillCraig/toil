@@ -1,0 +1,10 @@
+<figure class="dx dx-flow" data-reveal aria-labelledby="dx-onboard-cap">
+<ol class="dx-flow__steps">
+<li class="dx-step"><span class="dx-step__n" aria-hidden="true">1</span><span class="dx-step__k">Clone</span><code class="dx-step__v">.toil/projects/team.json</code><span class="dx-step__w">checked in: github by host github.com, ado by host dev.azure.com</span></li>
+<li class="dx-step"><span class="dx-step__n" aria-hidden="true">2</span><span class="dx-step__k">Onboard</span><code class="dx-step__v">toil projects onboard</code><span class="dx-step__w">reads the toil project the folder resolves to, one area at a time</span></li>
+<li class="dx-step"><span class="dx-step__n" aria-hidden="true">3</span><span class="dx-step__k">Match by host</span><code class="dx-step__v">github.com: your github<br />dev.azure.com: none</code><span class="dx-step__w">one match is used as it is; none offers toil connections add, with the token typed hidden</span></li>
+<li class="dx-step"><span class="dx-step__n" aria-hidden="true">4</span><span class="dx-step__k">Several match</span><code class="dx-step__v">~/.toil/projects/team.json</code><span class="dx-step__w">you pick one, and it is pinned in your own copy, which then applies</span></li>
+<li class="dx-step dx-step--out"><span class="dx-step__n" aria-hidden="true">5</span><span class="dx-step__k">Check and test</span><code class="dx-step__v">toil projects check<br />GET /user, GET /_apis/connectionData</code><span class="dx-step__w">no service contacted for the check, then one read per connection</span></li>
+</ol>
+<figcaption id="dx-onboard-cap">Onboarding to a repository that has a toil project: each area's host picks one of your connections, a missing one is added through toil connections add, and the run ends with a check and one test read per connection.</figcaption>
+</figure>

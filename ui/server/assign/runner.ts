@@ -4,7 +4,7 @@
  * the same SDK loading, environment allowlist, usage ledger and caps as a
  * question in the Ask pane (#295). Per mode:
  *
- * - **refine** and **investigate** get the dossier's read-only tools (the
+ * - **refine** and **investigate** get the toil project's read-only tools (the
  *   cache's owi_* and pr_* tools, toil's live reads, proposal_fields) and no
  *   shell, no file writes. The finished text goes through answer.ts's
  *   checks: every id held to the tools' results, every proposal to toil's
@@ -12,7 +12,7 @@
  * - **implement** runs on Codex alone, the one adapter whose own sandbox
  *   holds commands and writes to one folder with no network on every OS
  *   Toil UI supports. The folder is under the cache. Toil UI copies the
- *   dossier repository's git directory into its `repo` (`prepareClone`), and
+ *   toil project repository's git directory into its `repo` (`prepareClone`), and
  *   the agent fills the working tree from the last commit, branches,
  *   changes and stages. Then, before any git runs outside the sandbox,
  *   Toil UI takes the clone's git directory back (`reclaimGitDir`: its own
@@ -49,7 +49,7 @@ export interface HostRunnerOptions {
   registry: readonly ReadCommand[];
   execute: Execute;
   mapIds: MapIds;
-  data(dossier: string): AgentData | null;
+  data(toilProject: string): AgentData | null;
   version: string;
   toilVersion: string;
   /** What each run starts on (#305); absent, runs record no fingerprint and never go stale. */
@@ -72,7 +72,7 @@ export const cloneOf = (folder: string) => join(folder, 'repo');
 /** The tracker command that posts a comment on an item, by area, where toil has one; its input from the item and the text. */
 const COMMENT: Record<string, (key: string, body: string) => { command: string; input: Record<string, unknown> }> = {
   // A GitHub key is `owner/repo#41`; `github pr comment` (CLI alias `issue comment`) comments on an issue by its number too.
-  // The owner and repository come from the key, never the dossier: a board's items span repositories, and the dossier names at most one.
+  // The owner and repository come from the key, never the toil project: a board's items span repositories, and the toil project names at most one.
   github: (key, body) => {
     const m = /^([^/]+)\/([^#]+)#(\d+)$/.exec(key);
     return { command: 'github pr comment', input: m ? { owner: m[1], repo: m[2], number: Number(m[3]), body } : { number: Number(key.slice(key.lastIndexOf('#') + 1)), body } };
@@ -85,7 +85,7 @@ const COMMENT: Record<string, (key: string, body: string) => { command: string; 
 export const commentText = (parts: Array<{ text: string }>, by: string) => `${parts.map((p) => p.text.replace(/\[\[([^\]]+)\]\]/g, '$1')).join('\n\n')}\n\nInvestigated by ${by} through Toil UI, and posted by a person who reviewed it.`;
 
 /** The proposal that posts an investigation's report on the item, or one that says toil can't. */
-export function commentProposal(dossier: string, item: WorkItem, body: string, writes: ReadonlyMap<string, WriteCommand>): Proposal {
+export function commentProposal(toilProject: string, item: WorkItem, body: string, writes: ReadonlyMap<string, WriteCommand>): Proposal {
   const make = COMMENT[item.source.area];
   const made = make ? make(item.source.key, body) : null;
   const known = made && writes.has(made.command) ? made : null;
@@ -96,8 +96,8 @@ export function commentProposal(dossier: string, item: WorkItem, body: string, w
     title: `Post the report as a comment on ${item.source.key}`,
     reason: 'The investigation above, as one comment, so the people on the item can read it where they work.',
     command: known?.command ?? null,
-    // The dossier goes with it, as answer.ts adds it to the agent's own proposals, so toil resolves the same connection and project.
-    input: known ? (writes.get(known.command)!.fields.has('dossier') ? { dossier, ...known.input } : known.input) : null,
+    // The toil project goes with it, as answer.ts adds it to the agent's own proposals, so toil resolves the same connection and project.
+    input: known ? (writes.get(known.command)!.fields.has('toilProject') ? { toilProject, ...known.input } : known.input) : null,
     note: known ? 'The comment is the report exactly as shown above.' : `toil has no command that comments on a ${item.source.area} item, so copy the report into the item by hand.`,
   };
 }
@@ -172,13 +172,13 @@ export function hostRunner(o: HostRunnerOptions): Runner {
     async run(ctx): Promise<RunResult> {
       const { assignment: a, item } = ctx;
       const adapter = a.adapter as AssignAdapter;
-      const data = o.data(a.dossier);
-      if (!data) throw new RunStopped('error', `Toil UI hasn't synced ${a.dossier}, so the agent has nothing to read.`, 'Press Sync now in the Sync panel, then assign again.');
+      const data = o.data(a.toilProject);
+      if (!data) throw new RunStopped('error', `Toil UI hasn't synced ${a.toilProject}, so the agent has nothing to read.`, 'Press Sync now in the Sync panel, then assign again.');
       const actor = actorOf(a.id);
       // toil's live reads for this run carry the assignment as their actor in the audit log.
       const execute: Execute = (command, input, options) => o.execute(command, input, { ...options, actor });
       const ledger = new Ledger();
-      const tools = traced(recorded([...cacheTools(a.dossier, data, ledger), ...prTools(a.dossier, data, ledger), proposalTool(o.registry), ...liveTools(a.dossier, o.registry, execute, o.mapIds, ledger)], ledger), ctx);
+      const tools = traced(recorded([...cacheTools(a.toilProject, data, ledger), ...prTools(a.toilProject, data, ledger), proposalTool(o.registry), ...liveTools(a.toilProject, o.registry, execute, o.mapIds, ledger)], ledger), ctx);
 
       let workspace: Workspace | null = null;
       let branch: string | null = null;
@@ -186,7 +186,7 @@ export function hostRunner(o: HostRunnerOptions): Runner {
       let start: string | null = null;
       let modePrompt;
       if (a.mode === 'implement') {
-        repo = await repoNamed(o.execute, a.dossier, a.repo);
+        repo = await repoNamed(o.execute, a.toilProject, a.repo);
         branch = branchName(item);
         const folder = workFolder(o.dataDir, a.id);
         rmSync(folder, { recursive: true, force: true });
@@ -194,14 +194,14 @@ export function hostRunner(o: HostRunnerOptions): Runner {
         rmSync(`${folder}.commit-message.txt`, { force: true });
         start = prepareClone(repo.path, cloneOf(folder));
         workspace = { root: folder };
-        modePrompt = implementPrompt(a.dossier, item, now(), { repo: repo.name, branch });
+        modePrompt = implementPrompt(a.toilProject, item, now(), { repo: repo.name, branch });
       } else {
-        modePrompt = readPrompt(a.mode, a.dossier, item, now());
+        modePrompt = readPrompt(a.mode, a.toilProject, item, now());
       }
       // A renewal (#305) carries what the run it renews left, fenced as data.
       modePrompt = { ...modePrompt, prompt: withEarlierRun(modePrompt.prompt, a.history) };
-      const fingerprint = o.fingerprints ? await o.fingerprints.origin(a.dossier, assignmentPrompts(a.mode)).catch(() => null) : null;
-      const shown = await read('dossiers show', { dossier: a.dossier }, { actor });
+      const fingerprint = o.fingerprints ? await o.fingerprints.origin(a.toilProject, assignmentPrompts(a.mode)).catch(() => null) : null;
+      const shown = await read('projects show', { toilProject: a.toilProject }, { actor });
       const startedOn = {
         at: now(),
         toil: o.toilVersion,
@@ -213,7 +213,7 @@ export function hostRunner(o: HostRunnerOptions): Runner {
         // Toil UI hands an assigned agent no skill: its tools and this prompt are all it gets.
         skills: [] as string[],
         tools: tools.map((t) => t.name),
-        dossier: { name: a.dossier, fingerprint: shown.ok ? sha256(shown.data) : null },
+        toilProject: { name: a.toilProject, fingerprint: shown.ok ? sha256(shown.data) : null },
         item: { id: item.id, updated: item.updated, fingerprint: sha256(item) },
         prompt: sha256(`${modePrompt.system}\n\n${modePrompt.prompt}`),
         fingerprint,
@@ -227,7 +227,7 @@ export function hostRunner(o: HostRunnerOptions): Runner {
       try {
         const done = await o.host.task({
           adapter,
-          dossier: a.dossier,
+          toilProject: a.toilProject,
           chat: a.id,
           system: modePrompt.system,
           prompt: modePrompt.prompt,
@@ -248,10 +248,10 @@ export function hostRunner(o: HostRunnerOptions): Runner {
 
       const lines = splitLines(text);
       const by = ADAPTER_NAME[adapter];
-      const answer = finish(lines.text, { dossier: a.dossier, prompt: a.mode, by, ledger, writes });
+      const answer = finish(lines.text, { toilProject: a.toilProject, prompt: a.mode, by, ledger, writes });
       const report = { parts: answer.parts, citations: answer.citations, unverified: answer.unverified ?? [], warnings: answer.warnings ?? [] };
       const proposals = [...answer.proposals];
-      if (a.mode === 'investigate' && report.parts.length && !lines.injection) proposals.push(commentProposal(a.dossier, item, commentText(report.parts, by), writes));
+      if (a.mode === 'investigate' && report.parts.length && !lines.injection) proposals.push(commentProposal(a.toilProject, item, commentText(report.parts, by), writes));
 
       let branchInfo: Branch | null = null;
       if (workspace && branch && repo) {
@@ -285,18 +285,18 @@ export function hostRunner(o: HostRunnerOptions): Runner {
   };
 }
 
-/** The dossier's repositories that have a local path: what implement mode can clone. */
-export async function reposOf(execute: Execute, dossier: string): Promise<RepoChoice[]> {
-  const e = await execute('dossiers show', { dossier }, { readOnly: true, caller: CALLER });
+/** The toil project's repositories that have a local path: what implement mode can clone. */
+export async function reposOf(execute: Execute, toilProject: string): Promise<RepoChoice[]> {
+  const e = await execute('projects show', { toilProject }, { readOnly: true, caller: CALLER });
   if (!e.ok) return [];
-  const repos = ((e.data as { dossier?: { repos?: unknown } } | null)?.dossier?.repos ?? []) as Array<{ name?: unknown; path?: unknown }>;
+  const repos = ((e.data as { toilProject?: { repos?: unknown } } | null)?.toilProject?.repos ?? []) as Array<{ name?: unknown; path?: unknown }>;
   return (Array.isArray(repos) ? repos : []).flatMap((r) => (typeof r.name === 'string' && typeof r.path === 'string' && r.path ? [{ name: r.name, path: r.path }] : []));
 }
 
-async function repoNamed(execute: Execute, dossier: string, name: string | null): Promise<RepoChoice> {
-  const repos = await reposOf(execute, dossier);
+async function repoNamed(execute: Execute, toilProject: string, name: string | null): Promise<RepoChoice> {
+  const repos = await reposOf(execute, toilProject);
   const hit = repos.find((r) => r.name === name) ?? (name === null && repos.length === 1 ? repos[0] : undefined);
-  if (!hit) throw new RunStopped('error', `${dossier} has no repository ${name ?? ''} with a local path any more.`, `Check toil dossiers show ${dossier}, then assign again.`);
+  if (!hit) throw new RunStopped('error', `${toilProject} has no repository ${name ?? ''} with a local path any more.`, `Check toil projects show ${toilProject}, then assign again.`);
   return hit;
 }
 
@@ -385,7 +385,7 @@ function filesOf(data: unknown): Branch['files'] {
  * it never has to read the person's clone, which Codex's sandbox on Windows
  * won't map (git's local clone fails there with "CreateFileMapping", error
  * 5), and uncommitted work in the person's clone never comes along. Throws
- * when the dossier's path isn't a plain git clone. Returns the commit the
+ * when the toil project's path isn't a plain git clone. Returns the commit the
  * clone starts at, which the agent must not move.
  */
 export function prepareClone(source: string, clone: string): string | null {
@@ -394,9 +394,9 @@ export function prepareClone(source: string, clone: string): string | null {
   try {
     st = lstatSync(git);
   } catch {
-    throw new RunStopped('error', `${slashes(source)} isn't a git clone, so implement mode has nothing to copy.`, 'Point the dossier repository at a git clone (toil dossiers add-repo <dossier> <folder>), then assign again.');
+    throw new RunStopped('error', `${slashes(source)} isn't a git clone, so implement mode has nothing to copy.`, 'Point the Toil project repository at a git clone (toil projects add-repo <Toil project> <folder>), then assign again.');
   }
-  if (!st.isDirectory()) throw new RunStopped('error', `${slashes(source)} is a git worktree or a submodule (its .git is a file), so implement mode can't copy it.`, 'Point the dossier repository at the main clone, then assign again.');
+  if (!st.isDirectory()) throw new RunStopped('error', `${slashes(source)} is a git worktree or a submodule (its .git is a file), so implement mode can't copy it.`, 'Point the Toil project repository at the main clone, then assign again.');
   // A lock file anywhere is git at work in the person's clone (a commit, or the background maintenance git 2.5x
   // starts after one) and may vanish mid-copy; a file that still vanishes between listing and copying gets a fresh try.
   const copy = () => cpSync(git, join(clone, '.git'), { recursive: true, filter: (from) => !/[\\/]\.git[\\/](hooks|config)$/.test(from) && !/\.lock$/.test(from) });

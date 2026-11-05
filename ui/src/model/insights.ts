@@ -6,7 +6,7 @@
  * it. Every insight says what it rests on (principle 4): the OWI field, the
  * history, or the toil command whose output showed it. One that the data
  * can't support (aging with fewer than three cycle times to compare against,
- * "built but not deployed" for a dossier that names no environment) isn't
+ * "built but not deployed" for a toil project that names no environment) isn't
  * raised at all, rather than raised on a guess.
  * The standup's "any blockers?", answered before anyone unmutes.
  */
@@ -55,7 +55,7 @@ export const INSIGHT_LABEL: Record<InsightCode, string> = {
 
 /** No update for longer than this many days is stale. */
 export const STALE_DAYS = lensDef('stale').threshold!;
-/** Aging compares against this percentile of the dossier's cycle times, once there are enough of them. */
+/** Aging compares against this percentile of the toil project's cycle times, once there are enough of them. */
 export const AGING_PERCENTILE = 85;
 export const MIN_CYCLES = 3;
 
@@ -105,7 +105,7 @@ export function insights(item: WorkItem, p: Prepared): Insight[] {
 
   const age = p.ages.get(item.id);
   if (age !== undefined && p.p85 && age > p.p85.days) {
-    out.push({ code: 'aging', weight: 3, text: `In progress for ${days(age)}, longer than ${AGING_PERCENTILE}% of this dossier's finished items took (${days(p.p85.days)})`, evidence: `history.transitions, against ${p.p85.from} cycle times` });
+    out.push({ code: 'aging', weight: 3, text: `In progress for ${days(age)}, longer than ${AGING_PERCENTILE}% of this Toil project's finished items took (${days(p.p85.days)})`, evidence: `history.transitions, against ${p.p85.from} cycle times` });
   }
 
   const deployed = p.deployments.filter((d) => d.items.includes(item.id));
@@ -164,7 +164,7 @@ export interface Attention {
   insights: Insight[];
 }
 
-/** The dossier's items that need attention, most first: by total weight, then the dossier's own order. */
+/** The toil project's items that need attention, most first: by total weight, then the toil project's own order. */
 export function needsAttention(p: Prepared): Attention[] {
   return p.items
     .map((item) => ({ id: item.id, insights: insights(item, p) }))

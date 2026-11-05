@@ -1,5 +1,5 @@
 /**
- * What a dossier's card on the Dossiers view says about the work (#342), from
+ * What a toil project's card on the Toil projects view says about the work (#342), from
  * the same data its dashboard reads (src/load.ts), which the local app answers
  * from the cache: no tracker is asked. Its sprint with the days left and a
  * small burn-up, how many items are in progress and blocked, how many pull
@@ -9,7 +9,7 @@
  * is therefore read.
  */
 
-import type { DossierData } from '../load.ts';
+import type { ToilProjectData } from '../load.ts';
 import type { WorkItem } from '../toil.ts';
 import { burnup } from './burnup.ts';
 import { people } from './people.ts';
@@ -36,13 +36,13 @@ export interface PreviewPerson {
   kind: 'human' | 'agent';
 }
 
-export interface DossierPreview {
+export interface ToilProjectPreview {
   sprint: PreviewSprint | null;
   inProgress: number;
   blocked: number;
   /** Open pull requests waiting on a review. */
   awaitingReview: number;
-  /** Everyone with work on it, the dossier's own people first. */
+  /** Everyone with work on it, the toil project's own people first. */
   people: PreviewPerson[];
   /** Work items and pull requests updated after `since`; null when this browser never opened the dashboard. */
   changedSince: number | null;
@@ -58,7 +58,7 @@ export function isBlocked(item: WorkItem, byId: Map<string, WorkItem>): boolean 
   return item.links.some((l) => l.type === 'blocks' && l.direction === 'inward' && byId.has(l.target) && !isDone(byId.get(l.target)!));
 }
 
-export function previewOf(d: DossierData, now: string, since: string | null): DossierPreview {
+export function previewOf(d: ToilProjectData, now: string, since: string | null): ToilProjectPreview {
   const byId = new Map(d.items.map((i) => [i.id, i]));
   const h = health(d.items, d.changes, now);
   let sprint: PreviewSprint | null = null;
@@ -78,7 +78,7 @@ export function previewOf(d: DossierData, now: string, since: string | null): Do
   const inProgress = d.items.filter((i) => i.statusCategory === 'IN_PROGRESS').length;
   const blocked = d.items.filter((i) => isBlocked(i, byId)).length;
   const awaitingReview = prs.filter((c) => c.state === 'OPEN' && waitOf(c, now).on === 'review').length;
-  const view = people({ dossier: d.name, entries: d.people ?? [], wipLimit: d.wipLimit ?? null, items: d.items, changes: prs, now });
+  const view = people({ toilProject: d.name, entries: d.people ?? [], wipLimit: d.wipLimit ?? null, items: d.items, changes: prs, now });
   const who = [...view.people, ...view.unmapped].map((c) => ({ key: c.who.key, name: c.who.name, kind: c.who.kind }));
   const changedSince = since === null ? null : d.items.filter((i) => i.updated !== null && i.updated > since).length + prs.filter((c) => c.updated !== null && c.updated > since).length;
   return { sprint, inProgress, blocked, awaitingReview, people: who, changedSince, motion: inProgress + blocked + awaitingReview };

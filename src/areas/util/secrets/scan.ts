@@ -82,7 +82,7 @@ export interface ScanData {
   verified: Verified;
 }
 
-/** Where the allow file is read from when none is named: beside the dossiers, at the workspace's top. */
+/** Where the allow file is read from when none is named: beside the toil projects, at the workspace's top. */
 export const DEFAULT_ALLOW_FILE = '.toil/secrets-allow';
 /** A line this long is cut and reported; minified bundles fit, generated blobs may not. */
 const MAX_LINE = 4 * 1024 * 1024;

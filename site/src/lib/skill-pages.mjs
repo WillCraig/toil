@@ -14,7 +14,7 @@ export const skillDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..'
 const OWN_PAGES = {
   'SKILL.md': '/docs/',
   'core.md': '/docs/core/',
-  'dossiers.md': '/docs/dossiers/',
+  'projects.md': '/docs/projects/',
   'install.md': '/docs/install/',
   'mcp.md': '/docs/mcp/',
   'setup.md': '/docs/setup/',
@@ -88,7 +88,7 @@ export function pagePath(file) {
 export const integrationFiles = skillFiles.filter((f) => f.area && !(f.file in OWN_PAGES));
 
 /** Command groups whose commands a page other than their area's documents. */
-const GROUP_PAGES = { skill: '/docs/skills/#commands-at-a-glance', dossiers: '/docs/dossiers/' };
+const GROUP_PAGES = { skill: '/docs/skills/#commands-at-a-glance', projects: '/docs/projects/' };
 
 /**
  * The page that documents a command group (the first word after `toil`): its

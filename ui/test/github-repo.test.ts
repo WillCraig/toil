@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * A GitHub dossier with no project board, end to end through toil's own
+ * A GitHub toil project with no project board, end to end through toil's own
  * `execute()` from `@imagile-dev/toil/api`, with only `fetch` stubbed: GitHub
  * answers with REST payloads shaped like the real ones (issues, timelines, pull
  * requests and check runs, trimmed to the fields toil reads), and the sync,
@@ -19,7 +19,7 @@ import { Cache } from '../server/cache.ts';
 import type { RequestContext } from '../server/context.ts';
 import { sqliteStore } from '../server/store.ts';
 import { SKEW_MS, SyncService } from '../server/sync.ts';
-import { CHECKED_CLOSED_PRS, CLOSED_ISSUE_HISTORIES, checkedPrs, historyNumbers, loadDossier } from '../src/load.ts';
+import { CHECKED_CLOSED_PRS, CLOSED_ISSUE_HISTORIES, checkedPrs, historyNumbers, loadToilProject } from '../src/load.ts';
 import { columns } from '../src/model/board.ts';
 import { flows } from '../src/model/flow.ts';
 import { dependencyGraph } from '../src/model/graph.ts';
@@ -151,14 +151,14 @@ const caches: Cache[] = [];
 beforeEach(() => {
   const home = mkdtempSync(join(tmpdir(), 'toil-ui-github-'));
   folders.push(home);
-  mkdirSync(join(home, '.toil', 'dossiers'), { recursive: true });
+  mkdirSync(join(home, '.toil', 'projects'), { recursive: true });
   writeFileSync(join(home, '.toil', 'config.json'), JSON.stringify({ version: 2, connections: { github: { area: 'github', baseUrl: API } }, audit: { enabled: false } }));
-  writeFileSync(join(home, '.toil', 'dossiers', 'sandbox.json'), JSON.stringify({ name: 'sandbox', repos: [], github: { connection: 'github', owner: 'imagile', repo: 'payments-sandbox' } }));
-  for (const key of ['HOME', 'USERPROFILE', 'TOIL_GITHUB_TOKEN', 'GITHUB_TOKEN', 'GITHUB_API_URL', 'TOIL_DOSSIER', 'TOIL_DOSSIER_PATHS']) saved[key] = process.env[key];
+  writeFileSync(join(home, '.toil', 'projects', 'sandbox.json'), JSON.stringify({ name: 'sandbox', repos: [], github: { connection: 'github', owner: 'imagile', repo: 'payments-sandbox' } }));
+  for (const key of ['HOME', 'USERPROFILE', 'TOIL_GITHUB_TOKEN', 'GITHUB_TOKEN', 'GITHUB_API_URL', 'TOIL_TOIL_PROJECT', 'TOIL_TOIL_PROJECT_PATHS']) saved[key] = process.env[key];
   process.env.HOME = home;
   process.env.USERPROFILE = home;
   process.env.TOIL_GITHUB_TOKEN = 'test-token';
-  for (const key of ['GITHUB_TOKEN', 'GITHUB_API_URL', 'TOIL_DOSSIER', 'TOIL_DOSSIER_PATHS']) delete process.env[key];
+  for (const key of ['GITHUB_TOKEN', 'GITHUB_API_URL', 'TOIL_TOIL_PROJECT', 'TOIL_TOIL_PROJECT_PATHS']) delete process.env[key];
 });
 
 afterEach(() => {
@@ -178,26 +178,26 @@ async function syncOnce(start: string) {
   const now = () => new Date(clock);
   const cache = await Cache.open(dataDir, { retentionDays: 30, now });
   caches.push(cache);
-  const sync = new SyncService({ cache, execute, mapOwi, now });
+  const sync = new SyncService({ cache, execute: execute as unknown as ConstructorParameters<typeof SyncService>[0]['execute'], mapOwi, now });
   const store = sqliteStore(() => cache, execute as unknown as Execute, { version: 'x', contractVersion: 1 });
   const viaStore: Execute = (command, input = {}) => store.execute(ctx, command, input, 'read');
   return { cache, sync, viaStore, advance: (ms: number) => (clock += ms) };
 }
 
-describe('a GitHub dossier with no project board', () => {
+describe('a GitHub Toil project with no project board', () => {
   it("reads the repository's issues, their timelines, pull requests and checks, and the dashboard renders them from the cache", async () => {
     const gh = stubGithub();
     const { sync, viaStore } = await syncOnce('2026-10-19T22:10:00Z');
     const job = await sync.run(ctx);
     expect(job.error).toBeNull();
-    expect(sync.status().dossiers.find((d) => d.name === 'sandbox')?.sources).toEqual([expect.objectContaining({ area: 'github', status: 'ok' })]);
+    expect(sync.status().toilProjects.find((d) => d.name === 'sandbox')?.sources).toEqual([expect.objectContaining({ area: 'github', status: 'ok' })]);
 
     // Every request was a GET to the configured host, and the issues were asked for open and closed.
     expect(gh.urls.every((u) => u.startsWith('GET /repos/imagile/payments-sandbox/'))).toBe(true);
     expect(gh.urls.some((u) => /\/issues\?.*state=all/.test(u))).toBe(true);
     expect(gh.urls.filter((u) => u.includes('/timeline'))).toHaveLength(3);
 
-    const data = await loadDossier(viaStore, 'sandbox', { mapOwi });
+    const data = await loadToilProject(viaStore, 'sandbox', { mapOwi });
     expect(data.items.map((i) => [i.id, i.statusCategory]).sort()).toEqual([
       ['github:imagile/payments-sandbox#14', 'DONE'],
       ['github:imagile/payments-sandbox#7', 'TODO'],
@@ -231,10 +231,10 @@ describe('a GitHub dossier with no project board', () => {
   it("maps with the section's OWI fields, and leaves its --field aliases to the area's commands", async () => {
     stubGithub();
     const { sync, viaStore } = await syncOnce('2026-10-19T22:10:00Z');
-    const dossier = join(process.env.HOME!, '.toil', 'dossiers', 'sandbox.json');
-    writeFileSync(dossier, JSON.stringify({ name: 'sandbox', repos: [], github: { connection: 'github', owner: 'imagile', repo: 'payments-sandbox', fields: { estimateLabel: 'size/{n}', iterationDays: '7', storyPoints: 'Story Points' } } }));
+    const toilProject = join(process.env.HOME!, '.toil', 'projects', 'sandbox.json');
+    writeFileSync(toilProject, JSON.stringify({ name: 'sandbox', repos: [], github: { connection: 'github', owner: 'imagile', repo: 'payments-sandbox', fields: { estimateLabel: 'size/{n}', iterationDays: '7', storyPoints: 'Story Points' } } }));
     await sync.run(ctx);
-    const data = await loadDossier(viaStore, 'sandbox', { mapOwi });
+    const data = await loadToilProject(viaStore, 'sandbox', { mapOwi });
     const item = data.items.find((i) => i.id.endsWith('#7'))!;
     expect(item.estimate).toBeNull();
     expect(item.iteration).toMatchObject({ name: 'Sprint 42', start: '2026-10-19T07:00:00.000Z' });
@@ -255,7 +255,7 @@ describe('a GitHub dossier with no project board', () => {
     expect(Date.parse(new URL(`https://x${issues[0]!.slice(4)}`).searchParams.get('since')!)).toBe(Date.parse(since));
     expect(gh.urls.filter((u) => u.includes('/timeline'))).toEqual(['GET /repos/imagile/payments-sandbox/issues/8/timeline?per_page=100&page=1']);
 
-    const data = await loadDossier(viaStore, 'sandbox', { mapOwi });
+    const data = await loadToilProject(viaStore, 'sandbox', { mapOwi });
     expect(data.items).toHaveLength(3);
     expect(data.items.find((i) => i.id.endsWith('#8'))?.statusCategory).toBe('DONE');
   });

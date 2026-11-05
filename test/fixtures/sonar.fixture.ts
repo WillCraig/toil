@@ -96,7 +96,7 @@ const DEFAULT_METRICS = 'coverage,duplicated_lines_density,bugs,vulnerabilities,
 const json = (body: unknown) => ({ json: body });
 
 export const routes: Route[] = [
-  // check-dossier's lookup. Invented from the docs: api/components/show answers the component.
+  // check-toil-project's lookup. Invented from the docs: api/components/show answers the component.
   { path: '/api/components/show', query: { component: PROJECT }, respond: json({ component: { key: PROJECT, name: 'Imagile API', qualifier: 'TRK' } }) },
   { path: '/api/qualitygates/project_status', query: { projectKey: PROJECT }, respond: json(qualityGate) },
   { path: '/api/qualitygates/project_status', query: { projectKey: PROJECT, branch: 'release-1.2' }, respond: json(qualityGate) },
@@ -127,7 +127,7 @@ export const routes: Route[] = [
   { path: '/api/hotspots/search', query: { projectKey: PROJECT, p: '1', ps: '500' }, respond: json(hotspotsPage([hotspot(1), hotspot(2)], 2, 1, 500)) },
 ];
 
-/** The dossier the examples run with, for check-dossier: reference data only, so no other example changes. */
-export const dossier = { name: 'payments', sonar: { projects: [PROJECT] } };
+/** The toil project the examples run with, for check-toil-project: reference data only, so no other example changes. */
+export const toilProject = { name: 'payments', sonar: { projects: [PROJECT] } };
 
-export const fixture = defineFixture({ area: 'sonar', routes, config, dossier });
+export const fixture = defineFixture({ area: 'sonar', routes, config, toilProject });

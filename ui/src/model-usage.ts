@@ -31,7 +31,7 @@ export interface UsageRecord {
   chatId: string;
   /** Which question in the chat, from 1. */
   turn: number;
-  dossier: string;
+  toilProject: string;
   adapter: UsageAdapter;
   /** The model the SDK named, or null when it named none (Codex on the CLI's default model). */
   model: string | null;
@@ -122,7 +122,7 @@ export function addUp(records: readonly UsageRecord[]): UsageTotals {
   return out;
 }
 
-/** Totals per key, in descending order of tokens: by model, chat, day, adapter or dossier. */
+/** Totals per key, in descending order of tokens: by model, chat, day, adapter or toil project. */
 export function totalsBy<K extends string>(records: readonly UsageRecord[], key: (r: UsageRecord) => K): Array<{ key: K; sample: UsageRecord; totals: UsageTotals }> {
   const groups = new Map<K, UsageRecord[]>();
   for (const r of reports(records)) groups.set(key(r), [...(groups.get(key(r)) ?? []), r]);
@@ -350,7 +350,7 @@ export const WARN_AT = 0.8;
 
 // ---------------------------------------------------------------- export
 
-const CSV_COLUMNS = ['at', 'day', 'adapter', 'model', 'dossier', 'chatId', 'turn', 'inputTokens', 'cachedInputTokens', 'cacheWriteTokens', 'outputTokens', 'premiumRequests', 'costUsd', 'costSource', 'id'] as const;
+const CSV_COLUMNS = ['at', 'day', 'adapter', 'model', 'toilProject', 'chatId', 'turn', 'inputTokens', 'cachedInputTokens', 'cacheWriteTokens', 'outputTokens', 'premiumRequests', 'costUsd', 'costSource', 'id'] as const;
 
 const cell = (v: unknown) => {
   if (v === undefined || v === null) return '';

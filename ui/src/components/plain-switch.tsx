@@ -32,8 +32,8 @@ export function PlainWordsSetting() {
       </div>
       <p className="note">
         {on
-          ? 'On: tabs and headings use everyday words (a Toil project is a dossier, a code review a pull request, an AI helper an agent), with toil’s term one hover away. Saved in this browser.'
-          : 'Off: screens use toil’s own terms (dossier, pull request, agent). Saved in this browser.'}{' '}
+          ? 'On: tabs and headings use everyday words (a code review is a pull request, an AI helper an agent), with toil’s term one hover away. Saved in this browser.'
+          : 'Off: screens use toil’s own terms (pull request, agent). Saved in this browser.'}{' '}
         <Help topic="plain-words" />
       </p>
     </Card>

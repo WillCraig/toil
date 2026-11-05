@@ -1,11 +1,11 @@
 ---
-description: Standing instructions for an agent asked to set toil up for a person - install, ask about Toil UI, create their connections from non-secret settings, hand every secret to the person, then a dossier and a first read
+description: Standing instructions for an agent asked to set toil up for a person - install, ask about Toil UI, create their connections from non-secret settings, hand every secret to the person, then a toil project and a first read
 ---
 
 # Setting toil up for a person
 
 Run this page when the person says "set up toil for me". You create their connections
-and dossier with their approval. **They enter every secret, never you.** Do the steps
+and toil project with their approval. **They enter every secret, never you.** Do the steps
 in order, and say what you are about to do before each one that changes anything.
 
 ## The rules this page keeps
@@ -28,7 +28,7 @@ for other projects or agents, `toil skill install --allow-write` (`install.md`).
 
 Ask this before anything else, and let the person choose:
 
-> Do you want Toil UI? It is a local web dashboard on your dossiers, and its Settings
+> Do you want Toil UI? It is a local web dashboard on your toil projects, and its Settings
 > page is where you can type your credentials instead of in a terminal.
 
 Everything after this follows the answer. Toil UI is optional, and toil works the same
@@ -40,7 +40,7 @@ Start it with `npx @imagile-dev/toil-ui`. If you can run a command in the backgr
 do; otherwise ask the person to run it in their terminal. It prints one URL that
 carries a launch token. Give the person that URL and tell them to keep it to
 themselves; each start prints a new one. Point them at its first-run checklist on the
-Dossiers page (Connect a tracker, Create a dossier, Sync). Secrets are entered there,
+Toil projects page (Connect a tracker, Create a toil project, Sync). Secrets are entered there,
 in Settings, Connections. If they say no, stay on the CLI: secrets go in with `toil
 connections login <name>` in their own terminal.
 
@@ -109,20 +109,20 @@ When they say it is done, run `toil connections test <name>`. A failure names th
 an `AUTH` error or a missing secret means they should run `toil connections login
 <name>` again or re-enter it in Toil UI; a database that rejects the sign-in needs its password the same way. Report the result, never a secret.
 
-## 6. Make a dossier
+## 6. Make a toil project
 
-A dossier maps one body of work to their connections. In a repository that already has
-one, `toil dossiers onboard --plan` shows what is missing and adds no connection. For a
-new one, ask the person its name, then follow `dossiers.md`, **Create**:
-`toil dossiers init <name> --description "<what it is>"`, `toil dossiers add-repo
-<name> <folder>`, and `toil dossiers link <name> <area> --host <host> --set key=value`.
-With Toil UI, they press Sync on the dossier when it is ready.
+A toil project maps one body of work to their connections. In a repository that already has
+one, `toil projects onboard --plan` shows what is missing and adds no connection. For a
+new one, ask the person its name, then follow `projects.md`, **Create**:
+`toil projects init <name> --description "<what it is>"`, `toil projects add-repo
+<name> <folder>`, and `toil projects link <name> <area> --host <host> --set key=value`.
+With Toil UI, they press Sync on the toil project when it is ready.
 
 ## 7. A first read, then report
 
 Run one read per connected area, small and read-only, for example
 `toil github pr list --limit 5` or `toil jira issue search --limit 5`, using the
-dossier's context. Report what each returned, what is connected, and what is left.
+toil project's context. Report what each returned, what is connected, and what is left.
 
 Tell the person that every connection is read-only. If they ever want a write, they
 turn it on themselves with `toil connections writes <name> on`, which asks them to

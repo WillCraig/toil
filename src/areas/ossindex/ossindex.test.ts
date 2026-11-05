@@ -52,7 +52,7 @@ describe('ossindex vulns: requests', () => {
 
   it('is an area command with a connection, whose host is fixed in code', () => {
     expect(commands.map((c) => c.kind)).toEqual(['area']);
-    expect(Object.keys(vulnsCommand.input.shape).sort()).toEqual(['connection', 'cwd', 'directOnly', 'dossier', 'ecosystem', 'from', 'includeDev']);
+    expect(Object.keys(vulnsCommand.input.shape).sort()).toEqual(['connection', 'cwd', 'directOnly', 'ecosystem', 'from', 'includeDev', 'toilProject']);
   });
 
   it('builds package URLs as specified: a scope encoded, Maven group and artifact encoded, anything else generic', () => {

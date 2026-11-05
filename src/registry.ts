@@ -1,14 +1,15 @@
 import { modules } from './areas.generated.js';
 import { auditCommands } from './audit/commands.js';
 import { connectionsCommands } from './connections/commands.js';
-import { dossierBuildCommands } from './dossiers/build.js';
-import { dossierOnboardCommands } from './dossiers/onboard.js';
-import { dossierBriefCommands } from './dossiers/brief.js';
-import { dossiersCommands } from './dossiers/commands.js';
+import { toilProjectBuildCommands } from './projects/build.js';
+import { toilProjectOnboardCommands } from './projects/onboard.js';
+import { toilProjectBriefCommands } from './projects/brief.js';
+import { toilProjectsCommands } from './projects/commands.js';
 import { feedbackCommands } from './feedback/command.js';
 import { reposCommands } from './repos/commands.js';
 import type { AnyArea } from './core/area.js';
 import { assertUniquePaths, withCoreAliases, type AnyCommand } from './core/command.js';
+import { toilProjectMigrateCommands } from './projects/migrate.js';
 import { resolveRoutedAliases, type RoutedAlias } from './core/routed-alias.js';
 import { setupCommands } from './setup/commands.js';
 import { skillsConfigCommands } from './skills/commands.js';
@@ -31,7 +32,21 @@ export const areas: AnyArea[] = modules.flatMap((m) => (m.area ? [m.area] : []))
  * use one marketplace's connection are the `skills` area's. `skill install`
  * and `skill show` are the toil skill's own (src/skills/skill-commands.ts).
  */
-export const commands: AnyCommand[] = withCoreAliases([...modules.flatMap((m) => m.commands), ...connectionsCommands(areas), ...dossiersCommands(areas), ...dossierBriefCommands(), ...dossierBuildCommands(areas), ...dossierOnboardCommands(areas), ...reposCommands(), ...skillsConfigCommands(), ...skillCommands(areas), ...setupCommands(), ...auditCommands(() => commands), ...themeCommands(), ...feedbackCommands(), waitCommand], areas);
+/**
+ * `toil dossiers …` and `<area> check-dossier` were renamed when dossiers became toil
+ * projects. The old paths keep answering, with a TOIL_PROJECT_DEPRECATED_NAME warning, for at
+ * least one beta (principle 7); MCP never had them as aliases and drops the old tool names.
+ */
+const withRetiredToilProjectPaths = (list: AnyCommand[]): AnyCommand[] =>
+  list.map((def) => {
+    const [first, ...rest] = def.path;
+    if (first === 'projects' && rest[0] !== 'migrate') return { ...def, deprecatedPaths: [['dossiers', ...rest]] };
+    const last = def.path[def.path.length - 1];
+    if (last === 'check-toil-project') return { ...def, deprecatedPaths: [[first!, ...def.path.slice(1, -1), 'check-dossier']] };
+    return def;
+  });
+
+export const commands: AnyCommand[] = withRetiredToilProjectPaths(withCoreAliases([...modules.flatMap((m) => m.commands), ...connectionsCommands(areas), ...toilProjectsCommands(areas), ...toilProjectMigrateCommands(), ...toilProjectBriefCommands(), ...toilProjectBuildCommands(areas), ...toilProjectOnboardCommands(areas), ...reposCommands(), ...skillsConfigCommands(), ...skillCommands(areas), ...setupCommands(), ...auditCommands(() => commands), ...themeCommands(), ...feedbackCommands(), waitCommand], areas));
 
 // An alias in another group (`deps outdated` for `artifactory package outdated`) can
 // collide with a command there; better a failed start than a silent winner.

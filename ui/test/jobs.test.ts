@@ -101,7 +101,7 @@ describe('the target of a job is one the cache holds', () => {
     }
     expect(() => jobQuestion('d', jobPrompt('ship', 'x\ny'), () => 0, KNOWN)).toThrow(/not a pull request/);
   });
-  it('lets Diagram take a repository of the dossier or none, and refuses any other text', () => {
+  it('lets Diagram take a repository of the Toil project or none, and refuses any other text', () => {
     expect(jobQuestion('d', jobPrompt('map-codebase', ''), () => 0, KNOWN)).not.toBeNull();
     expect(jobQuestion('d', jobPrompt('map-codebase', 'imagile/payments-web'), () => 0, KNOWN)).not.toBeNull();
     expect(() => jobQuestion('d', jobPrompt('map-codebase', 'imagile/other'), () => 0, KNOWN)).toThrow(/not a repository of d/);

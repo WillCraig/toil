@@ -19,7 +19,7 @@ import { Panel } from '../components/panel.tsx';
 import { Help } from '../components/help.tsx';
 import { ProposalCard } from '../components/proposal.tsx';
 import { useData } from '../data.ts';
-import { dossierHref, standupHref, worklogHref } from '../format.ts';
+import { toilProjectHref, standupHref, worklogHref } from '../format.ts';
 import { allLines, bucketNone, BUCKETS, BUCKET_TITLE, defaultRange, factsCited, groupTitle, MAX_STANDUP_DAYS, standupLede, standupTitle, standupWriteUp, whenText, type StandupGroup, type StandupLine, type StandupReport } from '../model/standup.ts';
 import { dayOf } from '../model/worklog.ts';
 import { useTheme, useThemeChoiceContext } from '../skins.tsx';
@@ -32,7 +32,7 @@ const failedWith = (e: unknown) => ({ ok: false as const, message: e instanceof 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function Standup({ api, from, to, ignored }: { api: WorklogApi | null; from: string | null; to: string | null; ignored?: string }) {
-  const { dossier, now } = useData();
+  const { toilProject, now } = useData();
   const today = dayOf(now)!;
   const range = from && to ? { from, to } : defaultRange(today);
   const [loaded, setLoaded] = useState<Loaded<WorklogStandup>>(null);
@@ -41,19 +41,19 @@ export function Standup({ api, from, to, ignored }: { api: WorklogApi | null; fr
     if (!api) return;
     let live = true;
     setLoaded(null);
-    api.standup(dossier.name, range.from, range.to).then(
+    api.standup(toilProject.name, range.from, range.to).then(
       (value) => live && setLoaded({ ok: true, value }),
       (e: unknown) => live && setLoaded(failedWith(e)),
     );
     return () => {
       live = false;
     };
-  }, [api, dossier.name, range.from, range.to]);
+  }, [api, toilProject.name, range.from, range.to]);
 
   const head = (
     <div className="view-head">
       <p className="eyebrow">
-        <a href={dossierHref(dossier.name)}>{dossier.name}</a> · <a href={worklogHref(dossier.name)}>Worklog</a>
+        <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a> · <a href={worklogHref(toilProject.name)}>Worklog</a>
       </p>
       <h1 tabIndex={-1}>Stand-up</h1>
       <p className="lede">
@@ -99,12 +99,12 @@ export function Standup({ api, from, to, ignored }: { api: WorklogApi | null; fr
 
 /** The range: since the last working day by default, or two days a person picks. */
 function RangeForm({ from, to, today, explicit }: { from: string; to: string; today: string; explicit: boolean }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const [a, setA] = useState(from);
   const [b, setB] = useState(to);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    window.location.hash = standupHref(dossier.name, { from: a, to: b });
+    window.location.hash = standupHref(toilProject.name, { from: a, to: b });
   };
   return (
     <>
@@ -113,7 +113,7 @@ function RangeForm({ from, to, today, explicit }: { from: string; to: string; to
         {explicit && (
           <>
             {' '}
-            <a href={standupHref(dossier.name)}>Back to since the last working day</a>.
+            <a href={standupHref(toilProject.name)}>Back to since the last working day</a>.
           </>
         )}
       </p>
@@ -136,11 +136,11 @@ function RangeForm({ from, to, today, explicit }: { from: string; to: string; to
 
 /** What a line is about: its item or pull request, its build or deployment where the source has a page, or the worklog day an assignment ran on. */
 function Subject({ line }: { line: StandupLine }) {
-  const { byId, prById, dossier } = useData();
+  const { byId, prById, toilProject } = useData();
   if (byId.has(line.subject) || prById?.has(line.subject)) return <ItemLink id={line.subject} withTitle />;
   if (line.subject.startsWith('run:') && line.day) {
     return (
-      <a href={worklogHref(dossier.name, line.day)} className="item-link">
+      <a href={worklogHref(toilProject.name, line.day)} className="item-link">
         <span className="key">{line.label}</span>
       </a>
     );
@@ -193,7 +193,7 @@ function Person({ report, group, cited }: { report: StandupReport; group: Standu
   const count = BUCKETS.reduce((n, b) => n + group.lines[b].length, 0);
   return (
     <Panel id={id} title={groupTitle(group)} calls={[]}>
-      {!group.mapped && group.key !== 'none' && <p className="note">Not in the dossier's people: an account the People view can map to someone.</p>}
+      {!group.mapped && group.key !== 'none' && <p className="note">Not in the Toil project's people: an account the People view can map to someone.</p>}
       {count === 0 ? (
         <p className="note">Nothing recorded for these days.</p>
       ) : (
@@ -223,7 +223,7 @@ function Report({ api, data, onRebuilt }: { api: WorklogApi; data: WorklogStandu
     setMoved(false);
     if (!a) return;
     try {
-      const again = await api.standup(report.dossier, report.from, report.to);
+      const again = await api.standup(report.toilProject, report.from, report.to);
       if (again.markdown !== data.markdown) {
         onRebuilt(again);
         setMoved(true);
@@ -255,7 +255,7 @@ function Report({ api, data, onRebuilt }: { api: WorklogApi; data: WorklogStandu
       {report.people.length ? (
         report.people.map((g) => <Person key={g.key} report={report} group={g} cited={cited} />)
       ) : (
-        <p className="note">Nobody is in the dossier's people, and nobody did anything the worklog recorded on these days.</p>
+        <p className="note">Nobody is in the Toil project's people, and nobody did anything the worklog recorded on these days.</p>
       )}
       <Panel id="standup-share" title="Copy, export and publish" calls={[]}>
         <Share api={api} data={data} />
@@ -305,7 +305,7 @@ function Share({ api, data }: { api: WorklogApi; data: WorklogStandup }) {
     setBusy(true);
     setResult(null);
     try {
-      setResult({ ok: true, value: await api.exportTo(report.dossier, { from: report.from, to: report.to }, folder) });
+      setResult({ ok: true, value: await api.exportTo(report.toilProject, { from: report.from, to: report.to }, folder) });
     } catch (err) {
       setResult(failedWith(err));
     } finally {
@@ -344,7 +344,7 @@ function Share({ api, data }: { api: WorklogApi; data: WorklogStandup }) {
               {result.value.proposals.length ? (
                 result.value.proposals.map((p) => <ProposalCard key={p.id} proposal={p} />)
               ) : (
-                <p className="note">This dossier names no Confluence space and no GitHub repository, so there is nowhere to propose publishing it.</p>
+                <p className="note">This Toil project names no Confluence space and no GitHub repository, so there is nowhere to propose publishing it.</p>
               )}
             </>
           ) : (
@@ -371,7 +371,7 @@ function Share({ api, data }: { api: WorklogApi; data: WorklogStandup }) {
 
 /** "Write it up": the agent retells the same facts in a few sentences, labelled as its own and naming the fact lines it used. */
 function WriteUp({ report, answer, onAnswer }: { report: StandupReport; answer: Answer | null; onAnswer: (a: Answer | null) => void }) {
-  const { agent, dossier } = useData();
+  const { agent, toilProject } = useData();
   const theme = useTheme();
   const choice = useThemeChoiceContext();
   const [busy, setBusy] = useState(false);
@@ -383,7 +383,7 @@ function WriteUp({ report, answer, onAnswer }: { report: StandupReport; answer: 
     onAnswer(null);
     try {
       const chat = { id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `standup-${Date.now()}`, turn: 1 };
-      onAnswer(await agent.ask(dossier.name, standupWriteUp(report.from, report.to), { theme: theme.name, voice: voiceOn(theme, choice) }, chat));
+      onAnswer(await agent.ask(toilProject.name, standupWriteUp(report.from, report.to), { theme: theme.name, voice: voiceOn(theme, choice) }, chat));
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
     } finally {

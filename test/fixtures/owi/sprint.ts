@@ -2,7 +2,7 @@
  * One sprint of placeholder work across Jira Data Center, Azure DevOps Server
  * and GitHub Enterprise, as the toil commands that read it print it: the
  * input `toil util owi map` turns into test/fixtures/owi/sprint-42.owi.json,
- * and which the Toil UI preview's fixture `execute()` serves, split by dossier
+ * and which the Toil UI preview's fixture `execute()` serves, split by toil project
  * (ui/src/fixtures/work.ts).
  *
  * Sprint 42 runs 2026-10-05 to 2026-10-16. Twenty items in it: eight Jira
@@ -42,7 +42,7 @@ const envelope = (command: string, data: unknown, connection: string, inputs: Re
     version: VERSION,
     context: {
       connection: { value: connection, source: 'default', default: 'named' },
-      ...(Object.keys(inputs).length ? { inputs: Object.fromEntries(Object.entries(inputs).map(([k, value]) => [k, { value, source: 'dossier' }])) } : {}),
+      ...(Object.keys(inputs).length ? { inputs: Object.fromEntries(Object.entries(inputs).map(([k, value]) => [k, { value, source: 'toil-project' }])) } : {}),
     },
   },
 });

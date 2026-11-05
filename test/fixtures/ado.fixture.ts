@@ -194,7 +194,7 @@ const continued = (first: unknown[], second: unknown[]) => (r: RecordedRequest) 
   hasQuery(r, 'continuationToken') ? { json: { count: second.length, value: second } } : { json: { count: first.length, value: first }, headers: { 'x-ms-continuationtoken': 'abc12345' } };
 
 export const routes: Route[] = [
-  // check-dossier's project lookup. Invented from the docs: GET {collection}/_apis/projects/{project}. Its repo lookup is repo get's route.
+  // check-toil-project's project lookup. Invented from the docs: GET {collection}/_apis/projects/{project}. Its repo lookup is repo get's route.
   { path: `${COLL}/_apis/projects/Imagile`, query: { 'api-version': '7.1' }, respond: { json: project('Imagile') } },
   { path: `${COLL}/_apis/connectionData`, respond: { json: connectionData } },
   { path: '/_apis/projectCollections', respond: { json: { count: 1, value: [{ id: 'abc12345-0000-0000-0000-000000000004', name: 'DefaultCollection', url: `${ADO}/_apis/projectCollections/abc12345-0000-0000-0000-000000000004`, collectionUrl: `${ADO}${COLL}`, state: 'Started' }] } } },
@@ -325,10 +325,10 @@ export const files = {
 };
 
 /**
- * The dossier the examples run with, for check-dossier. Its context inputs are
+ * The toil project the examples run with, for check-toil-project. Its context inputs are
  * per repo, and no example's folder is that repo, so no other example reads them.
  */
-export const dossier = { name: 'payments', ado: { collection: { 'imagile-api': 'DefaultCollection' }, project: { 'imagile-api': 'Imagile' }, repo: { 'imagile-api': 'imagile-api' } } };
+export const toilProject = { name: 'payments', ado: { collection: { 'imagile-api': 'DefaultCollection' }, project: { 'imagile-api': 'Imagile' }, repo: { 'imagile-api': 'imagile-api' } } };
 
 
 /**
@@ -345,5 +345,5 @@ export const fixture = defineFixture({
   config: { ...config, ...cloud.config },
   deployments: { server: 'ado', cloud: 'ado-cloud' },
   files: { ...files, ...cloud.files },
-  dossier,
+  toilProject,
 });

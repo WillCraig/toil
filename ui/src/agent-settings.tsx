@@ -35,13 +35,13 @@ const ENDPOINT_LABEL: Record<string, string> = { anthropic: 'Anthropic API', bed
 
 export interface AgentSettingsPanelProps {
   client: AgentSettingsClient;
-  /** A dossier to show the full prompt for: the first one toil lists, when there is one. */
-  dossier?: string;
+  /** A toil project to show the full prompt for: the first one toil lists, when there is one. */
+  toilProject?: string;
   /** The choice was saved: the pane's starters and answers come from it from now on. */
   onChange?: (status: AgentStatus) => void;
 }
 
-export function AgentSettingsPanel({ client, onChange, dossier }: AgentSettingsPanelProps) {
+export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSettingsPanelProps) {
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [form, setForm] = useState<AgentSettings | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -212,7 +212,7 @@ export function AgentSettingsPanel({ client, onChange, dossier }: AgentSettingsP
         </form>
       </Card>
     )}
-    {status && <InstructionsCard saved={status.settings} save={saveWords} dossier={dossier ?? null} prompt={(style) => client.prompt(dossier, style)} />}
+    {status && <InstructionsCard saved={status.settings} save={saveWords} toilProject={toilProject ?? null} prompt={(style) => client.prompt(toilProject, style)} />}
     </>
   );
 }
@@ -231,7 +231,7 @@ export function AgentSettingsPreview() {
     <AdaptersCard adapters={SAMPLE_ADAPTER_STATUS} client={null} />
     <InstructionsCard
       saved={{ instructions: null, voice: null }}
-      dossier="card-payments"
+      toilProject="card-payments"
       disabled="This is the preview, so nothing is saved. Toil UI on your own machine keeps these in its data folder, in agent.json."
       prompt={async (style, draft) => systemPrompt('card-payments', FIXTURE_NOW, promptStyle(style, draft))}
     />
@@ -247,7 +247,7 @@ type Words = Pick<AgentSettings, 'instructions' | 'voice'>;
  * in the page's theme; the local app asks the server, which uses what was
  * saved, and the preview composes it from what is typed.
  */
-export function InstructionsCard({ saved, save, prompt, disabled, dossier }: { saved: Words; save?: (words: Words) => Promise<Words>; prompt: (style: AskStyle, draft: Words) => Promise<string>; disabled?: string; dossier: string | null }) {
+export function InstructionsCard({ saved, save, prompt, disabled, toilProject }: { saved: Words; save?: (words: Words) => Promise<Words>; prompt: (style: AskStyle, draft: Words) => Promise<string>; disabled?: string; toilProject: string | null }) {
   const theme = useTheme();
   const choice = useThemeChoiceContext();
   const style: AskStyle = { theme: theme.name, voice: voiceOn(theme, choice) };
@@ -349,8 +349,8 @@ export function InstructionsCard({ saved, save, prompt, disabled, dossier }: { s
         <div className="full-prompt">
           <p className="note">
             {save
-              ? `What the agent is sent now, in this theme, for a question about ${dossier ?? 'a dossier'}${dossier ? ', the first dossier toil lists' : ''}.${dirty ? ' Your unsaved changes are not in it until you save.' : ''}`
-              : `What the agent would be sent in this theme, for the sample dossier ${dossier ?? 'card-payments'}.`}
+              ? `What the agent is sent now, in this theme, for a question about ${toilProject ?? 'a Toil project'}${toilProject ? ', the first Toil project toil lists' : ''}.${dirty ? ' Your unsaved changes are not in it until you save.' : ''}`
+              : `What the agent would be sent in this theme, for the sample Toil project ${toilProject ?? 'card-payments'}.`}
           </p>
           <pre id={promptId} className="full-prompt__text" tabIndex={0} role="region" aria-label="The full prompt" data-scroller="">
             {shown}

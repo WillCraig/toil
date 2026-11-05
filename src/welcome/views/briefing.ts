@@ -4,22 +4,22 @@ import { pal, paint } from '../term.js';
 import type { Caps, Item, Run, Step, StepResult, View } from '../view.js';
 
 /**
- * Briefing a dossier from the menu (#494): what in its work needs a person,
- * and what to do first, the way `toil dossiers brief` says it, in a terminal.
+ * Briefing a toil project from the menu (#494): what in its work needs a person,
+ * and what to do first, the way `toil projects brief` says it, in a terminal.
  * The menu composes the reads a person would type, each shown as it runs:
  * each tracker's issues and each code host's open pull requests, then every
  * open pull request read with its reviews and checks, then `util owi map`,
- * then `dossiers brief`. It asks only what the dossier names (principle 3:
+ * then `toil projects brief`. It asks only what the toil project names (principle 3:
  * the caller composes, and here the menu is the caller). Every key on the
  * briefing is a terminal hyperlink to its tracker where the terminal draws
  * them, and the URL is printed beside it everywhere else. The weekly status
  * report, assembled live, with citations, before anyone asked for it.
  */
 
-/** What `dossiers show` says an area needs, as the briefing reads it. */
+/** What `toil projects show` says an area needs, as the briefing reads it. */
 type Areas = Record<string, { inputs?: Record<string, unknown> }>;
 
-/** The most open pull requests read in full; a dossier with more is briefed on these, and says so. */
+/** The most open pull requests read in full; a toil project with more is briefed on these, and says so. */
 export const MAX_PR_READS = 20;
 
 const isJira = (area: string) => area === 'jira';
@@ -28,16 +28,16 @@ const codeHosts = (area: string) => area === 'github' || area === 'bitbucket' ||
 const OPEN: Record<string, string> = { github: 'open', bitbucket: 'OPEN', ado: 'active' };
 
 /** The first run: each tracker's issues, each code host's open pull requests, and each Azure DevOps project's work item ids (a WIQL search; their fields come from one get-many in the next run). */
-export function readSteps(dossier: string, areas: Areas): { steps: Step[] } {
+export function readSteps(toilProject: string, areas: Areas): { steps: Step[] } {
   const steps: Step[] = [];
   for (const [area, a] of Object.entries(areas)) {
     const inputs = a.inputs ?? {};
     if (isJira(area) && typeof inputs.project === 'string') {
-      steps.push({ args: [area, 'issue', 'search', '--dossier', dossier, '--jql', `project = ${inputs.project} ORDER BY Rank ASC`], label: `The ${inputs.project} issues` });
+      steps.push({ args: [area, 'issue', 'search', '--toil-project', toilProject, '--jql', `project = ${inputs.project} ORDER BY Rank ASC`], label: `The ${inputs.project} issues` });
     }
-    if (area === 'github' && typeof inputs.repo === 'string') steps.push({ args: ['github', 'issue', 'list', '--dossier', dossier, '--state', 'all'], label: `${String(inputs.owner ?? '')}/${inputs.repo}'s issues` });
-    if (codeHosts(area) && typeof inputs.repo === 'string') steps.push({ args: [area, 'pr', 'list', '--dossier', dossier, '--state', OPEN[area]!], label: `${area}'s open pull requests` });
-    if (area === 'ado' && inputs.project) steps.push({ args: [area, 'work-item', 'search', '--dossier', dossier, '--wiql', WIQL], label: `${String(inputs.project)}'s work items` });
+    if (area === 'github' && typeof inputs.repo === 'string') steps.push({ args: ['github', 'issue', 'list', '--toil-project', toilProject, '--state', 'all'], label: `${String(inputs.owner ?? '')}/${inputs.repo}'s issues` });
+    if (codeHosts(area) && typeof inputs.repo === 'string') steps.push({ args: [area, 'pr', 'list', '--toil-project', toilProject, '--state', OPEN[area]!], label: `${area}'s open pull requests` });
+    if (area === 'ado' && inputs.project) steps.push({ args: [area, 'work-item', 'search', '--toil-project', toilProject, '--wiql', WIQL], label: `${String(inputs.project)}'s work items` });
   }
   return { steps };
 }
@@ -77,7 +77,7 @@ function keyPatterns(results: StepResult[]): string[] {
   return [...out];
 }
 
-/** The envelopes a run returned, one per line, as `util owi map` and `dossiers brief` read them. */
+/** The envelopes a run returned, one per line, as `util owi map` and `toil projects brief` read them. */
 const lines = (results: StepResult[]) => results.filter((r) => r.envelope.ok && !(r.args[1] === 'work-item' && r.args[2] === 'search')).map((r) => JSON.stringify(r.envelope)).join('\n');
 
 /** What the briefing couldn't read, in words, for its screen: failed reads, and work items or pull requests past their caps. */
@@ -88,34 +88,34 @@ function gaps(results: StepResult[], capped: string[]): string[] {
   ];
 }
 
-/** Brief a dossier, from its `dossiers show` data: the four runs, each shown, then the briefing with anything it couldn't read. */
-export function briefRun(dossier: string, areas: Areas): Run {
-  const { steps } = readSteps(dossier, areas);
+/** Brief a toil project, from its `toil projects show` data: the four runs, each shown, then the briefing with anything it couldn't read. */
+export function briefRun(toilProject: string, areas: Areas): Run {
+  const { steps } = readSteps(toilProject, areas);
   return {
-    title: `Read ${dossier}'s work`,
+    title: `Read ${toilProject}'s work`,
     steps,
     keepGoing: true,
     next: (read) => {
-      const open = read.flatMap((r) => openIds(r).map((id): Step => ({ args: [r.args[0]!, 'pr', 'get', id, '--dossier', dossier, '--include', 'reviews,checks'] })));
-      const capped: string[] = open.length > MAX_PR_READS ? [`The dossier has ${open.length} open pull requests; the first ${MAX_PR_READS} were read in full, the rest only as listed.`] : [];
+      const open = read.flatMap((r) => openIds(r).map((id): Step => ({ args: [r.args[0]!, 'pr', 'get', id, '--toil-project', toilProject, '--include', 'reviews,checks'] })));
+      const capped: string[] = open.length > MAX_PR_READS ? [`The toil project has ${open.length} open pull requests; the first ${MAX_PR_READS} were read in full, the rest only as listed.`] : [];
       const items = read.flatMap((r) => {
         const ids = workItemIds(r);
         if (ids.length > MAX_WORK_ITEMS) capped.push(`${r.args[0]} has ${ids.length} work items; the newest ${MAX_WORK_ITEMS} were read, since the search lists the oldest first.`);
-        return ids.length ? [{ args: [r.args[0]!, 'work-item', 'get-many', ...ids.slice(-MAX_WORK_ITEMS), '--dossier', dossier] }] : [];
+        return ids.length ? [{ args: [r.args[0]!, 'work-item', 'get-many', ...ids.slice(-MAX_WORK_ITEMS), '--toil-project', toilProject] }] : [];
       });
       const gets = [...items, ...open.slice(0, MAX_PR_READS)];
       const map = (all: StepResult[]): Run => ({
-        title: `Map ${dossier}'s work to Open Work Items`,
+        title: `Map ${toilProject}'s work to Open Work Items`,
         steps: [{ args: ['util', 'owi', 'map', '--text', lines(all), ...keyPatterns(all).flatMap((k) => ['--key-pattern', k])] }],
         next: (mapped) => ({
           run: {
-            title: `Brief ${dossier}`,
-            steps: [{ args: ['dossiers', 'brief', dossier, '--text', lines(mapped)] }],
-            next: (briefed) => (briefed[0]?.envelope.ok ? { go: 'dossier-brief', params: { dossier, gaps: JSON.stringify(gaps([...all, ...mapped], capped)) } } : undefined),
+            title: `Brief ${toilProject}`,
+            steps: [{ args: ['projects', 'brief', toilProject, '--text', lines(mapped)] }],
+            next: (briefed) => (briefed[0]?.envelope.ok ? { go: 'toil-project-brief', params: { toilProject, gaps: JSON.stringify(gaps([...all, ...mapped], capped)) } } : undefined),
           },
         }),
       });
-      return gets.length ? { run: { title: `Read ${dossier}'s ${items.length ? 'work items and ' : ''}open pull requests in full${open.length > MAX_PR_READS ? ` (the first ${MAX_PR_READS} of ${open.length} pull requests)` : ''}`, steps: gets, keepGoing: true, next: (got) => ({ run: map([...read, ...got]) }) } } : { run: map(read) };
+      return gets.length ? { run: { title: `Read ${toilProject}'s ${items.length ? 'work items and ' : ''}open pull requests in full${open.length > MAX_PR_READS ? ` (the first ${MAX_PR_READS} of ${open.length} pull requests)` : ''}`, steps: gets, keepGoing: true, next: (got) => ({ run: map([...read, ...got]) }) } } : { run: map(read) };
     },
   };
 }
@@ -140,7 +140,7 @@ function cited(caps: Caps, text: string, urls: ReadonlyMap<string, string | null
 }
 
 /** The briefing, as lines: the recommendation, each reason with its items, what's on track, which lenses couldn't check, and what wasn't read. */
-export function briefingLines(caps: Caps, b: Brief & { dossier?: { name: string } }, notRead: readonly string[] = []): string[] {
+export function briefingLines(caps: Caps, b: Brief & { toilProject?: { name: string } }, notRead: readonly string[] = []): string[] {
   const p = pal(caps);
   const items = b.reasons.flatMap((r) => r.items);
   const byId = new Map<string, string | null>([...items.map((i): [string, string | null] => [i.id, i.url]), ...items.flatMap((i) => i.changes.map((c): [string, string | null] => [c.id, c.url]))]);
@@ -163,12 +163,12 @@ export function briefingLines(caps: Caps, b: Brief & { dossier?: { name: string 
   return out;
 }
 
-/** The briefing screen: the latest `dossiers brief` this session ran for the dossier, what it couldn't read, and the way to run it again. */
+/** The briefing screen: the latest `toil projects brief` this session ran for the toil project, what it couldn't read, and the way to run it again. */
 export const briefView: View = {
   title: () => 'Briefing',
   body: (caps, p) => {
-    const b = p.session.briefs?.[p.frame.params.dossier ?? ''];
-    if (!b) return ['No briefing yet: Brief this dossier reads it.'];
+    const b = p.session.briefs?.[p.frame.params.toilProject ?? ''];
+    if (!b) return ['No briefing yet: Brief this toil project reads it.'];
     let notRead: string[] = [];
     try {
       notRead = JSON.parse(p.frame.params.gaps ?? '[]') as string[];
@@ -178,9 +178,9 @@ export const briefView: View = {
     return briefingLines(caps, b as Brief, notRead);
   },
   items: (p) => {
-    const dossier = p.frame.params.dossier ?? '';
-    const shown = p.session.dossiers?.[dossier]?.show as { areas?: Areas } | undefined;
-    const again: Item[] = shown?.areas ? [{ label: 'Brief it again', hint: 'Read its work again, then brief it', action: { run: briefRun(dossier, shown.areas) } }] : [];
+    const toilProject = p.frame.params.toilProject ?? '';
+    const shown = p.session.toilProjects?.[toilProject]?.show as { areas?: Areas } | undefined;
+    const again: Item[] = shown?.areas ? [{ label: 'Brief it again', hint: 'Read its work again, then brief it', action: { run: briefRun(toilProject, shown.areas) } }] : [];
     return [...again, { label: 'Back', hint: '', action: { back: true } }];
   },
 };

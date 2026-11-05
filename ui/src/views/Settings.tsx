@@ -1,5 +1,5 @@
 /**
- * toil's configuration from the browser (#253, item 4): Connections, Dossiers,
+ * toil's configuration from the browser (#253, item 4): Connections, Toil projects,
  * General (the theme and how deep it goes, #283, motion in this browser,
  * #271, notifications, links to learning content, #418, then bounds and the time limit), Usage (what toil's audit log says
  * about how toil is used, #309), Agent usage (what the agent's models used,
@@ -20,7 +20,7 @@ import { Help } from '../components/help.tsx';
 import type { HelpTopicId } from '../help.ts';
 import './settings.css';
 import { Connections } from './settings/Connections.tsx';
-import { DossierSetup } from './settings/DossierSetup.tsx';
+import { ToilProjectSetup } from './settings/ToilProjectSetup.tsx';
 import { General } from './settings/General.tsx';
 import { MotionSetting } from './settings/Motion.tsx';
 import { LearningSetting } from './settings/Learning.tsx';
@@ -34,14 +34,14 @@ import type { ModelUsageApi } from '../server-client.ts';
 
 /**
  * Where a link lands on a page that isn't a named thing (#416): the add-connection form, or the
- * create-dossier form. A connection or dossier name can't start with `+`, so these never collide with one.
+ * create-toil-project form. A connection or toil project name can't start with `+`, so these never collide with one.
  */
 export const ADD_CONNECTION_HREF = '#/settings/connections/+add';
-export const CREATE_DOSSIER_HREF = '#/settings/dossiers/+new';
+export const CREATE_TOIL_PROJECT_HREF = '#/settings/projects/+new';
 
 export const SETTINGS_PAGES: Array<{ page: SettingsPage; label: string; plain?: { label: string; about: string }; about: string; topic: HelpTopicId }> = [
   { page: 'connections', label: 'Connections', plain: { label: 'Connections', about: 'Your links to tools such as Jira and GitHub: add one, check that it works, choose the main one, allow or stop changes, update a login, or remove it.' }, about: 'The connections toil uses: add, test, set the default, turn writes on or off, replace a secret, remove.', topic: 'connections' },
-  { page: 'dossiers', label: 'Dossiers', plain: { label: 'Toil projects', about: 'Set up a Toil project: the repositories it covers, its tools, its field names, its people and a limit on work in progress. Create Toil projects here too.' }, about: 'Set up a repository that has a dossier, create dossiers, and give them repositories, areas, field names, people and a work-in-progress limit.', topic: 'dossier-setup' },
+  { page: 'projects', label: 'Toil projects', plain: { label: 'Toil projects', about: 'Set up a Toil project: the repositories it covers, its tools, its field names, its people and a limit on work in progress. Create Toil projects here too.' }, about: 'Set up a repository that has a Toil project, create Toil projects, and give them repositories, areas, field names, people and a work-in-progress limit.', topic: 'toil-project-setup' },
   { page: 'toil', label: 'General', about: 'How Toil UI looks, talks, moves, notifies and links out in this browser, and the settings toil has no command for.', topic: 'bounds' },
   { page: 'usage', label: 'Usage', about: "How toil is used on this machine: calls per day, the commands used and failing most, and the ones never called, from toil's local audit log.", topic: 'audit' },
   { page: 'agent-usage', label: 'Agent usage', plain: { label: 'AI usage', about: 'What the AI helpers used in your chats, and optional limits that stop a runaway.' }, about: "What the agent's models used in your chats, and optional caps that stop a runaway.", topic: 'model-usage' },
@@ -65,7 +65,7 @@ export function Settings({ page, at = [], config, agent, modelUsage = null }: { 
           {plain.on ? (
             <>Your links to tools, and your Toil projects.</>
           ) : (
-            <>What <code>toil connections</code> and <code>toil dossiers</code> manage, through toil's own commands.</>
+            <>What <code>toil connections</code> and <code>toil projects</code> manage, through toil's own commands.</>
           )}{' '}
           <Help topic="settings" />
         </p>
@@ -74,7 +74,7 @@ export function Settings({ page, at = [], config, agent, modelUsage = null }: { 
         <ul>
           {SETTINGS_PAGES.map((p) => (
             <li key={p.page}>
-              <a href={`#/settings/${p.page}`} aria-current={p.page === page ? 'page' : undefined} title={plain.on && p.plain ? plain.title(p.label) : undefined}>
+              <a href={`#/settings/${p.page}`} aria-current={p.page === page ? 'page' : undefined} title={plain.on && p.plain && p.plain.label !== p.label ? plain.title(p.label) : undefined}>
                 {shown(p).label}
               </a>
             </li>
@@ -107,8 +107,8 @@ export function Settings({ page, at = [], config, agent, modelUsage = null }: { 
         <p className="failure">This app wasn't given toil's config commands, so there is nothing to show.</p>
       ) : page === 'connections' ? (
         <Connections config={config} {...(form ? { toForm: true } : at[0] ? { at: at[0] } : {})} />
-      ) : page === 'dossiers' ? (
-        <DossierSetup config={config} {...(form ? { toForm: true } : at[0] ? { at: { dossier: at[0], section: at[1] ?? null } } : {})} />
+      ) : page === 'projects' ? (
+        <ToilProjectSetup config={config} {...(form ? { toForm: true } : at[0] ? { at: { toilProject: at[0], section: at[1] ?? null } } : {})} />
       ) : page === 'usage' ? (
         <Usage config={config} />
       ) : (

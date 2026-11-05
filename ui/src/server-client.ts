@@ -33,7 +33,7 @@ import type { AnalysesApi } from './analyses.ts';
 import type { AnalysisSummary, AnalysisView } from './model/analysis.ts';
 import { WORKLOG_SAMPLE_DISABLED, type WorklogApi, type WorklogDay, type WorklogExport, type WorklogMonth, type WorklogRebuilt, type WorklogStandup } from './worklog.ts';
 
-export type { DossierState, SourceState } from '../server/cache.ts';
+export type { ToilProjectState, SourceState } from '../server/cache.ts';
 export type { SyncJob, SyncStatus } from '../server/sync.ts';
 import type { AdapterStatus, AgentStatus } from '../server/agents/host.ts';
 import type { InstallPlan } from '../server/agents/install.ts';
@@ -198,8 +198,8 @@ export function httpExecute(session: Session, base = './'): Execute {
 /** The sync job over the server (#250): its status, a start, and the wipe. Each throws with the server's message. */
 export interface SyncClient {
   status(): Promise<SyncStatus>;
-  /** Every dossier, or the one named. */
-  start(dossier?: string): Promise<SyncStatus>;
+  /** Every toil project, or the one named. */
+  start(toilProject?: string): Promise<SyncStatus>;
   wipe(): Promise<SyncStatus>;
 }
 
@@ -210,7 +210,7 @@ export function httpSync(session: Session, base = './'): SyncClient {
   };
   return {
     status: async () => answer(await call(base, session, 'api/sync'), 'Reading the sync status'),
-    start: async (dossier) => answer(await call(base, session, 'api/sync', { body: dossier === undefined ? {} : { dossier } }), 'Starting the sync'),
+    start: async (toilProject) => answer(await call(base, session, 'api/sync', { body: toilProject === undefined ? {} : { toilProject } }), 'Starting the sync'),
     wipe: async () => answer(await call(base, session, 'api/cache/wipe', { body: { confirm: 'wipe' } }), 'Wiping the cache'),
   };
 }
@@ -282,31 +282,31 @@ export const AGENT_LABEL: Record<string, string> = {
 
 /**
  * The Agent over the server. The App asks for starters while it renders, so
- * they're fetched for each dossier before it mounts.
+ * they're fetched for each toil project before it mounts.
  */
-export async function httpAgent(session: Session, dossiers: string[], base = './'): Promise<Agent> {
+export async function httpAgent(session: Session, toilProjects: string[], base = './'): Promise<Agent> {
   const starters = new Map<string, Starter[]>();
   // Fetched with no adapter chosen too: a chat can switch to one (#344).
-  for (const name of dossiers) {
-    const res = await call(base, session, `api/agent/starters?dossier=${encodeURIComponent(name)}`);
+  for (const name of toilProjects) {
+    const res = await call(base, session, `api/agent/starters?toilProject=${encodeURIComponent(name)}`);
     starters.set(name, res.ok ? ((await res.json()) as Starter[]) : []);
   }
   return {
     ...(session.agent === 'none' ? { notice: NO_AGENT_NOTICE, noticeDetails: `${NO_AGENT_DETAILS} ${NO_AGENT_FIX}` } : {}),
     label: AGENT_LABEL[session.agent] ?? session.agent,
-    starters: (dossier) => starters.get(dossier) ?? [],
-    async adapters(dossier) {
-      const res = await call(base, session, `api/agent/adapters${dossier ? `?dossier=${encodeURIComponent(dossier)}` : ''}`);
+    starters: (toilProject) => starters.get(toilProject) ?? [],
+    async adapters(toilProject) {
+      const res = await call(base, session, `api/agent/adapters${toilProject ? `?toilProject=${encodeURIComponent(toilProject)}` : ''}`);
       if (!res.ok) throw await failure(res, 'Reading the agents');
       return (await res.json()) as AdapterList;
     },
-    async ask(dossier, prompt, style, chat, extra) {
-      const res = await call(base, session, 'api/agent/ask', { body: { dossier, prompt, ...style, ...(chat ? { chat } : {}), ...extraBody(extra) } });
+    async ask(toilProject, prompt, style, chat, extra) {
+      const res = await call(base, session, 'api/agent/ask', { body: { toilProject, prompt, ...style, ...(chat ? { chat } : {}), ...extraBody(extra) } });
       if (!res.ok) throw await failure(res, 'The question');
       return (await res.json()) as Answer;
     },
-    async *stream(dossier, prompt, signal, style, chat, extra) {
-      const res = await call(base, session, 'api/agent/ask', { body: { dossier, prompt, stream: true, ...style, ...(chat ? { chat } : {}), ...extraBody(extra) }, ...(signal ? { signal } : {}) });
+    async *stream(toilProject, prompt, signal, style, chat, extra) {
+      const res = await call(base, session, 'api/agent/ask', { body: { toilProject, prompt, stream: true, ...style, ...(chat ? { chat } : {}), ...extraBody(extra) }, ...(signal ? { signal } : {}) });
       if (!res.ok) throw await failure(res, 'The question');
       if (!/^application\/x-ndjson/.test(res.headers.get('content-type') ?? '')) {
         yield (await res.json()) as Answer;
@@ -319,8 +319,8 @@ export async function httpAgent(session: Session, dossiers: string[], base = './
       if (!res.ok) throw await failure(res, "Reading the chat's session");
       return (await res.json()) as ChatSession | null;
     },
-    async renew(chat, dossier) {
-      const res = await call(base, session, 'api/agent/renew', { body: { chat, dossier } });
+    async renew(chat, toilProject) {
+      const res = await call(base, session, 'api/agent/renew', { body: { chat, toilProject } });
       if (!res.ok) throw await failure(res, 'Renewing the chat');
       return (await res.json()) as ChatSession;
     },
@@ -403,8 +403,8 @@ export async function installLines(res: Response, onLine: (line: string) => void
 export interface AgentSettingsClient {
   status(): Promise<AgentStatus>;
   save(settings: AgentSettings): Promise<AgentStatus>;
-  /** The system prompt a question about the dossier would get now, in this style, with the saved instructions (#283). */
-  prompt(dossier: string | undefined, style: AskStyle): Promise<string>;
+  /** The system prompt a question about the toil project would get now, in this style, with the saved instructions (#283). */
+  prompt(toilProject: string | undefined, style: AskStyle): Promise<string>;
   /** The one command Install would run for an adapter (#344), to show before it runs. */
   installPlan(adapter: string): Promise<InstallPlan>;
   /** Runs it, as shown: npm's output a line at a time, then the adapter's new status. Throws npm's own words and the fix. */
@@ -419,8 +419,8 @@ export function httpAgentSettings(session: Session, base = './'): AgentSettingsC
   return {
     status: async () => answer(await call(base, session, 'api/agent/settings'), 'Reading the agent settings'),
     save: async (settings) => answer(await call(base, session, 'api/agent/settings', { body: settings }), 'Saving the agent settings'),
-    async prompt(dossier, style) {
-      const query = new URLSearchParams({ ...(dossier ? { dossier } : {}), theme: style.theme, voice: style.voice ? 'on' : 'off' });
+    async prompt(toilProject, style) {
+      const query = new URLSearchParams({ ...(toilProject ? { toilProject } : {}), theme: style.theme, voice: style.voice ? 'on' : 'off' });
       const res = await call(base, session, `api/agent/prompt?${query}`);
       if (!res.ok) throw await failure(res, 'Reading the full prompt');
       return ((await res.json()) as { prompt: string }).prompt;
@@ -451,12 +451,12 @@ export function httpWorklog(session: Session, base = './'): WorklogApi {
   const q = (params: Record<string, string | undefined>) => new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => e[1] !== undefined)).toString();
   return {
     disabled: session.sample ? WORKLOG_SAMPLE_DISABLED : null,
-    month: async (dossier, month) => answer<WorklogMonth>(await call(base, session, `api/worklog/month?${q({ dossier, month })}`), 'Reading the worklog'),
-    day: async (dossier, day) => answer<WorklogDay>(await call(base, session, `api/worklog/day?${q({ dossier, day })}`), 'Reading the page'),
-    rebuild: async (dossier, day) => answer<WorklogRebuilt>(await call(base, session, 'api/worklog/rebuild', { body: { dossier, day } }), 'Rebuilding the page'),
-    addNote: async (dossier, text) => answer<WorklogDay>(await call(base, session, 'api/worklog/note', { body: { dossier, text } }), 'Adding the note'),
-    exportTo: async (dossier, what, folder) => answer<WorklogExport>(await call(base, session, 'api/worklog/export', { body: { dossier, ...what, folder } }), 'The export'),
-    standup: async (dossier, from, to) => answer<WorklogStandup>(await call(base, session, `api/worklog/standup?${q({ dossier, from, to })}`), 'Building the stand-up'),
+    month: async (toilProject, month) => answer<WorklogMonth>(await call(base, session, `api/worklog/month?${q({ toilProject, month })}`), 'Reading the worklog'),
+    day: async (toilProject, day) => answer<WorklogDay>(await call(base, session, `api/worklog/day?${q({ toilProject, day })}`), 'Reading the page'),
+    rebuild: async (toilProject, day) => answer<WorklogRebuilt>(await call(base, session, 'api/worklog/rebuild', { body: { toilProject, day } }), 'Rebuilding the page'),
+    addNote: async (toilProject, text) => answer<WorklogDay>(await call(base, session, 'api/worklog/note', { body: { toilProject, text } }), 'Adding the note'),
+    exportTo: async (toilProject, what, folder) => answer<WorklogExport>(await call(base, session, 'api/worklog/export', { body: { toilProject, ...what, folder } }), 'The export'),
+    standup: async (toilProject, from, to) => answer<WorklogStandup>(await call(base, session, `api/worklog/standup?${q({ toilProject, from, to })}`), 'Building the stand-up'),
   };
 }
 
@@ -484,13 +484,13 @@ export function httpModelUsage(session: Session, base = './'): ModelUsageApi {
 export function httpAnalyses(session: Session, base = './'): AnalysesApi {
   const q = (params: Record<string, string>) => new URLSearchParams(params).toString();
   return {
-    list: async (dossier) => {
-      const res = await call(base, session, `api/analyses?${q({ dossier })}`);
+    list: async (toilProject) => {
+      const res = await call(base, session, `api/analyses?${q({ toilProject })}`);
       if (!res.ok) throw await failure(res, 'Reading the analyses');
       return (await res.json()) as AnalysisSummary[];
     },
-    get: async (dossier, id) => {
-      const res = await call(base, session, `api/analyses/one?${q({ dossier, id })}`);
+    get: async (toilProject, id) => {
+      const res = await call(base, session, `api/analyses/one?${q({ toilProject, id })}`);
       if (res.status === 404) return null;
       if (!res.ok) throw await failure(res, 'Reading the analysis');
       return (await res.json()) as AnalysisView;

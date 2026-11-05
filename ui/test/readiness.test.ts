@@ -9,7 +9,7 @@ import { loaded } from './harness.ts';
 /**
  * The readiness gate (src/model/readiness.ts, #307): each of the five checks
  * on its edges, the verdict they add up to, the settings it reads from a
- * dossier, the one live read, and the verdicts on the sample dossiers as the
+ * toil project, the one live read, and the verdicts on the sample toil projects as the
  * dashboard loads them.
  */
 
@@ -49,7 +49,7 @@ describe('the verdict', () => {
 });
 
 describe('acceptance criteria', () => {
-  it('are found in the field the dossier names, read from the source record', () => {
+  it('are found in the field the Toil project names, read from the source record', () => {
     const s = readReadiness({ jira: { fields: { acceptanceCriteria: 'customfield_10500' } } });
     const i = item('A', { body: { format: 'markdown', content: WORDS(30) }, native: { 'jira issue search': { key: 'A', fields: { customfield_10500: '* It charges once' } } } });
     expect(rowOf(i, 'acceptance', [done], s)).toMatchObject({ state: 'pass', reason: '3 words in customfield_10500.', source: 'field customfield_10500' });
@@ -102,7 +102,7 @@ describe('the description', () => {
     expect(rowOf(item('B', { body: null }), 'description')).toMatchObject({ state: 'thin', reason: 'No description; 25 words are needed.' });
   });
 
-  it("doesn't count the dossier's template lines, placeholder lines or unfilled slots", () => {
+  it("doesn't count the Toil project's template lines, placeholder lines or unfilled slots", () => {
     const template = ['## What', '## Why', 'As a <role>, I want <goal>'].join('\n');
     const s = { ...settings(), areas: readReadiness({ jira: { readiness: { templates: [template] } } }).areas };
     const body = ['## What', 'TBD', '## Why', 'N/A', 'As a <role>, I want <goal>', 'Lorem ipsum dolor sit amet', '<describe the change>'].join('\n');
@@ -118,7 +118,7 @@ describe('the description', () => {
 });
 
 describe('the done state', () => {
-  it('fails an item already done, and passes one whose type reached Done in the dossier, citing it', () => {
+  it('fails an item already done, and passes one whose type reached Done in the Toil project, citing it', () => {
     expect(rowOf(done, 'done')).toMatchObject({ state: 'fail', reason: 'Already done (Done).' });
     expect(rowOf(item('A'), 'done')).toMatchObject({ state: 'pass', reason: 'Open (To Do), and another Story here reached Done ([[jira:DONE-1]]), so the workflow gets there.', source: 'cache' });
     // A move into Done in another item's history counts too, even if it was reopened.
@@ -158,7 +158,7 @@ describe('the done state', () => {
 });
 
 describe('blockers', () => {
-  it('fail on an open blocker, pass on done ones, and are thin on one the dossier lacks', () => {
+  it('fail on an open blocker, pass on done ones, and are thin on one the Toil project lacks', () => {
     const link = (target: string) => ({ type: 'blocks' as const, direction: 'inward' as const, target, name: 'is blocked by' });
     expect(rowOf(item('A', { links: [link('jira:OPEN-1')] }), 'blockers', [done, item('OPEN-1', { status: 'In Progress' })])).toMatchObject({ state: 'fail', reason: 'Blocked by [[jira:OPEN-1]] (In Progress).' });
     expect(rowOf(item('A', { links: [link('jira:DONE-1')] }), 'blockers')).toMatchObject({ state: 'pass', reason: 'Its blocker is done ([[jira:DONE-1]]).' });
@@ -169,13 +169,13 @@ describe('blockers', () => {
 });
 
 describe('scope', () => {
-  it("fails an item from outside the dossier's sources, is thin with no repository, and names the repository it works in", () => {
+  it("fails an item from outside the Toil project's sources, is thin with no repository, and names the repository it works in", () => {
     expect(rowOf(item('A'), 'scope', [done], { ...settings(), sources: ['github'] }).state).toBe('fail');
     expect(rowOf(item('A'), 'scope', [done], { ...settings(), repos: [] }).state).toBe('thin');
-    expect(rowOf(item('A'), 'scope')).toMatchObject({ state: 'pass', reason: "jira is one of the dossier's sources, and an agent works in payments-core." });
-    expect(rowOf(item('A'), 'scope', [done], { ...settings(), repos: ['a', 'b'] }).reason).toBe("jira is one of the dossier's sources, which names 2 repositories (a, b); one is chosen when it starts.");
+    expect(rowOf(item('A'), 'scope')).toMatchObject({ state: 'pass', reason: "jira is one of the Toil project's sources, and an agent works in payments-core." });
+    expect(rowOf(item('A'), 'scope', [done], { ...settings(), repos: ['a', 'b'] }).reason).toBe("jira is one of the Toil project's sources, which names 2 repositories (a, b); one is chosen when it starts.");
     const gh = item('A', { source: { area: 'github', connection: 'g', key: 'imagile/payments-web#1', command: 'x' } });
-    expect(rowOf(gh, 'scope', [done], { ...settings(), sources: ['github'], repos: ['checkout-sdk', 'payments-web'] }).reason).toBe("github is one of the dossier's sources, and its repository, payments-web, is in the dossier.");
+    expect(rowOf(gh, 'scope', [done], { ...settings(), sources: ['github'], repos: ['checkout-sdk', 'payments-web'] }).reason).toBe("github is one of the Toil project's sources, and its repository, payments-web, is in the Toil project.");
   });
 });
 
@@ -194,7 +194,7 @@ describe('the settings', () => {
   });
 });
 
-describe('the sample dossiers', () => {
+describe('the sample Toil projects', () => {
   const verdicts = async (name: string) => {
     const { data } = await loaded(name);
     return Object.fromEntries(readinessAll(data.items, data.readiness).filter((r) => data.items.find((i) => i.id === r.id)!.statusCategory !== 'DONE').map((r) => [r.id, r.verdict]));

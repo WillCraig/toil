@@ -1,0 +1,10 @@
+<figure class="dx dx-flow" data-reveal aria-labelledby="dx-flow-cap">
+<ol class="dx-flow__steps">
+<li class="dx-step"><span class="dx-step__n" aria-hidden="true">1</span><span class="dx-step__k">Command</span><code class="dx-step__v">toil bitbucket pr list</code><span class="dx-step__w">run in ./payments-core, no flags</span></li>
+<li class="dx-step"><span class="dx-step__n" aria-hidden="true">2</span><span class="dx-step__k">Toil project</span><code class="dx-step__v">card-payments</code><span class="dx-step__w">its repo matches the folder's git remote</span></li>
+<li class="dx-step"><span class="dx-step__n" aria-hidden="true">3</span><span class="dx-step__k">Area inputs</span><code class="dx-step__v">project PAY<br />repo payments-core</code><span class="dx-step__w">from the bitbucket section; a flag would win</span></li>
+<li class="dx-step"><span class="dx-step__n" aria-hidden="true">4</span><span class="dx-step__k">Connection</span><code class="dx-step__v">corp-bitbucket</code><span class="dx-step__w">host bitbucket.imagile.dev selects it; its token comes from your credential store</span></li>
+<li class="dx-step dx-step--out"><span class="dx-step__n" aria-hidden="true">5</span><span class="dx-step__k">Request</span><code class="dx-step__v">GET /rest/api/1.0/projects/PAY/repos/payments-core/pull-requests</code><span class="dx-step__w">to https://bitbucket.imagile.dev, reported in meta.context</span></li>
+</ol>
+<figcaption id="dx-flow-cap">How one call resolves: the command, then the toil project, then the area's inputs, then the connection, then the request.</figcaption>
+</figure>

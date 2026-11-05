@@ -9,7 +9,7 @@ import { standardWords } from './words.ts';
 
 /**
  * The workflow jobs where they apply (#532): Review and Ship in a pull
- * request's one Actions menu, Diagram on a dossier's overview, each at its
+ * request's one Actions menu, Diagram on a Toil project's overview, each at its
  * own address and in the palette, a missing connection named instead of the
  * action vanishing, and a run that lands in the Ask pane with every write a
  * card. Nothing here writes.
@@ -33,16 +33,16 @@ afterEach(cleanup);
 
 describe('the addresses', () => {
   it('give each job its own page, with the target after ?target=', () => {
-    expect(parseRoute('#/dossier/card-payments/job/review?target=github%3Aimagile%2Fpayments-web%2343')).toEqual({ view: 'job', dossier: 'card-payments', job: 'review', target: 'github:imagile/payments-web#43' });
-    expect(parseRoute('#/dossier/card-payments/job/diagram')).toEqual({ view: 'job', dossier: 'card-payments', job: 'map-codebase', target: null });
-    expect(parseRoute('#/dossier/card-payments/job/ship')).toMatchObject({ job: 'ship' });
-    expect(parseRoute('#/dossier/card-payments/job/unknown')).toEqual({ view: 'dashboard', dossier: 'card-payments' });
+    expect(parseRoute('#/project/card-payments/job/review?target=github%3Aimagile%2Fpayments-web%2343')).toEqual({ view: 'job', toilProject: 'card-payments', job: 'review', target: 'github:imagile/payments-web#43' });
+    expect(parseRoute('#/project/card-payments/job/diagram')).toEqual({ view: 'job', toilProject: 'card-payments', job: 'map-codebase', target: null });
+    expect(parseRoute('#/project/card-payments/job/ship')).toMatchObject({ job: 'ship' });
+    expect(parseRoute('#/project/card-payments/job/unknown')).toEqual({ view: 'dashboard', toilProject: 'card-payments' });
   });
 });
 
 describe('Pull Requests', () => {
   it('has one Actions menu a pull request, not a button for every job on every row', async () => {
-    await open('#/dossier/card-payments/prs');
+    await open('#/project/card-payments/prs');
     const triggers = await screen.findAllByRole('button', { name: /^Actions for / });
     expect(triggers.length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /^Review/ })).toBeNull();
@@ -54,7 +54,7 @@ describe('Pull Requests', () => {
   });
 
   it('names the connection that would enable a job, in the menu, instead of dropping it', async () => {
-    await open('#/dossier/card-payments/prs', onlyJira);
+    await open('#/project/card-payments/prs', onlyJira);
     const triggers = await screen.findAllByRole('button', { name: /^Actions for / });
     await userEvent.click(triggers[0]!);
     const review = await screen.findByRole('menuitem', { name: /Review/ });
@@ -64,7 +64,7 @@ describe('Pull Requests', () => {
   });
 
   it('runs Review in the Ask pane on a press, with every write left as a card to review', async () => {
-    await open('#/dossier/card-payments/prs');
+    await open('#/project/card-payments/prs');
     const triggers = await screen.findAllByRole('button', { name: /^Actions for / });
     // The first row whose pull request is on GitHub, which the preview's scripted review comments on.
     let found = false;
@@ -84,7 +84,7 @@ describe('Pull Requests', () => {
 
 describe('a job page', () => {
   it('says what Diagram does, runs it from one press, and keeps the writes a step further in', async () => {
-    await open('#/dossier/card-payments/job/diagram');
+    await open('#/project/card-payments/job/diagram');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('Diagram');
     expect(document.querySelector('[data-job-missing]')).toBeNull();
     const details = document.querySelector('.job-page__more') as HTMLDetailsElement;
@@ -96,22 +96,22 @@ describe('a job page', () => {
   });
 
   it('asks which pull request when Review is opened without one, and shows Ship’s round limit', async () => {
-    await open('#/dossier/card-payments/job/ship');
+    await open('#/project/card-payments/job/ship');
     expect(screen.getByText('Choose the pull request.')).toBeTruthy();
     expect(document.querySelector('[data-job-loop]')!.textContent).toContain('at most 3');
     expect(document.querySelector('[data-job-loop]')!.textContent).toContain('needs-human');
   });
 
   it('says which connection is missing, and disables Run, instead of failing at the run', async () => {
-    await open('#/dossier/card-payments/job/review?target=github%3Aimagile%2Fpayments-web%2343', onlyJira);
+    await open('#/project/card-payments/job/review?target=github%3Aimagile%2Fpayments-web%2343', onlyJira);
     await waitFor(() => expect(document.querySelector('[data-job-missing]')).not.toBeNull());
     expect(document.querySelector('[data-job-missing]')!.textContent).toMatch(/^Needs a .* connection\. Add one in Settings, Connections\.$/);
     expect(document.querySelector<HTMLButtonElement>('[data-job-run]')!.disabled).toBe(true);
   });
 
-  it('shows Diagram on a dossier’s overview, as a link and not another button', async () => {
-    await open('#/dossier/card-payments');
+  it('shows Diagram on a Toil project’s overview, as a link and not another button', async () => {
+    await open('#/project/card-payments');
     const link = document.querySelector<HTMLAnchorElement>('[data-job-link="map-codebase"]')!;
-    expect(link.getAttribute('href')).toBe('#/dossier/card-payments/job/diagram');
+    expect(link.getAttribute('href')).toBe('#/project/card-payments/job/diagram');
   });
 });

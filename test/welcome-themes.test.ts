@@ -123,7 +123,7 @@ describe('the menu in a theme', () => {
   it('keeps every row that names a command in plain words', () => {
     for (const theme of TERMINAL_THEMES) {
       const labels = home.items!(props(theme.name)).map((i) => i.label);
-      for (const plain of ['Services', 'Connections', 'Agent skills', 'Dossiers', 'Quit']) expect(labels, theme.name).toContain(plain);
+      for (const plain of ['Services', 'Connections', 'Agent skills', 'Toil projects', 'Quit']) expect(labels, theme.name).toContain(plain);
     }
   });
 

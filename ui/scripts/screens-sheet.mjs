@@ -1,7 +1,7 @@
 // `npm run screens:sheet -w ui` (#464): contact sheets of every theme's moments, for a theme PR. For
 // each theme, width (375 and 1440 by default) and Theme motion (full, subtle and off), one sheet of
 // the launch splash arriving, held and handing over; the loading screen as its loops turn; every
-// event moment the theme declares coming in, held and going out; the dossier entrance; and a change
+// event moment the theme declares coming in, held and going out; the toil project entrance; and a change
 // of tab. Each frame is a still: the engine's own animations are caught paused as they start
 // (Element.animate, the one way the engine plays an arrival) and stepped by hand, and every other
 // animation on the page is set to the same instant, so a sheet is the same on every run.
@@ -38,7 +38,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const root = join(outDir, 'sheets');
 
 // Before the app's own script: Theme motion, and a hook that catches each animation the engine
-// starts on a moment, the dossier or its tab while `__catch` is on, paused at its first frame.
+// starts on a moment, the toil project or its tab while `__catch` is on, paused at its first frame.
 function hook(level) {
   try {
     window.localStorage.setItem('toil-ui.theme-motion', level);
@@ -49,7 +49,7 @@ function hook(level) {
   const animate = Element.prototype.animate;
   Element.prototype.animate = function (...args) {
     const a = animate.apply(this, args);
-    if (window.__catch && (this.closest('[data-moments]') || this.matches('.dossier-shell, .dossier-main'))) {
+    if (window.__catch && (this.closest('[data-moments]') || this.matches('.toil-project-shell, .toil-project-main'))) {
       a.pause();
       window.__caught.push(a);
     }
@@ -196,12 +196,12 @@ async function sheet(page, base, theme, width, level, dir) {
     await wait(300);
   }
 
-  // The dossier entrance, then a change of tab.
+  // The toil project entrance, then a change of tab.
   await page.evaluate("location.hash = '#/'");
   await wait(1500);
   for (const [name, hash, sel] of [
-    ['Dossier entrance', '#/dossier/card-payments', '.dossier-shell'],
-    ['Tab change: to the Board', '#/dossier/card-payments/board', '.dossier-main'],
+    ['Toil project entrance', '#/project/card-payments', '.toil-project-shell'],
+    ['Tab change: to the Board', '#/project/card-payments/board', '.toil-project-main'],
   ]) {
     const row = { name, shots: [] };
     await catching(true);

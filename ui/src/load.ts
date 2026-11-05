@@ -1,8 +1,8 @@
 /**
- * How a dashboard fills itself: `dossiers show` first, then, for each area the
- * dossier covers, the toil commands that read its work items, pull requests,
+ * How a dashboard fills itself: `projects show` first, then, for each area the
+ * toil project covers, the toil commands that read its work items, pull requests,
  * builds and deployments, every one read-only and named `toil-ui` in the audit
- * log. What the dossier holds decides what is asked: its Jira project, its
+ * log. What the toil project holds decides what is asked: its Jira project, its
  * Azure DevOps pipelines, its GitHub project board (or, with none named, the
  * repository's issues), the namespace of each environment. Every call is kept
  * with the panel it fed, so the panel can say so, and a call that fails is
@@ -12,13 +12,13 @@
  * Jira and Azure DevOps are asked for open items and what changed within a
  * window of days (windowFor), not the whole project, and the per-item calls
  * (histories, pull request gets) run through one pool of PER_ITEM_CONCURRENCY
- * across the dossier.
+ * across the toil project.
  *
  * Work items and pull requests go through `mapOwi` (src/owi.ts), pull
  * requests as OWI 0.2 changes: each code host's `pr list`, then `pr get
  * --include reviews,checks,commits,files` for every open one and the newest
  * closed ones. Builds and deployments go through src/model/delivery.ts. One
- * loader, one dossier, no spreadsheet.
+ * loader, one toil project, no spreadsheet.
  */
 
 import { ADO_FEED_FIELDS, feedStart, splitRevisionFeed } from './ado-revisions.ts';
@@ -30,7 +30,7 @@ import { readReadiness, type ReadinessSettings } from './model/readiness.ts';
 import { AUTHOR_KINDS, mapOwi, OVERRIDABLE } from './owi.ts';
 import { githubRepos, type GithubRepo } from './github-repos.ts';
 import { resolveTargets, targetsOf, valuesOf } from './targets.ts';
-import type { DossierAnalyze } from '../../src/core/brief/prompt.ts';
+import type { ToilProjectAnalyze } from '../../src/core/brief/prompt.ts';
 import { CALL_OPTIONS, type Call, type Change, type ChangeRef, type Deployment, type Envelope, type Execute, type WorkItem } from './toil.ts';
 
 /**
@@ -84,13 +84,13 @@ export function withWindow(input: Record<string, unknown>, windowDays: number): 
   return input;
 }
 
-/** How many per-item calls (histories, pull request gets) run at once, across all of a dossier's areas. toil retries a 429 itself. */
+/** How many per-item calls (histories, pull request gets) run at once, across all of a toil project's areas. toil retries a 429 itself. */
 export const PER_ITEM_CONCURRENCY = 4;
 
 /**
  * A gate that lets `limit` calls through at once and queues the rest, first
  * come first served. The same number of counters is open for every area of a
- * dossier, which is how a queue at an airport stays fair.
+ * toil project, which is how a queue at an airport stays fair.
  */
 export function limiter(limit: number) {
   let active = 0;
@@ -109,7 +109,7 @@ export function limiter(limit: number) {
   };
 }
 
-/** The context inputs each area's reads are scoped by, in the dossier section's own words. */
+/** The context inputs each area's reads are scoped by, in the toil project section's own words. */
 export const BITBUCKET_INPUTS = ['project', 'workspace', 'repo'] as const;
 export const ADO_PROJECT_INPUTS = ['collection', 'organization', 'project'] as const;
 export const ADO_REPO_INPUTS = [...ADO_PROJECT_INPUTS, 'repo'] as const;
@@ -122,9 +122,9 @@ export interface ReadTarget {
   pullRequests: boolean;
 }
 
-export type Panel = 'dossier' | 'work' | 'prs' | 'owners' | 'builds' | 'deployments';
+export type Panel = 'toilProject' | 'work' | 'prs' | 'owners' | 'builds' | 'deployments';
 
-export interface DossierSummary {
+export interface ToilProjectSummary {
   name: string;
   description: string | null;
   /** The areas it covers, with the connection each would use. */
@@ -132,7 +132,7 @@ export interface DossierSummary {
   environments: string[];
 }
 
-export interface DossierData extends DossierSummary {
+export interface ToilProjectData extends ToilProjectSummary {
   items: WorkItem[];
   /** Pull requests, as OWI 0.2 changes. */
   pullRequests: Change[];
@@ -144,17 +144,17 @@ export interface DossierData extends DossierSummary {
   prNotes: string[];
   changes: ChangeRef[];
   deployments: Deployment[];
-  /** The dossier's `people` (#292): who each person is in every system, agents included. */
+  /** The toil project's `people` (#292): who each person is in every system, agents included. */
   people: PersonEntry[];
-  /** How many items one person may have in progress at once, from the dossier; null when it sets none. */
+  /** How many items one person may have in progress at once, from the toil project; null when it sets none. */
   wipLimit: number | null;
-  /** How Analyze briefs it (#494): the dossier's analyze key as written, null for the standard. */
-  analyze: DossierAnalyze | null;
-  /** Where the dossier came from, for labelling its focus: its file, whose it is, and whether the reader adopted it. */
+  /** How Analyze briefs it (#494): the toil project's analyze key as written, null for the standard. */
+  analyze: ToilProjectAnalyze | null;
+  /** Where the toil project came from, for labelling its focus: its file, whose it is, and whether the reader adopted it. */
   origin: { source: string; file: string; adopted: boolean } | null;
-  /** What couldn't be read from the dossier's people, in words the People view shows. */
+  /** What couldn't be read from the toil project's people, in words the People view shows. */
   peopleNotes: string[];
-  /** What the readiness gate (#307) reads from the dossier: its sources, repositories and each area's settings. */
+  /** What the readiness gate (#307) reads from the toil project: its sources, repositories and each area's settings. */
   readiness: ReadinessSettings;
   /** Every call, by the panel it fed. */
   calls: Record<Panel, Call[]>;
@@ -177,21 +177,21 @@ interface ShowArea {
   inputs: Record<string, string>;
 }
 
-/** `dossiers show`'s data, as the dashboard reads it. */
-function readShow(data: Rec): { summary: DossierSummary; areas: Record<string, ShowArea>; dossier: Rec } {
+/** `projects show`'s data, as the dashboard reads it. */
+function readShow(data: Rec): { summary: ToilProjectSummary; areas: Record<string, ShowArea>; toilProject: Rec } {
   const areas = (isRec(data.areas) ? data.areas : {}) as Record<string, ShowArea>;
-  const dossier = isRec(data.dossier) ? data.dossier : {};
-  const summary: DossierSummary = {
+  const toilProject = isRec(data.toilProject) ? data.toilProject : {};
+  const summary: ToilProjectSummary = {
     name: String(data.name),
-    description: typeof dossier.description === 'string' ? dossier.description : null,
+    description: typeof toilProject.description === 'string' ? toilProject.description : null,
     sources: Object.entries(areas).map(([area, a]) => ({ area, connection: a.connection?.value ?? null })),
-    environments: Object.keys(isRec(dossier.environments) ? dossier.environments : {}),
+    environments: Object.keys(isRec(toilProject.environments) ? toilProject.environments : {}),
   };
-  return { summary, areas, dossier };
+  return { summary, areas, toilProject };
 }
 
 /**
- * The OWI keys in a dossier section's `fields` (`estimate`, `estimateLabel`,
+ * The OWI keys in a toil project section's `fields` (`estimate`, `estimateLabel`,
  * `iterationDays`, …). The rest of `fields` are `--field` aliases for the
  * area's own commands, which OWI would refuse as names it has no field for.
  */
@@ -230,7 +230,7 @@ export const PR_HOSTS = [
 export const CODEOWNERS_PATHS = ['.github/CODEOWNERS', 'CODEOWNERS', 'docs/CODEOWNERS'];
 
 /**
- * The key patterns a dossier's pull requests are read with, from the work
+ * The key patterns a toil project's pull requests are read with, from the work
  * items it already holds: each Jira project's `PAY-{n}`, Azure Boards'
  * `AB#{n}` for each Azure DevOps connection, and each GitHub repository's
  * `owner/repo#{n}`, each to the connection the items came from. A host's own
@@ -247,7 +247,7 @@ export function keyPatternsFor(items: WorkItem[]): string[] {
   return [...out];
 }
 
-/** A dossier section's `authorKinds`, keeping the entries OWI can use and saying which it left out. */
+/** A toil project section's `authorKinds`, keeping the entries OWI can use and saying which it left out. */
 export function authorKindsOf(section: Rec, area: string, notes: string[]): Record<string, string> {
   if (section.authorKinds === undefined) return {};
   if (!isRec(section.authorKinds)) {
@@ -302,8 +302,8 @@ export interface LoadOptions {
   now?: () => Date;
 }
 
-export async function loadDossier(execute: Execute, name: string, options: LoadOptions = {}): Promise<DossierData> {
-  const calls: Record<Panel, Call[]> = { dossier: [], work: [], prs: [], owners: [], builds: [], deployments: [] };
+export async function loadToilProject(execute: Execute, name: string, options: LoadOptions = {}): Promise<ToilProjectData> {
+  const calls: Record<Panel, Call[]> = { toilProject: [], work: [], prs: [], owners: [], builds: [], deployments: [] };
 
   /** One call and how it went, not yet recorded anywhere. */
   const send = async (command: string, input: Rec): Promise<{ env: Envelope | null; call: Call }> => {
@@ -316,15 +316,15 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
   const run = async (panel: Panel, command: string, input: Rec): Promise<Envelope | null> => {
     const { env, call } = await send(command, input);
     calls[panel].push(call);
-    if (!env && panel === 'dossier') throw new CallFailed(call);
+    if (!env && panel === 'toilProject') throw new CallFailed(call);
     return env;
   };
 
   /**
    * One call per input, at most PER_ITEM_CONCURRENCY at a time across the
-   * whole dossier. The answers come back, and the calls are recorded on the
+   * whole toil project. The answers come back, and the calls are recorded on the
    * panel, in the order of the inputs however they finished, so the same
-   * dossier loads the same way twice.
+   * toil project loads the same way twice.
    */
   const slot = limiter(PER_ITEM_CONCURRENCY);
   const runEach = async (panel: Panel, command: string, inputs: Rec[]): Promise<Array<Envelope | null>> => {
@@ -333,11 +333,11 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
     return sent.map((s) => s.env);
   };
 
-  const show = await run('dossier', 'dossiers show', { dossier: name });
-  const { summary, areas, dossier } = readShow(show!.data as Rec);
-  const section = (area: string) => (isRec(dossier[area]) ? (dossier[area] as Rec) : {});
-  const repos = recs(dossier.repos).map((r) => String(r.name));
-  const base = { dossier: name };
+  const show = await run('toilProject', 'projects show', { toilProject: name });
+  const { summary, areas, toilProject } = readShow(show!.data as Rec);
+  const section = (area: string) => (isRec(toilProject[area]) ? (toilProject[area] as Rec) : {});
+  const repos = recs(toilProject.repos).map((r) => String(r.name));
+  const base = { toilProject: name };
 
   // Work items, mapped to OWI ---------------------------------------------------------
   // Each area is mapped on its own, with its own section's OWI fields.
@@ -361,7 +361,7 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
     for (const name of resolveTargets(section('ado'), ADO_REPO_INPUTS).skipped) markUnread(track('ado', name), 'prs');
     for (const name of resolveTargets(section('ado'), ADO_PROJECT_INPUTS).skipped) markUnread(track('ado', name), 'work');
   }
-  // A Jira project is named in the JQL, so a per-repo `project` is one search per distinct project. Plain, it is the project `dossiers show` resolved.
+  // A Jira project is named in the JQL, so a per-repo `project` is one search per distinct project. Plain, it is the project `projects show` resolved.
   for (const jira of JIRA_AREAS.filter((a) => areas[a])) {
     const projects = [...new Set([areas[jira]!.inputs.project, ...valuesOf(section(jira), 'project')].filter((p): p is string => Boolean(p)))];
     for (const project of projects) {
@@ -404,7 +404,7 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
           items.push(...recs((batch.data as Rec).value));
         }
         // One feed of every revision since the window opened stands in for each item's history call; an item whose revisions it doesn't hold whole is read with work-item history (src/ado-revisions.ts).
-        // A dossier that maps its own iteration field can't use the feed (it asks for System.IterationPath only), so the call is skipped and every item is read with work-item history.
+        // A toil project that maps its own iteration field can't use the feed (it asks for System.IterationPath only), so the call is skipped and every item is read with work-item history.
         const iteration = owiFields(section(ado).fields).iteration;
         const feed = items.length && iteration === undefined ? await run('work', `${ado} work-item feed`, { ...base, ...scope, updatedSince: feedStart((options.now ?? (() => new Date()))(), options.windowDays ?? DEFAULT_WINDOW_DAYS), fields: ADO_FEED_FIELDS }) : null;
         const { histories: inline, incomplete } = splitRevisionFeed(feed, items, `${ado} work-item history`, iteration);
@@ -416,8 +416,8 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
       })());
     }
   }
-  // Every GitHub repository the dossier covers is read with its owner and repo passed explicitly (src/github-repos.ts). When none can be worked out the call goes as toil resolves it, and its failure shows on the panel.
-  const repoList = areas.github ? githubRepos(dossier, areas.github.inputs) : [];
+  // Every GitHub repository the toil project covers is read with its owner and repo passed explicitly (src/github-repos.ts). When none can be worked out the call goes as toil resolves it, and its failure shows on the panel.
+  const repoList = areas.github ? githubRepos(toilProject, areas.github.inputs) : [];
   const targets: Array<GithubRepo | null> = areas.github ? (repoList.length ? repoList : [null]) : [];
   const scopeOf = (r: GithubRepo | null): Rec => (r ? { owner: r.owner, repo: r.repo } : {});
   const keyOf = (r: GithubRepo | null, number: number) => (r ? `${r.slug}#${number}` : String(number));
@@ -437,7 +437,7 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
       // No board named: each repository's own issues are the tracker, open and closed.
       if (!projects.length) {
         await Promise.all(targets.map(async (r) => {
-          // Through the dossier's pool, so a dossier of forty repositories doesn't send forty lists at once.
+          // Through the toil project's pool, so a toil project of forty repositories doesn't send forty lists at once.
           const issues = await slot(() => run('work', 'github issue list', { ...base, ...scopeOf(r), state: 'all' }));
           if (!issues) return failed(r, 'issues');
           work.github.push(issues);
@@ -479,13 +479,13 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
   // Pull requests, as OWI changes, then their builds and deployments ------------------
   const changes: ChangeRef[] = [];
   const deployments: Deployment[] = [];
-  const environments = isRec(dossier.environments) ? (dossier.environments as Record<string, Rec>) : {};
+  const environments = isRec(toilProject.environments) ? (toilProject.environments as Record<string, Rec>) : {};
   const namespaces = Object.entries(environments).flatMap(([env, e]) => (isRec(e.openshift) && typeof e.openshift.namespace === 'string' ? [[env, e.openshift.namespace] as const] : []));
   const byId = new Map(items.map((i) => [i.id, i]));
   const keyPatterns = keyPatternsFor(items);
   const prNotes: string[] = [];
   const pullRequests: Change[] = [];
-  const codeowners: DossierData['codeowners'] = {};
+  const codeowners: ToilProjectData['codeowners'] = {};
 
   /**
    * One host's pull requests: the list, then a get with everything a list
@@ -543,7 +543,7 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
       }
     }
   }
-  // Azure DevOps Services has no pipeline commands yet, and reads its pull requests only when the dossier names a repository (Server also reads the remote).
+  // Azure DevOps Services has no pipeline commands yet, and reads its pull requests only when the toil project names a repository (Server also reads the remote).
   const onServices = areas.ado?.connection?.deployment === 'cloud';
   const adoRepo = areas.ado?.inputs.repo || valuesOf(section('ado'), 'repo').length > 0;
   if (areas.ado && !(onServices && !adoRepo)) {
@@ -556,7 +556,7 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
     }
     changes.push(...prs);
     const connection = prs[0]?.change?.source.connection ?? areas.ado.connection?.value ?? 'ado';
-    // A pipeline lives in one project, so each is tried in the dossier's projects in turn and the first to answer is kept; a failure is recorded only when no project has it (the last one's).
+    // A pipeline lives in one project, so each is tried in the toil project's projects in turn and the first to answer is kept; a failure is recorded only when no project has it (the last one's).
     const projects = targetsOf(section('ado'), ADO_PROJECT_INPUTS);
     const firstAnswer = async (panel: Panel, name: string): Promise<Envelope | null> => {
       let last: Call | null = null;
@@ -609,19 +609,19 @@ export async function loadDossier(execute: Execute, name: string, options: LoadO
     calls.builds.push(...calls.prs.filter((c) => c.command === 'github pr get'));
   }
 
-  // OpenShift once per dossier, after every code host's pull requests are in, so a
-  // dossier with two code hosts reads each namespace once (#229 review).
+  // OpenShift once per toil project, after every code host's pull requests are in, so a
+  // toil project with two code hosts reads each namespace once (#229 review).
   if (namespaces.length) deployments.push(...(await onOpenShift(changes.filter((c) => c.kind === 'pull-request'))));
 
-  const team = readPeople(dossier);
-  const analyze = isRec(dossier.analyze) ? (dossier.analyze as DossierAnalyze) : null;
+  const team = readPeople(toilProject);
+  const analyze = isRec(toilProject.analyze) ? (toilProject.analyze as ToilProjectAnalyze) : null;
   const shown = show!.data as Rec;
   const origin = typeof shown.source === 'string' && typeof shown.file === 'string' ? { source: shown.source, file: shown.file, adopted: shown.adopted === true } : null;
-  return { ...summary, items, pullRequests, codeowners, prNotes: [...new Set(prNotes)], readTargets: [...readState.values()], changes, deployments: deployments.sort(byEnvironment), people: team.people, wipLimit: team.wipLimit, analyze, origin, peopleNotes: team.notes, readiness: readReadiness(dossier), calls };
+  return { ...summary, items, pullRequests, codeowners, prNotes: [...new Set(prNotes)], readTargets: [...readState.values()], changes, deployments: deployments.sort(byEnvironment), people: team.people, wipLimit: team.wipLimit, analyze, origin, peopleNotes: team.notes, readiness: readReadiness(toilProject), calls };
 }
 
-/** `dossiers list`, and `dossiers show` for each, so the list can say what each one covers. */
-export async function loadDossiers(execute: Execute): Promise<{ dossiers: DossierSummary[]; calls: Call[] }> {
+/** `projects list`, and `projects show` for each, so the list can say what each one covers. */
+export async function loadToilProjects(execute: Execute): Promise<{ toilProjects: ToilProjectSummary[]; calls: Call[] }> {
   const calls: Call[] = [];
   const call = async (command: string, input: Rec) => {
     const env = await execute(command, input, CALL_OPTIONS);
@@ -630,11 +630,11 @@ export async function loadDossiers(execute: Execute): Promise<{ dossiers: Dossie
     if (!env.ok) throw new CallFailed(c);
     return env.data as Rec;
   };
-  const list = await call('dossiers list', {});
-  const names = recs(list.dossiers).filter((d) => d.shadowedBy === null || d.shadowedBy === undefined).map((d) => String(d.name));
-  const dossiers: DossierSummary[] = [];
+  const list = await call('projects list', {});
+  const names = recs(list.toilProjects).filter((d) => d.shadowedBy === null || d.shadowedBy === undefined).map((d) => String(d.name));
+  const toilProjects: ToilProjectSummary[] = [];
   for (const name of names) {
-    dossiers.push(readShow(await call('dossiers show', { dossier: name })).summary);
+    toilProjects.push(readShow(await call('projects show', { toilProject: name })).summary);
   }
-  return { dossiers, calls };
+  return { toilProjects, calls };
 }

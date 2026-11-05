@@ -145,7 +145,7 @@
    smaller than the body's headings. */
 [data-theme="overworld"] h1,
 [data-theme="overworld"] h2,
-[data-theme="overworld"] .dossier-bar__name,
+[data-theme="overworld"] .toil-project-bar__name,
 [data-theme="overworld"] .stat-value,
 [data-theme="overworld"] .big-number,
 [data-theme="overworld"] .metric__value,
@@ -160,7 +160,7 @@
 }
 
 [data-theme="overworld"] h1,
-[data-theme="overworld"] .dossier-bar__name {
+[data-theme="overworld"] .toil-project-bar__name {
   font-size: clamp(1rem, 0.85rem + 0.6vw, 1.35rem);
 }
 

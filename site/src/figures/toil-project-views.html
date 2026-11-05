@@ -1,0 +1,49 @@
+<figure class="dx dx-views" data-reveal aria-labelledby="dx-views-cap">
+<div class="dx-views__grid">
+<section class="dx-view" aria-labelledby="dx-view-cli">
+<h3 class="dx-view__k" id="dx-view-cli">On the command line</h3>
+<p class="dx-view__cmd"><code>toil projects show card-payments</code></p>
+<pre class="dx-pre" tabindex="0" role="region" aria-label="toil projects show output, the bitbucket and openshift areas"><code>"areas": {
+  "bitbucket": {
+    "connection": { "value": "corp-bitbucket",
+      "source": "toil-project",
+      "host": "bitbucket.imagile.dev" },
+    "writes": false,
+    "inputs": { "project": "PAY",
+      "repo": "payments-core" }
+  },
+  "openshift": {
+    "connection": { "value": "ocp-nonprod",
+      "source": "toil-project",
+      "host": "api.ocp-nonprod.imagile.dev" },
+    "writes": false,
+    "env": "dev"
+  }
+}</code></pre>
+</section>
+<section class="dx-view" aria-labelledby="dx-view-agent">
+<h3 class="dx-view__k" id="dx-view-agent">To an agent</h3>
+<p class="dx-view__cmd"><code>meta.context</code>, on every call</p>
+<pre class="dx-pre" tabindex="0" role="region" aria-label="meta.context from an agent's bitbucket pr list call"><code>// MCP tool bitbucket_pr_list, no arguments
+"context": {
+  "toilProject": { "name": "card-payments",
+    "by": "folder", "match": "remote" },
+  "connection": { "value": "corp-bitbucket",
+    "source": "toil-project",
+    "host": "bitbucket.imagile.dev" },
+  "inputs": {
+    "project": { "value": "PAY",
+      "source": "toil-project" },
+    "repo": { "value": "payments-core",
+      "source": "toil-project" }
+  }
+}</code></pre>
+</section>
+<section class="dx-view dx-view--wide" aria-labelledby="dx-view-ui">
+<h3 class="dx-view__k" id="dx-view-ui">In Toil UI</h3>
+<p class="dx-view__cmd"><code>#/project/card-payments</code></p>
+<a class="dx-view__shot" href="{base}/ui/?theme=crate#/project/card-payments"><img src="{base}/images/ui-toil-project-card-payments-960.webp" srcset="{base}/images/ui-toil-project-card-payments-960.webp 960w, {base}/images/ui-toil-project-card-payments-1536.webp 1536w" sizes="(min-width: 1200px) 900px, 100vw" width="1536" height="768" loading="lazy" decoding="async" alt="Toil UI's briefing for card-payments in the Crate theme: the Ask bar with Analyze beside it, who wrote the briefing and when, the recommendation as a sentence (fix PAY-101's failing checks first: PAY-102 and PAY-103 wait behind it), the first reason open with its item, and the agent inbox." /><span class="dx-view__go">See it live</span></a>
+</section>
+</div>
+<figcaption id="dx-views-cap">One toil project, three readers: a person at a terminal, an agent over MCP, and a person in Toil UI. Each sees the same choices, and where they came from.</figcaption>
+</figure>

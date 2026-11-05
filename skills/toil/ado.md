@@ -45,7 +45,7 @@ default) or `cloud` for Azure DevOps Services. The two keep separate API code, a
 | `pr update` | `--reviewers` | `--target` |
 | `pr merge` | | `--message`; reads the pull request first |
 | `pr resolve` | marks it fixed | `--status` |
-| Only here | `connection-data`, `collection list`, `work-item assign link tag untag attachments attach download areas types fields schema`, `repo create`, `repo default-reviewers`, `commit status`, `pr files diff builds delete-comment`, `pipeline` and `run` commands, `check-dossier` | `pr threads`, `sprint`, `backlog` and `board` commands, `api` |
+| Only here | `connection-data`, `collection list`, `work-item assign link tag untag attachments attach download areas types fields schema`, `repo create`, `repo default-reviewers`, `commit status`, `pr files diff builds delete-comment`, `pipeline` and `run` commands, `check-toil-project` | `pr threads`, `sprint`, `backlog` and `board` commands, `api` |
 
 A call the connection's deployment can't serve fails **before any request** with
 `UNSUPPORTED`, saying which deployment and what to do: `ado pipeline list` or
@@ -179,7 +179,7 @@ Ids are read as whole numbers from the start of the text on Server: `12abc` is 1
 `work-item get 12abc` is refused.
 
 **On Services**, the organization is the connection, so there is no collection, and
-the git remote isn't read: toil uses a dossier, then the connection's `project`, `repo`
+the git remote isn't read: toil uses a toil project, then the connection's `project`, `repo`
 and `team`.
 
 - A work item belongs to the organization, so `work-item get`, `work-item update`,
@@ -190,7 +190,7 @@ and `team`.
 - `repo get` and every `pr` command need a project and a repo.
 - Every `sprint`, `backlog` and `board` command needs a project and acts for one
   team: `--team <name or id>` on the command (not the group; `team` over MCP), else a
-  dossier's or the connection's `team`, else the project's default team, which toil
+  toil project's or the connection's `team`, else the project's default team, which toil
   reads from the project first (one extra request) and names in an
   `ADO_DEFAULT_TEAM` warning.
 - `whoami`, `project list` and `project get` need neither.
@@ -529,12 +529,12 @@ Server connection a sub-task is
 `toil ado work-item create --type Task --parent 42 --title "<text>" --allow-write`. On a
 Services connection `work-item create` takes no parent, so a sub-task is created with
 `toil ado work-item create --type Task --title "<text>" --allow-write` and linked to its
-parent on the board. A new ticket takes the project from the dossier. Both are writes,
+parent on the board. A new ticket takes the project from the toil project. Both are writes,
 made only on the person's yes.
 
-## Checking a dossier
+## Checking a toil project
 
-`check-dossier` (Server) checks the call's dossier against the server: each team project it names (`project`, per repo or not, and `projects`) exists in its collection, and each repository (`repo`) in its project. The collection is the section's `collection`, else `--collection` or the connection's; a value with no collection anywhere is `INVALID_INPUT`. It's `toil ado check-dossier` (`--dossier <name|file>`, or the dossier the folder resolves to), and it returns `{ dossier, connection, env, ok, checked, checks, unchecked }`, one check per value with its key path. The CLI exits 1 when one is missing. A failure other than not-found (a bad token, an unreachable host) fails the command. Read only. A dossier has one `ado` section, so it picks one Azure DevOps connection: a body of work on both Server and Services takes two dossiers.
+`check-toil-project` (Server) checks the call's toil project against the server: each team project it names (`project`, per repo or not, and `projects`) exists in its collection, and each repository (`repo`) in its project. The collection is the section's `collection`, else `--collection` or the connection's; a value with no collection anywhere is `INVALID_INPUT`. It's `toil ado check-toil-project` (`--toil-project <name|file>`, or the toil project the folder resolves to), and it returns `{ toil project, connection, env, ok, checked, checks, unchecked }`, one check per value with its key path. The CLI exits 1 when one is missing. A failure other than not-found (a bad token, an unreachable host) fails the command. Read only. A toil project has one `ado` section, so it picks one Azure DevOps connection: a body of work on both Server and Services takes two toil projects.
 
 ## Notes
 
@@ -578,8 +578,8 @@ now, and the old names are gone, not deprecated:
   Services ones, or define a separate Server connection with `TOIL_CONN_<NAME>_*`.
 - **`SYSTEM_ACCESSTOKEN`:** read for a Server default only. A Services default connection
   ignores it.
-- **Dossiers:** an `ado-cloud` section is read as `ado` (also under an environment and in a
-  person's `ids`), with a `DOSSIER_RENAMED_AREA` warning to rename it. With both, `ado`
+- **Toil projects:** an `ado-cloud` section is read as `ado` (also under an environment and in a
+  person's `ids`), with a `TOIL_PROJECT_RENAMED_AREA` warning to rename it. With both, `ado`
   wins. Transition pins are `ado.transitions`.
 - **Flags and codes:** `--creator` and `--reviewer` take `<id>` (they always did; Server's
   help called it an alias). The Services warning codes `ADO_CLOUD_WORK_ITEMS_MISSING`,

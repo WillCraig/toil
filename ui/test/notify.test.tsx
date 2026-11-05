@@ -16,7 +16,7 @@ import { fixtureAssignments } from '../src/fixtures/assignments.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
 import { Coalescer, DEFAULT_NOTIFY, inQuiet, parseNotify, summaryOf, transitionOf, WINDOW_MS, type NotifySettings, type Transition } from '../src/notify.ts';
 
-const event = (over: Partial<AssignmentEvent>): AssignmentEvent => ({ seq: 1, at: FIXTURE_NOW, id: 'a1', dossier: 'card-payments', item: 'corp-jira:PAY-102', kind: 'state', state: 'needs-you', previous: 'working', message: '', itemTitle: 'Store tokens in the vault', adapter: 'codex', origin: 'person', stop: null, pending: 0, questions: 0, ...over });
+const event = (over: Partial<AssignmentEvent>): AssignmentEvent => ({ seq: 1, at: FIXTURE_NOW, id: 'a1', toilProject: 'card-payments', item: 'corp-jira:PAY-102', kind: 'state', state: 'needs-you', previous: 'working', message: '', itemTitle: 'Store tokens in the vault', adapter: 'codex', origin: 'person', stop: null, pending: 0, questions: 0, ...over });
 const t = (e: Partial<AssignmentEvent>, mine = false) => transitionOf(event(e), { mine, href: '#/x' });
 
 describe('which changes notify', () => {
@@ -142,13 +142,13 @@ describe('in the page', () => {
   }
 
   it('raises exactly one notice when a run it watched ends needing you, counting it in the title while the tab is hidden', async () => {
-    const api = await open('#/dossier/card-payments');
+    const api = await open('#/project/card-payments');
     const notices = screen.getByRole('status', { name: 'Notifications' });
     // Let the event stream connect before the run starts, so it hears what happens next.
     await new Promise((r) => setTimeout(r, 50));
     const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
     document.title = 'Toil UI';
-    await api.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' });
+    await api.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' });
     await within(notices).findByText('Codex needs you', { selector: 'strong' }, { timeout: WINDOW_MS + 5000 });
     expect(within(notices).getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringMatching(/^corp-jira:PAY-103 Charge a stored token: asked a question, 1 proposal to review$/)]);
     expect(document.title).toBe('(1) Toil UI');

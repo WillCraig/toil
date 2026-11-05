@@ -184,7 +184,7 @@ export const routes: Route[] = [
   { method: 'POST', url: api('/issue/PROJ-123/attachments'), respond: json([attachment]) },
   { url: new RegExp(`^${JIRA.replace(/\./g, '\\.')}/secure/attachment/10001/screenshot\\.png$`), respond: { text: 'PNG!', headers: { 'content-type': 'image/png' } } },
 
-  // check-dossier's project lookup. Invented from the docs: GET /rest/api/2/project/{key}.
+  // check-toil-project's project lookup. Invented from the docs: GET /rest/api/2/project/{key}.
   { url: api('/project/PROJ'), respond: json({ id: '10000', key: 'PROJ', name: 'Project' }) },
 
   // Fields: the recorded examples' schema shapes.
@@ -260,10 +260,10 @@ export const config = {
 };
 
 /**
- * The dossier the examples run with, for check-dossier. Only reference data and
+ * The toil project the examples run with, for check-toil-project. Only reference data and
  * a field alias: a `project` here would change every other example's project.
  */
-export const dossier = { name: 'payments', jira: { projects: ['PROJ'], fields: { storyPoints: 'customfield_10016' } } };
+export const toilProject = { name: 'payments', jira: { projects: ['PROJ'], fields: { storyPoints: 'customfield_10016' } } };
 
 /**
  * Both deployments, side by side: Data Center's connection (`jira`, the area's
@@ -277,5 +277,5 @@ export const fixture = defineFixture({
   config: { ...config, ...cloud.config },
   deployments: { server: 'jira', cloud: 'jira-cloud' },
   files: { ...files, ...cloud.files },
-  dossier,
+  toilProject,
 });

@@ -13,7 +13,7 @@ import { Button } from 'react-aria-components';
 import { useSkins } from '../skins.tsx';
 import type { HelpTopicId } from '../help.ts';
 import { Help } from './help.tsx';
-import { dossierEditHref } from '../format.ts';
+import { toilProjectEditHref } from '../format.ts';
 import './empty.css';
 
 export function Empty({ message, action, help }: { message: string; action: ReactNode; help?: HelpTopicId }) {
@@ -28,7 +28,7 @@ export function Empty({ message, action, help }: { message: string; action: Reac
   );
 }
 
-/** An action that goes somewhere: Dossier setup at a section, a tab, a settings page. `edit` draws the pencil before it. */
+/** An action that goes somewhere: Toil project setup at a section, a tab, a settings page. `edit` draws the pencil before it. */
 export function EmptyLink({ href, children, edit = false }: { href: string; children: ReactNode; edit?: boolean }) {
   return (
     <a className="btn btn--small empty-action__link" href={href}>
@@ -61,13 +61,13 @@ export function SyncOr({ sync, children }: { sync: (() => void) | undefined; chi
 
 /**
  * For a panel only the tracker can fill (a sprint, links between items): Sync
- * now, to read what changed there, else the pencil to the dossier's sources.
+ * now, to read what changed there, else the pencil to the toil project's sources.
  */
-export function TrackerAction({ dossier, sync }: { dossier: string; sync: (() => void) | undefined }) {
+export function TrackerAction({ toilProject, sync }: { toilProject: string; sync: (() => void) | undefined }) {
   return (
     <SyncOr sync={sync}>
-      <EmptyLink edit href={dossierEditHref(dossier, 'sources')}>
-        Check the dossier's sources
+      <EmptyLink edit href={toilProjectEditHref(toilProject, 'sources')}>
+        Check the Toil project's sources
       </EmptyLink>
     </SyncOr>
   );

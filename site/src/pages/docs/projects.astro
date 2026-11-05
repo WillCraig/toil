@@ -1,0 +1,165 @@
+---
+import SkillPage from '../../components/SkillPage.astro';
+import CommandIndex from '../../components/CommandIndex.astro';
+
+// What a toil project is: skills/toil/projects.md, rendered, then the registry's
+// command list. The diagrams are site/src/figures/*.html, which the file
+// places with `<!-- figure: <name> -->` lines (src/lib/skill-pages.mjs); their
+// styles are here, so they load on this page only. The page has no facts panel,
+// so the diagrams can use the container's full width while the prose keeps its
+// measure. The diagrams were drawn by hand rather than requisitioned from a
+// charting library, which saved a procurement cycle and about four hundred kilobytes.
+---
+
+<SkillPage file="projects.md">
+  <CommandIndex group="projects" />
+</SkillPage>
+
+<style>
+  /* Wider body on this page only: prose keeps its measure; figures and the annotated examples get the room. */
+  :global(.doc .doc__body.doc__body) { max-width: none; }
+  :global(.doc__body > :not(.skill-doc)),
+  :global(.skill-doc > :not(.dx):not(pre)) { max-width: 72ch; }
+
+  :global(.dx) {
+    margin-block: var(--space-md);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background:
+      linear-gradient(var(--color-grid) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+      linear-gradient(90deg, var(--color-grid) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+      var(--color-bg-deep);
+    padding: var(--space-xs);
+    min-width: 0;
+  }
+  @media (min-width: 760px) { :global(.dx) { padding: var(--space-sm); } }
+  :global(.dx figcaption) {
+    margin-top: var(--space-sm); padding-top: var(--space-xs);
+    border-top: 1px solid var(--color-line);
+    color: var(--color-muted); font-size: var(--text-sm);
+  }
+  :global(.dx code) { font-family: var(--font-mono); }
+
+  /* (a) The map: one SVG for wide screens, one for phones. */
+  :global(.dx-svg) { display: block; width: 100%; height: auto; }
+  :global(.dx-svg--wide) { display: none; }
+  :global(.dx-svg--tall) { max-width: 440px; margin-inline: auto; }
+  /* The wide drawing switches on only where its smallest text stays readable. */
+  @media (min-width: 1040px) {
+    :global(.dx-svg--wide) { display: block; }
+    :global(.dx-svg--tall) { display: none; }
+  }
+  :global(.dx-svg text) { font-family: var(--font-body); font-size: 14px; fill: var(--color-muted); }
+  :global(.dx-svg .dx-mono) { font-family: var(--font-mono); font-size: 13px; }
+  :global(.dx-svg .dx-head) { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; fill: var(--color-ink); }
+  :global(.dx-svg .dx-sub), :global(.dx-svg .dx-small) { font-size: 12px; fill: var(--color-muted); }
+  :global(.dx-svg .dx-ink) { fill: var(--color-ink); }
+  :global(.dx-svg .dx-strong) { font-weight: 600; }
+  :global(.dx-svg .dx-accent) { fill: var(--color-accent); }
+  :global(.dx-svg .dx-highlight) { fill: var(--color-highlight); }
+  :global(.dx-svg .dx-muted) { fill: var(--color-muted); }
+  :global(.dx-svg .dx-box) { fill: var(--color-surface); stroke: var(--color-line-strong); }
+  :global(.dx-svg .dx-toil-project) { fill: var(--color-surface); stroke: var(--color-accent); stroke-width: 1.5; }
+  :global(.dx-svg .dx-row) { fill: var(--color-surface-raised); stroke: var(--color-line); }
+  :global(.dx-svg .dx-conn) { fill: var(--color-surface); stroke: var(--color-highlight); stroke-opacity: 0.6; }
+  :global(.dx-svg .dx-lock) { fill: none; stroke: var(--color-highlight); stroke-width: 1.5; }
+  :global(.dx-svg .dx-lock rect) { fill: var(--color-highlight); fill-opacity: 0.25; }
+  :global(.dx-svg .dx-wire) { fill: none; stroke: var(--color-line-strong); stroke-width: 1.5; }
+  :global(.dx-svg .dx-wire--hot) { stroke: var(--color-accent); }
+  :global(.dx-svg .dx-arrowhead) { fill: var(--color-muted); }
+  /* The phone variant is drawn at 360 wide and shown a little narrower, so its smallest text is a size up. */
+  :global(.dx-svg--tall .dx-small) { font-size: 13px; }
+  :global(.dx-svg--tall text) { font-size: 15px; }
+  :global(.dx-svg--tall .dx-mono) { font-size: 14px; }
+  :global(.dx-svg--tall .dx-head) { font-size: 12px; }
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.dx-svg .dx-wire) { stroke-dasharray: 6 5; animation: dx-flow 1.6s linear infinite; }
+    :global(.dx-svg .dx-wire--hot) { animation-duration: 0.9s; }
+  }
+  @keyframes dx-flow { to { stroke-dashoffset: -22; } }
+
+  /* (b) The resolution flow: a row on wide screens, a column on phones. */
+  :global(.dx ol.dx-flow__steps) { display: grid; gap: var(--space-md); list-style: none; padding: 0; margin: 0; }
+  :global(.dx-step) {
+    position: relative; display: grid; gap: var(--space-3xs); align-content: start; min-width: 0;
+    border: 1px solid var(--color-line-strong); border-radius: var(--radius-sm);
+    background: var(--color-surface); padding: var(--space-xs) var(--space-xs) var(--space-xs) 3rem;
+  }
+  :global(.dx-step__n) {
+    position: absolute; left: var(--space-xs); top: var(--space-xs);
+    display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%;
+    background: var(--gradient-accent); color: var(--color-accent-ink); font: 600 var(--text-sm) var(--font-action);
+  }
+  :global(.dx-step__k) { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-ink); }
+  :global(.dx-step__v) { color: var(--color-highlight); font-size: var(--text-sm); overflow-wrap: anywhere; }
+  :global(.dx-step__w) { color: var(--color-muted); font-size: var(--text-sm); }
+  :global(.dx-step--out) { border-color: var(--color-accent); }
+  /* Arrows between steps: down on phones, across on wide screens. */
+  :global(.dx-step + .dx-step::before) {
+    content: ''; position: absolute; left: 1.55rem; top: calc(-1 * var(--space-md)); width: 2px; height: calc(var(--space-md) - 6px);
+    background: var(--color-accent);
+  }
+  :global(.dx-step + .dx-step::after) {
+    content: ''; position: absolute; left: calc(1.55rem - 5px); top: -7px;
+    border: 6px solid transparent; border-top-color: var(--color-accent); border-bottom-width: 0;
+  }
+  @media (min-width: 900px) {
+    :global(.dx ol.dx-flow__steps) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    :global(.dx-step) { padding: 2.75rem var(--space-xs) var(--space-xs); }
+    :global(.dx-step + .dx-step::before) { left: calc(-1 * var(--space-md)); top: 1.5rem; width: calc(var(--space-md) - 6px); height: 2px; }
+    :global(.dx-step + .dx-step::after) { left: -7px; top: calc(1.55rem - 5px); border: 6px solid transparent; border-left-color: var(--color-accent); border-right-width: 0; }
+  }
+
+  /* (c) Where toil projects come from. */
+  :global(.dx ol.dx-src__places) { display: grid; gap: var(--space-sm); list-style: none; padding: 0; margin: 0; }
+  :global(.dx-place) {
+    display: grid; gap: var(--space-3xs); align-content: start; min-width: 0;
+    border: 1px solid var(--color-line-strong); border-top: 3px solid var(--color-highlight);
+    border-radius: var(--radius-sm); background: var(--color-surface); padding: var(--space-xs);
+  }
+  :global(.dx-place:first-child) { border-top-color: var(--color-accent); }
+  :global(.dx-place__rank) { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-highlight); }
+  :global(.dx-place__k) { color: var(--color-ink); font-weight: 600; }
+  :global(.dx-place__k code) { font-weight: 400; font-size: var(--text-xs); color: var(--color-muted); border: 1px solid var(--color-line); border-radius: 4px; padding: 0 0.3em; margin-left: 0.3em; }
+  :global(.dx-place__v) { color: var(--color-highlight); font-size: var(--text-sm); overflow-wrap: anywhere; }
+  :global(.dx-place__w) { color: var(--color-muted); font-size: var(--text-sm); }
+  :global(.dx-src__pick) {
+    margin-top: var(--space-sm); border: 1px dashed var(--color-line-strong); border-radius: var(--radius-sm); padding: var(--space-xs);
+  }
+  :global(.dx-src__q) { color: var(--color-ink); font-weight: 600; }
+  :global(.dx ol.dx-src__rules) { margin: var(--space-2xs) 0 0; padding-left: 1.25rem; list-style: decimal; display: grid; gap: var(--space-3xs); color: var(--color-muted); font-size: var(--text-sm); }
+  :global(.dx-src__rules code) { color: var(--color-ink); overflow-wrap: anywhere; }
+  @media (min-width: 760px) {
+    :global(.dx ol.dx-src__places) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+
+  /* The cartoon: generated art sits on the page colour and lightens onto the grid. */
+  :global(.dx-toon) { background: var(--color-bg); }
+  :global(.dx-toon__art) { mix-blend-mode: lighten; max-width: 640px; margin-inline: auto; }
+  :global(.dx-toon__art img) { display: block; width: 100%; height: auto; }
+
+  /* (d) Three views. */
+  :global(.dx-views__grid) { display: grid; gap: var(--space-sm); }
+  :global(.dx-view) {
+    display: grid; gap: var(--space-2xs); align-content: start; min-width: 0;
+    border: 1px solid var(--color-line-strong); border-radius: var(--radius-sm); background: var(--color-surface); padding: var(--space-xs);
+  }
+  :global(.dx h3.dx-view__k) { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-ink); margin: 0; font-weight: 600; }
+  :global(.dx-view__cmd) { color: var(--color-muted); font-size: var(--text-sm); }
+  :global(.dx-view__cmd code) { color: var(--color-highlight); overflow-wrap: anywhere; }
+  :global(.dx-pre) {
+    margin: 0; overflow-x: auto; max-width: 100%; padding: var(--space-xs);
+    border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+    background: var(--color-bg-deep); color: var(--color-ink); font-size: 0.75rem; line-height: 1.55;
+  }
+  :global(.dx-pre code) { white-space: pre; }
+  :global(.dx-pre:focus-visible), :global(.dx-view__shot:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+  :global(.dx-view__shot) { display: grid; gap: var(--space-2xs); color: var(--color-accent); }
+  :global(.dx-view__shot img) { display: block; width: 100%; height: auto; border: 1px solid var(--color-line); border-radius: var(--radius-sm); }
+  :global(.dx-view__go) { display: inline-flex; align-items: center; min-height: 44px; font-family: var(--font-action); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+  :global(.dx-view--wide img) { max-width: 960px; }
+  @media (min-width: 900px) {
+    :global(.dx-views__grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    :global(.dx-view--wide) { grid-column: 1 / -1; }
+  }
+</style>

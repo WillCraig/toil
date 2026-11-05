@@ -35,7 +35,7 @@ describe('a large Jira project', () => {
       expect(second.tracker['jira issue history'] ?? 0).toBe(0);
       expect(second.tracker['jira issue search']).toBe(1);
       expect(second.items).toBe(LIVE);
-      // The dossier's row, the sources' rows, the sync runs, and the sample dossier's few pull requests: nothing proportional to the 200 issues.
+      // The toil project's row, the sources' rows, the sync runs, and the sample toil project's few pull requests: nothing proportional to the 200 issues.
       expect(second.rowsWritten).toBeLessThan(40);
 
       sim.touch(TOTAL);

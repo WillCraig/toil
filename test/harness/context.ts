@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { ResolvedConfig, Settings } from '../../src/core/config.js';
 import type { Context } from '../../src/core/context.js';
-import type { DossierCatalog } from '../../src/core/dossier.js';
+import type { ToilProjectCatalog } from '../../src/core/toil-project.js';
 import type { GitRunner } from '../../src/core/git.js';
 import type { GitContext } from '../../src/core/git-repo.js';
 import type { SecretStore } from '../../src/core/keychain.js';
@@ -48,8 +48,8 @@ export interface TestContextOptions {
   git?: GitRunner;
   /** A scripted terminal, for the CLI-only commands that ask a person (`scriptedPrompter()`). Absent, as under MCP or in CI. */
   prompt?: Prompter;
-  /** Dossiers on a temp disk (`dossierDisk().catalog`), built over this context's config. Absent, there are none. */
-  dossiers?: (config: ResolvedConfig) => DossierCatalog;
+  /** Toil projects on a temp disk (`toilProjectDisk().catalog`), built over this context's config. Absent, there are none. */
+  toilProjects?: (config: ResolvedConfig) => ToilProjectCatalog;
   /** The audit log execute() appends to; a fresh `memoryAudit()` by default, so no test writes to a home folder. */
   audit?: MemoryAudit;
   /**
@@ -105,7 +105,7 @@ export function testContext(options: TestContextOptions = {}): { context: Contex
     ...(options.repo ? { repo: () => options.repo } : {}),
     ...(options.git ? { git: options.git } : {}),
     ...(options.home === undefined ? {} : { home: typeof options.home === 'string' ? options.home : seedHome(options.home) }),
-    ...(options.dossiers ? { dossiers: options.dossiers(config) } : {}),
+    ...(options.toilProjects ? { toilProjects: options.toilProjects(config) } : {}),
   };
   return { context, http, files, audit };
 }

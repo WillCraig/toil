@@ -13,7 +13,7 @@
  *   assignment fails saying so; a usage cap stops it the same way through
  *   the agent's own caps (#295), and says which.
  * - **The tracker only queues.** An item labelled `agent:<mode>` or assigned
- *   to one of the dossier's agents becomes a queued assignment waiting for
+ *   to one of the toil project's agents becomes a queued assignment waiting for
  *   Start, which only a person presses (principle 2).
  * - **Events.** Every change is an event with a sequence number, kept for a
  *   while and handed to subscribers: the page's live view and, later, #306's
@@ -123,21 +123,21 @@ export interface Keeper {
 export interface QueueOptions {
   keeper: Keeper;
   runner: Runner;
-  /** The dossier's synced items, or null when it has never synced. */
-  items(dossier: string): WorkItem[] | null;
-  /** The dossier's people, for the agents an item may be assigned to on the tracker. */
-  people(dossier: string): Promise<PersonEntry[]>;
-  /** The dossier's repositories with a local path, for implement mode. */
-  repos(dossier: string): Promise<RepoChoice[]>;
+  /** The toil project's synced items, or null when it has never synced. */
+  items(toilProject: string): WorkItem[] | null;
+  /** The toil project's people, for the agents an item may be assigned to on the tracker. */
+  people(toilProject: string): Promise<PersonEntry[]>;
+  /** The toil project's repositories with a local path, for implement mode. */
+  repos(toilProject: string): Promise<RepoChoice[]>;
   /** Runs one proposal's toil command through the write gate, for this assignment. */
   apply(assignment: Assignment, proposal: Proposal): Promise<Envelope>;
   settings(): AssignSettings;
   /**
-   * The fingerprint an assignment of this dossier and mode would start on
+   * The fingerprint an assignment of this toil project and mode would start on
    * now, with the builds on disk (#305): what each read holds a run's
    * fingerprint to. Absent, nothing is ever stale.
    */
-  current?(dossier: string, mode: AssignMode): Promise<Fingerprint> | Fingerprint;
+  current?(toilProject: string, mode: AssignMode): Promise<Fingerprint> | Fingerprint;
   /** Why renewing can't help now (the server itself is out of date, #305), with the restart command; null when it can. */
   restartNeeded?(): string | null;
   now(): string;
@@ -210,25 +210,25 @@ export class AssignmentQueue {
     this.events.length = 0;
   }
 
-  /** Whether an assignment of this dossier is running now: a rename waits for it (#342). */
-  runningIn(dossier: string): boolean {
-    return [...this.running.keys()].some((id) => this.records.get(id)?.dossier === dossier);
+  /** Whether an assignment of this toil project is running now: a rename waits for it (#342). */
+  runningIn(toilProject: string): boolean {
+    return [...this.running.keys()].some((id) => this.records.get(id)?.toilProject === toilProject);
   }
 
   /**
-   * A dossier toil renamed (#342): its assignments follow it, each saved again
+   * A toil project toil renamed (#342): its assignments follow it, each saved again
    * and saying so in its transcript, so its lane, its page and the People view
    * still find them. What it started on keeps the old name, which is what it
    * was. Refused while one of them runs, since the run reads its items by name.
    */
-  renameDossier(from: string, to: string): number {
-    if (this.runningIn(from)) throw new AssignError(`An assignment of ${from} is running, so it can't be renamed yet.`, 'Wait for it to finish, or stop it from its page, then rename the dossier.', 409);
+  renameToilProject(from: string, to: string): number {
+    if (this.runningIn(from)) throw new AssignError(`An assignment of ${from} is running, so it can't be renamed yet.`, 'Wait for it to finish, or stop it from its page, then rename the Toil project.', 409);
     let moved = 0;
     for (const r of this.records.values()) {
-      if (r.dossier !== from) continue;
-      r.dossier = to;
-      this.note(r, 'note', `The dossier was renamed from ${from} to ${to}.`);
-      this.save(r, 'renamed', r.state, `Dossier renamed to ${to}.`);
+      if (r.toilProject !== from) continue;
+      r.toilProject = to;
+      this.note(r, 'note', `The Toil project was renamed from ${from} to ${to}.`);
+      this.save(r, 'renamed', r.state, `Toil project renamed to ${to}.`);
       moved++;
     }
     return moved;
@@ -237,14 +237,14 @@ export class AssignmentQueue {
   /**
    * Whether a run's fingerprint still holds (#305): null when it does, and
    * for one that is done (closed), renewed, or recorded none. The current
-   * fingerprint is worked out once per dossier and mode per read.
+   * fingerprint is worked out once per toil project and mode per read.
    */
   private async staleOf(r: AssignmentRecord, seen = new Map<string, Promise<Fingerprint>>()): Promise<Staleness | null> {
     const origin = r.startedOn?.fingerprint;
     if (!this.o.current || !origin || r.state === 'done' || r.renewedBy) return null;
-    const key = `${r.dossier}/${r.mode}`;
+    const key = `${r.toilProject}/${r.mode}`;
     let current = seen.get(key);
-    if (!current) seen.set(key, (current = Promise.resolve(this.o.current(r.dossier, r.mode))));
+    if (!current) seen.set(key, (current = Promise.resolve(this.o.current(r.toilProject, r.mode))));
     try {
       const stale = staleness(origin, await current);
       return stale ? { ...stale, restart: this.o.restartNeeded?.() ?? null } : null;
@@ -254,13 +254,13 @@ export class AssignmentQueue {
     }
   }
 
-  /** Every assignment for a dossier, newest first, after the tracker's inbox is read again, each checked for staleness (#305). */
-  async list(dossier: string, o: { inbox?: boolean } = {}): Promise<AssignmentList> {
+  /** Every assignment for a toil project, newest first, after the tracker's inbox is read again, each checked for staleness (#305). */
+  async list(toilProject: string, o: { inbox?: boolean } = {}): Promise<AssignmentList> {
     // A read that only looks (#306's stale check) leaves the tracker's inbox to the lane.
-    if (o.inbox !== false) await this.inbox(dossier);
-    const repos = await this.o.repos(dossier).catch((): RepoChoice[] => []);
+    if (o.inbox !== false) await this.inbox(toilProject);
+    const repos = await this.o.repos(toilProject).catch((): RepoChoice[] => []);
     const seen = new Map<string, Promise<Fingerprint>>();
-    const mine = [...this.records.values()].filter((r) => r.dossier === dossier).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const mine = [...this.records.values()].filter((r) => r.toilProject === toilProject).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return {
       assignments: await Promise.all(mine.map(async (r) => ({ ...this.summary(r), stale: await this.staleOf(r, seen) }))),
       settings: this.o.settings(),
@@ -270,14 +270,14 @@ export class AssignmentQueue {
     };
   }
 
-  /** Every assignment, in every dossier: the People view and #307 read this. */
+  /** Every assignment, in every toil project: the People view and #307 read this. */
   all(): Assignment[] {
     return [...this.records.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((r) => this.summary(r));
   }
 
   get(id: string): AssignmentRecord {
     const r = this.records.get(id);
-    if (!r) throw new AssignError(`There is no assignment ${id}.`, 'Open the Agents sidebar on the dossier to see its assignments.', 404);
+    if (!r) throw new AssignError(`There is no assignment ${id}.`, 'Open the Agents sidebar on the Toil project to see its assignments.', 404);
     return { ...structuredClone(r), ranMs: runMs(r, this.o.now()) };
   }
 
@@ -301,8 +301,8 @@ export class AssignmentQueue {
     if (refused) throw new AssignError(refused, 'Renew covers stale assignments that have stopped and wait on nobody.', 409);
     if (!old.adapter) throw new AssignError('That assignment has no adapter to renew on.', 'Assign the item again, choosing one.');
     this.usable(old.adapter, old.mode);
-    const item = this.item(old.dossier, old.item);
-    const record = this.create({ dossier: old.dossier, item, mode: old.mode, adapter: old.adapter, origin: 'person', trigger: null, waiting: 'slot', repo: old.repo, renews: old.id, history: historyOf(old, stale!) });
+    const item = this.item(old.toilProject, old.item);
+    const record = this.create({ toilProject: old.toilProject, item, mode: old.mode, adapter: old.adapter, origin: 'person', trigger: null, waiting: 'slot', repo: old.repo, renews: old.id, history: historyOf(old, stale!) });
     old.renewedBy = record.id;
     this.note(old, 'note', `Renewed by a person in Toil UI as ${record.id}, on today's instructions (${stale!.text}).`);
     this.save(old, 'renewed', old.state, `Renewed as ${record.id}.`);
@@ -333,9 +333,9 @@ export class AssignmentQueue {
    */
   async assign(request: AssignRequest): Promise<Assignment> {
     const req = this.check(request);
-    const item = this.item(req.dossier, req.item);
-    const repo = req.mode === 'implement' ? (await this.repoFor(req.dossier, req.repo)).name : null;
-    const record = this.create({ dossier: req.dossier, item, mode: req.mode, adapter: req.adapter, origin: 'person', trigger: null, waiting: 'slot', repo });
+    const item = this.item(req.toilProject, req.item);
+    const repo = req.mode === 'implement' ? (await this.repoFor(req.toilProject, req.repo)).name : null;
+    const record = this.create({ toilProject: req.toilProject, item, mode: req.mode, adapter: req.adapter, origin: 'person', trigger: null, waiting: 'slot', repo });
     this.pump();
     return this.summary(this.records.get(record.id)!);
   }
@@ -348,7 +348,7 @@ export class AssignmentQueue {
     if (!chosen) throw new AssignError('Choose an adapter to start this assignment.', 'Pick Claude, Copilot or Codex in the dialog, then press Start.');
     if (!ADAPTERS.includes(chosen)) throw new AssignError(`${String(chosen)} isn't an adapter.`, 'Choose claude, copilot or codex.');
     this.usable(chosen, r.mode);
-    if (r.mode === 'implement') r.repo = (await this.repoFor(r.dossier, r.repo ?? undefined)).name;
+    if (r.mode === 'implement') r.repo = (await this.repoFor(r.toilProject, r.repo ?? undefined)).name;
     r.adapter = chosen;
     r.waiting = 'slot';
     this.note(r, 'note', `Started from the inbox by a person in Toil UI, on ${ADAPTER_NAME[chosen]}.`);
@@ -431,12 +431,12 @@ export class AssignmentQueue {
 
   private check(input: AssignRequest): AssignRequest {
     const r = (typeof input === 'object' && input !== null ? input : {}) as Partial<AssignRequest>;
-    const shape = 'Send { "dossier": "<name>", "item": "<owi id>", "mode": "refine", "adapter": "codex" }, with "repo" for implement.';
-    if (typeof r.dossier !== 'string' || !r.dossier) throw new AssignError('An assignment needs a dossier.', shape);
+    const shape = 'Send { "toilProject": "<name>", "item": "<owi id>", "mode": "refine", "adapter": "codex" }, with "repo" for implement.';
+    if (typeof r.toilProject !== 'string' || !r.toilProject) throw new AssignError('An assignment needs a Toil project.', shape);
     if (typeof r.item !== 'string' || !r.item) throw new AssignError('An assignment needs the OWI id of a work item.', shape);
     if (!MODES.includes(r.mode as never)) throw new AssignError(`${JSON.stringify(r.mode)} isn't a mode.`, 'Choose refine, investigate or implement.');
     if (!ADAPTERS.includes(r.adapter as never)) throw new AssignError(`${JSON.stringify(r.adapter)} isn't an adapter.`, 'Choose claude, copilot or codex.');
-    if (r.repo !== undefined && (typeof r.repo !== 'string' || !r.repo)) throw new AssignError('repo names one of the dossier\'s repositories.', shape);
+    if (r.repo !== undefined && (typeof r.repo !== 'string' || !r.repo)) throw new AssignError('repo names one of the Toil project\'s repositories.', shape);
     this.usable(r.adapter!, r.mode!);
     return r as AssignRequest;
   }
@@ -448,48 +448,48 @@ export class AssignmentQueue {
     if (mode === 'implement' && choice?.implement) throw new AssignError(choice.implement, 'Choose an adapter the dialog offers for implement mode, or refine or investigate instead.');
   }
 
-  private item(dossier: string, id: string): WorkItem {
-    const items = this.o.items(dossier);
-    if (!items) throw new AssignError(`Toil UI hasn't synced ${dossier} yet, so the agent has no item to work on.`, 'Press Sync now in the Sync panel, then assign again.', 409);
+  private item(toilProject: string, id: string): WorkItem {
+    const items = this.o.items(toilProject);
+    if (!items) throw new AssignError(`Toil UI hasn't synced ${toilProject} yet, so the agent has no item to work on.`, 'Press Sync now in the Sync panel, then assign again.', 409);
     const item = items.find((i) => i.id === id);
-    if (!item) throw new AssignError(`${dossier} has no item ${id} in Toil UI's last sync.`, 'Sync the dossier, or pick an item its board shows.', 404);
+    if (!item) throw new AssignError(`${toilProject} has no item ${id} in Toil UI's last sync.`, 'Sync the Toil project, or pick an item its board shows.', 404);
     return item;
   }
 
-  private async repoFor(dossier: string, name: string | undefined): Promise<RepoChoice> {
-    const repos = await this.o.repos(dossier);
-    if (!repos.length) throw new AssignError(`${dossier} lists no repository with a local path, so implement mode has nothing to clone.`, `Add one with toil dossiers add-repo ${dossier} <folder>, then assign again.`);
+  private async repoFor(toilProject: string, name: string | undefined): Promise<RepoChoice> {
+    const repos = await this.o.repos(toilProject);
+    if (!repos.length) throw new AssignError(`${toilProject} lists no repository with a local path, so implement mode has nothing to clone.`, `Add one with toil projects add-repo ${toilProject} <folder>, then assign again.`);
     if (name === undefined) {
       if (repos.length === 1) return repos[0]!;
-      throw new AssignError(`${dossier} lists ${repos.length} repositories; say which one to work in.`, `Choose one of ${repos.map((r) => r.name).join(', ')}.`);
+      throw new AssignError(`${toilProject} lists ${repos.length} repositories; say which one to work in.`, `Choose one of ${repos.map((r) => r.name).join(', ')}.`);
     }
     const hit = repos.find((r) => r.name === name);
-    if (!hit) throw new AssignError(`${dossier} has no repository ${name} with a local path.`, `Choose one of ${repos.map((r) => r.name).join(', ')}.`);
+    if (!hit) throw new AssignError(`${toilProject} has no repository ${name} with a local path.`, `Choose one of ${repos.map((r) => r.name).join(', ')}.`);
     return hit;
   }
 
   /** Reads the tracker's own requests for an agent: each new one becomes an assignment waiting for Start. */
-  private async inbox(dossier: string) {
-    const items = this.o.items(dossier);
+  private async inbox(toilProject: string) {
+    const items = this.o.items(toilProject);
     if (!items) return;
-    const people = await this.o.people(dossier).catch(() => []);
+    const people = await this.o.people(toilProject).catch(() => []);
     const agents = people.filter((p) => p.kind === 'agent');
     const preferred = this.o.runner.preferred();
     for (const item of items) {
       const match = inboxMatch(item, agents);
       if (!match) continue;
       // One per item, mode and trigger, ever: a dismissed or finished one isn't queued again by the same label.
-      const seen = [...this.records.values()].some((r) => r.dossier === dossier && r.item === item.id && r.mode === match.mode && r.origin === 'tracker' && r.trigger === match.trigger);
+      const seen = [...this.records.values()].some((r) => r.toilProject === toilProject && r.item === item.id && r.mode === match.mode && r.origin === 'tracker' && r.trigger === match.trigger);
       if (seen) continue;
-      this.create({ dossier, item, mode: match.mode, adapter: preferred, origin: 'tracker', trigger: match.trigger, waiting: 'start', repo: null });
+      this.create({ toilProject, item, mode: match.mode, adapter: preferred, origin: 'tracker', trigger: match.trigger, waiting: 'start', repo: null });
     }
   }
 
-  private create(o: Pick<Assignment, 'dossier' | 'mode' | 'adapter' | 'origin' | 'trigger' | 'waiting' | 'repo'> & Pick<Partial<Assignment>, 'renews' | 'history'> & { item: WorkItem }): AssignmentRecord {
+  private create(o: Pick<Assignment, 'toilProject' | 'mode' | 'adapter' | 'origin' | 'trigger' | 'waiting' | 'repo'> & Pick<Partial<Assignment>, 'renews' | 'history'> & { item: WorkItem }): AssignmentRecord {
     const at = this.o.now();
     const record: AssignmentRecord = {
       id: this.o.newId(),
-      dossier: o.dossier,
+      toilProject: o.toilProject,
       item: o.item.id,
       itemTitle: o.item.title,
       mode: o.mode,
@@ -523,7 +523,7 @@ export class AssignmentQueue {
 
   private mutable(id: string): AssignmentRecord {
     const r = this.records.get(id);
-    if (!r) throw new AssignError(`There is no assignment ${id}.`, 'Open the Agents sidebar on the dossier to see its assignments.', 404);
+    if (!r) throw new AssignError(`There is no assignment ${id}.`, 'Open the Agents sidebar on the Toil project to see its assignments.', 404);
     return r;
   }
 
@@ -538,7 +538,7 @@ export class AssignmentQueue {
       seq: ++this.seq,
       at: this.o.now(),
       id: r.id,
-      dossier: r.dossier,
+      toilProject: r.toilProject,
       item: r.item,
       kind,
       state: r.state,
@@ -603,7 +603,7 @@ export class AssignmentQueue {
     this.note(r, 'note', `Started on ${r.adapter ? ADAPTER_NAME[r.adapter] : 'no adapter'}, with a time limit of ${timeLimitMinutes} minutes.`);
     this.save(r, 'state', previous, 'Working.');
     try {
-      const item = this.item(r.dossier, r.item);
+      const item = this.item(r.toilProject, r.item);
       const result = await this.o.runner.run({ assignment: this.summary(r), item, signal: controller.signal, record: (e) => this.note(r, e.kind, e.title, e.detail), started: (on) => void ((r.startedOn = on), this.o.keeper.save(r)) });
       if (controller.signal.aborted) throw controller.signal.reason;
       r.report = result.report;

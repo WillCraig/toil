@@ -20,7 +20,7 @@ import { THEMES, themeNamed } from '../src/themes.ts';
  * animation. When both animate one element, Chrome can't run either on the
  * compositor and moves both to the main thread, which is how Crate's splash
  * dropped frames. This plays every arrival every theme has (the splash, each
- * event moment, the dossier entrance and a tab change) and fails if the
+ * event moment, the toil project entrance and a tab change) and fails if the
  * element it lands on carries a loop, or is matched by any rule in the app's
  * or the theme's stylesheets that starts an animation; and it fails if a
  * looping part of the splash or a loader is matched by more than its one rule.
@@ -198,7 +198,7 @@ describe('one animation to an element (#451)', () => {
       </ThemeProvider>
     );
     // With no data, and on a sprint's day (#462), when a face rides in the holder that arrives.
-    for (const [where, data] of [['the splash', null], ["the splash on a sprint's day", { dossier: 'card-payments', day: 7, days: 10, done: 4 }]] as const) {
+    for (const [where, data] of [['the splash', null], ["the splash on a sprint's day", { toilProject: 'card-payments', day: 7, days: 10, done: 4 }]] as const) {
       let shown: HTMLElement[] = [];
       check(where, await arrivals(async () => {
         const r = render(wrap(<Splash ready={false} data={data} preview />));
@@ -236,13 +236,13 @@ describe('one animation to an element (#451)', () => {
     }, probe));
     vi.useRealTimers();
 
-    // The dossier entrance, then a tab change.
-    window.history.replaceState(null, '', `/?theme=${name}#/dossier/card-payments`);
-    check('the dossier entrance and a tab change', await arrivals(async () => {
+    // The toil project entrance, then a tab change.
+    window.history.replaceState(null, '', `/?theme=${name}#/project/card-payments`);
+    check('the Toil project entrance and a tab change', await arrivals(async () => {
       render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
       await screen.findByRole('heading', { level: 1 });
       await act(async () => {
-        window.location.hash = '#/dossier/card-payments/board';
+        window.location.hash = '#/project/card-payments/board';
         await new Promise((r) => setTimeout(r, 50));
       });
     }, probe));

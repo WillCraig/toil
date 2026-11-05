@@ -3,7 +3,7 @@ job: review
 description: Review someone else's pull request as the reviewer, reading it and its checks, running toil's checks on the branch, holding it to the repository's stated principles, drafting inline findings and posting them only on a yes. Use for "review this PR".
 role: reviewer
 needs: {"any": ["github", "bitbucket", "ado"], "optional": ["sonar"]}
-inputs: [{"name": "pr", "dossier": false}, {"name": "repository", "dossier": true}, {"name": "connection", "dossier": true}]
+inputs: [{"name": "pr", "toilProject": false}, {"name": "repository", "toilProject": true}, {"name": "connection", "toilProject": true}]
 writes: ["github pr comment-inline", "github pr comment", "github pr request-changes", "github pr reply", "github pr resolve", "bitbucket pr comment-inline", "bitbucket pr comment", "bitbucket pr needs-work", "bitbucket pr reply", "bitbucket pr resolve", "ado pr comment-inline", "ado pr comment", "ado pr wait-for-author", "ado pr reply", "ado pr resolve"]
 loop: none
 verification: unit

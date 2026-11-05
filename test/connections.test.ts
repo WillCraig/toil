@@ -129,7 +129,7 @@ describe('toil connections add', () => {
     expect(store.entries.get('corp-demo.token')).toBe(SECRET);
     expect(store.log).toEqual(['set corp-demo.token', 'get corp-demo.token']);
     expect(readConfig()).toEqual({
-      version: 3,
+      version: 4,
       connections: { 'corp-demo': { area: 'demo', baseUrl: 'https://jira.imagile.dev', token: 'keychain:corp-demo.token' } },
       defaults: { demo: { connection: 'corp-demo' } },
     });
@@ -228,7 +228,7 @@ describe('toil connections add', () => {
     });
     await cli(['connections', 'add', 'second', '--area', 'demo'], context({ prompt: terminal({ token: SECRET }).prompt, secrets: fakeStore() }));
     expect(readConfig()).toEqual({
-      version: 3,
+      version: 4,
       $schema: 'https://imagile-dev.github.io/toil/config.schema.json',
       futureKey: { kept: true },
       connections: {
@@ -243,7 +243,7 @@ describe('toil connections add', () => {
     writeConfig({ demo: { baseUrl: 'https://v1.imagile.dev', token: 'plain', writes: true } });
     await cli(['connections', 'add', 'reporting', '--area', 'warehouse'], context({ prompt: terminal({ host: 'h', username: 'u', password: 'p' }).prompt, secrets: fakeStore() }));
     expect(readConfig()).toEqual({
-      version: 3,
+      version: 4,
       connections: {
         demo: { area: 'demo', baseUrl: 'https://v1.imagile.dev', token: 'plain', writes: true },
         reporting: { area: 'warehouse', host: 'h', username: 'u', password: 'keychain:reporting.password' },
@@ -347,7 +347,7 @@ describe('toil connections remove', () => {
     const store = fakeStore({ entries: { 'a.token': 'x', 'b.token': 'y' }, onDelete: () => seenAtDelete.push(readFileSync(file, 'utf8')) });
     const run = await cli(['connections', 'remove', 'a'], context({ secrets: store }));
     expect(run.envelope).toMatchObject({ ok: true, data: { name: 'a', deletedFromStore: ['a.token'] } });
-    expect(readConfig()).toEqual({ version: 3, connections: { b: { area: 'demo', token: 'keychain:b.token' } }, defaults: { demo: { pageSize: 5 } } });
+    expect(readConfig()).toEqual({ version: 4, connections: { b: { area: 'demo', token: 'keychain:b.token' } }, defaults: { demo: { pageSize: 5 } } });
     expect(seenAtDelete[0]).not.toContain('"a"');
     expect([...store.entries.keys()]).toEqual(['b.token']);
   });
@@ -599,7 +599,7 @@ describe('pasting a secret at a real terminal prompt (#358)', () => {
 describe('toil connections migrate', () => {
   const cloud = { area: 'jira-cloud', baseUrl: 'https://imagile-cloud.imagile.dev', email: 'you@example.com', token: 'keychain:imagile-cloud.token' };
 
-  it('saves a version 2 file as version 3 with jira-cloud folded into jira, and reports names and keys only', async () => {
+  it('saves a version 2 file as the current version with jira-cloud folded into jira, and reports names and keys only', async () => {
     writeConfig({ version: 2, connections: { 'imagile-cloud': cloud }, defaults: { 'jira-cloud': { connection: 'imagile-cloud', project: 'ABC' } }, theme: 'plain' });
     const run = await cli(['connections', 'migrate'], context());
     expect(run.envelope).toMatchObject({
@@ -607,13 +607,13 @@ describe('toil connections migrate', () => {
       data: {
         written: true,
         fromVersion: 2,
-        toVersion: 3,
+        toVersion: 4,
         folded: [{ connection: 'imagile-cloud', from: 'jira-cloud', to: 'jira', deployment: 'cloud' }],
         defaultsMoved: [{ from: 'jira-cloud', to: 'jira', keys: ['connection', 'project'] }],
         setAside: [],
       },
     });
-    expect(readConfig()).toMatchObject({ version: 3, theme: 'plain', connections: { 'imagile-cloud': { area: 'jira', deployment: 'cloud', token: 'keychain:imagile-cloud.token' } } });
+    expect(readConfig()).toMatchObject({ version: 4, theme: 'plain', connections: { 'imagile-cloud': { area: 'jira', deployment: 'cloud', token: 'keychain:imagile-cloud.token' } } });
     expect(readConfig().defaults['jira-cloud']).toBeUndefined();
     // Nothing secret, and no value of any setting: the reference stays in the file, not in the output.
     expect(run.stdout).not.toContain('keychain:');
@@ -634,11 +634,11 @@ describe('toil connections migrate', () => {
   });
 
   it('leaves a current file untouched, byte for byte, and says so', async () => {
-    const current = '{"version":3,"connections":{"corp-demo":{"area":"demo","token":"keychain:corp-demo.token"}},"defaults":{"demo":{"connection":"corp-demo"}}}';
+    const current = '{"version":4,"connections":{"corp-demo":{"area":"demo","token":"keychain:corp-demo.token"}},"defaults":{"demo":{"connection":"corp-demo"}}}';
     mkdirSync(join(home, '.toil'), { recursive: true });
     writeFileSync(file, current);
     const run = await cli(['connections', 'migrate'], context());
-    expect(run.envelope).toMatchObject({ ok: true, data: { written: false, fromVersion: 3, toVersion: 3 } });
+    expect(run.envelope).toMatchObject({ ok: true, data: { written: false, fromVersion: 4, toVersion: 4 } });
     expect((run.envelope?.data as { reason: string }).reason).toContain('nothing was written');
     expect(readFileSync(file, 'utf8')).toBe(current);
   });
@@ -646,8 +646,17 @@ describe('toil connections migrate', () => {
   it('saves an old version with nothing retired in it as the current version', async () => {
     writeConfig({ version: 2, connections: { 'corp-demo': { area: 'demo', token: 'keychain:corp-demo.token' } }, defaults: { demo: { connection: 'corp-demo' } } });
     const run = await cli(['connections', 'migrate'], context());
-    expect(run.envelope).toMatchObject({ ok: true, data: { written: true, fromVersion: 2, toVersion: 3, folded: [] } });
-    expect(readConfig().version).toBe(3);
+    expect(run.envelope).toMatchObject({ ok: true, data: { written: true, fromVersion: 2, toVersion: 4, folded: [] } });
+    expect(readConfig().version).toBe(4);
+  });
+
+  it('renames dossierPaths to projectPaths, in a version 4 file too, and says so by key name only', async () => {
+    writeConfig({ version: 4, connections: {}, defaults: {}, dossierPaths: ['/shared/toil-projects'] });
+    const run = await cli(['connections', 'migrate'], context());
+    expect(run.envelope).toMatchObject({ ok: true, data: { written: true, fromVersion: 4, toVersion: 4, renamedKeys: [{ from: 'dossierPaths', to: 'projectPaths' }] } });
+    expect(readConfig()).toEqual({ version: 4, connections: {}, defaults: {}, projectPaths: ['/shared/toil-projects'] });
+    const again = await cli(['connections', 'migrate'], context());
+    expect(again.envelope).toMatchObject({ ok: true, data: { written: false, renamedKeys: [] } });
   });
 
   it('writes nothing, and says so, when there is no config file', async () => {

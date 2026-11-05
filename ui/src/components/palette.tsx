@@ -1,7 +1,7 @@
 /**
  * The command palette and the shortcuts sheet (#416). Ctrl+K (⌘K on a Mac)
- * opens the palette from anywhere: it jumps to a dossier, a dossier's tab, an
- * item in any dossier, a saved analysis, a settings page or a theme, and runs
+ * opens the palette from anywhere: it jumps to a toil project, a toil project's tab, an
+ * item in any toil project, a saved analysis, a settings page or a theme, and runs
  * Sync, Ask, Analyze, assign the focused item to an agent, and the choice of
  * agent for the chat. `?` opens the sheet, drawn from the shortcut table
  * (src/shortcuts.ts). Both stay out of sight until called up.
@@ -10,7 +10,7 @@
  * the highlighted result while focus stays in the search field, and the
  * matching is our own (src/fuzzy.ts). Items are searched in what the App has
  * read, which the local app answers from its cache: the palette makes no live
- * call. A result from a dossier whose last sync is old says how old. A
+ * call. A result from a toil project whose last sync is old says how old. A
  * switchboard, without the hold music.
  */
 
@@ -20,31 +20,31 @@ import type { AdapterList, Agent } from '../agent.ts';
 import type { AnalysesApi } from '../analyses.ts';
 import type { Route } from '../App.tsx';
 import { sendCommand, type UiCommand } from '../commands.ts';
-import { analysisHref, dateTime, dossierHref, itemHref, shortKey, STATUS_CATEGORY_LABEL, dossierEditHref } from '../format.ts';
+import { analysisHref, dateTime, toilProjectHref, itemHref, shortKey, STATUS_CATEGORY_LABEL, toilProjectEditHref } from '../format.ts';
 import { fuzzyRank } from '../fuzzy.ts';
-import type { DossierData } from '../load.ts';
+import type { ToilProjectData } from '../load.ts';
 import type { AnalysisSummary } from '../model/analysis.ts';
 import { keyLabel, SHORTCUTS, type Shortcut } from '../shortcuts.ts';
-import { DOSSIER_TABS } from '../views/DossierShell.tsx';
+import { TOIL_PROJECT_TABS } from '../views/ToilProjectShell.tsx';
 import { FACE } from '../model/jobs.ts';
 import { jobHref } from './jobs.tsx';
 import { setPlain, usePlain } from '../plain-words.ts';
-import type { SyncedAt } from '../views/Dossiers.tsx';
+import type { SyncedAt } from '../views/ToilProjects.tsx';
 import { SETTINGS_PAGES } from '../views/Settings.tsx';
 import { Help } from './help.tsx';
 import './palette.css';
 
-export type PaletteGroup = 'commands' | 'dossiers' | 'tabs' | 'items' | 'analyses' | 'settings' | 'themes';
+export type PaletteGroup = 'commands' | 'toilProjects' | 'tabs' | 'items' | 'analyses' | 'settings' | 'themes';
 
-const GROUP_LABEL: Record<PaletteGroup, string> = { commands: 'Commands', dossiers: 'Dossiers', tabs: 'Tabs', items: 'Items', analyses: 'Analyses', settings: 'Settings', themes: 'Themes' };
+const GROUP_LABEL: Record<PaletteGroup, string> = { commands: 'Commands', toilProjects: 'Toil projects', tabs: 'Tabs', items: 'Items', analyses: 'Analyses', settings: 'Settings', themes: 'Themes' };
 /** The groups plain words (src/plain-words.ts) renames. */
-const PLAIN_GROUP_LABEL: Partial<Record<PaletteGroup, string>> = { dossiers: 'Toil projects', tabs: 'Pages', analyses: 'Past briefings' };
+const PLAIN_GROUP_LABEL: Partial<Record<PaletteGroup, string>> = { toilProjects: 'Toil projects', tabs: 'Pages', analyses: 'Past briefings' };
 /** The order with nothing typed. With a query, the groups go in the order of their best match. */
-const GROUP_ORDER: PaletteGroup[] = ['commands', 'dossiers', 'tabs', 'items', 'analyses', 'settings', 'themes'];
+const GROUP_ORDER: PaletteGroup[] = ['commands', 'toilProjects', 'tabs', 'items', 'analyses', 'settings', 'themes'];
 /** The most results a group shows for a query: enough to choose from, few enough to read. */
-const GROUP_CAP: Record<PaletteGroup, number> = { commands: 8, dossiers: 8, tabs: 10, items: 20, analyses: 8, settings: 8, themes: 12 };
+const GROUP_CAP: Record<PaletteGroup, number> = { commands: 8, toilProjects: 8, tabs: 10, items: 20, analyses: 8, settings: 8, themes: 12 };
 
-/** How old a dossier's cache may be before its results say how old. */
+/** How old a toil project's cache may be before its results say how old. */
 export const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 export interface PaletteEntry {
@@ -59,7 +59,7 @@ export interface PaletteEntry {
   go: { href: string } | { command: UiCommand } | { run: () => void };
 }
 
-type Loaded = { ok: true; value: DossierData } | { ok: false; message: string };
+type Loaded = { ok: true; value: ToilProjectData } | { ok: false; message: string };
 
 /** "3 days", "5 hours", "20 minutes". */
 export function ageText(ms: number): string {
@@ -71,7 +71,7 @@ export function ageText(ms: number): string {
   return `${days} days`;
 }
 
-/** What an item's result says after its dossier when the dossier's cache is stale: its age, or that its last sync failed. */
+/** What an item's result says after its toil project when the toil project's cache is stale: its age, or that its last sync failed. */
 export function staleNote(synced: SyncedAt | undefined, at: number): string | null {
   if (!synced) return null;
   const age = at - Date.parse(synced.at);
@@ -81,7 +81,7 @@ export function staleNote(synced: SyncedAt | undefined, at: number): string | nu
 
 export interface EntriesInput {
   route: Route;
-  dossiers: string[];
+  toilProjects: string[];
   loaded: Record<string, Loaded | undefined>;
   analyses: Record<string, AnalysisSummary[] | undefined>;
   synced: Record<string, SyncedAt> | undefined;
@@ -93,7 +93,7 @@ export interface EntriesInput {
   scheme: 'system' | 'light' | 'dark';
   setScheme: (scheme: 'system' | 'light' | 'dark') => void;
   onSync: (() => void) | undefined;
-  /** The item the focus was on when the palette opened, in the dossier on screen. */
+  /** The item the focus was on when the palette opened, in the toil project on screen. */
   focused: string | null;
   canAssign: boolean;
   adapters: AdapterList | null;
@@ -107,12 +107,12 @@ export interface EntriesInput {
 export function paletteEntries(x: EntriesInput): PaletteEntry[] {
   const pw = (standard: string, plain: string) => (x.plain ? plain : standard);
   const out: PaletteEntry[] = [];
-  const here = x.route.view === 'dossiers' || x.route.view === 'settings' ? null : x.route.dossier;
+  const here = x.route.view === 'toilProjects' || x.route.view === 'settings' ? null : x.route.toilProject;
   const current = here ? x.loaded[here] : undefined;
-  if (x.onSync) out.push({ id: 'cmd:sync', group: 'commands', label: 'Sync now', detail: 'Read every dossier through toil into the cache', go: { run: x.onSync } });
+  if (x.onSync) out.push({ id: 'cmd:sync', group: 'commands', label: 'Sync now', detail: 'Read every Toil project through toil into the cache', go: { run: x.onSync } });
   if (here && current?.ok) {
     out.push({ id: 'cmd:ask', group: 'commands', label: `Ask about ${here}`, detail: 'Focus the Ask bar', go: { command: { kind: 'ask' } } });
-    out.push({ id: 'cmd:analyze', group: 'commands', label: pw(`Analyze ${here}`, `Get a briefing on ${here}`), detail: pw("The agent's pulse check of the dossier", "An AI helper writes a briefing of what needs attention"), go: { command: { kind: 'analyze' } } });
+    out.push({ id: 'cmd:analyze', group: 'commands', label: pw(`Analyze ${here}`, `Get a briefing on ${here}`), detail: pw("The agent's pulse check of the Toil project", "An AI helper writes a briefing of what needs attention"), go: { command: { kind: 'analyze' } } });
     out.push({ id: 'cmd:agents', group: 'commands', label: pw('Open the Agents panel', 'Open the AI helpers panel'), detail: pw('Assignments, the inbox and limits', 'What the AI helpers are doing, and what waits on you'), text: 'agents ai helpers assignments inbox', go: { command: { kind: 'agents' } } });
     // The workflow jobs (#532): each opens its own page, which says what it needs and has the Run button.
     out.push({ id: 'cmd:job:review', group: 'commands', label: pw('Review a pull request', 'Check a code change'), detail: FACE.review.gist, text: 'review pull request code review job', go: { href: jobHref(here, 'review') } });
@@ -127,18 +127,18 @@ export function paletteEntries(x: EntriesInput): PaletteEntry[] {
     }
   }
   if (x.agentSettings) out.push({ id: 'cmd:agent-default', group: 'commands', label: 'Choose the default agent', detail: 'Settings, Agent', go: { href: '#/settings/agent' } });
-  out.push({ id: 'cmd:plain-words', group: 'commands', label: pw('Use plain words', "Use toil's own terms"), detail: pw('Everyday words for tabs and headings', 'Dossier, pull request, agent'), text: 'plain words everyday terms jargon', go: { run: () => setPlain(!x.plain) } });
+  out.push({ id: 'cmd:plain-words', group: 'commands', label: pw('Use plain words', "Use toil's own terms"), detail: pw('Everyday words for tabs and headings', 'Pull request, agent'), text: 'plain words everyday terms jargon', go: { run: () => setPlain(!x.plain) } });
   out.push({ id: 'cmd:shortcuts', group: 'commands', label: 'Keyboard shortcuts', detail: `Press ${SHORTCUTS.shortcuts.keys.join('')} anywhere`, go: { run: x.openShortcuts } });
 
-  out.push({ id: 'dossier:*', group: 'dossiers', label: pw('All dossiers', 'All Toil projects'), go: { href: '#/' } });
-  for (const d of x.dossiers) out.push({ id: `dossier:${d}`, group: 'dossiers', label: d, go: { href: dossierHref(d) } });
-  for (const d of x.dossiers) {
+  out.push({ id: 'toilProject:*', group: 'toilProjects', label: 'All Toil projects', go: { href: '#/' } });
+  for (const d of x.toilProjects) out.push({ id: `toilProject:${d}`, group: 'toilProjects', label: d, go: { href: toilProjectHref(d) } });
+  for (const d of x.toilProjects) {
     // With plain words on, a tab is found by either name: its plain label shows, and its own term still matches a search.
-    for (const t of DOSSIER_TABS) out.push({ id: `tab:${d}:${t.id}`, group: 'tabs', label: pw(t.label, t.plain), detail: d, text: `${pw(t.label, t.plain)} ${t.label} ${d}`, go: { href: t.href(d) } });
+    for (const t of TOIL_PROJECT_TABS) out.push({ id: `tab:${d}:${t.id}`, group: 'tabs', label: pw(t.label, t.plain), detail: d, text: `${pw(t.label, t.plain)} ${t.label} ${d}`, go: { href: t.href(d) } });
     // How Analyze briefs it (#494): its page in Settings, one more way in.
-    out.push({ id: `settings:analyze:${d}`, group: 'settings', label: 'How Analyze briefs it', detail: d, text: `analyze settings ${d}`, go: { href: dossierEditHref(d, 'analyze') } });
+    out.push({ id: `settings:analyze:${d}`, group: 'settings', label: 'How Analyze briefs it', detail: d, text: `analyze settings ${d}`, go: { href: toilProjectEditHref(d, 'analyze') } });
   }
-  for (const d of x.dossiers) {
+  for (const d of x.toilProjects) {
     const l = x.loaded[d];
     if (!l?.ok) continue;
     const stale = staleNote(x.synced?.[d], x.at);
@@ -147,7 +147,7 @@ export function paletteEntries(x: EntriesInput): PaletteEntry[] {
       out.push({ id: `item:${d}:${i.id}`, group: 'items', label: `${shortKey(i)} ${i.title}`, detail: [d, status, stale].filter(Boolean).join(' · '), go: { href: itemHref(d, i.id) } });
     }
   }
-  for (const d of x.dossiers) {
+  for (const d of x.toilProjects) {
     for (const a of x.analyses[d] ?? []) {
       out.push({ id: `analysis:${d}:${a.id}`, group: 'analyses', label: `Analysis of ${d}, ${dateTime(a.at)}`, ...(a.recommendation ? { detail: a.recommendation } : {}), text: `analysis ${d} ${dateTime(a.at)} ${a.recommendation ?? ''}`, go: { href: analysisHref(d, a.id) } });
     }
@@ -160,8 +160,8 @@ export function paletteEntries(x: EntriesInput): PaletteEntry[] {
 
 /**
  * What the palette shows for a query, group by group. With nothing typed: the
- * commands, the dossiers, the tabs of the dossier on screen, settings and
- * themes, since every item of every dossier is too many to read. With a
+ * commands, the toil projects, the tabs of the toil project on screen, settings and
+ * themes, since every item of every toil project is too many to read. With a
  * query: everything that matches, best first in each group, and the group
  * with the best match first.
  */
@@ -187,7 +187,7 @@ export interface CommandPaletteProps extends Omit<EntriesInput, 'analyses' | 'ad
   onOpenChange: (open: boolean) => void;
   agent: Agent;
   analysesApi: AnalysesApi;
-  /** Dossiers still being read from the cache for the item search. */
+  /** Toil projects still being read from the cache for the item search. */
   reading: number;
 }
 
@@ -197,8 +197,8 @@ export function CommandPalette({ isOpen, onOpenChange, agent, analysesApi, readi
   const [analyses, setAnalyses] = useState<Record<string, AnalysisSummary[]>>({});
   // The wall clock when it opened, for how old a cache is: the App's own clock is when its data was read.
   const [at, setAt] = useState(0);
-  const names = input.dossiers.join('\n');
-  const here = input.route.view === 'dossiers' || input.route.view === 'settings' ? null : input.route.dossier;
+  const names = input.toilProjects.join('\n');
+  const here = input.route.view === 'toilProjects' || input.route.view === 'settings' ? null : input.route.toilProject;
 
   // Each time it opens: the adapters and the saved analyses, both read from what the server already has.
   useEffect(() => {
@@ -213,7 +213,7 @@ export function CommandPalette({ isOpen, onOpenChange, agent, analysesApi, readi
   }, [isOpen, agent, analysesApi, names, here]);
 
   // Built on each render while it's open, which is cheap next to a keystroke (a few hundred entries), and not at all
-  // while it's closed: the App re-renders often (a streaming answer), and every item of every dossier is a lot to list for nothing.
+  // while it's closed: the App re-renders often (a streaming answer), and every item of every toil project is a lot to list for nothing.
   const plain = usePlain();
   const entries = isOpen ? paletteEntries({ ...input, analyses, adapters, at, plain: plain.on }) : [];
   const results = paletteResults(entries, query, here);
@@ -241,10 +241,10 @@ export function CommandPalette({ isOpen, onOpenChange, agent, analysesApi, readi
         <Dialog className="palette" aria-label="Command palette" data-palette="">
           <Autocomplete inputValue={query} onInputChange={setQuery}>
             <SearchField className="palette__search" aria-label="Jump to or run" autoFocus>
-              <Input className="palette__input" placeholder={plain.pw('Jump to a dossier, tab, item or setting, or run a command', 'Jump to a Toil project, page, item or setting, or run a command')} data-palette-input="" />
+              <Input className="palette__input" placeholder={plain.pw('Jump to a Toil project, tab, item or setting, or run a command', 'Jump to a Toil project, page, item or setting, or run a command')} data-palette-input="" />
             </SearchField>
             <p className="palette__status note" role="status">
-              {reading > 0 ? `Reading ${reading} more ${reading === 1 ? 'dossier' : 'dossiers'} from the cache for the item search…` : !query.trim() ? 'Type a key or a title to search the items of every dossier.' : ''}
+              {reading > 0 ? `Reading ${reading} more ${reading === 1 ? 'Toil project' : 'Toil projects'} from the cache for the item search…` : !query.trim() ? 'Type a key or a title to search the items of every Toil project.' : ''}
             </p>
             <Menu className="palette__list" aria-label="Results" onAction={(k) => choose(String(k))} renderEmptyState={() => <p className="palette__empty">Nothing matches “{query.trim()}”.</p>}>
               {results.map((g) => (

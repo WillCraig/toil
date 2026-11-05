@@ -115,7 +115,7 @@ describe('what waits on you, for the AI helpers button', () => {
 });
 
 describe('the usage line', () => {
-  const rec = (plan: boolean): UsageRecord => ({ id: 'a', chatId: 'c', turn: 1, dossier: 'd', adapter: 'claude', model: 'm', inputTokens: 1, outputTokens: 1, costUsd: 0.04, costSource: 'sdk-estimate', plan, at: '2026-01-01T00:00:00Z' }) as unknown as UsageRecord;
+  const rec = (plan: boolean): UsageRecord => ({ id: 'a', chatId: 'c', turn: 1, toilProject: 'd', adapter: 'claude', model: 'm', inputTokens: 1, outputTokens: 1, costUsd: 0.04, costSource: 'sdk-estimate', plan, at: '2026-01-01T00:00:00Z' }) as unknown as UsageRecord;
 
   it('says estimate by default, and not billed on a plan', () => {
     expect(usageSummary([rec(false)])).toBe('about $0.04 of usage (estimate)');

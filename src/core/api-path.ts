@@ -16,7 +16,7 @@ import { ToilError } from './errors.js';
  * already encoded, for the rare value that is itself a fragment of path.
  *
  * Context inputs that land in a path also get `pathIdSchema()`, so a value
- * with path syntax in it is refused when it arrives (a flag, the dossier, an
+ * with path syntax in it is refused when it arrives (a flag, the toil project, an
  * env var, a git remote) rather than encoded into a name nobody has. The
  * request layer backs both up (src/core/rest.ts). One id, one segment, one
  * resource: the filing system's oldest rule, now enforced.
@@ -70,7 +70,7 @@ export const PATH_ID = /^[^/\\?#%\u0000-\u001f\u007f]*$/;
 /**
  * A context input or id that is put into a request path as one segment. It
  * refuses the characters that would be path or query syntax there, so the
- * value is checked however it arrived (core validates dossier, env, git and
+ * value is checked however it arrived (core validates toil project, env, git and
  * setting values against the same schema). Empty is allowed, so a command's
  * own "could not determine" error still words a missing value.
  */

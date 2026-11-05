@@ -11,7 +11,7 @@ import { Card, DataTable } from '../components/layout.tsx';
 import { EditLink } from '../components/help.tsx';
 import { useData, useDerived } from '../data.ts';
 import { Empty, EmptyButton, EmptyLink } from '../components/empty.tsx';
-import { STATUS_CATEGORY_LABEL, connectionEditHref, dateTime, dossierEditHref, dossierHref, estimateText, personText, shortKey, sourceLabel } from '../format.ts';
+import { STATUS_CATEGORY_LABEL, connectionEditHref, dateTime, toilProjectEditHref, toilProjectHref, estimateText, personText, shortKey, sourceLabel } from '../format.ts';
 import { possibleDuplicates } from '../model/duplicates.ts';
 import { age, cycleTime } from '../model/flow.ts';
 import { INSIGHT_LABEL, insights } from '../model/insights.ts';
@@ -30,7 +30,7 @@ const LINK_WORD: Record<string, [string, string]> = {
 };
 
 export function ItemView({ id }: { id: string }) {
-  const { byId, dossier, now, sync } = useData();
+  const { byId, toilProject, now, sync } = useData();
   const theme = useTheme();
   const term = useTerm();
   const plain = usePlain();
@@ -40,19 +40,19 @@ export function ItemView({ id }: { id: string }) {
     return (
       <>
         <h1 tabIndex={-1}>No such item</h1>
-        <Empty message={`The dossier has no item ${id}.`} action={<EmptyLink href={dossierHref(dossier.name)}>Back to {dossier.name}</EmptyLink>} />
+        <Empty message={`The Toil project has no item ${id}.`} action={<EmptyLink href={toilProjectHref(toilProject.name)}>Back to {toilProject.name}</EmptyLink>} />
       </>
     );
   }
-  const mine = dossier.changes.filter((c) => c.items.includes(id));
-  const deployedTo = dossier.deployments.filter((d) => d.items.includes(id));
+  const mine = toilProject.changes.filter((c) => c.items.includes(id));
+  const deployedTo = toilProject.deployments.filter((d) => d.items.includes(id));
   const e = entry(item);
   const source = sourceLabel(item.source.area);
   const found = insights(item, prepared);
   const cycle = cycleTime(item);
   const inProgress = age(item, now);
   const round1 = (n: number) => Math.round(n * 10) / 10;
-  const duplicates = possibleDuplicates(dossier.items, id);
+  const duplicates = possibleDuplicates(toilProject.items, id);
 
   return (
     <>
@@ -115,7 +115,7 @@ export function ItemView({ id }: { id: string }) {
             ))}
           </ul>
         ) : (
-          <p>None in {dossier.name}: no item shares enough words with this one.</p>
+          <p>None in {toilProject.name}: no item shares enough words with this one.</p>
         )}
         <p className="note">
           By shared words in titles and bodies, title trigrams, labels, parent and links, as <code>toil util owi similar</code> scores them: not by meaning, so a duplicate written in other words isn't found.
@@ -126,7 +126,7 @@ export function ItemView({ id }: { id: string }) {
         <section aria-labelledby="fields">
           <div className="edit-head">
             <h2 id="fields">Fields</h2>
-            <EditLink href={dossierEditHref(dossier.name, 'fields')} label={`Edit ${dossier.name}'s field names`} />
+            <EditLink href={toilProjectEditHref(toilProject.name, 'fields')} label={`Edit ${toilProject.name}'s field names`} />
           </div>
           <dl className="fields">
             <dt>Source</dt>
@@ -235,7 +235,7 @@ export function ItemView({ id }: { id: string }) {
               ))}
             </ul>
           ) : (
-            <p>Not deployed anywhere the dossier names.</p>
+            <p>Not deployed anywhere the Toil project names.</p>
           )}
         </section>
 

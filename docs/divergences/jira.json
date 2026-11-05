@@ -63,7 +63,7 @@
     {
       "allows": [],
       "old": "Issue keys, board ids, sprint ids, issue type ids and project keys put into request paths as typed, so an id with path syntax in it (issue get PROJ-1/comment sends GET /rest/api/2/issue/PROJ-1/comment) names a different resource (#70)",
-      "toil": "Each id is encoded as one path segment (PROJ-1/comment is sent as PROJ-1%2Fcomment), and one that is a . or .. segment once encoded slashes split it (x/../y) is refused with INVALID_INPUT by core's requests.path bound. The project context input (--project, the connection's project setting, a dossier or \"project\" in --input-file) is refused with INVALID_INPUT if it holds /, \\, ?, #, % or a control character, which a Jira project key never does. Plain keys and ids are sent unchanged",
+      "toil": "Each id is encoded as one path segment (PROJ-1/comment is sent as PROJ-1%2Fcomment), and one that is a . or .. segment once encoded slashes split it (x/../y) is refused with INVALID_INPUT by core's requests.path bound. The project context input (--project, the connection's project setting, a toil project or \"project\" in --input-file) is refused with INVALID_INPUT if it holds /, \\, ?, #, % or a control character, which a Jira project key never does. Plain keys and ids are sent unchanged",
       "why": "The write gate approves the command a caller asked for; an id must name the one resource that command is about, not another endpoint. An agent can be handed such an id by text in the content it reads.",
       "principle": "2"
     },

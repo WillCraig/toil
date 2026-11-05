@@ -34,12 +34,12 @@ function recording(reply: (prompt: string) => Answer = (p) => answer(p), extra: 
   return { agent, asked };
 }
 
-async function openChat(agent: Agent, dossier = 'card-payments', preview = true) {
-  window.location.hash = `#/dossier/${dossier}`;
+async function openChat(agent: Agent, toilProject = 'card-payments', preview = true) {
+  window.location.hash = `#/project/${toilProject}`;
   render(<App execute={fixtureExecute().execute} agent={agent} now={FIXTURE_NOW} preview={preview} />);
   await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
   await userEvent.click(screen.getByRole('textbox', { name: 'Your question' }));
-  return screen.findByRole('dialog', { name: `Ask about ${dossier}` });
+  return screen.findByRole('dialog', { name: `Ask about ${toilProject}` });
 }
 
 beforeEach(() => {
@@ -96,7 +96,7 @@ describe('the guided start', () => {
 
   it('still lets the command palette run Analyze', async () => {
     const { agent, asked } = recording(() => answer('Analyze'));
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     render(<App execute={fixtureExecute().execute} agent={agent} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
     await act(async () => {
@@ -106,12 +106,12 @@ describe('the guided start', () => {
     await waitFor(() => expect(asked).toEqual(['analyze']));
   });
 
-  it("wears toil's own words with plain words off: the same questions, a dossier named as one", async () => {
+  it("wears toil's own words with plain words off: the same questions, a Toil project named as one", async () => {
     setPlain(false);
     const chat = await openChat(scriptedAgent());
     expect(within(chat).getAllByRole('group', { name: 'Starter questions' })[0]!.querySelectorAll('button')).toHaveLength(9);
     await userEvent.click(within(chat).getByRole('button', { name: 'What AI can see' }));
-    expect(within(chat).getByText("This dossier's saved work:")).toBeTruthy();
+    expect(within(chat).getByText("This Toil project's saved work:")).toBeTruthy();
   });
 });
 
@@ -193,7 +193,7 @@ describe('"How sure is this?"', () => {
   it('is Low when a read failed, naming the panel, only for the questions that need it', async () => {
     const failing = fixtureExecute();
     const execute: typeof failing.execute = async (command, input, ...rest) => (command === 'jenkins build list' || command === 'github workflow-run list' ? { ok: false, data: null, error: { code: 'NETWORK', message: 'down', fix: 'retry' }, meta: { command, durationMs: 0, version: 'x', contractVersion: 1 } } : failing.execute(command, input, ...rest)) as never;
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     const { agent } = recording();
     render(<App execute={execute} agent={agent} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
@@ -266,7 +266,7 @@ describe('after an AI helper is installed (the notice must not outlive it)', () 
 
   it('drops the notice once a helper can answer, when the page moves, without a reload', async () => {
     const { agent, state } = changing();
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     render(<App execute={fixtureExecute().execute} agent={agent} now={FIXTURE_NOW} preview={false} />);
     await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
     // The person installs on the Settings page and comes back.

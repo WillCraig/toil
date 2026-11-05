@@ -44,7 +44,7 @@ export interface StubToil {
   removeAdo(id: number): void;
   /** Updates one Azure DevOps work item: its state and changed date. */
   touchAdo(id: number, state: string, at: string): void;
-  /** Adds an Azure DevOps work item to the settlement dossier: a copy of the first one, under a new id, with its revisions. */
+  /** Adds an Azure DevOps work item to the settlement toil project: a copy of the first one, under a new id, with its revisions. */
   addAdo(id: number): void;
   /** Renames the iteration path in every revision of every Azure DevOps work item, as renaming an iteration does in the tracker. */
   renameIteration(from: string, to: string): void;
@@ -73,7 +73,7 @@ export function stubToil(): StubToil {
   };
   const failing = new Set<string>();
   const find = (command: string, input: Rec) => canned.find((c) => c.command === command && inputKey(c.input) === inputKey(input));
-  const sameDossier = (command: string, input: Rec) => canned.find((c) => c.command === command && c.input.dossier === input.dossier);
+  const sameToilProject = (command: string, input: Rec) => canned.find((c) => c.command === command && c.input.toilProject === input.toilProject);
 
   // meta.context (the connection a call used) as the preview's fixture reports it, from the pristine canned call.
   const pristine = fixtureExecute();
@@ -83,8 +83,8 @@ export function stubToil(): StubToil {
     return real.meta.context ? ({ ...env, meta: { ...env.meta, context: real.meta.context } } as Envelope) : env;
   };
 
-  const adoChanged = (dossier: unknown) => {
-    const batch = canned.find((c) => c.command === 'ado work-item get-many' && c.input.dossier === dossier)!.data as { value: Array<{ id: number; fields: Rec }> };
+  const adoChanged = (toilProject: unknown) => {
+    const batch = canned.find((c) => c.command === 'ado work-item get-many' && c.input.toilProject === toilProject)!.data as { value: Array<{ id: number; fields: Rec }> };
     return new Map(batch.value.map((w) => [w.id, String(w.fields['System.ChangedDate'])]));
   };
 
@@ -112,7 +112,7 @@ export function stubToil(): StubToil {
     if (command === 'ado work-item search') {
       const hit = find(command, rest);
       if (!hit) return fail(command, 'INVALID_INPUT', `No canned ${command}.`, 'Add it.');
-      const changed = adoChanged(rest.dossier);
+      const changed = adoChanged(rest.toilProject);
       const data = hit.data as { workItems: Array<{ id: number }> };
       return ok(command, { ...data, workItems: data.workItems.filter((w) => since === null || Date.parse(changed.get(w.id) ?? '') >= since) });
     }
@@ -121,7 +121,7 @@ export function stubToil(): StubToil {
       return list ? ok(command, structuredClone(list)) : fail(command, 'NOT_FOUND', `No work item ${String(rest.id)}.`, 'Ask for an id the sample has.');
     }
     if (command === 'ado work-item feed') {
-      const ids = new Set(adoChanged(rest.dossier).keys());
+      const ids = new Set(adoChanged(rest.toilProject).keys());
       const feed = [...revisions].filter(([id]) => ids.has(id)).flatMap(([, list]) => list)
         .filter((r) => since === null || Date.parse(String((r.fields as Rec)['System.ChangedDate'])) > since)
         .map(feedOf)
@@ -131,7 +131,7 @@ export function stubToil(): StubToil {
     if (command === 'ado work-item get-many' || command === 'github issue get') {
       const exact = find(command, rest);
       if (exact) return ok(command, structuredClone(exact.data));
-      const whole = sameDossier(command, rest);
+      const whole = sameToilProject(command, rest);
       if (!whole) return fail(command, 'INVALID_INPUT', `No canned ${command}.`, 'Add it.');
       if (command === 'ado work-item get-many') {
         const ids = (rest.id as number[]).map(Number);
@@ -156,7 +156,7 @@ export function stubToil(): StubToil {
 
   const execute: SyncExecute = async (command, input, options) => {
     const rest = Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'updatedSince' && k !== 'cursor' && k !== 'fields'));
-    return context(find(command, rest) ?? sameDossier(command, rest), await answer(command, input, options));
+    return context(find(command, rest) ?? sameToilProject(command, rest), await answer(command, input, options));
   };
 
   return {
@@ -191,7 +191,7 @@ export function stubToil(): StubToil {
       }
     },
     addAdo(id) {
-      const of = (command: string) => canned.find((c) => c.command === command && c.input.dossier === 'settlement')!.data as Rec;
+      const of = (command: string) => canned.find((c) => c.command === command && c.input.toilProject === 'settlement')!.data as Rec;
       const search = of('ado work-item search') as { workItems: Rec[] };
       const many = of('ado work-item get-many') as { value: Array<{ id: number }>; count?: number };
       const template = many.value[0]!;

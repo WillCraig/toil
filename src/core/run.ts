@@ -7,7 +7,7 @@ import { connectionEnvName, connectionsOf, defaultConnectionName, envName } from
 import { IncompleteConnectionError } from './connection.js';
 import { refuseForDeployment } from './deployments.js';
 import type { CommandContext, Context } from './context.js';
-import type { Place } from './dossier.js';
+import type { Place } from './toil-project.js';
 import { CONTRACT_VERSION, failure, success, type ApiAnswer, type ContextReport, type Envelope, type LintReport, type Meta, type Page, type Warning } from './envelope.js';
 import { ToilError, toToilError } from './errors.js';
 import { instrumentFetch, type RequestLog } from './http.js';
@@ -42,6 +42,9 @@ export interface CallOptions {
   /** Who the call is made on behalf of (`assignment-<id>`), for the audit log. Checked by the front door. */
   actor?: string;
 }
+
+/** Input fields renamed in a release, so a call that still sends the old one is told the new one (contract version 3). */
+const RENAMED_FIELDS: Record<string, string> = { dossier: 'toilProject' };
 
 /**
  * Builds the context and runs the command, so a failure building the context
@@ -175,10 +178,10 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
   let lint: LintReport | undefined;
   let report: ContextReport | undefined;
   let exitCode: number | undefined;
-  // Reports the dossier once it has been consulted, which may be as late as the command's own run.
-  let reportDossier: (() => void) | undefined;
+  // Reports the toil project once it has been consulted, which may be as late as the command's own run.
+  let reportToilProject: (() => void) | undefined;
   const meta = (): Meta => {
-    reportDossier?.();
+    reportToilProject?.();
     const m: Meta = { command: commandName(def), durationMs: Math.round(performance.now() - started), version: ctx.version, contractVersion: CONTRACT_VERSION };
     if (ctx.verbose) m.requests = requests;
     if (warnings.length > 0) m.warnings = warnings;
@@ -246,8 +249,10 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
     const { input: own, query } = takeSelect(commandName(def), rawInput);
     const parsed = def.input.strict().safeParse(own ?? {});
     if (!parsed.success) {
+      // A field that was renamed gets its new name in the fix, not a pointer to --help that never mentions the old one.
+      const renamed = Object.entries(RENAMED_FIELDS).filter(([old]) => parsed.error.issues.some((i: z.core.$ZodIssue) => i.code === 'unrecognized_keys' && i.keys.includes(old)));
       throw new ToilError('INVALID_INPUT', `Invalid input for ${commandName(def)}: ${z.prettifyError(parsed.error)}`, {
-        fix: `Run toil ${commandName(def)} --help to see the expected arguments.`,
+        fix: `${renamed.map(([old, now]) => `The field "${old}" is now "${now}". `).join('')}Run toil ${commandName(def)} --help to see the expected arguments.`,
         details: parsed.error.issues,
       });
     }
@@ -278,39 +283,39 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
       typeof input.connection !== 'string' &&
       !Object.entries(def.area?.context ?? {}).some(([name, spec]) => spec?.selectsConnection && typeof input[name] === 'string');
     const unconfigured = optional && defaultConnectionName(ctx.config, areaOf(def)) === undefined && connectionsOf(ctx.config, areaOf(def)).length === 0;
-    // Where the call's dossier would come from, from its `dossier` and `cwd`
-    // (src/core/dossier.ts). Which one applies is settled only if the resolver
-    // reaches the dossier step, so a call that never does can't fail on one.
-    const place: Place | undefined = usesConnection(def) && ctx.dossiers ? ctx.dossiers.place({ dossier: input.dossier as string | undefined, cwd: input.cwd as string | undefined }) : undefined;
+    // Where the call's toil project would come from, from its `toilProject` and `cwd`
+    // (src/core/toil-project.ts). Which one applies is settled only if the resolver
+    // reaches the toil project step, so a call that never does can't fail on one.
+    const place: Place | undefined = usesConnection(def) && ctx.toilProjects ? ctx.toilProjects.place({ toilProject: input.toilProject as string | undefined, cwd: input.cwd as string | undefined }) : undefined;
     let warned = 0;
-    reportDossier = () => {
+    reportToilProject = () => {
       if (!place) return;
       const found = place.warnings();
       warnings.push(...found.slice(warned));
       warned = found.length;
       const used = place.report();
-      if (!used || partial.dossier) return;
+      if (!used || partial.toilProject) return;
       // First in meta.context, as it's where the rest came from.
       const rest = { ...partial };
       for (const key of Object.keys(partial) as Array<keyof ContextReport>) delete partial[key];
-      Object.assign(partial, { dossier: used }, rest);
+      Object.assign(partial, { toilProject: used }, rest);
     };
     let call: ResolvedCall | undefined;
     // An input that says everything a connection would (db lint's --engine) skips resolution entirely.
     const connectionless = optional && def.connectionlessWhen?.(input) === true;
     if (usesConnection(def) && !unconfigured && !connectionless) {
       try {
-        const dossier = ctx.dossiers ? place?.lookup : ctx.dossier;
+        const toilProject = ctx.toilProjects ? place?.lookup : ctx.toilProject;
         try {
           call = await Promise.race([
-            resolveCall(def, input, { config: ctx.config, secrets: ctx.secrets, dossier, gitRemote: place?.gitRemote ?? ctx.gitRemote }, (w) => warnings.push(w), controller.signal, partial, (own ?? {}) as Record<string, unknown>),
+            resolveCall(def, input, { config: ctx.config, secrets: ctx.secrets, toilProject, gitRemote: place?.gitRemote ?? ctx.gitRemote }, (w) => warnings.push(w), controller.signal, partial, (own ?? {}) as Record<string, unknown>),
             aborted,
           ]);
         } finally {
-          reportDossier();
+          reportToilProject();
           // Said even when resolution failed after choosing the connection (a required input missing).
           const chosen = partial.connection;
-          const host = chosen?.source === 'dossier' ? place?.hostFor(areaOf(def), input) : undefined;
+          const host = chosen?.source === 'toil-project' ? place?.hostFor(areaOf(def), input) : undefined;
           if (chosen && host) chosen.host = host;
         }
       } catch (err) {
@@ -333,17 +338,17 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
     // enforced rather than requested in a policy nobody reads.
     // The credential store and the prompter go only to commands that manage
     // connections, which get them through ctx.manage.
-    const rest: Omit<Context, 'config' | 'env' | 'secrets' | 'prompt' | 'dossiers' | 'dossier' | 'gitRemote' | 'adopted' | 'repo' | 'audit' | 'skillUpkeep' | 'progress'> & {
+    const rest: Omit<Context, 'config' | 'env' | 'secrets' | 'prompt' | 'toilProjects' | 'toilProject' | 'gitRemote' | 'adopted' | 'repo' | 'audit' | 'skillUpkeep' | 'progress'> & {
       progress?: unknown;
       skillUpkeep?: unknown;
       audit?: unknown;
       repo?: unknown;
-      dossiers?: unknown;
+      toilProjects?: unknown;
       config?: unknown;
       env?: unknown;
       secrets?: unknown;
       prompt?: unknown;
-      dossier?: unknown;
+      toilProject?: unknown;
       gitRemote?: unknown;
       adopted?: unknown;
     } = { ...ctx };
@@ -351,8 +356,8 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
     delete rest.env;
     delete rest.secrets;
     delete rest.prompt;
-    delete rest.dossiers;
-    delete rest.dossier;
+    delete rest.toilProjects;
+    delete rest.toilProject;
     delete rest.gitRemote;
     delete rest.adopted;
     delete rest.repo;
@@ -361,7 +366,7 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
     delete rest.progress;
     const resolved = call?.report ?? {};
     const adoptedHere = place ? place.adopted : ctx.adopted;
-    const context = writing && connection && !adoptedHere?.(areaOf(def), connection.name, 'dossier') ? guardTargets(def, call?.context ?? {}, resolved, via) : (call?.context ?? {});
+    const context = writing && connection && !adoptedHere?.(areaOf(def), connection.name, 'toil-project') ? guardTargets(def, call?.context ?? {}, resolved, via) : (call?.context ?? {});
     const commandCtx: CommandContext<Connection | undefined> = {
       ...rest,
       connection,
@@ -371,7 +376,7 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
         if (!def.area || !call) throw new Error(`${commandName(def)} has no context inputs to supply.`);
         return supplyContext(def.area, def, context, resolved, name, value, source);
       },
-      ...(managesConfig(def) ? { manage: { config: ctx.config, secrets: ctx.secrets, prompt: ctx.prompt, dossiers: ctx.dossiers, env: ctx.env, via, audit: ctx.audit } } : {}),
+      ...(managesConfig(def) ? { manage: { config: ctx.config, secrets: ctx.secrets, prompt: ctx.prompt, toilProjects: ctx.toilProjects, env: ctx.env, via, audit: ctx.audit } } : {}),
       signal: controller.signal,
       fetch: instrumentFetch(ctx.fetch, requests, controller.signal),
       // For a server-side cancel or a session close after the signal fired: logged, but not bound to it.
@@ -389,9 +394,9 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
       ...(ctx.git ? { git: { run: (call) => ctx.git!.run(call, controller.signal) } } : {}),
       // A call's `cwd` names the folder its repository is read from; otherwise the workspace's.
       repo: () => (place?.repo ?? ctx.repo)?.(),
-      dossierFields: () => (place && def.area ? place.fields(def.area.name, input) : {}),
-      dossierView: () => (place && def.area ? place.view(def.area.name) : undefined),
-      dossierTransitions: () => (place && def.area ? place.transitions(def.area.name, input) : {}),
+      toilProjectFields: () => (place && def.area ? place.fields(def.area.name, input) : {}),
+      toilProjectView: () => (place && def.area ? place.view(def.area.name) : undefined),
+      toilProjectTransitions: () => (place && def.area ? place.transitions(def.area.name, input) : {}),
       warn: (warning) => warnings.push(warning),
       setPage: (p) => (page = p),
       setResponse: (r) => (response = r),
@@ -402,10 +407,10 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
         exitCode = code;
       },
     };
-    // `dossier` and `cwd` choose context, which core has resolved; the command never needs them.
+    // `toilProject` and `cwd` choose context, which core has resolved; the command never needs them.
     const forRun = { ...(parsed.data as Record<string, unknown>) };
     if (usesConnection(def)) {
-      delete forRun.dossier;
+      delete forRun.toilProject;
       delete forRun.cwd;
     }
     const result = await Promise.race([withProgress(toListener, () => def.run(forRun, commandCtx)), aborted]);
@@ -462,14 +467,14 @@ function assertWritesAllowed(
     });
   }
   const area = areaOf(def);
-  // A connection the dossier or the git remote picked is a suggestion until
+  // A connection the toil project or the git remote picked is a suggestion until
   // the user adopts it. Reads may follow a suggestion; a write waits for a yes,
   // asked once, not inferred from where the terminal happens to be.
   const chosenBy = report?.connection?.source;
-  if (connection && (chosenBy === 'dossier' || chosenBy === 'git') && !adopted?.(area, connection.name, chosenBy)) {
-    const by = chosenBy === 'dossier' ? 'your dossier' : 'the git remote';
+  if (connection && (chosenBy === 'toil-project' || chosenBy === 'git') && !adopted?.(area, connection.name, chosenBy)) {
+    const by = chosenBy === 'toil-project' ? 'your toil project' : 'the git remote';
     throw new ToilError('WRITE_DISABLED', `${commandName(def)} changes data in ${area}, and connection ${connection.name} was chosen by ${by}, not by you.`, {
-      fix: `Pass --connection ${connection.name} to choose it yourself${chosenBy === 'dossier' ? ', or adopt the dossier once with toil dossiers import, which copies it into your own folder' : ''}.`,
+      fix: `Pass --connection ${connection.name} to choose it yourself${chosenBy === 'toil-project' ? ', or adopt the toil project once with toil projects import, which copies it into your own folder' : ''}.`,
     });
   }
   if (!connection?.writes) {
@@ -489,7 +494,7 @@ function assertWritesAllowed(
 /**
  * Where in the service a write lands (owner and repo, a project) is as much a
  * choice as which connection, so a write takes it only from a source the user
- * owns. A dossier they haven't adopted (a repository's checked-in one, a
+ * owns. A toil project they haven't adopted (a repository's checked-in one, a
  * listed folder's, a loose file) may set it for reads, never for a write.
  * The check is made when the command reads the input, so a write that never
  * uses an input the area resolves for every command (an ADO work item update
@@ -498,21 +503,21 @@ function assertWritesAllowed(
  * front defeats this (the write is refused over one it never uses), so a
  * helper reads a value only where a path needs it, and checks presence
  * through `ctx.resolved` (ado's `where()`). Field aliases and transition pins from
- * such a dossier stay allowed (#302). A rubber stamp from another department
+ * such a toil project stay allowed (#302). A rubber stamp from another department
  * is not a signature.
  */
 function guardTargets(def: AnyCommand, context: Record<string, string>, report: ContextReport, via: FrontDoor): Record<string, string> {
   const declared = (def.area?.context ?? {}) as Record<string, ContextInput>;
   return new Proxy(context, {
     get(target, name, receiver) {
-      if (typeof name === 'string' && report.inputs?.[name]?.source === 'dossier' && declared[name] && !declared[name].selectsConnection) {
+      if (typeof name === 'string' && report.inputs?.[name]?.source === 'toil-project' && declared[name] && !declared[name].selectsConnection) {
         const flag = flagOf(name, declared[name]).split(' ')[0];
-        const dossier = report.dossier?.name;
-        throw new ToilError('WRITE_DISABLED', `${commandName(def)} changes data in ${areaOf(def)}, and its ${name} came from ${dossier ? `dossier ${dossier}` : 'a dossier'}, which you haven't adopted.`, {
+        const toilProject = report.toilProject?.name;
+        throw new ToilError('WRITE_DISABLED', `${commandName(def)} changes data in ${areaOf(def)}, and its ${name} came from ${toilProject ? `toil project ${toilProject}` : 'a toil project'}, which you haven't adopted.`, {
           fix:
             via === 'cli'
-              ? `This dossier sets where this write goes. Adopt it with toil dossiers import ${dossier ?? '<name>'} (the CLI only), or pass ${flag} yourself.`
-              : `This dossier sets where this write goes. Ask the user to adopt it (toil dossiers import ${dossier ?? '<name>'}, on the CLI), or pass ${name} yourself.`,
+              ? `This toil project sets where this write goes. Adopt it with toil projects import ${toilProject ?? '<name>'} (the CLI only), or pass ${flag} yourself.`
+              : `This toil project sets where this write goes. Ask the user to adopt it (toil projects import ${toilProject ?? '<name>'}, on the CLI), or pass ${name} yourself.`,
         });
       }
       return Reflect.get(target, name, receiver);

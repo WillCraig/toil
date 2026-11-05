@@ -1,7 +1,7 @@
 /**
  * A small MCP server over loopback HTTP, for the one SDK that takes tools
  * only from an MCP server (Codex, codex.ts). Each run gets a grant: a random
- * bearer token and the dossier's read tools, gone when the run ends. The
+ * bearer token and the toil project's read tools, gone when the run ends. The
  * server (server.ts) answers `POST <base>api/agent/mcp` with the grant the
  * token names, and only with no `Origin` header, so a web page can't use it
  * (browsers always send one on a POST, and this server sends no CORS headers).
@@ -71,7 +71,7 @@ export async function answerMcp(message: unknown, tools: ToolSpec[], version: st
         protocolVersion: MCP_VERSIONS.includes(asked) ? asked : MCP_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'toil-ui', version },
-        instructions: "Toil UI's read-only tools for one dossier. Nothing here writes.",
+        instructions: "Toil UI's read-only tools for one Toil project. Nothing here writes.",
       });
     }
     case 'ping':

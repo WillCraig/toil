@@ -11,7 +11,7 @@
  * job, and after each agent question's start and end.
  */
 
-import { execute, mapOwi, registry, contractVersion as toilContract, version as toilVersion } from '@imagile-dev/toil/api';
+import { execute as installedExecute, mapOwi, registry, contractVersion as toilContract, version as toilVersion } from '@imagile-dev/toil/api';
 import { roundsUsedFor } from '../src/model/jobs.ts';
 import { fileURLToPath } from 'node:url';
 import { FIXTURE_AREAS } from '../src/fixtures/config.ts';
@@ -20,15 +20,15 @@ import { AgentHost } from './agents/host.ts';
 import { cacheData } from './agents/tools.ts';
 import { Cache, CacheError, wipeCacheFiles } from './cache.ts';
 import { areasFrom, settingsFrom } from './config.ts';
-import { createUiServer, type DossierRenames } from './server.ts';
-import { DossierAgents } from './agents/dossier-agents.ts';
+import { createUiServer, type ToilProjectRenames } from './server.ts';
+import { ToilProjectAgents } from './agents/toil-project-agents.ts';
 import { parseSettings, SettingsError, themesNotice, USAGE } from './settings.ts';
 import { fixtureStore, sqliteStore } from './store.ts';
 import { SyncService } from './sync.ts';
 import { WorklogService } from './worklog.ts';
 import { cacheAnalyses, sampleAnalyses } from './analyses.ts';
 import { fixtureAnalyses } from '../src/fixtures/analyses.ts';
-import { loadDossier } from '../src/load.ts';
+import { loadToilProject } from '../src/load.ts';
 import { fixtureWorklog } from '../src/fixtures/worklog.ts';
 import { cacheLedger, memoryLedger, usageControl } from './usage.ts';
 import { SAMPLE_USAGE_SETTINGS, sampleUsageRecords } from '../src/fixtures/model-usage.ts';
@@ -45,6 +45,9 @@ import { CALLER } from './store.ts';
 import type { Execute } from '../src/toil.ts';
 import { Fingerprints, restartCommand } from './fingerprint.ts';
 import { assignmentPrompts } from './assign/runner.ts';
+
+// The pinned toil's envelope types name a context source the next release renames (#555), so until the pin moves the installed execute is typed as the one this build calls.
+const execute = installedExecute as unknown as Execute;
 
 declare const __TOIL_UI_VERSION__: string;
 declare const __TOIL_UI_COMMIT__: string | null;
@@ -97,8 +100,8 @@ async function main(): Promise<number> {
   let cache: Cache | undefined;
   let sync: SyncService | undefined;
   let worklog: WorklogService | undefined;
-  // The agent last used for each dossier's Analyze (#494), in the data folder beside agent.json; the sample remembers nothing.
-  const dossierAgents = settings.sample ? undefined : new DossierAgents(settings.dataDir);
+  // The agent last used for each toil project's Analyze (#494), in the data folder beside agent.json; the sample remembers nothing.
+  const toilProjectAgents = settings.sample ? undefined : new ToilProjectAgents(settings.dataDir);
   if (!settings.sample) {
     try {
       cache = await Cache.open(settings.dataDir, { retentionDays: settings.retentionDays });
@@ -111,7 +114,7 @@ async function main(): Promise<number> {
     }
     worklog = new WorklogService({ cache: () => cache!, execute });
     const pages = worklog;
-    sync = new SyncService({ cache, execute, mapOwi, onFinished: () => pages.reconcileAll(), onForget: (dossier) => dossierAgents?.forget(dossier) });
+    sync = new SyncService({ cache, execute, mapOwi, onFinished: () => pages.reconcileAll(), onForget: (toilProject) => toilProjectAgents?.forget(toilProject) });
     // The cache pruned what outlived its retention as it opened; the pages follow it.
     await worklog.reconcileAll().catch((e: unknown) => process.stderr.write(`toil-ui: couldn't fold the worklog pages again: ${e instanceof Error ? e.message : String(e)}\n`));
   }
@@ -152,12 +155,12 @@ async function main(): Promise<number> {
     ? new AgentHost({
         dataDir: settings.dataDir,
         version: __TOIL_UI_VERSION__,
-        data: (dossier) => {
-          const data = cacheData(cache!, dossier);
-          return data && worklog ? { ...data, worklog: async (day) => (await worklog!.day(dossier, day)).page, standup: async (from, to) => (await worklog!.standup(dossier, from, to)).report } : data;
+        data: (toilProject) => {
+          const data = cacheData(cache!, toilProject);
+          return data && worklog ? { ...data, worklog: async (day) => (await worklog!.day(toilProject, day)).page, standup: async (from, to) => (await worklog!.standup(toilProject, from, to)).report } : data;
         },
         onRun: (run) => worklog?.recordRun(run),
-        rounds: (dossier, label, self) => roundsUsedFor(cache!.runs(dossier), label, self),
+        rounds: (toilProject, label, self) => roundsUsedFor(cache!.runs(toilProject), label, self),
         registry: registry.commands,
         execute,
         mapIds,
@@ -176,20 +179,20 @@ async function main(): Promise<number> {
     const dataDir = settings.dataDir;
     // Toil UI's own view of execute(), which names the actor: a toil older than the option ignores it.
     const toilExecute: Execute = execute;
-    const data = (dossier: string) => cacheData(cache!, dossier);
+    const data = (toilProject: string) => cacheData(cache!, toilProject);
     const queue = new AssignmentQueue({
       keeper: fileKeeper(dataDir, problems),
       runner: hostRunner({ host, dataDir, registry: registry.commands, execute, mapIds, data, version: __TOIL_UI_VERSION__, toilVersion, ...(fingerprints ? { fingerprints } : {}) }),
-      items: (dossier) => data(dossier)?.items() ?? null,
-      people: async (dossier) => {
-        const e = await execute('dossiers show', { dossier }, { readOnly: true, caller: CALLER });
-        return e.ok ? readPeople((e.data as { dossier?: unknown } | null)?.dossier).people : [];
+      items: (toilProject) => data(toilProject)?.items() ?? null,
+      people: async (toilProject) => {
+        const e = await execute('projects show', { toilProject }, { readOnly: true, caller: CALLER });
+        return e.ok ? readPeople((e.data as { toilProject?: unknown } | null)?.toilProject).people : [];
       },
-      repos: (dossier) => reposOf(execute, dossier),
+      repos: (toilProject) => reposOf(execute, toilProject),
       // The one write an assignment makes, and only on a person's Apply: toil's own command, through its own gate, labelled with the assignment.
       apply: (a, p) => toilExecute(p.command!, { ...p.input, allowWrite: true }, { caller: CALLER, actor: actorOf(a.id) }),
       settings: () => queueSettings(dataDir),
-      ...(fingerprints ? { current: (dossier: string, mode: Parameters<typeof assignmentPrompts>[0]) => fingerprints!.current(dossier, assignmentPrompts(mode)), restartNeeded: () => fingerprints!.restartNeeded() } : {}),
+      ...(fingerprints ? { current: (toilProject: string, mode: Parameters<typeof assignmentPrompts>[0]) => fingerprints!.current(toilProject, assignmentPrompts(mode)), restartNeeded: () => fingerprints!.restartNeeded() } : {}),
       now: () => new Date().toISOString(),
       newId: () => randomUUID(),
     });
@@ -207,16 +210,16 @@ async function main(): Promise<number> {
     assignments = { queue: sample.queue };
   }
 
-  // A dossier renamed from its card or dashboard (#342): Toil UI's own records of it follow toil's rename.
-  const renames: DossierRenames | undefined =
+  // A toil project renamed from its card or dashboard (#342): Toil UI's own records of it follow toil's rename.
+  const renames: ToilProjectRenames | undefined =
     cache && sync && worklog
       ? {
           hold: () => sync!.hold(),
-          blocked: (dossier) =>
+          blocked: (toilProject) =>
             sync!.running
-              ? { message: `A sync is running, so ${dossier} can't be renamed until it ends.`, fix: 'Wait for the Sync panel to say the sync finished, then rename it.' }
-              : assignments.queue.runningIn(dossier)
-                ? { message: `An assignment of ${dossier} is running, so it can't be renamed until it ends.`, fix: 'Wait for it to finish, or stop it from its page, then rename the dossier.' }
+              ? { message: `A sync is running, so ${toilProject} can't be renamed until it ends.`, fix: 'Wait for the Sync panel to say the sync finished, then rename it.' }
+              : assignments.queue.runningIn(toilProject)
+                ? { message: `An assignment of ${toilProject} is running, so it can't be renamed until it ends.`, fix: 'Wait for it to finish, or stop it from its page, then rename the Toil project.' }
                 : null,
           moved: async (from, to) => {
             const problems: string[] = [];
@@ -228,9 +231,9 @@ async function main(): Promise<number> {
               }
             };
             step('its cache', () => cache!.rename(from, to));
-            step('its assignments', () => assignments.queue.renameDossier(from, to));
-            step('its Analyze agent', () => dossierAgents?.rename(from, to));
-            // The pages are folded again under the new name, and the old name's folder, which no dossier holds now, goes.
+            step('its assignments', () => assignments.queue.renameToilProject(from, to));
+            step('its Analyze agent', () => toilProjectAgents?.rename(from, to));
+            // The pages are folded again under the new name, and the old name's folder, which no toil project holds now, goes.
             await worklog!.reconcileAll().catch((e: unknown) => problems.push(`Toil UI couldn't fold the worklog again under ${to}: ${e instanceof Error ? e.message : String(e)}`));
             return problems;
           },
@@ -239,7 +242,7 @@ async function main(): Promise<number> {
 
   const ui = createUiServer({
     ...(renames ? { renames } : {}),
-    ...(dossierAgents ? { dossierAgents } : {}),
+    ...(toilProjectAgents ? { toilProjectAgents } : {}),
     settings,
     store: cache ? sqliteStore(() => cache, execute, toil) : fixtureStore(),
     agent: host ?? fixtureAgent(),
@@ -247,7 +250,7 @@ async function main(): Promise<number> {
     ...(sync ? { sync } : {}),
     worklog: worklog ?? fixtureWorklog(),
     // Every Analyze, kept (#395): in the cache, or for this run in memory with the sample's.
-    analyses: cache ? cacheAnalyses(() => cache!) : sampleAnalyses(fixtureAnalyses(), async (dossier) => (await loadDossier(fixtureExecute().execute, dossier)).items, () => FIXTURE_NOW),
+    analyses: cache ? cacheAnalyses(() => cache!) : sampleAnalyses(fixtureAnalyses(), async (toilProject) => (await loadToilProject(fixtureExecute().execute, toilProject)).items, () => FIXTURE_NOW),
     usage,
     assignments,
     ...(fingerprints ? { serverStatus: () => fingerprints!.server() } : {}),
@@ -273,7 +276,7 @@ async function main(): Promise<number> {
   process.stdout.write(
     [
       `Toil UI ${__TOIL_UI_VERSION__} (beta, local only), on toil ${toilVersion}`,
-      settings.sample ? 'Serving sample data and the scripted agent; nothing connects to a tracker.' : 'Syncing through toil, read-only, with your own connections and dossiers. Only its Settings pages, and a dossier\'s name and description edited in place, change anything: toil\'s own connections and dossiers, when you ask. The worklog keeps its pages and your notes in its data folder, and writes anywhere else only when you export one. Feedback goes to Imagile only when you send it.',
+      settings.sample ? 'Serving sample data and the scripted agent; nothing connects to a tracker.' : 'Syncing through toil, read-only, with your own connections and Toil projects. Only its Settings pages, and a Toil project\'s name and description edited in place, change anything: toil\'s own connections and Toil projects, when you ask. The worklog keeps its pages and your notes in its data folder, and writes anywhere else only when you export one. Feedback goes to Imagile only when you send it.',
       ...(cache ? [`The cache is ${cache.paths.db}, kept ${settings.retentionDays} days after each sync; toil-ui wipe deletes it.`] : []),
       '',
       'Open this URL in your browser. It carries this launch\'s token, so keep it to yourself:',

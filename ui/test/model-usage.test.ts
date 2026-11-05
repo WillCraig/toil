@@ -66,7 +66,7 @@ afterAll(() => {
   rmSync(folder, { recursive: true, force: true, maxRetries: 3 });
 });
 
-const rec = (over: Partial<UsageRecord>): UsageRecord => ({ id: 'r1', chatId: 'chat-0001', turn: 1, dossier: 'card-payments', adapter: 'claude', model: 'claude-sonnet-4-6', costSource: 'none', at: '2026-10-13T08:00:00.000Z', ...over });
+const rec = (over: Partial<UsageRecord>): UsageRecord => ({ id: 'r1', chatId: 'chat-0001', turn: 1, toilProject: 'card-payments', adapter: 'claude', model: 'claude-sonnet-4-6', costSource: 'none', at: '2026-10-13T08:00:00.000Z', ...over });
 
 describe('the adding-up rule', () => {
   it('sums per-call reports, each once by its id', () => {
@@ -138,7 +138,7 @@ describe('the adding-up rule', () => {
 
   it('exports CSV with an empty cell where the SDK reported nothing, and a formula kept as text', () => {
     const csv = usageCsv([rec({ id: '=cmd()', adapter: 'codex', model: null, inputTokens: 5 })]).trim().split('\n');
-    expect(csv[0]).toBe('at,day,adapter,model,dossier,chatId,turn,inputTokens,cachedInputTokens,cacheWriteTokens,outputTokens,premiumRequests,costUsd,costSource,id');
+    expect(csv[0]).toBe('at,day,adapter,model,toilProject,chatId,turn,inputTokens,cachedInputTokens,cacheWriteTokens,outputTokens,premiumRequests,costUsd,costSource,id');
     expect(csv[1]).toBe(`2026-10-13T08:00:00.000Z,2026-10-13,codex,,card-payments,chat-0001,1,5,,,,,,none,"'=cmd()"`);
   });
 
@@ -149,12 +149,12 @@ describe('the adding-up rule', () => {
 });
 
 describe('the ledger', () => {
-  it("survives a sync's cleanup and a forgotten dossier: a total never drops", async () => {
+  it("survives a sync's cleanup and a forgotten Toil project: a total never drops", async () => {
     const dir = mkdtempSync(join(folder, 'ledger-'));
     const c = await Cache.open(dir, { retentionDays: 30, now: () => new Date(FIXTURE_NOW) });
     try {
       const ledger = cacheLedger(() => c);
-      ledger.add([rec({ id: 'a', inputTokens: 100 }), rec({ id: 'b', inputTokens: 50, dossier: 'settlement' })]);
+      ledger.add([rec({ id: 'a', inputTokens: 100 }), rec({ id: 'b', inputTokens: 50, toilProject: 'settlement' })]);
       const before = addUp(ledger.since('2026-10-01T00:00:00.000Z'));
       await new SyncService({ cache: c, execute: stubToil().execute, mapOwi, now: () => new Date(FIXTURE_NOW) }).run(ctx());
       c.forget('settlement');
@@ -368,7 +368,7 @@ describe('the host, holding a chat to its usage and caps', () => {
     const usage = answer.usage as AnswerUsage;
     expect(usage.adapter).toBe('claude');
     expect(usage.records).toHaveLength(1);
-    expect(usage.records[0]).toMatchObject({ id: 'claude:sess-1:claude-sonnet-4-6', chatId: 'chat-test-0001', turn: 1, dossier: 'card-payments', adapter: 'claude', inputTokens: 400, outputTokens: 60, cachedInputTokens: 2000, costUsd: 0.02, costSource: 'sdk-estimate', plan: true, at: FIXTURE_NOW });
+    expect(usage.records[0]).toMatchObject({ id: 'claude:sess-1:claude-sonnet-4-6', chatId: 'chat-test-0001', turn: 1, toilProject: 'card-payments', adapter: 'claude', inputTokens: 400, outputTokens: 60, cachedInputTokens: 2000, costUsd: 0.02, costSource: 'sdk-estimate', plan: true, at: FIXTURE_NOW });
     expect(usage.context).toEqual({ used: 300 + 1000 + 40, window: 200000 });
     expect(ledger.rows).toEqual(usage.records);
   });
@@ -554,10 +554,10 @@ describe("the server's usage routes", () => {
 
   it('pass the chat a question belongs to, and refuse one that is not a chat', async () => {
     const { post, asked } = await serve();
-    expect((await post('/api/agent/ask', { dossier: 'card-payments', prompt: 'risk', chat: { id: 'abc12345-0000-0000-0000-000000000000', turn: 2 } })).status).toBe(200);
+    expect((await post('/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk', chat: { id: 'abc12345-0000-0000-0000-000000000000', turn: 2 } })).status).toBe(200);
     expect(asked).toEqual([{ id: 'abc12345-0000-0000-0000-000000000000', turn: 2 }]);
-    expect((await post('/api/agent/ask', { dossier: 'card-payments', prompt: 'risk', chat: { id: '../x', turn: 1 } })).status).toBe(400);
-    expect((await post('/api/agent/ask', { dossier: 'card-payments', prompt: 'risk', chat: { id: 'abc12345', turn: 0 } })).status).toBe(400);
+    expect((await post('/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk', chat: { id: '../x', turn: 1 } })).status).toBe(400);
+    expect((await post('/api/agent/ask', { toilProject: 'card-payments', prompt: 'risk', chat: { id: 'abc12345', turn: 0 } })).status).toBe(400);
   });
 
   it("send a failed run's usage with its error, streamed or not", async () => {
@@ -580,10 +580,10 @@ describe("the server's usage routes", () => {
     running.push(() => ui.close());
     const s = JSON.parse((await send(origin, '/api/session', { method: 'POST', body: JSON.stringify({ token: 'tok' }), headers: { origin, 'content-type': 'application/json' } })).body) as { session: string; csrf: string };
     const post = (body: unknown) => send(origin, '/api/agent/ask', { method: 'POST', body: JSON.stringify(body), headers: { [SESSION_HEADER]: s.session, origin, 'content-type': 'application/json', [CSRF_HEADER]: s.csrf } });
-    const whole = await post({ dossier: 'card-payments', prompt: 'q' });
+    const whole = await post({ toilProject: 'card-payments', prompt: 'q' });
     expect(whole.status).toBe(502);
     expect(JSON.parse(whole.body).error).toEqual({ message: 'stopped at the cap', fix: 'raise it', usage });
-    const streamed = await post({ dossier: 'card-payments', prompt: 'q', stream: true });
+    const streamed = await post({ toilProject: 'card-payments', prompt: 'q', stream: true });
     expect(JSON.parse(streamed.body.trim().split('\n').at(-1)!).error.usage).toEqual(usage);
   });
 

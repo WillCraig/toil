@@ -1,15 +1,15 @@
 /**
  * The People view (#292): what is on each person's plate, agents included,
- * across every system the dossier reads. Pure functions of the dossier's
+ * across every system the toil project reads. Pure functions of the toil project's
  * `people` list, its OWI work items, its OWI changes and a clock, like
  * prs.ts, so the view and the agent's people tools work it out the same way.
  *
- * Who someone is comes from the dossier: each person's `ids` names the
+ * Who someone is comes from the toil project: each person's `ids` names the
  * account each area knows them by, matched on the account's id or email,
  * without case. An agent is a person with kind `agent`; it is matched by the
  * same signals that set a change's `authorKind` (an agent's account, a
  * Co-Authored-By trailer, a branch prefix) where the signal names it.
- * Accounts the dossier doesn't map get cards of their own, and an email they
+ * Accounts the toil project doesn't map get cards of their own, and an email they
  * share with a person, or with an account in another system, is offered as a
  * suggestion, never applied: one email on two accounts is how the wrong
  * person gets someone else's work, so a match is suggested only when there
@@ -17,7 +17,7 @@
  *
  * It shows load, never a score: cards are in name order, nothing is ranked,
  * and no figure compares one person with another. The limit a team sets in
- * the dossier is the only line anyone is measured against, and only their
+ * the toil project is the only line anyone is measured against, and only their
  * own count of work in progress meets it. The seating plan is alphabetical,
  * which ended the meeting about the seating plan.
  */
@@ -39,7 +39,7 @@ const lower = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
 
 // Who is who ---------------------------------------------------------------------------
 
-/** One entry of the dossier's `people` list, as the view reads it. */
+/** One entry of the toil project's `people` list, as the view reads it. */
 export interface PersonEntry {
   name: string;
   kind: 'human' | 'agent';
@@ -48,12 +48,12 @@ export interface PersonEntry {
   ids: Record<string, string>;
 }
 
-/** The dossier's `people` and `wipLimit`, read from `dossiers show`, with anything that couldn't be used said in `notes`. */
-export function readPeople(dossier: unknown): { people: PersonEntry[]; wipLimit: number | null; notes: string[] } {
-  const d = isRec(dossier) ? dossier : {};
+/** The toil project's `people` and `wipLimit`, read from `projects show`, with anything that couldn't be used said in `notes`. */
+export function readPeople(toilProject: unknown): { people: PersonEntry[]; wipLimit: number | null; notes: string[] } {
+  const d = isRec(toilProject) ? toilProject : {};
   const notes: string[] = [];
   const people: PersonEntry[] = [];
-  if (d.people !== undefined && !Array.isArray(d.people)) notes.push('The dossier\'s "people" isn\'t a list, so nobody is mapped.');
+  if (d.people !== undefined && !Array.isArray(d.people)) notes.push('The Toil project\'s "people" isn\'t a list, so nobody is mapped.');
   for (const [i, raw] of (Array.isArray(d.people) ? d.people : []).entries()) {
     if (!isRec(raw) || typeof raw.name !== 'string' || !raw.name.trim()) {
       notes.push(`people[${i}] has no name, so it was left out.`);
@@ -64,7 +64,7 @@ export function readPeople(dossier: unknown): { people: PersonEntry[]; wipLimit:
   }
   const limit = d.wipLimit;
   const wipLimit = typeof limit === 'number' && Number.isInteger(limit) && limit > 0 ? limit : null;
-  if (limit !== undefined && wipLimit === null) notes.push('The dossier\'s "wipLimit" isn\'t a whole number above 0, so no limit is shown.');
+  if (limit !== undefined && wipLimit === null) notes.push('The Toil project\'s "wipLimit" isn\'t a whole number above 0, so no limit is shown.');
   return { people, wipLimit, notes };
 }
 
@@ -90,14 +90,14 @@ export function isPerson(person: PersonEntry, who: Identity): boolean {
   return id !== undefined && (lower(id) === lower(who.id) || (who.email !== null && lower(id) === lower(who.email)));
 }
 
-/** Someone a card is about: a person in the dossier, or an account it doesn't map. */
+/** Someone a card is about: a person in the toil project, or an account it doesn't map. */
 export interface Who {
   /** `person:<name>` or `id:<area>:<id>`: what the board filter and the agent's tools name them by. */
   key: string;
   name: string;
   kind: 'human' | 'agent';
   mapped: boolean;
-  /** The accounts seen for them, plus, for a person, the ids the dossier gives that no data has shown yet. */
+  /** The accounts seen for them, plus, for a person, the ids the toil project gives that no data has shown yet. */
   identities: Identity[];
   email: string | null;
 }
@@ -158,7 +158,7 @@ export interface ReviewWait {
 
 export interface Blocked {
   item: WorkItem;
-  /** What blocks it: each blocker's id, and its record when the dossier holds it (else its status is unknown). */
+  /** What blocks it: each blocker's id, and its record when the toil project holds it (else its status is unknown). */
   by: Array<{ id: string; item: WorkItem | null }>;
 }
 
@@ -172,7 +172,7 @@ export interface Card {
   /** Work in progress by status, each status's items longest-sitting first. */
   wip: Array<{ status: string; items: WipItem[] }>;
   wipCount: number;
-  /** Over the dossier's limit; null when it sets none. */
+  /** Over the toil project's limit; null when it sets none. */
   overLimit: boolean | null;
   prs: OpenPr[];
   reviews: ReviewWait[];
@@ -194,7 +194,7 @@ export function sinceInStatus(item: WorkItem): string | null {
   return into?.at ?? null;
 }
 
-/** The agents a change was written with, among the dossier's agents: its author's account is one, or its authorKind signal names one. */
+/** The agents a change was written with, among the toil project's agents: its author's account is one, or its authorKind signal names one. */
 export function agentsOf(c: Change, agents: PersonEntry[]): PersonEntry[] {
   if (c.authorKind !== 'AGENT') return [];
   const author = asIdentity(c.source.area, c.author);
@@ -224,7 +224,7 @@ function cardFor(who: Who, match: Matcher, agent: PersonEntry | null, data: { it
   const prs = changes
     .filter((c) => isOpen(c) && written(c))
     .map((change): OpenPr => {
-      const withAgent = !agent && change.authorKind === 'AGENT' ? (agentsOf(change, data.agents)[0]?.name ?? `an agent the dossier doesn't name (${change.authorKindSignal ?? 'its account'})`) : null;
+      const withAgent = !agent && change.authorKind === 'AGENT' ? (agentsOf(change, data.agents)[0]?.name ?? `an agent the Toil project doesn't name (${change.authorKindSignal ?? 'its account'})`) : null;
       return { change, wait: waitOf(change, now), withAgent };
     })
     .sort((a, b) => (b.wait.days ?? -1) - (a.wait.days ?? -1) || a.change.id.localeCompare(b.change.id));
@@ -262,7 +262,7 @@ function cardFor(who: Who, match: Matcher, agent: PersonEntry | null, data: { it
   };
 }
 
-/** Whether a card has anything on it: an account the dossier doesn't map gets one only then. */
+/** Whether a card has anything on it: an account the toil project doesn't map gets one only then. */
 export const hasWork = (c: Card) => c.wipCount > 0 || c.prs.length > 0 || c.reviews.length > 0 || c.blocked.length > 0 || c.activity.length > 0;
 
 // Suggestions ------------------------------------------------------------------------------
@@ -276,20 +276,20 @@ export interface Suggestion {
   name: string;
   email: string;
   /** The toil command that applies it, and its input: exactly what the line shows and the button runs. */
-  command: 'dossiers person';
-  input: { dossier: string; name: string; id: string[]; email?: string };
+  command: 'projects person';
+  input: { toilProject: string; name: string; id: string[]; email?: string };
 }
 
 export interface People {
-  dossier: string;
-  /** Everyone the dossier's `people` lists, agents included, in name order. */
+  toilProject: string;
+  /** Everyone the toil project's `people` lists, agents included, in name order. */
   people: Card[];
-  /** Accounts the dossier doesn't map, each with something on its plate, in name order. */
+  /** Accounts the toil project doesn't map, each with something on its plate, in name order. */
   unmapped: Card[];
   suggestions: Suggestion[];
   /** Why an email suggested nothing: it points at more than one candidate. */
   ambiguous: string[];
-  /** Pull requests an agent wrote that no agent in the dossier's people is matched to. */
+  /** Pull requests an agent wrote that no agent in the toil project's people is matched to. */
   unnamedAgents: Change[];
   /** Accounts that wrote only bots' pull requests: left out of the cards. */
   bots: Identity[];
@@ -308,9 +308,9 @@ export interface Team {
 
 const byName = (a: Card, b: Card) => a.who.name.localeCompare(b.who.name, 'en', { sensitivity: 'base' }) || a.who.key.localeCompare(b.who.key);
 
-/** Everything the People view shows for one dossier. */
-export function people(input: { dossier: string; entries: PersonEntry[]; wipLimit: number | null; items: WorkItem[]; changes: Change[]; now: string }): People {
-  const { dossier, entries, wipLimit, items, now } = input;
+/** Everything the People view shows for one toil project. */
+export function people(input: { toilProject: string; entries: PersonEntry[]; wipLimit: number | null; items: WorkItem[]; changes: Change[]; now: string }): People {
+  const { toilProject, entries, wipLimit, items, now } = input;
   const changes = input.changes;
   const byId = new Map(items.map((i) => [i.id, i]));
   const seen = accounts(items, changes);
@@ -320,7 +320,7 @@ export function people(input: { dossier: string; entries: PersonEntry[]; wipLimi
   const owner = (i: Identity) => entries.find((e) => isPerson(e, i));
   const peopleCards = entries.map((e) => {
     const found = [...seen.values()].filter((i) => isPerson(e, i));
-    // Ids the dossier gives that no data has shown yet still say who the card is about.
+    // Ids the toil project gives that no data has shown yet still say who the card is about.
     const named = Object.entries(e.ids).filter(([area, id]) => !found.some((f) => f.area === area && (lower(f.id) === lower(id) || lower(f.email) === lower(id)))).map(([area, id]): Identity => ({ area, id, name: null, email: null }));
     const who: Who = { key: personKey(e.name), name: e.name, kind: e.kind, mapped: true, identities: [...found, ...named], email: e.email };
     return cardFor(who, (i) => isPerson(e, i), e.kind === 'agent' ? e : null, data);
@@ -335,12 +335,12 @@ export function people(input: { dossier: string; entries: PersonEntry[]; wipLimi
     .map((i) => cardFor({ key: identityWhoKey(i), name: i.name ?? i.id, kind: 'human', mapped: false, identities: [i], email: i.email }, (x) => keyOf(x) === keyOf(i), null, data))
     .filter(hasWork);
 
-  const { suggestions, ambiguous } = suggest(dossier, entries, unmappedIds.filter(human));
+  const { suggestions, ambiguous } = suggest(toilProject, entries, unmappedIds.filter(human));
   const unnamedAgents = changes.filter((c) => c.authorKind === 'AGENT' && agentsOf(c, agents).length === 0);
   const cards = [...peopleCards].sort(byName);
   const health_ = health(items, [], now);
   return {
-    dossier,
+    toilProject,
     people: cards,
     unmapped: unmapped.sort(byName),
     suggestions,
@@ -371,7 +371,7 @@ export function people(input: { dossier: string; entries: PersonEntry[]; wipLimi
  * the rest are said in `ambiguous`. A mapped account's email isn't used: one
  * shared mailbox on two accounts would pull a third to the wrong person.
  */
-export function suggest(dossier: string, entries: PersonEntry[], unmapped: Identity[]): { suggestions: Suggestion[]; ambiguous: string[] } {
+export function suggest(toilProject: string, entries: PersonEntry[], unmapped: Identity[]): { suggestions: Suggestion[]; ambiguous: string[] } {
   const suggestions: Suggestion[] = [];
   const ambiguous: string[] = [];
   const byEmail = new Map<string, Identity[]>();
@@ -395,12 +395,12 @@ export function suggest(dossier: string, entries: PersonEntry[], unmapped: Ident
       const taken = accounts_.filter((i) => idIn(person, i.area) !== undefined);
       for (const i of taken) ambiguous.push(`${label(i)} has ${person.name}'s email, but ${person.name} already has a ${i.area} identity (${idIn(person, i.area)}), so it isn't suggested.`);
       const fit = accounts_.filter((i) => !taken.includes(i));
-      if (fit.length) suggestions.push({ identities: fit, person: person.name, name: person.name, email, command: 'dossiers person', input: { dossier, name: person.name, id: fit.map((i) => `${i.area}=${i.id}`) } });
+      if (fit.length) suggestions.push({ identities: fit, person: person.name, name: person.name, email, command: 'projects person', input: { toilProject, name: person.name, id: fit.map((i) => `${i.area}=${i.id}`) } });
       continue;
     }
     if (accounts_.length < 2) continue;
     const name = accounts_.find((i) => i.name)?.name ?? accounts_[0]!.id;
-    suggestions.push({ identities: accounts_, person: null, name, email, command: 'dossiers person', input: { dossier, name, id: accounts_.map((i) => `${i.area}=${i.id}`), email } });
+    suggestions.push({ identities: accounts_, person: null, name, email, command: 'projects person', input: { toilProject, name, id: accounts_.map((i) => `${i.area}=${i.id}`), email } });
   }
   return { suggestions, ambiguous };
 }
@@ -408,7 +408,7 @@ export function suggest(dossier: string, entries: PersonEntry[], unmapped: Ident
 /** A suggestion as the command line that applies it, made from its input alone, so the line and the button can't differ. */
 export function suggestionLine(s: Suggestion): string {
   const quote = (v: string) => (/^[\w@.:=-]+$/.test(v) ? v : `"${v.replace(/(["\\$`])/g, '\\$1')}"`);
-  return ['toil dossiers person', quote(s.input.dossier), quote(s.input.name), ...s.input.id.flatMap((id) => ['--id', quote(id)]), ...(s.input.email ? ['--email', quote(s.input.email)] : [])].join(' ');
+  return ['toil projects person', quote(s.input.toilProject), quote(s.input.name), ...s.input.id.flatMap((id) => ['--id', quote(id)]), ...(s.input.email ? ['--email', quote(s.input.email)] : [])].join(' ');
 }
 
 /** The card a key names, among the people and the unmapped accounts. */

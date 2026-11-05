@@ -5,7 +5,7 @@
  * pull request. `toil util owi map` turns them into OWI 0.2 changes
  * (test/fixtures/owi/pull-requests.owi.json, pinned by test/owi-changes.test.ts),
  * and the Toil UI preview's fixture `execute()` serves them, split by
- * dossier (ui/src/fixtures/delivery.ts).
+ * toil project (ui/src/fixtures/delivery.ts).
  *
  * - **Bitbucket Data Center** (`corp-bitbucket`, PAY/payments-core): PAY-101's
  *   pull request sent back for work with its build failing; PAY-104's waiting
@@ -43,8 +43,8 @@ const envelope = (command: string, data: unknown, connection: string, inputs: Re
     durationMs: 233,
     version: VERSION,
     context: {
-      connection: { value: connection, source: 'dossier', ...(deployment === undefined ? {} : { deployment }) },
-      inputs: Object.fromEntries(Object.entries(inputs).map(([k, value]) => [k, { value, source: 'dossier' }])),
+      connection: { value: connection, source: 'toil-project', ...(deployment === undefined ? {} : { deployment }) },
+      inputs: Object.fromEntries(Object.entries(inputs).map(([k, value]) => [k, { value, source: 'toil-project' }])),
     },
   },
 });
@@ -469,7 +469,7 @@ export const prEnvelopes: unknown[] = [
   ...Object.values(BITBUCKET_CLOUD_PR_GETS).map((d) => envelope('bitbucket pr get', d, 'bitbucket-cloud', BBC_AT, 'cloud')),
 ];
 
-/** The key patterns the dossiers give: Jira's PAY project, and the GitHub issues the SDK's pull requests name. */
+/** The key patterns the toil projects give: Jira's PAY project, and the GitHub issues the SDK's pull requests name. */
 export const PR_KEY_PATTERNS = ['PAY-{n}=corp-jira', 'imagile/payments-web#{n}=github'];
 
 /** One envelope a line, as util owi map's example reads it (owi/pull-requests.jsonl). */

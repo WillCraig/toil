@@ -1,7 +1,7 @@
 /**
  * The pieces every view shows an item with: a link that names its source and
  * key, and text with `[[id]]` citations turned into links. A citation to an id
- * the dossier doesn't hold stays visible as the id, so a wrong one is obvious
+ * the toil project doesn't hold stays visible as the id, so a wrong one is obvious
  * rather than quietly dropped (principle 4). Footnotes that actually lead
  * somewhere, a first for a status report.
  */
@@ -21,18 +21,18 @@ import type { Change, WorkItem } from '../toil.ts';
  * briefing (#494) opens the item's drawer instead, one step in rather than a
  * page away, and the drawer's Open link goes on to the page.
  */
-export const ItemHrefContext = createContext<((dossier: string, id: string) => string) | null>(null);
+export const ItemHrefContext = createContext<((toilProject: string, id: string) => string) | null>(null);
 
 /** The item's source and key, as a link to its page, or to its drawer where a view says so. */
 export function ItemLink({ id, withTitle = false }: { id: string; withTitle?: boolean }) {
-  const { byId, prById, dossier } = useData();
+  const { byId, prById, toilProject } = useData();
   const hrefOf = useContext(ItemHrefContext);
   const item = byId.get(id);
   const pr = item ? undefined : prById?.get(id);
   if (pr) return <PrLink change={pr} withTitle={withTitle} />;
   if (!item) return <code className="missing">{id}</code>;
   return (
-    <a href={hrefOf ? hrefOf(dossier.name, id) : itemHref(dossier.name, id)} className="item-link">
+    <a href={hrefOf ? hrefOf(toilProject.name, id) : itemHref(toilProject.name, id)} className="item-link">
       <span className="key">
         <span className="source">{sourceLabel(item.source.area)}</span> {shortKey(item)}
       </span>
@@ -105,11 +105,11 @@ function detailLines(item: WorkItem | undefined, pr: Change | undefined, theme?:
  * name it reads out. With `detail` (#395), hovering or focusing it shows a tooltip
  * with its type, assignee, estimate, sprint and last update (a pull
  * request's repository, author and checks); otherwise the whole line is in
- * its title. An id the dossier doesn't hold stays the bare id, marked
+ * its title. An id the toil project doesn't hold stays the bare id, marked
  * missing, as every citation does.
  */
 export function TicketChip({ id, detail = false }: { id: string; detail?: boolean }) {
-  const { byId, prById, dossier } = useData();
+  const { byId, prById, toilProject } = useData();
   const item = byId.get(id);
   const pr = item ? undefined : prById?.get(id);
   if (!item && !pr) return <code className="missing">{id}</code>;
@@ -126,7 +126,7 @@ export function TicketChip({ id, detail = false }: { id: string; detail?: boolea
     </>
   );
   const label = `${key} ${title}, ${status}`;
-  const href = item ? itemHref(dossier.name, id) : pr!.url;
+  const href = item ? itemHref(toilProject.name, id) : pr!.url;
   if (detail && href) {
     // In running text a citation reads as a link: a short source name, the key and a cut title. The status, the full
     // title and the source are in the tooltip (hover or focus) and in the name a screen reader reads.

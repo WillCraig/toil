@@ -25,7 +25,7 @@ export function buildFieldMap(fields: CustomFieldDefinition[]): CustomFieldMap {
 }
 
 /**
- * The map with a dossier's field aliases added (`storyPoints` for
+ * The map with a toil project's field aliases added (`storyPoints` for
  * `customfield_10002`), so `--field storyPoints=5` works. An alias names the
  * field, with the type the connection gives it when it registers that id; a
  * name the connection already uses keeps the connection's meaning. Aliases

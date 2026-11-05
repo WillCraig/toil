@@ -8,10 +8,10 @@ import { Cache } from '../server/cache.ts';
 import type { RequestContext } from '../server/context.ts';
 import { sqliteStore } from '../server/store.ts';
 import { SKEW_MS, SyncBusy, SyncService, joinPages } from '../server/sync.ts';
-import { DOSSIERS } from '../src/fixtures/dossiers.ts';
+import { TOIL_PROJECTS } from '../src/fixtures/toil-projects.ts';
 import { JIRA_CUT_SHORT } from '../src/fixtures/work.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
-import { JQL, loadDossier } from '../src/load.ts';
+import { JQL, loadToilProject } from '../src/load.ts';
 import type { Envelope, Execute } from '../src/toil.ts';
 import { JIRA_PAGE, stubToil, type StubToil } from './toil-stub.ts';
 
@@ -42,7 +42,7 @@ async function setup(start = FIXTURE_NOW) {
   caches.push(cache);
   const toil = stubToil();
   const sync = new SyncService({ cache, execute: toil.execute, mapOwi, now });
-  // The views' execute(), over the SQLite Store; dossiers go to the stub, as they'd go to toil.
+  // The views' execute(), over the SQLite Store; toil projects go to the stub, as they'd go to toil.
   const store = sqliteStore(() => cache, toil.execute as unknown as Execute, TOIL);
   const viaStore: Execute = (command, input = {}) => store.execute(ctx, command, input, 'read');
   return { dataDir, cache, toil, sync, viaStore, advance: (ms: number) => (clock += ms) };
@@ -61,14 +61,14 @@ describe('the cache folder', () => {
 });
 
 describe('a full sync', () => {
-  it('fills the cache from every dossier, read-only and named toil-ui, following nextCursor', async () => {
+  it('fills the cache from every Toil project, read-only and named toil-ui, following nextCursor', async () => {
     const { cache, toil, sync } = await setup();
     const job = await sync.run(ctx);
     expect(job.error).toBeNull();
-    expect(job.dossiersDone).toBe(3);
+    expect(job.toilProjectsDone).toBe(3);
     // The stub refuses anything but readOnly toil-ui calls, so every call being ok proves both.
     const states = cache.states();
-    expect(states.map((d) => [d.name, d.status])).toEqual(DOSSIERS.map((d) => [d.name, 'ok']).sort());
+    expect(states.map((d) => [d.name, d.status])).toEqual(TOIL_PROJECTS.map((d) => [d.name, 'ok']).sort());
     expect(states.flatMap((d) => d.sources.map((s) => `${d.name}/${s.area}:${s.status}`)).sort()).toEqual(
       ['card-payments/bitbucket:ok', 'card-payments/jenkins:ok', 'card-payments/jira:ok', 'card-payments/openshift:ok', 'checkout-web/bitbucket:ok', 'checkout-web/github:ok', 'checkout-web/openshift:ok', 'settlement/ado:ok'],
     );
@@ -76,7 +76,7 @@ describe('a full sync', () => {
     expect(named(toil, 'jira issue history').map((c) => c.input.key)).toEqual(JIRA_CUT_SHORT);
     // jira issue search came in pages of JIRA_PAGE, every one followed.
     const pages = named(toil, 'jira issue search');
-    const issues = (await fixtureExecute().execute('jira issue search', { dossier: 'card-payments', jql: JQL('PAY'), changelog: true }, { readOnly: true })).data as { issues: unknown[] };
+    const issues = (await fixtureExecute().execute('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true }, { readOnly: true })).data as { issues: unknown[] };
     expect(pages.length).toBe(Math.ceil(issues.issues.length / JIRA_PAGE));
     expect(pages.slice(1).map((p) => p.input.cursor)).toEqual(pages.slice(1).map((_, i) => String((i + 1) * JIRA_PAGE)));
     // OWI items, transitions and change refs are stored.
@@ -91,9 +91,9 @@ describe('a full sync', () => {
   it('lets every dashboard render from the cache exactly as it renders from toil', async () => {
     const { sync, viaStore } = await setup();
     await sync.run(ctx);
-    for (const { name } of DOSSIERS) {
-      const fromToil = await loadDossier(fixtureExecute().execute, name, { mapOwi });
-      const fromCache = await loadDossier(viaStore, name, { mapOwi });
+    for (const { name } of TOIL_PROJECTS) {
+      const fromToil = await loadToilProject(fixtureExecute().execute, name, { mapOwi });
+      const fromCache = await loadToilProject(viaStore, name, { mapOwi });
       expect(fromCache.items, name).toEqual(fromToil.items);
       expect(fromCache.changes, name).toEqual(fromToil.changes);
       expect(fromCache.deployments, name).toEqual(fromToil.deployments);
@@ -103,7 +103,7 @@ describe('a full sync', () => {
 
   it('answers a call it never synced with a refusal that says to sync', async () => {
     const { viaStore } = await setup();
-    const env = await viaStore('jira issue search', { dossier: 'card-payments', jql: JQL('PAY'), changelog: true });
+    const env = await viaStore('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true });
     expect(env.ok).toBe(false);
     if (!env.ok) {
       expect(env.error.code).toBe('NOT_FOUND');
@@ -150,10 +150,10 @@ describe('an incremental sync', () => {
     expect(job.reused).toBeGreaterThan(10);
 
     // The merged answer still holds every item, with the change in it.
-    const card = await loadDossier(viaStore, 'card-payments', { mapOwi });
+    const card = await loadToilProject(viaStore, 'card-payments', { mapOwi });
     expect(card.items).toHaveLength(cache.items('card-payments').length);
     expect(card.items.find((i) => i.source.key === 'PAY-104')!.status).toBe('Done');
-    const settle = await loadDossier(viaStore, 'settlement', { mapOwi });
+    const settle = await loadToilProject(viaStore, 'settlement', { mapOwi });
     expect(settle.items.find((i) => i.source.key === '2302')!.status).toBe('Resolved');
     // ... and its history has the move the feed carried, the same as a whole read of the tracker gives.
     expect(settle.items.find((i) => i.source.key === '2302')!.history?.transitions.at(-1)).toMatchObject({ to: 'Resolved' });
@@ -172,14 +172,14 @@ describe('an incremental sync', () => {
     await sync.run(ctx);
     const since = new Date(first - SKEW_MS).toISOString();
     for (const command of ['github pr list', 'ado pr list']) expect(named(toil, command).map((c) => c.input.updatedSince), command).toEqual([since]);
-    // Bitbucket is asked once for each dossier that has it: Data Center for card-payments, Cloud for checkout-web.
+    // Bitbucket is asked once for each toil project that has it: Data Center for card-payments, Cloud for checkout-web.
     expect(named(toil, 'bitbucket pr list').map((c) => c.input.updatedSince)).toEqual([since, since]);
     // The open ones every time (a check finishing isn't an update everywhere), the changed merged one, and no other merged one.
     expect(named(toil, 'github pr get').map((c) => c.input.number).sort()).toEqual([48, 51, 52, 53]);
     expect(named(toil, 'bitbucket pr get').map((c) => c.input.id).sort((a, b) => Number(a) - Number(b))).toEqual([12, 305, 311]);
     expect(named(toil, 'ado pr get').map((c) => c.input.id)).toEqual([87]);
     // And the merged list still holds every pull request.
-    const web = await loadDossier(viaStore, 'checkout-web', { mapOwi });
+    const web = await loadToilProject(viaStore, 'checkout-web', { mapOwi });
     expect(web.pullRequests).toHaveLength(8);
   });
 
@@ -195,15 +195,15 @@ describe('an incremental sync', () => {
     expect(named(toil, 'github issue history').map((c) => c.input.number)).toEqual([43]);
   });
 
-  it('syncs one dossier when asked, and leaves the others as they were', async () => {
+  it('syncs one Toil project when asked, and leaves the others as they were', async () => {
     const { toil, sync, cache } = await setup();
     await sync.run(ctx);
     const before = cache.states().find((d) => d.name === 'settlement')!.lastSyncAt;
     toil.reset();
     await sync.run(ctx, 'card-payments');
-    expect(toil.calls.some((c) => c.input.dossier === 'settlement')).toBe(false);
+    expect(toil.calls.some((c) => c.input.toilProject === 'settlement')).toBe(false);
     expect(cache.states().find((d) => d.name === 'settlement')!.lastSyncAt).toBe(before);
-    await expect(sync.run(ctx, 'nope')).resolves.toMatchObject({ error: expect.stringContaining('no dossier named "nope"') });
+    await expect(sync.run(ctx, 'nope')).resolves.toMatchObject({ error: expect.stringContaining('no Toil project named "nope"') });
   });
 });
 
@@ -234,7 +234,7 @@ describe('deleted and moved items (#493)', () => {
     expect(keys(cache.items('card-payments'))).not.toContain('PAY-104');
     expect(named(toil, 'jira issue history').map((c) => c.input.key)).not.toContain('PAY-104');
     expect(job.messages.some((m) => m.includes('listed whole: 1 no longer there'))).toBe(true);
-    const card = await loadDossier(viaStore, 'card-payments', { mapOwi });
+    const card = await loadToilProject(viaStore, 'card-payments', { mapOwi });
     expect(keys(card.items)).not.toContain('PAY-104');
     expect(card.items).toHaveLength(cache.items('card-payments').length);
     expect(cache.source('card-payments', 'jira')!.fullReadAt).toBe(new Date(Date.parse(FIXTURE_NOW) + 25 * 3_600_000).toISOString());
@@ -311,7 +311,7 @@ describe('a failing source', () => {
   it("is marked failed with toil's message and fix, keeps its last good data marked stale, and leaves the others alone", async () => {
     const { toil, sync, cache, viaStore, advance } = await setup();
     await sync.run(ctx);
-    const good = await loadDossier(viaStore, 'card-payments', { mapOwi });
+    const good = await loadToilProject(viaStore, 'card-payments', { mapOwi });
     const watermark = cache.source('card-payments', 'jira')!.watermark;
 
     advance(3_600_000);
@@ -329,10 +329,10 @@ describe('a failing source', () => {
     expect(cache.states().filter((d) => d.name !== 'card-payments').every((d) => d.status === 'ok')).toBe(true);
 
     // The dashboard still has every item and every change, from the last good copy, warned as stale.
-    const after = await loadDossier(viaStore, 'card-payments', { mapOwi });
+    const after = await loadToilProject(viaStore, 'card-payments', { mapOwi });
     expect(after.items).toEqual(good.items);
     expect(after.changes).toEqual(good.changes);
-    const search = (await viaStore('jira issue search', { dossier: 'card-payments', jql: JQL('PAY'), changelog: true })) as Envelope & { ok: true };
+    const search = (await viaStore('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true })) as Envelope & { ok: true };
     expect(search.ok).toBe(true);
     expect(search.meta.warnings?.map((w) => w.code)).toContain('STALE');
     expect(cache.items('card-payments')).toHaveLength(good.items.length);
@@ -344,7 +344,7 @@ describe('a failing source', () => {
     await sync.run(ctx);
     expect(named(toil, 'jira issue search')[0]!.input.updatedSince).toBe(watermark);
     expect(cache.source('card-payments', 'jira')).toMatchObject({ status: 'ok', stale: false });
-    const fresh = (await viaStore('jira issue search', { dossier: 'card-payments', jql: JQL('PAY'), changelog: true })) as Envelope & { ok: true };
+    const fresh = (await viaStore('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true })) as Envelope & { ok: true };
     expect(fresh.meta.warnings ?? []).toEqual([]);
   });
 
@@ -354,17 +354,17 @@ describe('a failing source', () => {
     await sync.run(ctx);
     const card = cache.states().find((d) => d.name === 'card-payments')!;
     expect(card.sources.find((s) => s.area === 'openshift')).toMatchObject({ status: 'failed', stale: false, lastSuccessAt: null });
-    const data = await loadDossier(viaStore, 'card-payments', { mapOwi });
+    const data = await loadToilProject(viaStore, 'card-payments', { mapOwi });
     expect(data.items.length).toBeGreaterThan(0);
     expect(data.calls.deployments.every((c) => !c.ok)).toBe(true);
     expect(data.calls.work.every((c) => c.ok)).toBe(true);
   });
 
-  it("keeps a dossier's data when its dossiers show fails", async () => {
+  it("keeps a Toil project's data when its projects show fails", async () => {
     const { toil, sync, cache } = await setup();
     await sync.run(ctx);
     const items = cache.items('settlement').length;
-    toil.canned.splice(toil.canned.findIndex((c) => c.command === 'dossiers show' && c.input.dossier === 'settlement'), 1);
+    toil.canned.splice(toil.canned.findIndex((c) => c.command === 'projects show' && c.input.toilProject === 'settlement'), 1);
     await sync.run(ctx);
     expect(cache.states().find((d) => d.name === 'settlement')).toMatchObject({ status: 'failed', error: expect.stringContaining('No canned answer') });
     expect(cache.items('settlement')).toHaveLength(items);
@@ -372,14 +372,14 @@ describe('a failing source', () => {
 });
 
 describe('the job', () => {
-  it('starts no sync while a dossier is being renamed (#342), and starts once the hold is let go', async () => {
+  it('starts no sync while a Toil project is being renamed (#342), and starts once the hold is let go', async () => {
     const { sync } = await setup();
     const release = sync.hold();
-    expect(() => sync.run(ctx)).toThrow('A dossier is being renamed, so the sync waits until it is done.');
+    expect(() => sync.run(ctx)).toThrow('A Toil project is being renamed, so the sync waits until it is done.');
     release();
     release();
     await sync.run(ctx);
-    expect(sync.status().job.dossiersDone).toBe(3);
+    expect(sync.status().job.toilProjectsDone).toBe(3);
   });
 
   it('runs one at a time, and the wipe waits for it', async () => {
@@ -389,7 +389,7 @@ describe('the job', () => {
     expect(() => sync.wipe()).toThrow(SyncBusy);
     expect(sync.status().job.running).toBe(true);
     await running;
-    expect(sync.status().job).toMatchObject({ running: false, by: 'local', dossiersDone: 3 });
+    expect(sync.status().job).toMatchObject({ running: false, by: 'local', toilProjectsDone: 3 });
   });
 
   it('wipes everything it synced', async () => {
@@ -398,18 +398,18 @@ describe('the job', () => {
     expect(cache.counts().responses).toBeGreaterThan(0);
     sync.wipe();
     expect(Object.values(cache.counts()).every((n) => n === 0)).toBe(true);
-    expect(sync.status().dossiers).toEqual([]);
+    expect(sync.status().toilProjects).toEqual([]);
     // The database, and the write-ahead log beside it while the file is open (server/cache.ts, JOURNAL).
     expect(readdirSync(cache.paths.dir).sort()).toEqual(['toil-ui.db', 'toil-ui.db-shm', 'toil-ui.db-wal']);
   });
 
-  it('forgets a dossier toil no longer has', async () => {
+  it('forgets a Toil project toil no longer has', async () => {
     const { toil, sync, cache } = await setup();
     await sync.run(ctx);
-    const list = toil.canned.find((c) => c.command === 'dossiers list')!.data as { dossiers: Array<{ name: string }> };
-    list.dossiers = list.dossiers.filter((d) => d.name !== 'checkout-web');
+    const list = toil.canned.find((c) => c.command === 'projects list')!.data as { toilProjects: Array<{ name: string }> };
+    list.toilProjects = list.toilProjects.filter((d) => d.name !== 'checkout-web');
     await sync.run(ctx);
-    expect(cache.dossierNames()).not.toContain('checkout-web');
+    expect(cache.toilProjectNames()).not.toContain('checkout-web');
     expect(cache.items('checkout-web')).toEqual([]);
   });
 
@@ -433,7 +433,7 @@ describe('the job', () => {
 });
 
 describe('the worklog after a sync (#308)', () => {
-  it('folds every synced dossier into pages, the same as the sample folds them, and keeps them as it syncs again', async () => {
+  it('folds every synced Toil project into pages, the same as the sample folds them, and keeps them as it syncs again', async () => {
     const { dataDir, cache, toil, advance } = await setup();
     const { WorklogService } = await import('../server/worklog.ts');
     const { fixtureWorklog } = await import('../src/fixtures/worklog.ts');
@@ -442,7 +442,7 @@ describe('the worklog after a sync (#308)', () => {
     const sync = new SyncService({ cache, execute: toil.execute, mapOwi, now: () => new Date(FIXTURE_NOW), onFinished: async () => (finished++, worklog.reconcileAll()) });
     await sync.run(ctx);
     expect(finished).toBe(1);
-    for (const d of DOSSIERS) expect(existsSync(join(dataDir, 'cache', 'worklog', d.name))).toBe(true);
+    for (const d of TOIL_PROJECTS) expect(existsSync(join(dataDir, 'cache', 'worklog', d.name))).toBe(true);
     // The day before the sample's clock: the facts with their own times are the sample's own, line for line.
     const day = '2026-10-12';
     const page = await worklog.day('checkout-web', day);
@@ -459,7 +459,7 @@ describe('the worklog after a sync (#308)', () => {
     const sync = new SyncService({ cache, execute: toil.execute, mapOwi, onFinished: async () => { throw new Error('disk full'); } });
     const job = await sync.run(ctx);
     expect(job.error).toBeNull();
-    expect(job.dossiersDone).toBe(DOSSIERS.length);
+    expect(job.toilProjectsDone).toBe(TOIL_PROJECTS.length);
     expect(job.messages.at(-1)).toBe("Couldn't update the worklog: disk full");
   });
 });

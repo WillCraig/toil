@@ -1,7 +1,7 @@
 /**
  * The server's side of the settings pages (#253, item 4). `/api/config` runs
  * only `CONFIG_COMMANDS` (src/config.ts): toil's own commands for its
- * connections and dossiers, through the Store's `execute()`, with the
+ * connections and toil projects, through the Store's `execute()`, with the
  * `toil-ui` caller label like every other call. The reads among them run
  * read-only; the changes run with readOnly off and each command's own write
  * gate unchanged.

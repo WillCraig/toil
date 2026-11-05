@@ -5,7 +5,7 @@ import { ToilError } from './errors.js';
  * `jira-cloud`, `confluence-cloud`, `bitbucket-cloud` and `ado-cloud` are `jira`,
  * `confluence`, `bitbucket` and `ado` with `"deployment": "cloud"` on the connection (#495): one product, one command
  * tree, one set of MCP tools. Everything that still names the old area (a
- * config file, an env var, a dossier
+ * config file, an env var, a toil project
  * section, `--areas`, a typed command) gets the new form from here, so no
  * place invents its own wording and none of them goes quiet.
  *
@@ -46,7 +46,7 @@ export function renamedAreaFix(old: string): string {
   const r = RENAMED_AREAS[old]!;
   const says = Object.entries(r.settings).map(([k, v]) => `"${k}": "${v}"`).join(', ');
   const env = Object.entries(r.settings).map(([k, v]) => `TOIL_${upper(r.area)}_${upper(k)}=${v}`).join(' ');
-  return `${old} is now ${r.area}, with ${says} on the connection: use toil ${r.area} …, the ${r.area}_* MCP tools, --areas ${r.area}, a ${r.area} dossier section, and TOIL_${upper(r.area)}_* env vars with ${env}.`;
+  return `${old} is now ${r.area}, with ${says} on the connection: use toil ${r.area} …, the ${r.area}_* MCP tools, --areas ${r.area}, a ${r.area} toil project section, and TOIL_${upper(r.area)}_* env vars with ${env}.`;
 }
 
 /** The fix for an env var `name` of an old area: its new name, and the setting that says which deployment. */

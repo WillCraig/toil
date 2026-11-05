@@ -391,9 +391,9 @@
     ]
   },
   {
-    "name": "check-dossier",
-    "tool": "bitbucket_check_dossier",
-    "description": "Check the call's dossier against Bitbucket: its projects and repositories exist",
+    "name": "check-toil-project",
+    "tool": "bitbucket_check_toil_project",
+    "description": "Check the call's toil project against Bitbucket: its projects and repositories exist",
     "writes": false,
     "connection": true,
     "flags": [

@@ -46,7 +46,7 @@ export const overrides: Record<string, DeploymentOverride> = {
   },
   'ado work-item transition': {
     toolDescription:
-      "Sets System.State on a work item and returns it. Give state with an exact state, or to with an intent (start, review, done, reopen) or a state name, and toil resolves it against the states this item's own type has: a pin in the dossier first, then an exact state name, then the intent's state category (start InProgress, review Resolved, done Completed, reopen Proposed), then a single state named for it. No match, or more than one, is refused with the states the type does have; meta.transition says what it resolved to. Services needs no project for it. ado_work_item_states lists the states a type has.",
+      "Sets System.State on a work item and returns it. Give state with an exact state, or to with an intent (start, review, done, reopen) or a state name, and toil resolves it against the states this item's own type has: a pin in the toil project first, then an exact state name, then the intent's state category (start InProgress, review Resolved, done Completed, reopen Proposed), then a single state named for it. No match, or more than one, is refused with the states the type does have; meta.transition says what it resolved to. Services needs no project for it. ado_work_item_states lists the states a type has.",
   },
   'ado work-item history': {
     toolDescription:

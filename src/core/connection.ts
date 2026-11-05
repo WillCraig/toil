@@ -345,7 +345,7 @@ async function takeShared(
  * None, or more than one, is INVALID_INPUT naming the candidates.
  */
 export function selectConnection(config: ResolvedConfig, area: AnyArea, input: string, setting: string, value: string, flag: string, source: ContextSource = 'input'): string {
-  const where = { input: 'the call', file: 'the input file', dossier: 'your dossier', git: 'the git remote', connection: 'the connection', default: "the area's default" }[source];
+  const where = { input: 'the call', file: 'the input file', 'toil-project': 'your toil project', git: 'the git remote', connection: 'the connection', default: "the area's default" }[source];
   const instead = source === 'input' ? '' : `, or correct ${where}`;
   const names = connectionsOf(config, area.name);
   if (names.includes(value)) return value;

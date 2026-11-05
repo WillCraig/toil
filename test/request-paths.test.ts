@@ -99,17 +99,17 @@ describe('the path a server receives', () => {
     expect(seen).toEqual([{ method: 'GET', url: '/repos/imagile/toil-probe/commits/release%2F1.4/status' }]);
   });
 
-  it("a write takes its owner from a repository's checked-in dossier only once it's adopted; --owner and reads need no adoption", async () => {
+  it("a write takes its owner from a repository's checked-in toil project only once it's adopted; --owner and reads need no adoption", async () => {
     const repo = join(cwd, 'app');
     mkdirSync(join(repo, '.git'), { recursive: true });
     writeFileSync(join(repo, '.git', 'HEAD'), 'ref: refs/heads/main\n');
-    mkdirSync(join(repo, '.toil', 'dossiers'), { recursive: true });
-    const file = join(repo, '.toil', 'dossiers', 'acme.json');
+    mkdirSync(join(repo, '.toil', 'projects'), { recursive: true });
+    const file = join(repo, '.toil', 'projects', 'acme.json');
     writeFileSync(file, JSON.stringify({ name: 'acme', repos: [{ name: 'app', path: repo }], github: { owner: 'other-org' } }));
     const unlabel = ['github', 'issue', 'unlabel', '7', '--label', 'x', '--allow-write', '--cwd', repo];
 
     const refused = await cli(unlabel);
-    expect(refused.envelope?.error).toMatchObject({ code: 'WRITE_DISABLED', fix: expect.stringContaining('toil dossiers import acme') });
+    expect(refused.envelope?.error).toMatchObject({ code: 'WRITE_DISABLED', fix: expect.stringContaining('toil projects import acme') });
     expect(seen).toEqual([]);
 
     const read = await cli(['github', 'pr', 'get', '7', '--cwd', repo]);
@@ -119,18 +119,18 @@ describe('the path a server receives', () => {
     expect(seen.map((r) => r.url)).toEqual(['/repos/other-org/toil-probe/pulls/7', '/repos/imagile/toil-probe/issues/7/labels/x']);
 
     seen.length = 0;
-    expect((await cli(['dossiers', 'import', file])).envelope?.ok).toBe(true);
+    expect((await cli(['projects', 'import', file])).envelope?.ok).toBe(true);
     const adopted = await cli(unlabel);
     expect(adopted.envelope?.ok, JSON.stringify(adopted.envelope?.error)).toBe(true);
     expect(seen).toEqual([{ method: 'DELETE', url: '/repos/other-org/toil-probe/issues/7/labels/x' }]);
   });
 
-  it('a repo with path syntax, from the flag or from a dossier, never reaches the server', async () => {
+  it('a repo with path syntax, from the flag or from a toil project, never reaches the server', async () => {
     const flag = await cli(['github', 'pr', 'get', '7', '--repo', 'x/pulls/9/merge?y=']);
     expect(flag.envelope?.error).toMatchObject({ code: 'INVALID_INPUT' });
     writeFileSync(join(cwd, 'odd.json'), JSON.stringify({ name: 'odd', github: { owner: 'imagile', repo: 'x/pulls/9/merge?y=' } }));
-    const dossier = await cli(['github', 'pr', 'get', '7', '--dossier', 'odd.json']);
-    expect(dossier.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('from the dossier') });
+    const toilProject = await cli(['github', 'pr', 'get', '7', '--toil-project', 'odd.json']);
+    expect(toilProject.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('from the toil project') });
     expect(seen).toEqual([]);
   });
 });

@@ -2,7 +2,7 @@ import { Validator } from '@cfworker/json-schema';
 import { describe, expect, it } from 'vitest';
 import { execute, mapOwi as apiMapOwi, registry } from '../../src/api.ts';
 import { CANNED, callKey, fixtureExecute } from '../src/fixtures/execute.ts';
-import { loadDossier, loadDossiers } from '../src/load.ts';
+import { loadToilProject, loadToilProjects } from '../src/load.ts';
 import { workflowRead } from '../src/model/readiness.ts';
 import { WORKFLOW_READS } from '../server/store.ts';
 import { mapOwi } from '../src/owi.ts';
@@ -53,8 +53,8 @@ describe('the dashboards', () => {
       options.add(JSON.stringify(opts));
       return fixture.execute(command, input, opts);
     };
-    await loadDossiers(watched);
-    for (const name of NAMES) await loadDossier(watched, name);
+    await loadToilProjects(watched);
+    for (const name of NAMES) await loadToilProject(watched, name);
     expect(fixture.calls.filter((c) => !c.ok)).toEqual([]);
     expect([...options]).toEqual([JSON.stringify({ readOnly: true, caller: 'toil-ui' })]);
     const asked = new Set(fixture.calls.map((c) => callKey(c.command, c.input)));
@@ -67,10 +67,10 @@ describe('the dashboards', () => {
   it("answer the readiness gate's workflow read for every open item it applies to, and hold no other", async () => {
     const reads = new Set<string>();
     for (const name of NAMES) {
-      const d = await loadDossier(fixtureExecute().execute, name);
+      const d = await loadToilProject(fixtureExecute().execute, name);
       for (const item of d.items.filter((i) => i.statusCategory !== 'DONE')) {
         const read = workflowRead(item);
-        if (read) reads.add(callKey(read.command, { dossier: name, ...read.input }));
+        if (read) reads.add(callKey(read.command, { toilProject: name, ...read.input }));
       }
     }
     const canned = CANNED.filter((c) => (WORKFLOW_READS as readonly string[]).includes(c.command)).map((c) => callKey(c.command, c.input));
@@ -82,8 +82,8 @@ describe('the dashboards', () => {
 
 describe("the browser's mapOwi", () => {
   it.each(NAMES)("maps %s's work exactly as the API's mapOwi does", async (name) => {
-    const browser = await loadDossier(fixtureExecute().execute, name, { mapOwi });
-    const api = await loadDossier(fixtureExecute().execute, name, { mapOwi: (input) => apiMapOwi(input) });
+    const browser = await loadToilProject(fixtureExecute().execute, name, { mapOwi });
+    const api = await loadToilProject(fixtureExecute().execute, name, { mapOwi: (input) => apiMapOwi(input) });
     expect(browser.items.length).toBeGreaterThan(0);
     expect(browser.items).toEqual(api.items);
   });
@@ -95,7 +95,7 @@ describe('every proposal the board, the scripted agent and the pull request view
   const { reviewProposal } = await import('../src/model/prs.ts');
   const proposals = [];
   for (const name of NAMES) {
-    const { items, pullRequests } = await loadDossier(fixtureExecute().execute, name);
+    const { items, pullRequests } = await loadToilProject(fixtureExecute().execute, name);
     for (const item of items) for (const to of COLUMNS) proposals.push(proposeMove(item, to, items, name));
     // A review request on every pull request, as a team and as a person, whatever the suggestions are today.
     for (const c of pullRequests) for (const id of ['bo-web', 'imagile/writers']) proposals.push(reviewProposal(c, { id, why: ['reviewed it before'], score: 1 }, name));
@@ -104,14 +104,14 @@ describe('every proposal the board, the scripted agent and the pull request view
   // The comment a scripted review ends on (#532).
   const { scriptedJob } = await import('../src/fixtures/agent.ts');
   proposals.push(...scriptedJob('job:review:github:imagile/payments-web#43')!.proposals);
-  // Publishing a worklog (#308), to every place a dossier can name.
+  // Publishing a worklog (#308), to every place a toil project can name.
   const { publishProposals } = await import('../src/worklog.ts');
   const everywhere = { confluence: { connection: null, inputs: { space: 'PAY' } }, github: { connection: null, inputs: { owner: 'imagile', repo: 'payments-web' } } };
   proposals.push(...publishProposals('card-payments', { day: '2026-10-12' }, 'C:/Users/you/Documents/worklog-card-payments-2026-10-12.md', everywhere));
   // Ticketing a chat's work (#304): a sub-task under every open item, and a new ticket, on every tracker toil creates on.
   const { newTicketProposal, subTaskProposal } = await import('../src/model/ticketing.ts');
   for (const name of NAMES) {
-    const { items } = await loadDossier(fixtureExecute().execute, name);
+    const { items } = await loadToilProject(fixtureExecute().execute, name);
     const open = items.filter((i) => i.statusCategory !== 'DONE');
     // Azure DevOps on a Services connection is still area ado: the item's source says the deployment.
     const onServices = open.filter((i) => i.source.area === 'ado').map((i) => ({ ...i, id: `services-ado:${i.source.key}`, source: { ...i.source, connection: 'services-ado', deployment: 'cloud' } }));
@@ -160,7 +160,7 @@ describe('every proposal the board, the scripted agent and the pull request view
   it('refers a PowerShell refusal to an MCP tool that exists, with input its schema accepts', async () => {
     const { commandLine, toolName } = await import('../src/proposal.ts');
     const byTool = new Map(registry.commands.map((c) => [toolName(c.name), c]));
-    const hostile = withCommand.map((p) => ({ ...p, input: { ...p!.input, ...(p!.command === 'jira issue transition' ? { transition: 'Code Review & QA' } : p!.command === 'ado work-item transition' ? { state: 'Code Review & QA' } : { dossier: 'a&b' }) } }));
+    const hostile = withCommand.map((p) => ({ ...p, input: { ...p!.input, ...(p!.command === 'jira issue transition' ? { transition: 'Code Review & QA' } : p!.command === 'ado work-item transition' ? { state: 'Code Review & QA' } : { toilProject: 'a&b' }) } }));
     for (const p of hostile) {
       const out = commandLine({ command: p!.command ?? null, input: p!.input }, 'powershell');
       expect(out.line, p!.command!).toBeNull();

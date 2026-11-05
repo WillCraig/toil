@@ -1,6 +1,6 @@
 /**
  * The engine's one-shot motifs (#419), as Web Animations keyframes: how a
- * splash, a dossier, a tab or an event moment arrives. Every keyframe sets
+ * splash, a toil project, a tab or an event moment arrives. Every keyframe sets
  * `transform` and `opacity` and nothing else, so the browser runs them on the
  * compositor and never repaints the page for them (the type below allows no
  * other property). A level scales them: full is the motif as drawn, subtle is

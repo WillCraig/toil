@@ -9,7 +9,7 @@ import type { RequestContext } from '../server/context.ts';
 import { SyncService, type SyncExecute } from '../server/sync.ts';
 import { ADO_FEED_FIELDS } from '../src/ado-revisions.ts';
 import { FIXTURE_NOW } from '../src/fixtures/execute.ts';
-import { loadDossier } from '../src/load.ts';
+import { loadToilProject } from '../src/load.ts';
 import type { Envelope, Execute } from '../src/toil.ts';
 import { stubToil, type StubToil } from './toil-stub.ts';
 
@@ -52,12 +52,12 @@ describe('get-many in slices', () => {
 
   it('is asked for 1001 ids in two calls, keeping every item and the search\'s order', async () => {
     const toil = stubToil();
-    const before = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.dossier === 'settlement')!.data as { workItems: unknown[] }).workItems.length;
+    const before = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.toilProject === 'settlement')!.data as { workItems: unknown[] }).workItems.length;
     extras(toil, MANY - before);
-    const data = await loadDossier(toil.execute as unknown as Execute, 'settlement', { mapOwi });
+    const data = await loadToilProject(toil.execute as unknown as Execute, 'settlement', { mapOwi });
     const asked = named(toil, 'ado work-item get-many').map((c) => c.input.id as number[]);
     expect(asked.map((ids) => ids.length)).toEqual([1000, 1]);
-    const search = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.dossier === 'settlement')!.data as { workItems: Array<{ id: number }> }).workItems.map((w) => w.id);
+    const search = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.toilProject === 'settlement')!.data as { workItems: Array<{ id: number }> }).workItems.map((w) => w.id);
     expect(asked.flat()).toEqual(search);
     expect(data.items.filter((i) => i.source.area === 'ado')).toHaveLength(MANY);
     // The feed was asked once, for only the fields mapOwi reads from a revision.
@@ -66,7 +66,7 @@ describe('get-many in slices', () => {
 
   it('on a second sync with the slices shifted fetches only the changed items, not every slice again', async () => {
     const toil = stubToil();
-    const before = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.dossier === 'settlement')!.data as { workItems: unknown[] }).workItems.length;
+    const before = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.toilProject === 'settlement')!.data as { workItems: unknown[] }).workItems.length;
     extras(toil, MANY - before);
     const { sync, advance } = await setup(toil);
     expect((await sync.run(ctx)).error).toBeNull();
@@ -74,7 +74,7 @@ describe('get-many in slices', () => {
 
     // A day on, the search is listed whole and one item is gone, so the first slice now ends one id later and the second is empty.
     advance(25 * HOUR);
-    const first = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.dossier === 'settlement')!.data as { workItems: Array<{ id: number }> }).workItems[0]!.id;
+    const first = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.toilProject === 'settlement')!.data as { workItems: Array<{ id: number }> }).workItems[0]!.id;
     toil.removeAdo(first);
     toil.touchAdo(2302, 'Resolved', new Date(Date.parse(FIXTURE_NOW) + HOUR).toISOString());
     toil.reset();
@@ -83,14 +83,14 @@ describe('get-many in slices', () => {
   });
 });
 
-describe('a dossier that maps its own iteration field', () => {
+describe('a Toil project that maps its own iteration field', () => {
   it('makes no feed call and reads the history of each item', async () => {
     const toil = stubToil();
-    const show = toil.canned.find((c) => c.command === 'dossiers show' && c.input.dossier === 'settlement')!.data as { dossier: { ado: Record<string, unknown> } };
-    show.dossier.ado.fields = { iteration: 'Custom.Sprint' };
-    await loadDossier(toil.execute as unknown as Execute, 'settlement', { mapOwi });
+    const show = toil.canned.find((c) => c.command === 'projects show' && c.input.toilProject === 'settlement')!.data as { toilProject: { ado: Record<string, unknown> } };
+    show.toilProject.ado.fields = { iteration: 'Custom.Sprint' };
+    await loadToilProject(toil.execute as unknown as Execute, 'settlement', { mapOwi });
     expect(named(toil, FEED)).toHaveLength(0);
-    const ids = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.dossier === 'settlement')!.data as { workItems: Array<{ id: number }> }).workItems.map((w) => w.id);
+    const ids = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.toilProject === 'settlement')!.data as { workItems: Array<{ id: number }> }).workItems.map((w) => w.id);
     expect(named(toil, 'ado work-item history').map((c) => c.input.id).sort()).toEqual([...ids].sort());
   });
 });

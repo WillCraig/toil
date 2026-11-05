@@ -126,7 +126,7 @@ function BriefingBody({ briefing: b, evidence, open, H }: { briefing: Briefing; 
         )}
         {b.leftOut.length > 0 && (
           <p className="note">
-            Left out by the dossier's focus: <Chips ids={b.leftOut.map((l) => l.id)} />
+            Left out by the Toil project's focus: <Chips ids={b.leftOut.map((l) => l.id)} />
           </p>
         )}
       </section>
@@ -184,7 +184,7 @@ export function ChangesDetail({ changes: c }: { changes: AnalysisChanges }) {
   const sprintText = (s: NonNullable<AnalysisChanges['sprint']>['from']) => (s ? `${s.name}: ${s.done} done, ${s.remaining} left` : 'no sprint running');
   return (
     <>
-    <p className="note analysis-changes__since">Compared with the analysis of {dateTime(c.previous.at)}, by the dossier's items then and now.</p>
+    <p className="note analysis-changes__since">Compared with the analysis of {dateTime(c.previous.at)}, by the Toil project's items then and now.</p>
     <dl className="analysis-changes">
       {c.newlyBlocked.length > 0 && (
         <div>

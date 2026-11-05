@@ -1,6 +1,6 @@
 /**
  * The sample worklog (#308), for the site preview and `toil-ui --sample`:
- * each sample dossier's pages folded by the same code the server folds them
+ * each sample toil project's pages folded by the same code the server folds them
  * with (src/model/worklog.ts), from the sample's own items, pull requests and
  * builds, plus a scripted fortnight of daily syncs (one of which fails), a
  * blocker one sync saw, an agent question with its proposals and a note.
@@ -9,7 +9,7 @@
  */
 
 import type { Answer } from '../agent.ts';
-import { loadDossier, type DossierData } from '../load.ts';
+import { loadToilProject, type ToilProjectData } from '../load.ts';
 import { buildStandup, daysBetween, rangeProblem, standupMarkdown, standupText } from '../model/standup.ts';
 import {
   addDays, buildDay, dayOf, eventsFrom, gapsFor, isDay, isMonth, lineCount, markdownOf, monthOf, runFromAnswer,
@@ -26,7 +26,7 @@ const RETENTION = 30;
 const SYNC_DAYS = 14;
 
 interface Sample {
-  data: DossierData;
+  data: ToilProjectData;
   events: WorklogEvent[];
   runs: AgentRun[];
   applied: Record<string, Applied>;
@@ -37,21 +37,21 @@ interface Sample {
 const at = (day: string, time: string) => `${day}T${time}:00.000Z`;
 
 /** A scripted question from the day before, with its answer and proposals, the first one applied. */
-async function sampleRun(dossier: string, day: string): Promise<{ run: AgentRun; applied: Record<string, Applied> } | null> {
+async function sampleRun(toilProject: string, day: string): Promise<{ run: AgentRun; applied: Record<string, Applied> } | null> {
   const agent = scriptedAgent();
-  const starters = agent.starters(dossier);
+  const starters = agent.starters(toilProject);
   let chosen: { label: string; answer: Answer } | null = null;
   for (const s of starters) {
-    const answer = await agent.ask(dossier, s.id);
+    const answer = await agent.ask(toilProject, s.id);
     if (!chosen || (!chosen.answer.proposals.length && answer.proposals.length)) chosen = { label: s.label, answer };
   }
   if (!chosen) return null;
-  const run = runFromAnswer({ id: `sample-${dossier}-1`, kind: 'ask', dossier, startedAt: at(day, '15:20'), by: 'the scripted preview', prompt: chosen.label }, at(day, '15:21'), chosen.answer);
+  const run = runFromAnswer({ id: `sample-${toilProject}-1`, kind: 'ask', toilProject, startedAt: at(day, '15:20'), by: 'the scripted preview', prompt: chosen.label }, at(day, '15:21'), chosen.answer);
   const first = run.proposals.find((p) => p.command);
   return { run, applied: first ? { [first.id]: { state: 'applied', at: at(day, '16:02'), via: 'cli' } } : {} };
 }
 
-async function sampleOf(data: DossierData, now: string): Promise<Sample> {
+async function sampleOf(data: ToilProjectData, now: string): Promise<Sample> {
   const today = dayOf(now)!;
   const yesterday = addDays(today, -1);
   const events = eventsFrom({ items: data.items, changes: data.changes });
@@ -103,59 +103,59 @@ async function sampleOf(data: DossierData, now: string): Promise<Sample> {
 /** The sample worklog, over the fixture `execute()` and its fixed clock. */
 export function fixtureWorklog(execute: Execute = fixtureExecute().execute, now: string = FIXTURE_NOW): WorklogApi {
   const loaded = new Map<string, Promise<Sample>>();
-  const sample = (dossier: string) => {
-    if (!loaded.has(dossier)) loaded.set(dossier, loadDossier(execute, dossier).then((d) => sampleOf(d, now)));
-    return loaded.get(dossier)!.catch((e: unknown) => {
-      loaded.delete(dossier);
-      throw new WorklogRefusal(e instanceof Error ? e.message : String(e), 'Pick one of the sample dossiers.', 404);
+  const sample = (toilProject: string) => {
+    if (!loaded.has(toilProject)) loaded.set(toilProject, loadToilProject(execute, toilProject).then((d) => sampleOf(d, now)));
+    return loaded.get(toilProject)!.catch((e: unknown) => {
+      loaded.delete(toilProject);
+      throw new WorklogRefusal(e instanceof Error ? e.message : String(e), 'Pick one of the sample Toil projects.', 404);
     });
   };
   const today = dayOf(now)!;
   const contentDays = (s: Sample) => [...new Set([...s.events.map((e) => dayOf(e.at)!), ...s.runs.map((r) => dayOf(r.startedAt)!), ...s.notes.map((n) => dayOf(n.at)!), ...s.syncs.map((x) => dayOf(x.at)!)])].filter((d) => d <= today).sort();
-  const page = (dossier: string, s: Sample, day: string): WorklogPage => buildDay({ dossier, day, events: s.events, runs: s.runs, applied: s.applied, notes: s.notes, syncs: s.syncs, now, retentionDays: RETENTION });
+  const page = (toilProject: string, s: Sample, day: string): WorklogPage => buildDay({ toilProject, day, events: s.events, runs: s.runs, applied: s.applied, notes: s.notes, syncs: s.syncs, now, retentionDays: RETENTION });
   const checkDay = (day: string) => {
     if (!isDay(day)) throw new WorklogRefusal('Name a day as yyyy-mm-dd.', 'Pick one from the calendar.');
     if (day > today) throw new WorklogRefusal(`${day} hasn't happened yet, so it has no page.`, 'Pick today or an earlier day.');
     return day;
   };
-  const dayOfSample = async (dossier: string, day: string): Promise<WorklogDay> => {
-    const p = page(dossier, await sample(dossier), checkDay(day));
+  const dayOfSample = async (toilProject: string, day: string): Promise<WorklogDay> => {
+    const p = page(toilProject, await sample(toilProject), checkDay(day));
     return { page: p, markdown: markdownOf(p), file: null };
   };
   return {
     disabled: WORKLOG_SAMPLE_DISABLED,
-    async month(dossier, month): Promise<WorklogMonth> {
-      const s = await sample(dossier);
+    async month(toilProject, month): Promise<WorklogMonth> {
+      const s = await sample(toilProject);
       const wanted = month ?? monthOf(today);
       if (!isMonth(wanted)) throw new WorklogRefusal('Name a month as yyyy-mm.', "Use the calendar's arrows.");
       const all = contentDays(s);
       return {
-        dossier,
+        toilProject,
         month: wanted,
         today,
         timeZone: 'UTC',
         retentionDays: RETENTION,
         first: all[0] ?? null,
         last: all.at(-1) ?? null,
-        days: all.filter((d) => monthOf(d) === wanted).map((day) => ({ day, lines: lineCount(page(dossier, s, day)), gaps: gapsFor({ day, syncs: s.syncs, now, retentionDays: RETENTION }).length })),
+        days: all.filter((d) => monthOf(d) === wanted).map((day) => ({ day, lines: lineCount(page(toilProject, s, day)), gaps: gapsFor({ day, syncs: s.syncs, now, retentionDays: RETENTION }).length })),
       };
     },
     day: dayOfSample,
-    async rebuild(dossier, day): Promise<WorklogRebuilt> {
-      return { ...(await dayOfSample(dossier, day)), same: null };
+    async rebuild(toilProject, day): Promise<WorklogRebuilt> {
+      return { ...(await dayOfSample(toilProject, day)), same: null };
     },
     async addNote(): Promise<WorklogDay> {
       throw new WorklogRefusal(WORKLOG_SAMPLE_DISABLED, 'Run toil-ui on your own machine to keep notes.');
     },
-    async exportTo(_dossier: string, _what: ExportWhat): Promise<WorklogExport> {
+    async exportTo(_toilProject: string, _what: ExportWhat): Promise<WorklogExport> {
       throw new WorklogRefusal(WORKLOG_SAMPLE_DISABLED, 'Run toil-ui on your own machine to export a page.');
     },
-    async standup(dossier, from, to): Promise<WorklogStandup> {
-      const s = await sample(dossier);
+    async standup(toilProject, from, to): Promise<WorklogStandup> {
+      const s = await sample(toilProject);
       const problem = rangeProblem(from, to, today);
       if (problem) throw new WorklogRefusal(problem, 'Pick the days again, ending today or earlier.');
       const asOf = s.syncs.filter((x) => x.ok).map((x) => x.at).sort().at(-1) ?? null;
-      const report = buildStandup({ dossier, from, to, pages: daysBetween(from, to).map((d) => page(dossier, s, d)), people: s.data.people, items: s.data.items, pullRequests: s.data.pullRequests, asOf, notes: s.data.peopleNotes });
+      const report = buildStandup({ toilProject, from, to, pages: daysBetween(from, to).map((d) => page(toilProject, s, d)), people: s.data.people, items: s.data.items, pullRequests: s.data.pullRequests, asOf, notes: s.data.peopleNotes });
       return { report, markdown: standupMarkdown(report), text: standupText(report) };
     },
   };

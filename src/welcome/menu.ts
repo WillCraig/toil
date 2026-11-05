@@ -139,21 +139,21 @@ export function apply(state: MenuState, action: Action): MenuState {
   return { ...state, stack };
 }
 
-/** Records what a run returned: the health of every connection it tested, each dossier it read, and a result screen. */
+/** Records what a run returned: the health of every connection it tested, each toil project it read, and a result screen. */
 export function finish(state: MenuState, results: StepResult[]): MenuState {
   const health = { ...state.session.health };
   for (const r of results) if (r.args[0] === 'connections' && r.args[1] === 'test' && r.args[2]) health[r.args[2]] = healthOf(r.envelope);
-  const dossiers = { ...state.session.dossiers };
+  const toilProjects = { ...state.session.toilProjects };
   for (const r of results) {
     const [group, verb, ref] = r.args;
-    if (group === 'dossiers' && (verb === 'show' || verb === 'check') && ref && r.envelope.ok) dossiers[ref] = { ...dossiers[ref], [verb]: r.envelope.data };
+    if (group === 'projects' && (verb === 'show' || verb === 'check') && ref && r.envelope.ok) toilProjects[ref] = { ...toilProjects[ref], [verb]: r.envelope.data };
   }
   const briefs = { ...state.session.briefs };
-  for (const r of results) if (r.args[0] === 'dossiers' && r.args[1] === 'brief' && r.args[2] && r.envelope.ok) briefs[r.args[2]] = r.envelope.data;
+  for (const r of results) if (r.args[0] === 'projects' && r.args[1] === 'brief' && r.args[2] && r.envelope.ok) briefs[r.args[2]] = r.envelope.data;
   const run = state.pending;
   const rest = { ...state };
   delete rest.pending;
-  const session = { ...state.session, health, ...(Object.keys(dossiers).length ? { dossiers } : {}), ...(Object.keys(briefs).length ? { briefs } : {}) };
+  const session = { ...state.session, health, ...(Object.keys(toilProjects).length ? { toilProjects } : {}), ...(Object.keys(briefs).length ? { briefs } : {}) };
   return { ...rest, session, stack: [...state.stack, { ...frame('result'), ...(run ? { run } : {}), results }] };
 }
 

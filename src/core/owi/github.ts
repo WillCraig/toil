@@ -43,11 +43,11 @@ export const GITHUB_STATUSES: Record<string, StatusCategory> = {
   done: 'DONE',
 };
 
-/** How long a milestone's sprint runs when no earlier milestone says where it starts, and the dossier names no length. */
+/** How long a milestone's sprint runs when no earlier milestone says where it starts, and the toil project names no length. */
 export const GITHUB_ITERATION_DAYS = 14;
 
 /**
- * The labels that hold an estimate when the dossier names no pattern of its
+ * The labels that hold an estimate when the toil project names no pattern of its
  * own: a word that says it is an estimate, then the number. `size: M` and
  * other T-shirt sizes are left alone: a letter is not a number of points.
  */
@@ -56,9 +56,9 @@ const ESTIMATE_LABEL = /^(?:story[ -]?points?|points?|pts|sp|estimate)\s*[:=/ -]
 export const GITHUB_ESTIMATE_LABELS = '"points: N", "story points: N", "pts: N", "sp: N" or "estimate: N"';
 
 /**
- * A dossier's `estimateLabel` (`points: {n}`) as a pattern: the text
+ * A toil project's `estimateLabel` (`points: {n}`) as a pattern: the text
  * literally, in any case, with `{n}` the number. Literal on purpose, not a
- * regular expression, since a dossier may come from a repository, and a
+ * regular expression, since a toil project may come from a repository, and a
  * pattern from someone else's file shouldn't be able to stall the mapper.
  */
 export function estimateLabelPattern(template: string): RegExp {
@@ -136,7 +136,7 @@ export function githubItem(doc: OwiDocument, issue: Issue, state: MapState): Wor
   return item;
 }
 
-/** The estimate a label holds: the dossier's `estimateLabel` pattern, else the usual words. Two labels that both match are listed, never picked between. */
+/** The estimate a label holds: the toil project's `estimateLabel` pattern, else the usual words. Two labels that both match are listed, never picked between. */
 function labelEstimate(item: WorkItem, state: MapState): void {
   const pattern = state.fields.estimateLabel === undefined ? ESTIMATE_LABEL : estimateLabelPattern(state.fields.estimateLabel);
   const hits = item.labels.flatMap((label) => {

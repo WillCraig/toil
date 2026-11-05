@@ -1,6 +1,6 @@
 /**
  * Ticket the work (#304): a chat about work that no ticket covers, matched to
- * the dossier's open items by the scorer `toil util owi similar` runs
+ * the toil project's open items by the scorer `toil util owi similar` runs
  * (src/core/owi/similar.ts), imported as it is, so the banner and the command
  * rank the same items the same way and give the same reasons. The person
  * chooses what happens: attach the work to a match (nothing is written), or
@@ -29,7 +29,7 @@ const MAX_SUMMARY = 120;
  */
 const QUESTION = /^(what|whats|what's|why|how|who|whose|when|where|which)\b/i;
 
-/** Whether a prompt is a question about the dossier, which needs no ticket: it ends with a question mark, or opens with a wh-word. */
+/** Whether a prompt is a question about the toil project, which needs no ticket: it ends with a question mark, or opens with a wh-word. */
 export function isQuestion(prompt: string): boolean {
   const text = prompt.trim();
   return text.endsWith('?') || QUESTION.test(text);
@@ -97,7 +97,7 @@ function commonType(items: readonly WorkItem[], area: string): string | null {
   return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
 }
 
-/** The area most of the dossier's open items come from: where a new ticket goes when no match says. */
+/** The area most of the toil project's open items come from: where a new ticket goes when no match says. */
 function mainArea(items: readonly WorkItem[]): string | null {
   const counts = new Map<string, number>();
   for (const i of items) if (i.statusCategory !== 'DONE') counts.set(i.source.area, (counts.get(i.source.area) ?? 0) + 1);
@@ -107,52 +107,52 @@ function mainArea(items: readonly WorkItem[]): string | null {
 const ATTACH = (key: string) => `To attach the work instead, which writes nothing, name ${key} in the branch and in every commit message.`;
 
 /** A sub-task under one match, as toil would create it on that item's tracker. */
-export function subTaskProposal(prompt: string, parent: WorkItem, dossier: string): Proposal {
+export function subTaskProposal(prompt: string, parent: WorkItem, toilProject: string): Proposal {
   const key = shortKey(parent);
-  const base = { id: `ticket:${dossier}:sub:${parent.id}`, from: 'ticket' as const, item: parent.id, title: `Create a sub-task under ${key}`, reason: `The work reads closest to [[${parent.id}]]. ${ATTACH(key)}` };
+  const base = { id: `ticket:${toilProject}:sub:${parent.id}`, from: 'ticket' as const, item: parent.id, title: `Create a sub-task under ${key}`, reason: `The work reads closest to [[${parent.id}]]. ${ATTACH(key)}` };
   const summary = summaryOf(prompt);
   const area = parent.source.area;
   if (area === 'jira') {
     // Data Center names the type Sub-task and Cloud Subtask; the item's source says which it came from.
     const type = parent.source.deployment === 'cloud' ? 'Subtask' : 'Sub-task';
-    return { ...base, command: 'jira issue create', input: { dossier, project: parent.source.key.split('-')[0]!, issueType: type, parent: parent.source.key, summary, description: describe(prompt) }, note: `${type} is Jira's default name for the type; your project may call it something else.` };
+    return { ...base, command: 'jira issue create', input: { toilProject, project: parent.source.key.split('-')[0]!, issueType: type, parent: parent.source.key, summary, description: describe(prompt) }, note: `${type} is Jira's default name for the type; your project may call it something else.` };
   }
   if (area === 'ado') {
     // Services' work-item create takes no parent (Server's does); the item's source says which it came from.
     if (parent.source.deployment === 'cloud') {
-      return { ...base, command: 'ado work-item create', input: { dossier, type: 'Task', title: summary, description: describe(prompt) }, note: `ado work-item create takes no parent on a Services connection: once it exists, link it under ${key} on the board.` };
+      return { ...base, command: 'ado work-item create', input: { toilProject, type: 'Task', title: summary, description: describe(prompt) }, note: `ado work-item create takes no parent on a Services connection: once it exists, link it under ${key} on the board.` };
     }
-    return { ...base, command: 'ado work-item create', input: { dossier, type: 'Task', title: summary, description: describe(prompt), parent: parent.source.key }, note: null };
+    return { ...base, command: 'ado work-item create', input: { toilProject, type: 'Task', title: summary, description: describe(prompt), parent: parent.source.key }, note: null };
   }
   if (area === 'github') {
     const m = /^([^/]+)\/([^#]+)#(\d+)$/.exec(parent.source.key);
     if (m) {
-      return { ...base, command: 'github issue create', input: { dossier, owner: m[1]!, repo: m[2]!, title: summary, body: `Part of #${m[3]}. ${describe(prompt)}` }, note: 'toil has no sub-issue command, so this names its parent in the body; add it as a sub-issue on GitHub if the repository uses them.' };
+      return { ...base, command: 'github issue create', input: { toilProject, owner: m[1]!, repo: m[2]!, title: summary, body: `Part of #${m[3]}. ${describe(prompt)}` }, note: 'toil has no sub-issue command, so this names its parent in the body; add it as a sub-issue on GitHub if the repository uses them.' };
     }
   }
   return { ...base, command: null, input: null, note: `toil has no create command for ${area} items.` };
 }
 
-/** A new ticket for the work, on the tracker the top match is on, else the one most of the dossier's open items come from. */
-export function newTicketProposal(prompt: string, items: readonly WorkItem[], dossier: string, near: WorkItem | null): Proposal {
+/** A new ticket for the work, on the tracker the top match is on, else the one most of the toil project's open items come from. */
+export function newTicketProposal(prompt: string, items: readonly WorkItem[], toilProject: string, near: WorkItem | null): Proposal {
   const summary = summaryOf(prompt);
   const area = near?.source.area ?? mainArea(items);
-  const base = { id: `ticket:${dossier}:new`, from: 'ticket' as const, item: `${dossier}:new`, title: `Create a new ticket: ${summary}`, reason: near ? `Not one of the matches: a ticket of its own.` : 'No open item shares enough words with the work to be its ticket.' };
+  const base = { id: `ticket:${toilProject}:new`, from: 'ticket' as const, item: `${toilProject}:new`, title: `Create a new ticket: ${summary}`, reason: near ? `Not one of the matches: a ticket of its own.` : 'No open item shares enough words with the work to be its ticket.' };
   if (area === 'jira') {
-    return { ...base, command: 'jira issue create', input: { dossier, summary, description: describe(prompt) }, note: "The project and issue type come from the dossier and the connection's defaults; add --project or --type where they don't set them." };
+    return { ...base, command: 'jira issue create', input: { toilProject, summary, description: describe(prompt) }, note: "The project and issue type come from the Toil project and the connection's defaults; add --project or --type where they don't set them." };
   }
   if (area === 'ado') {
     const type = commonType(items, area);
-    return { ...base, command: 'ado work-item create', input: { dossier, type: type ?? 'Task', title: summary, description: describe(prompt) }, note: type ? `${type} is the type most of the dossier's open ${area} items have; change --type if this is something else.` : 'Task is a guess: no open item shows which type the process uses; change --type if it calls it something else.' };
+    return { ...base, command: 'ado work-item create', input: { toilProject, type: type ?? 'Task', title: summary, description: describe(prompt) }, note: type ? `${type} is the type most of the Toil project's open ${area} items have; change --type if this is something else.` : 'Task is a guess: no open item shows which type the process uses; change --type if it calls it something else.' };
   }
   if (area === 'github') {
-    return { ...base, command: 'github issue create', input: { dossier, title: summary, body: describe(prompt) }, note: 'The repository comes from the dossier; add --owner and --repo where it names none.' };
+    return { ...base, command: 'github issue create', input: { toilProject, title: summary, body: describe(prompt) }, note: 'The repository comes from the Toil project; add --owner and --repo where it names none.' };
   }
-  return { ...base, command: null, input: null, note: area ? `toil has no create command for ${area} items.` : 'The dossier has no open item to say which tracker a new ticket goes on.' };
+  return { ...base, command: null, input: null, note: area ? `toil has no create command for ${area} items.` : 'The Toil project has no open item to say which tracker a new ticket goes on.' };
 }
 
 /** What "Ticket this" offers: a sub-task under each match, then a new ticket. */
-export function ticketProposals(found: Unticketed, byId: ReadonlyMap<string, WorkItem>, items: readonly WorkItem[], dossier: string): Proposal[] {
+export function ticketProposals(found: Unticketed, byId: ReadonlyMap<string, WorkItem>, items: readonly WorkItem[], toilProject: string): Proposal[] {
   const parents = found.matches.flatMap((m) => (byId.get(m.id) ? [byId.get(m.id)!] : []));
-  return [...parents.map((p) => subTaskProposal(found.prompt, p, dossier)), newTicketProposal(found.prompt, items, dossier, parents[0] ?? null)];
+  return [...parents.map((p) => subTaskProposal(found.prompt, p, toilProject)), newTicketProposal(found.prompt, items, toilProject, parents[0] ?? null)];
 }

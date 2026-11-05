@@ -26,8 +26,8 @@ afterEach(() => {
 // A Jira key (PAY-101) or an Azure DevOps id (2303): what a headline must not carry.
 const KEY = /\b[A-Z][A-Z0-9]+-\d+\b|\b\d{4}\b/;
 
-async function open(dossier: string, analyses = true) {
-  window.location.hash = `#/dossier/${dossier}`;
+async function open(toilProject: string, analyses = true) {
+  window.location.hash = `#/project/${toilProject}`;
   render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} analyses={analyses ? fixtureAnalyses() : undefined} now={FIXTURE_NOW} preview />);
   const region = await screen.findByRole('region', { name: 'Briefing' });
   await waitFor(() => expect(region.querySelector('[data-answer]')).toBeTruthy());
@@ -107,7 +107,7 @@ describe('what needs attention', () => {
     const risk = region.querySelector('.sum-card')!;
     expect(risk.querySelector('h3')!.firstChild!.textContent).toBe('Tokenise card numbers at the edge');
     expect(risk.querySelector('h3 .sum-key')!.textContent!.trim()).toBe('Jira PAY-101');
-    expect(risk.querySelector('a')!.getAttribute('href')).toBe('#/dossier/card-payments?item=corp-jira%3APAY-101');
+    expect(risk.querySelector('a')!.getAttribute('href')).toBe('#/project/card-payments?item=corp-jira%3APAY-101');
   });
 
   it('never gives one story two cards, and falls back to stories not ready to start', async () => {
@@ -123,7 +123,7 @@ describe('what needs attention', () => {
   it('opens an item on its own page when the person chose that', async () => {
     setPrefs({ opensIn: 'page' });
     const region = await open('card-payments');
-    expect(region.querySelector('.sum-card[data-card="risk"] a')!.getAttribute('href')).toBe('#/dossier/card-payments/item/corp-jira%3APAY-101');
+    expect(region.querySelector('.sum-card[data-card="risk"] a')!.getAttribute('href')).toBe('#/project/card-payments/item/corp-jira%3APAY-101');
   });
 });
 

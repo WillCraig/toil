@@ -95,7 +95,7 @@ const NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
  * Key patterns as `text=connection` entries (the CLI's repeatable
- * --key-pattern) or objects (what Toil UI builds from a dossier), checked.
+ * --key-pattern) or objects (what Toil UI builds from a toil project), checked.
  * The text holds exactly one `{n}` and is matched as written, never as a
  * regular expression.
  */
@@ -207,7 +207,7 @@ export interface AccountSignal {
 
 /**
  * Sets `authorKind` from the strongest signal there is, in this order: the
- * dossier's override for the author, the account itself (a bot, or an
+ * toil project's override for the author, the account itself (a bot, or an
  * agent's account), an agent's Co-Authored-By trailer on a commit, an
  * agent's branch prefix. With none, HUMAN, and the source says `default`.
  */
@@ -235,7 +235,7 @@ function overrideFor(authors: Record<string, AuthorKind>, person: Person): { id:
   return undefined;
 }
 
-/** Author kinds as `id=KIND` entries (the CLI's repeatable --author-kind) or an object (a dossier section's `authorKinds`), checked. */
+/** Author kinds as `id=KIND` entries (the CLI's repeatable --author-kind) or an object (a toil project section's `authorKinds`), checked. */
 export function authorKinds(entries: string[] | Record<string, string> | undefined): Record<string, AuthorKind> {
   const pairs = Array.isArray(entries)
     ? entries.map((entry) => {

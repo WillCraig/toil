@@ -1,6 +1,6 @@
 // Writes ui/scripts/ado-seed/items.owi.json: about 45 made-up work items for an
 // Azure DevOps Services board (Scrum process), as Open Work Item 0.1 records,
-// spread across the three sample dossiers' products (card-payments, settlement,
+// spread across the three sample toil projects' products (card-payments, settlement,
 // checkout-web). The choices are random but seeded, so the same seed always
 // writes the same file:
 //

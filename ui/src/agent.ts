@@ -1,6 +1,6 @@
 /**
  * The agent seam (#206, Reasoning on the subscription you already have). An
- * agent answers questions about one dossier's work, as the dashboard read it
+ * agent answers questions about one toil project's work, as the dashboard read it
  * through toil, and cites every item it used; it never writes. A change it
  * suggests comes back as a proposal (src/proposal.ts) a person reviews and
  * applies through toil's write gate, so this interface has no way to send
@@ -89,7 +89,7 @@ export const MAX_HISTORY_ANSWER = 1500;
 export interface AskExtra {
   /** The adapter this chat switched to; absent, the one chosen in Settings answers. */
   adapter?: string;
-  /** The adapter was the chat's fallback (Settings' choice can't run), not anyone's choice, so the dossier doesn't remember it. */
+  /** The adapter was the chat's fallback (Settings' choice can't run), not anyone's choice, so the toil project doesn't remember it. */
   fallback?: boolean;
   history?: HistoryTurn[];
 }
@@ -110,7 +110,7 @@ export interface AdapterOption {
 export interface AdapterList {
   /** The adapter chosen in Settings, or null. */
   chosen: string | null;
-  /** The adapter last used for the asked dossier's Analyze (#494), when the list was asked for one. */
+  /** The adapter last used for the asked toil project's Analyze (#494), when the list was asked for one. */
   remembered?: string | null;
   options: AdapterOption[];
 }
@@ -148,24 +148,24 @@ export interface Agent {
   noticeDetails?: string;
   /** Who answers, in words, for the pane's info: an adapter's name, or the scripted preview. */
   label?: string;
-  /** The questions offered about a dossier before anyone types. */
-  starters(dossier: string): Starter[];
-  /** Answers about the named dossier only. */
-  ask(dossier: string, prompt: string, style?: AskStyle, chat?: ChatTurn, extra?: AskExtra): Promise<Answer>;
+  /** The questions offered about a toil project before anyone types. */
+  starters(toilProject: string): Starter[];
+  /** Answers about the named toil project only. */
+  ask(toilProject: string, prompt: string, style?: AskStyle, chat?: ChatTurn, extra?: AskExtra): Promise<Answer>;
   /**
    * The same answer as it grows: each value is the answer so far, and the
    * last is the whole of it. Optional; the pane falls back to `ask`.
    */
-  stream?(dossier: string, prompt: string, signal?: AbortSignal, style?: AskStyle, chat?: ChatTurn, extra?: AskExtra): AsyncIterable<Answer>;
-  /** The adapters a chat can switch between (#344), and, for a dossier, the one its Analyze last used (#494). Absent: the chat has no switcher. */
-  adapters?(dossier?: string): Promise<AdapterList>;
+  stream?(toilProject: string, prompt: string, signal?: AbortSignal, style?: AskStyle, chat?: ChatTurn, extra?: AskExtra): AsyncIterable<Answer>;
+  /** The adapters a chat can switch between (#344), and, for a toil project, the one its Analyze last used (#494). Absent: the chat has no switcher. */
+  adapters?(toilProject?: string): Promise<AdapterList>;
   /** What a chat started on, checked now (#305); null before its first question. Absent: chats record nothing. */
   session?(chat: string): Promise<ChatSession | null>;
   /** Starts the chat afresh on today's instructions (#305), keeping its log; refused while it answers. */
-  renew?(chat: string, dossier: string): Promise<ChatSession>;
+  renew?(chat: string, toilProject: string): Promise<ChatSession>;
 }
 
-/** The fixed question Analyze asks (#343): a pulse check of the dossier. */
+/** The fixed question Analyze asks (#343): a pulse check of the toil project. */
 export const ANALYZE = 'analyze';
 
 const CITE = /\[\[([^\]]+)\]\]/g;

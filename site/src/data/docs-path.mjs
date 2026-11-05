@@ -16,14 +16,14 @@ export const docsPath = [
       { label: 'Install', href: '/docs/install/' },
       { label: 'Set up with your agent', href: '/docs/setup/' },
       { label: 'The welcome menu', href: '/docs/welcome/' },
-      { label: 'Your first dossier', href: '/docs/dossiers/#create' },
+      { label: 'Your first toil project', href: '/docs/projects/#create' },
     ],
   },
   {
     id: 'use',
     title: 'Use',
     links: [
-      { label: 'Dossiers', href: '/docs/dossiers/' },
+      { label: 'Toil projects', href: '/docs/projects/' },
       { label: 'Utilities', href: '/docs/utilities/' },
       { label: 'Local git', href: '/connect/git/' },
       { label: 'Dependency checks', href: '/connect/#dependency-checks' },
@@ -88,7 +88,7 @@ export const startPaths = [
     role: 'You lead a team',
     steps: [
       { label: 'Run Toil UI', href: '/docs/ui/#start-it' },
-      { label: 'Onboard to a dossier', href: '/docs/dossiers/#onboarding-to-a-repo-that-has-a-dossier' },
+      { label: 'Onboard to a toil project', href: '/docs/projects/#onboarding-to-a-repo-that-has-a-toil-project' },
       { label: 'Press Analyze', href: '/docs/ui/#the-agent' },
     ],
   },

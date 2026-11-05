@@ -16,13 +16,13 @@ import { openChat } from './chat.ts';
  * applies; a question, or work that names its ticket, gets no banner.
  */
 
-async function chat(dossier: string) {
+async function chat(toilProject: string) {
   const fixture = fixtureExecute();
-  window.location.hash = `#/dossier/${dossier}`;
+  window.location.hash = `#/project/${toilProject}`;
   render(<App execute={fixture.execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
   await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
   // The focused view the Ask bar opens (#343).
-  const pane = await openChat(dossier);
+  const pane = await openChat(toilProject);
   const say = async (text: string) => {
     await userEvent.type(within(pane).getByRole('textbox', { name: 'Your question' }), text);
     await userEvent.click(within(pane).getByRole('button', { name: 'Ask' }));
@@ -77,7 +77,7 @@ describe('the "Not ticketed yet" banner', () => {
     expect(within(cards[0]!).getByText(/^toil ado work-item create/).textContent).toContain("--type 'User Story'");
   }, 20_000);
 
-  it('stays away from Analyze, which is a question about the dossier, and still catches work asked after it (#343)', async () => {
+  it('stays away from Analyze, which is a question about the Toil project, and still catches work asked after it (#343)', async () => {
     const { pane, say } = await chat('settlement');
     await userEvent.click(within(pane).getByRole('button', { name: /^Give me the full briefing/ }));
     await within(pane).findByRole('heading', { level: 3, name: 'Analyze' });

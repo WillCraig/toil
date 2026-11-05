@@ -4,7 +4,7 @@
  * that shows them, and the settings under Settings, General. A change
  * notifies once, when it happens, and only for the states a person switched
  * on: assignments' end states from the server's event stream, a session gone
- * stale (#305) from the chat and from a minute's read of the dossier's
+ * stale (#305) from the chat and from a minute's read of the toil project's
  * assignments. While the tab is hidden the title counts them, and the
  * browser's own notification shows them once a person has turned that on
  * and the browser allowed it. Plain words in every theme. Nothing leaves the
@@ -16,7 +16,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Button, Checkbox, FieldError, Input, Label, TextField } from 'react-aria-components';
 import { ADAPTER_NAME, type AssignmentsApi } from '../assign/model.ts';
 import { Card } from './layout.tsx';
-import { dossierHref } from '../format.ts';
+import { toilProjectHref } from '../format.ts';
 import { history } from '../history.ts';
 import { Coalescer, HHMM, inQuiet, NOTABLE_LABEL, NOTABLES, parseNotify, summaryOf, transitionOf, type NotifySettings, type Transition } from '../notify.ts';
 
@@ -24,7 +24,7 @@ const SETTINGS_KEY = 'toil-ui.notify';
 const MINE_KEY = 'toil-ui.notify.mine';
 /** How many assignment ids this browser remembers starting: plenty for "only mine". */
 const MAX_MINE = 500;
-/** How often the dossier on screen is read for sessions gone stale. */
+/** How often the toil project on screen is read for sessions gone stale. */
 export const STALE_POLL_MS = 60_000;
 /** How long the event stream waits before it reconnects. */
 const RECONNECT_MS = 5000;
@@ -117,7 +117,7 @@ export function useMine(): { mine: () => Set<string>; mark: (id: string) => void
   return { mine, mark };
 }
 
-export function NotifyProvider({ assignments, dossier, mine, children }: { assignments: AssignmentsApi | undefined; dossier: string | null; mine: () => Set<string>; children: ReactNode }) {
+export function NotifyProvider({ assignments, toilProject, mine, children }: { assignments: AssignmentsApi | undefined; toilProject: string | null; mine: () => Set<string>; children: ReactNode }) {
   const [settings, setSettings] = useState<NotifySettings>(() => parseNotify(read(SETTINGS_KEY)));
   const [permission, setPermission] = useState<Permission>(permissionNow);
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -174,7 +174,7 @@ export function NotifyProvider({ assignments, dossier, mine, children }: { assig
     const listen = () => {
       assignments.events!(since, (e) => {
         since = e.seq;
-        const t = transitionOf(e, { mine: mine().has(e.id), href: `${dossierHref(e.dossier)}/assignment/${encodeURIComponent(e.id)}` });
+        const t = transitionOf(e, { mine: mine().has(e.id), href: `${toilProjectHref(e.toilProject)}/assignment/${encodeURIComponent(e.id)}` });
         if (t) coalescer.push(t, e.previous);
       }, controller.signal).then(
         () => undefined,
@@ -190,20 +190,20 @@ export function NotifyProvider({ assignments, dossier, mine, children }: { assig
     };
   }, [assignments, coalescer, mine]);
 
-  // Sessions gone stale (#305) on the dossier on screen: those seen stale at the first read are known already, so only a change notifies.
+  // Sessions gone stale (#305) on the toil project on screen: those seen stale at the first read are known already, so only a change notifies.
   useEffect(() => {
-    if (!assignments || assignments.disabled || !dossier) return;
+    if (!assignments || assignments.disabled || !toilProject) return;
     let known: Set<string> | null = null;
     let alive = true;
     const look = () =>
-      assignments.list(dossier, { inbox: false }).then(
+      assignments.list(toilProject, { inbox: false }).then(
         (l) => {
           if (!alive) return;
           const stale = l.assignments.filter((a) => a.stale);
           if (known) {
             for (const a of stale) {
               if (known.has(a.id)) continue;
-              coalescer.push({ key: `stale:${a.id}`, state: 'stale', notable: 'stale', agent: a.adapter ? ADAPTER_NAME[a.adapter] : 'An agent', item: a.item, itemTitle: a.itemTitle, why: a.stale!.text, dossier: a.dossier, href: `${dossierHref(a.dossier)}/assignment/${encodeURIComponent(a.id)}`, mine: mine().has(a.id) }, 'fresh');
+              coalescer.push({ key: `stale:${a.id}`, state: 'stale', notable: 'stale', agent: a.adapter ? ADAPTER_NAME[a.adapter] : 'An agent', item: a.item, itemTitle: a.itemTitle, why: a.stale!.text, toilProject: a.toilProject, href: `${toilProjectHref(a.toilProject)}/assignment/${encodeURIComponent(a.id)}`, mine: mine().has(a.id) }, 'fresh');
             }
           }
           known = new Set([...(known ?? []), ...stale.map((a) => a.id)]);
@@ -216,7 +216,7 @@ export function NotifyProvider({ assignments, dossier, mine, children }: { assig
       alive = false;
       clearInterval(t);
     };
-  }, [assignments, dossier, coalescer, mine]);
+  }, [assignments, toilProject, coalescer, mine]);
 
   const value: Notify = {
     settings,
@@ -264,7 +264,7 @@ export function Notices() {
   );
 }
 
-const lineOfLink = (c: Transition) => `${c.item ? `${c.item}${c.itemTitle ? ` ${c.itemTitle}` : ''}` : c.dossier}: ${c.why}`;
+const lineOfLink = (c: Transition) => `${c.item ? `${c.item}${c.itemTitle ? ` ${c.itemTitle}` : ''}` : c.toilProject}: ${c.why}`;
 
 /** One checkbox in the settings, drawn as Settings, General draws its others. */
 function Check({ on, set, children }: { on: boolean; set: (on: boolean) => void; children: ReactNode }) {

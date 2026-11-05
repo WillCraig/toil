@@ -2,7 +2,7 @@
  * Theme moments (#419): what a theme may declare in its `theme.json` under
  * `"moments"`, and the plain defaults a theme without the block gets. A theme
  * only declares; the one engine in this folder plays it (the splash, the
- * loading screens, the dossier entrance, the tab transitions and the event
+ * loading screens, the toil project entrance, the tab transitions and the event
  * moments), so no theme writes a player of its own.
  *
  * Everything a moment shows is named here as data: an asset by its key in the
@@ -56,12 +56,12 @@ export interface SpriteSheet extends MomentArt {
 
 /**
  * The plain values a splash may be handed (#462), when the engine knows them: the sprint's day and
- * length, the items done in it and the dossier's name. Numbers and a name, never markup or code; they
+ * length, the items done in it and the toil project's name. Numbers and a name, never markup or code; they
  * reach a theme only as a face's text and as data attributes on the splash (`data-sprint-day`,
- * `data-sprint-days`, `data-items-done`, `data-dossier`).
+ * `data-sprint-days`, `data-items-done`, `data-toil-project`).
  */
 export interface SplashData {
-  dossier: string;
+  toilProject: string;
   /** The sprint's working day, from 1: "day 7 of 10". */
   day: number;
   days: number;
@@ -111,9 +111,9 @@ export interface ThemeMoments {
   loader?: LoaderMoment;
   /** How toil tips are framed on a loading screen: only the label. Absent: "Tip". */
   tips?: { label: string };
-  /** How a dossier arrives when it opens. Absent: it simply appears. */
+  /** How a toil project arrives when it opens. Absent: it simply appears. */
   entrance?: EnterMotif;
-  /** How a dossier's tab arrives when you change tabs. Absent: it simply appears. */
+  /** How a toil project's tab arrives when you change tabs. Absent: it simply appears. */
   tabs?: EnterMotif;
   /** One moment per state change. A kind left out plays nothing. */
   events?: Partial<Record<MomentKind, EventMoment>>;

@@ -27,7 +27,7 @@ function sources(dir: string): string[] {
 const src = sources(join(root, 'src')).join('\n');
 
 /** Codes the page names only to say they were renamed away. */
-const RETIRED_CODES = ['ADO_CLOUD_WORK_ITEMS_MISSING', 'ADO_CLOUD_TYPE_UNKNOWN', 'ADO_CLOUD_DEFAULT_TEAM'];
+const RETIRED_CODES = ['ADO_CLOUD_WORK_ITEMS_MISSING', 'ADO_CLOUD_TYPE_UNKNOWN', 'ADO_CLOUD_DEFAULT_TEAM', 'DOSSIER_RENAMED_AREA', 'DOSSIER_REPO_UNMATCHED'];
 
 describe('the upgrading page', () => {
   it('is in the skill index, and installs with the skill', () => {

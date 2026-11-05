@@ -8,7 +8,7 @@ import { resetPlain } from '../src/plain-words.ts';
 import { GLOSSARY_SLUGS } from './glossary-terms.ts';
 import { openChat } from './chat.ts';
 import { standardWords } from './words.ts';
-import { App, parseRoute } from '../src/App.tsx';
+import { App, parseRoute, upgradeHash } from '../src/App.tsx';
 import { EditLink, Help } from '../src/components/help.tsx';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureConfig } from '../src/fixtures/config.ts';
@@ -70,7 +70,7 @@ describe('the help topics', () => {
   });
 
   it("gives every view the header's Help opens a topic", () => {
-    const views: HelpView[] = ['dossiers', 'dashboard', 'prs', 'people', 'command-center', 'worklog', 'standup', 'item', 'assignment', 'settings'];
+    const views: HelpView[] = ['toilProjects', 'dashboard', 'prs', 'people', 'command-center', 'worklog', 'standup', 'item', 'assignment', 'settings'];
     for (const v of views) expect(viewHelpHref(v)).toMatch(new RegExp(`^${DOCS_SITE}/docs/[a-z-]+/#[a-z0-9-]+$`));
     expect(viewHelpHref('settings', 'agent')).toBe(helpHref(HELP.agent));
   });
@@ -128,10 +128,25 @@ describe('edit links', () => {
 
   it('routes a settings page to the place an edit link names', () => {
     expect(parseRoute('#/settings/connections/corp-jira')).toEqual({ view: 'settings', page: 'connections', at: ['corp-jira'] });
-    expect(parseRoute('#/settings/dossiers/card-payments/wip')).toEqual({ view: 'settings', page: 'dossiers', at: ['card-payments', 'wip'] });
+    expect(parseRoute('#/settings/projects/card-payments/wip')).toEqual({ view: 'settings', page: 'projects', at: ['card-payments', 'wip'] });
     expect(parseRoute('#/settings/agent-usage/caps')).toEqual({ view: 'settings', page: 'agent-usage', at: ['caps'] });
-    expect(parseRoute('#/settings/dossiers')).toEqual({ view: 'settings', page: 'dossiers' });
+    expect(parseRoute('#/settings/projects')).toEqual({ view: 'settings', page: 'projects' });
     expect(parseRoute('#/settings/connections/100%')).toEqual({ view: 'settings', page: 'connections', at: ['100%'] });
+  });
+
+  it('still opens an address from before the rename, as the one it has now (#555)', () => {
+    expect(upgradeHash('#/dossier/card-payments/board')).toBe('#/project/card-payments/board');
+    expect(upgradeHash('#/dossier/card-payments?item=jira%3APAY-1')).toBe('#/project/card-payments?item=jira%3APAY-1');
+    expect(upgradeHash('#/settings/dossiers/card-payments/wip')).toBe('#/settings/projects/card-payments/wip');
+    expect(upgradeHash('#/dossiers')).toBe('#/');
+    expect(upgradeHash('#/project/card-payments')).toBe('#/project/card-payments');
+    expect(parseRoute('#/dossier/card-payments/prs')).toEqual({ view: 'prs', toilProject: 'card-payments' });
+    expect(parseRoute('#/settings/dossiers')).toEqual({ view: 'settings', page: 'projects' });
+  });
+
+  it('rewrites an old address in the bar when the page opens on it', async () => {
+    await open('#/dossier/card-payments');
+    expect(window.location.hash).toBe('#/project/card-payments');
   });
 
   const open = async (hash: string) => {
@@ -148,26 +163,26 @@ describe('edit links', () => {
     expect((await screen.findByText(/toil has no connection named/)).textContent).toContain('gone');
   });
 
-  it('lands on the dossier section it names, with that dossier chosen', async () => {
-    await open('#/settings/dossiers/checkout-web/wip');
-    await waitFor(() => expect(document.activeElement?.id).toBe('dossier-form-wip'));
+  it('lands on the Toil project section it names, with that Toil project chosen', async () => {
+    await open('#/settings/projects/checkout-web/wip');
+    await waitFor(() => expect(document.activeElement?.id).toBe('toil-project-form-wip'));
     expect(document.activeElement?.textContent).toBe("Set checkout-web's work-in-progress limit");
   });
 
   it("puts a pencil on an item's connection and on the People view's limit, each opening its settings", async () => {
-    await open(`#/dossier/card-payments/item/${encodeURIComponent('corp-jira:PAY-102')}`);
+    await open(`#/project/card-payments/item/${encodeURIComponent('corp-jira:PAY-102')}`);
     expect(screen.getByRole('link', { name: 'Edit the corp-jira connection' }).getAttribute('href')).toBe('#/settings/connections/corp-jira');
-    expect(screen.getByRole('link', { name: "Edit card-payments's field names" }).getAttribute('href')).toBe('#/settings/dossiers/card-payments/fields');
+    expect(screen.getByRole('link', { name: "Edit card-payments's field names" }).getAttribute('href')).toBe('#/settings/projects/card-payments/fields');
   });
 
   it('has a Help entry in the header for the view in front of you', async () => {
     setLearningLinks(false);
-    await open('#/dossier/card-payments/people');
+    await open('#/project/card-payments/people');
     await userEvent.click(screen.getByRole('button', { name: /^Help/ }));
     const menu = await screen.findByRole('menu', { name: 'Help' });
     expect(within(menu).getByRole('menuitem', { name: /^Help for this view/ }).getAttribute('href')).toBe(helpHref(HELP.people));
     await userEvent.keyboard('{Escape}');
-    expect(screen.getByRole('link', { name: "Edit card-payments's work-in-progress limit" }).getAttribute('href')).toBe('#/settings/dossiers/card-payments/wip');
+    expect(screen.getByRole('link', { name: "Edit card-payments's work-in-progress limit" }).getAttribute('href')).toBe('#/settings/projects/card-payments/wip');
   });
 });
 
@@ -227,7 +242,7 @@ describe('learning links (#418)', () => {
   };
 
   it("puts Learn in Help's menu, after the view's docs and What's new, and takes it out once the setting is off", async () => {
-    await open('#/dossier/card-payments/people');
+    await open('#/project/card-payments/people');
     await userEvent.click(screen.getByRole('button', { name: /^Help/ }));
     const menu = await screen.findByRole('menu', { name: 'Help' });
     const items = within(menu).getAllByRole('menuitem');
@@ -248,7 +263,7 @@ describe('learning links (#418)', () => {
   });
 
   it("keeps Learn out of the chat's guided start (the header's Help has it), and offers the answers' terms in its (i)", async () => {
-    await open('#/dossier/checkout-web');
+    await open('#/project/checkout-web');
     const chat = await openChat('checkout-web');
     expect(within(chat).queryByRole('button', { name: 'Learn' })).toBeNull();
     await userEvent.click(within(chat).getByRole('button', { name: 'About these answers' }));

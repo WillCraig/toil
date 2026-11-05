@@ -4,7 +4,7 @@
  * prompt, the question and the tools, streams the text back and returns the
  * final answer. Everything else lives here once: loading the SDK with a
  * dynamic import (it's an optional peer dependency, so it may not be there),
- * finding the CLI, building the dossier's read-only tools and their ledger,
+ * finding the CLI, building the toil project's read-only tools and their ledger,
  * streaming, and the checks in answer.ts. Three plugs, one socket.
  */
 
@@ -72,8 +72,8 @@ export interface RunRequest {
 
 export type Endpoint = 'anthropic' | 'bedrock' | 'foundry' | 'vertex';
 
-/** One usage report in the SDK's own figures; the host adds the chat, turn, dossier, adapter and time (#295). */
-export type UsageReport = Omit<UsageRecord, 'chatId' | 'turn' | 'dossier' | 'adapter' | 'at'>;
+/** One usage report in the SDK's own figures; the host adds the chat, turn, toil project, adapter and time (#295). */
+export type UsageReport = Omit<UsageRecord, 'chatId' | 'turn' | 'toilProject' | 'adapter' | 'at'>;
 
 /** Where an adapter sends what its SDK reports about usage, as it reports it (#295). */
 export interface UsageSink {

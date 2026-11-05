@@ -8,7 +8,7 @@
 // ships. A brochure that is also the product saves printing a second one.
 import Layout from '../layouts/Layout.astro';
 import { url } from '../lib/url';
-import { CHECKBOXES, DEFAULT_THEME, DOSSIER, PROPOSAL, QUESTION, SAMPLE_INSTRUCTIONS, STANDARD_ANSWER, STANDARD_PROMPT, START, THEMES, cited } from '../../../ui/scripts/showcase.ts';
+import { CHECKBOXES, DEFAULT_THEME, TOIL_PROJECT, PROPOSAL, QUESTION, SAMPLE_INSTRUCTIONS, STANDARD_ANSWER, STANDARD_PROMPT, START, THEMES, cited } from '../../../ui/scripts/showcase.ts';
 // Each game theme's own faces, at the weights its theme.css loads, so a card
 // drawn in a theme reads in its type. Imported here, they load on this page only.
 import '@fontsource/pixelify-sans/400.css';
@@ -28,11 +28,11 @@ import '@fontsource/bitter/latin-600.css';
 import '@fontsource/fredoka/latin-600.css';
 
 const app = url('/ui/app/');
-const home = `#/dossier/${DOSSIER}`;
+const home = `#/project/${TOIL_PROJECT}`;
 
 /** The views the tour walks through: where each opens in the app, and what the frame does there once it loads. */
 const steps = [
-  { id: 'dossiers', label: 'Toil projects', route: '#/', act: null, title: 'Every Toil project, one card each', body: 'Its sprint and burn-up, what is in progress and blocked, who is on it, and what changed since you last looked. The Toil project you opened last comes first.' },
+  { id: 'projects', label: 'Toil projects', route: '#/', act: null, title: 'Every Toil project, one card each', body: 'Its sprint and burn-up, what is in progress and blocked, who is on it, and what changed since you last looked. The Toil project you opened last comes first.' },
   { id: 'dashboard', label: 'Briefing', route: home, act: null, title: 'A briefing, one layer at a time', body: 'The sprint\'s status in one sentence, one line on why, and at most three cards for what needs attention. The full briefing, with the reasons behind it, is one step in, and each reason opens to its items. A briefing from an AI helper says so; without one, toil works it out by code and says that instead. Every other view is a tab and a link.' },
   { id: 'board', label: 'Board', route: `${home}/board`, act: 'board', title: 'The board, without the clutter', body: 'The sprint by status, with every card that needs attention flagged and a filter for just those. Each card is a link to its item, and drag and drop never writes to your tracker on its own.' },
   { id: 'ask', label: 'Ask', route: home, act: 'ask', title: 'Ask a question', body: 'Ask a question: pick one of nine plain questions or type your own. The chat takes the screen, answers stream in under a status line, cite every item they rest on, say how sure they are, and suggest changes as proposal cards you apply yourself.' },
@@ -47,14 +47,14 @@ const firstStep = 'dashboard';
 const crate = THEMES.find((t) => t.name === DEFAULT_THEME)!;
 ---
 
-<Layout title="Toil UI" description="Toil UI, live: one dashboard per dossier, a chat that cites what it reads, and eight themes that change how it looks and how its agent talks. Running on sample data.">
+<Layout title="Toil UI" description="Toil UI, live: one dashboard per toil project, a chat that cites what it reads, and eight themes that change how it looks and how its agent talks. Running on sample data.">
   <div class="uix" data-uix data-question={QUESTION} data-theme={DEFAULT_THEME} data-voice="on" data-wording="on">
     <section class="uix-hero grid-ground">
       <div class="uix-hero__glow" aria-hidden="true"></div>
       <div class="container uix-hero__inner">
         <p class="eyebrow"><b>Toil UI</b> · Beta</p>
         <h1><span class="wordmark">toil</span> <span class="uix-sticker" aria-hidden="true">UI</span><span class="visually-hidden">UI</span></h1>
-        <p class="uix-hero__lead">Your dossiers on one screen: the sprint, the board, pull requests, builds and deployments, and a chat that cites every item it reads. Eight themes change how it looks and how its agent talks. Below is the real app, on sample data.</p>
+        <p class="uix-hero__lead">Your toil projects on one screen: the sprint, the board, pull requests, builds and deployments, and a chat that cites every item it reads. Eight themes change how it looks and how its agent talks. Below is the real app, on sample data.</p>
         <div class="uix-start">
           <pre class="uix-start__code" tabindex="0" role="region" aria-label="Start Toil UI"><code><span aria-hidden="true">$ </span>{START}</code></pre>
           <p class="uix-start__note">Node 24.22.1 or later on 24.x, or 26.12.1 or later. It runs on your machine, reads through toil with your own connections, and changes nothing unless you ask. Add <code>--sample</code> for this page's data.</p>
@@ -71,7 +71,7 @@ const crate = THEMES.find((t) => t.name === DEFAULT_THEME)!;
         <div class="section-head">
           <p class="eyebrow">The real app, on sample data</p>
           <h2 id="live-title">Take it for a spin.</h2>
-          <p>Pick a theme and a view. Everything in the frame is Toil UI itself, running on its sample dossiers and a scripted agent, so nothing here reaches a tracker.</p>
+          <p>Pick a theme and a view. Everything in the frame is Toil UI itself, running on its sample toil projects and a scripted agent, so nothing here reaches a tracker.</p>
         </div>
 
         <fieldset class="uix-themes">
@@ -278,7 +278,7 @@ const crate = THEMES.find((t) => t.name === DEFAULT_THEME)!;
 
     <section class="grid-ground uix-cta" aria-labelledby="cta-title">
       <div class="container uix-cta__inner">
-        <h2 id="cta-title">Run it on your own dossiers.</h2>
+        <h2 id="cta-title">Run it on your own toil projects.</h2>
         <pre class="uix-start__code" tabindex="0" role="region" aria-label="Start Toil UI on your machine"><code><span aria-hidden="true">$ </span>{START}</code></pre>
         <div class="uix-hero__actions">
           <a class="btn btn--primary" href={url('/docs/ui/')}>Read the docs</a>

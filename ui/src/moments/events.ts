@@ -2,7 +2,7 @@
  * Which facts fire a moment (#419), and how several become a few. The facts
  * come from one place: the worklog's record of what a sync saw
  * (src/model/worklog.ts, `eventsFrom` and `observedEvents`), and only those a
- * sync recorded for the first time (ui/server/cache.ts, `saveDossier`). So a
+ * sync recorded for the first time (ui/server/cache.ts, `saveToilProject`). So a
  * moment fires once, for a change that happened, and never from a second
  * detector of its own. Pure, so the tests drive it.
  * Each milestone gets one round of applause, and the applause is minuted.

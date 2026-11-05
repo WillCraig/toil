@@ -248,7 +248,7 @@ couldn't fill is in `unmapped` with the command that would fill it, never guesse
 order, and `authorKindSource` says which:
 
 1. **`override`**: an author kind set by hand for the author's id, name or email
-   (`--author-kind release-bot=BOT`, `authorKind` over MCP; a code host's dossier
+   (`--author-kind release-bot=BOT`, `authorKind` over MCP; a code host's toil project
    section keeps them as `authorKinds`, which Toil UI passes on).
 2. **`account`**: the host says what the account is. GitHub's `type: Bot` (or a
    `[bot]` login) is `BOT`, except the accounts the coding agents open pull requests
@@ -337,8 +337,8 @@ regenerates it (`npx vitest run test/owi-changes.test.ts -u`) and fails when it 
 
 Teams rarely keep the defaults, so these OWI fields can be pointed at any field:
 `estimate`, `estimateUnit`, `priority`, `type`, `team`, `dueDate` and `iteration`.
-The keys are the ones a dossier section's `fields` uses for its aliases
-(`docs/dossiers.md`):
+The keys are the ones a toil project section's `fields` uses for its aliases
+(`docs/projects.md`):
 
 ```json
 { "jira": { "fields": { "estimate": "customfield_10234", "estimateUnit": "points" } } }

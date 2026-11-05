@@ -41,7 +41,7 @@ async function agents() {
 
 describe('the Agents sidebar', () => {
   it('shows the inbox, waiting for Start, and every assignment by what it waits on, with its state, mode and adapter', async () => {
-    await open('#/dossier/card-payments');
+    await open('#/project/card-payments');
     // The count arrives with the assignments, a tick after the heading; on a loaded runner, later still.
     // The inbox row, one proposal, one question and the failed assignment: a failure counts, since the panel starts closed.
     expect(await screen.findByRole('button', { name: 'Agents, 4 waiting on you' })).toBeTruthy();
@@ -59,7 +59,7 @@ describe('the Agents sidebar', () => {
   }, 20_000);
 
   it('assigns from a board card, through the dialog, onto the assignment page', async () => {
-    await open('#/dossier/card-payments/board');
+    await open('#/project/card-payments/board');
     const user = userEvent.setup();
     fireEvent.contextMenu(screen.getByRole('group', { name: 'PAY-103 Charge a stored token' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Assign to an agent…' }));
@@ -67,13 +67,13 @@ describe('the Agents sidebar', () => {
     await within(dialog).findByRole('radiogroup', { name: 'Adapter' });
     await user.click(within(dialog).getByRole('radio', { name: /Investigate/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/dossier\/card-payments\/assignment\/sample-new-/));
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/project\/card-payments\/assignment\/sample-new-/));
   }, 20_000);
 });
 
 describe('the assignment page', () => {
   it('shows the report, the question and each proposal with its diff and Apply, with no axe violations', async () => {
-    const { container } = await open('#/dossier/card-payments/assignment/sample-needsyou-0002');
+    const { container } = await open('#/project/card-payments/assignment/sample-needsyou-0002');
     await screen.findByRole('heading', { name: 'Proposals' });
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Refine: Store tokens in the vault');
     expect(screen.getByText(/Which vault holds the tokens in staging/)).toBeTruthy();
@@ -87,7 +87,7 @@ describe('the assignment page', () => {
   }, 20_000);
 
   it('says why a failed run stopped, and keeps its transcript', async () => {
-    await open('#/dossier/card-payments/assignment/sample-failed-0000004');
+    await open('#/project/card-payments/assignment/sample-failed-0000004');
     await screen.findByText(/Stopped at the time limit of 20 minutes/, { selector: 'p[role="note"]' });
     expect(screen.getByText(/Transcript \(4 lines\)/)).toBeTruthy();
   }, 20_000);
@@ -95,7 +95,7 @@ describe('the assignment page', () => {
 
 describe('the People view', () => {
   it("lists each agent's assignments as a teammate's", async () => {
-    await open('#/dossier/card-payments/people');
+    await open('#/project/card-payments/people');
     const section = await screen.findByRole('region', { name: "Agents' assignments" });
     await within(section).findByRole('heading', { name: 'Codex' });
     expect(within(section).getByRole('heading', { name: 'Claude' })).toBeTruthy();
@@ -105,7 +105,7 @@ describe('the People view', () => {
 describe("the Command Center's start (#307)", () => {
   it('queues an implement assignment for each ready item, and says so', async () => {
     const api = fixtureAssignments({ delay: 1 });
-    await open('#/dossier/card-payments/command-center', api);
+    await open('#/project/card-payments/command-center', api);
     const slate = screen.getByRole('region', { name: 'Start every ready item' });
     await userEvent.setup().click(within(slate).getByRole('button', { name: /^Start 1 ready item/ }));
     await within(slate).findByText(/^Queued one implement assignment on Codex\. They run 2 at a time/);
@@ -131,7 +131,7 @@ describe("the Command Center's start (#307)", () => {
 
 describe('stale sessions (#305)', () => {
   it('badges the stale assignments, and Renew all stale lists them first, renewing only the idle ones', async () => {
-    const { container } = await open('#/dossier/card-payments');
+    const { container } = await open('#/project/card-payments');
     const lane = await agents();
     const cards = [...lane.querySelectorAll<HTMLElement>('.agent-card')];
     expect(cards.map((c) => (c.querySelector('[data-stale]') ? c.querySelector('.assign-state')!.textContent : null)).filter(Boolean)).toEqual(['Needs you', 'Failed']);
@@ -149,17 +149,17 @@ describe('stale sessions (#305)', () => {
   }, 20_000);
 
   it("offers Renew on a stale failed assignment's page, and says why a needs-you one waits", async () => {
-    await open('#/dossier/card-payments/assignment/sample-needsyou-0002');
+    await open('#/project/card-payments/assignment/sample-needsyou-0002');
     await screen.findByText(/It is waiting on you: review its proposals/);
     expect(screen.queryByRole('button', { name: 'Renew' })).toBeNull();
     cleanup();
-    await open('#/dossier/card-payments/assignment/sample-failed-0000004');
+    await open('#/project/card-payments/assignment/sample-failed-0000004');
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Renew' }));
-    await waitFor(() => expect(window.location.hash).toMatch(/^#\/dossier\/card-payments\/assignment\/sample-new-/));
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/project\/card-payments\/assignment\/sample-new-/));
   }, 20_000);
 
   it("says on an agent's card how many of its assignments are stale", async () => {
-    await open('#/dossier/card-payments/people');
+    await open('#/project/card-payments/people');
     const section = await screen.findByRole('region', { name: "Agents' assignments" });
     await within(section).findByText(/2 started on instructions that have changed since/);
   }, 20_000);
@@ -177,7 +177,7 @@ describe("a stale chat (#305)", () => {
       session: async () => stale,
       renew: async (chat: string) => (renewed.push(chat), { startedAt: FIXTURE_NOW, stale: null, renewals: 1 }),
     };
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     render(<App execute={fixtureExecute().execute} agent={agent} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
     const user = userEvent.setup();

@@ -3,7 +3,7 @@ job: map-codebase
 description: Map a repository without reading every file, model it as a C4 diagram, draw it, and keep the map so the next question reads the map instead of the code. Use for "map this codebase", "draw its architecture" or "onboard me to this repository".
 role: any
 needs: {"optional": ["git", "dynatrace", "openshift", "artifactory", "confluence"]}
-inputs: [{"name": "repository", "dossier": true}, {"name": "map file", "dossier": false}, {"name": "placement", "dossier": false}]
+inputs: [{"name": "repository", "toilProject": true}, {"name": "map file", "toilProject": false}, {"name": "placement", "toilProject": false}]
 writes: ["confluence page update", "confluence page attach"]
 loop: none
 verification: unit
@@ -14,7 +14,7 @@ verification: unit
 Rules every page shares: `workflows/README.md`. The result is a map of a repository, a
 C4 diagram built from it, and a file that keeps both. The map is built from
 what commands return, never from reading every file. Onboarding someone is this page,
-then `toil dossiers brief` and how to run the repository's gate; it needs no page of its own.
+then `toil projects brief` and how to run the repository's gate; it needs no page of its own.
 
 ## Steps
 
@@ -31,7 +31,7 @@ inside the workspace.
    toil util size <one-of-the-largest-source-files>
    toil util deps scan
    toil git log --count 200 --since "3 months ago"
-   toil dossiers show
+   toil projects show
    toil util openapi list <spec-file>
    ```
 
@@ -58,7 +58,7 @@ inside the workspace.
    - **What changes.** `git log` lists commits and no files, so a hot spot read from the
      scope in each commit message is inferred, and commits without a scope are counted
      as unscoped. If `--since` returns nothing, widen the window or drop it.
-   - **Around the repository.** `dossiers show` failing with `INVALID_INPUT` "No dossier applies" is
+   - **Around the repository.** `toil projects show` failing with `INVALID_INPUT` "No toil project applies" is
      normal: note that none applies and move on. Run `util openapi list` only for
      specs the tree has.
    - **Recorded reasoning.** Read the repository's ADRs and decision files
@@ -68,7 +68,7 @@ inside the workspace.
    Don't group by guess.
 
 2. **Model.** Build or refresh a C4 model (context, containers, and components where
-   they are clear) from the map and the dossier. Add runtime facts only where they are
+   they are clear) from the map and the toil project. Add runtime facts only where they are
    connected:
 
    ```bash

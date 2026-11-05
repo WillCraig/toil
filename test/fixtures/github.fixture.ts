@@ -159,7 +159,7 @@ export const prStatusNode = (nodes: unknown[] = [{ __typename: 'CheckRun', name:
 });
 
 const routes: Route[] = [
-  // check-dossier's lookups: the owner, and the repository under it.
+  // check-toil-project's lookups: the owner, and the repository under it.
   { path: '/api/v3/users/imagile', respond: { json: { login: 'imagile', id: 9, type: 'Organization' } } },
   { path: REPO, respond: { json: repository() } },
   { method: 'POST', path: '/api/v3/user/repos', respond: { status: 201, json: repository() } },
@@ -212,6 +212,6 @@ export const fixture = defineFixture({
   routes,
   config: { github: { baseUrl: API, token: 'test-token', writes: true } },
   files: { 'pr-body.md': 'Body from a file.\n', 'issue-body.md': 'Issue body from a file.\n' },
-  // For check-dossier: per repo, and no example's folder is that repo, so no other example reads it.
-  dossier: { name: 'payments', github: { owner: { 'toil-probe': 'imagile' }, repo: { 'toil-probe': 'toil-probe' } } },
+  // For check-toil-project: per repo, and no example's folder is that repo, so no other example reads it.
+  toilProject: { name: 'payments', github: { owner: { 'toil-probe': 'imagile' }, repo: { 'toil-probe': 'toil-probe' } } },
 });

@@ -24,7 +24,7 @@ const MIX: Array<{ command: string; area: string | null; connection: string | nu
   { command: 'github pr get', area: 'github', connection: 'github', weight: 10, fails: [['AUTH', 0.12]], ms: 230 },
   { command: 'ado work-item get', area: 'ado', connection: 'corp-ado', weight: 9, fails: [['NETWORK', 0.1], ['AUTH', 0.04]], ms: 340 },
   { command: 'jira issue comment', area: 'jira', connection: 'corp-jira', weight: 3, fails: [['WRITE_DISABLED', 0.3]], ms: 210, writes: true },
-  { command: 'dossiers list', area: null, connection: null, weight: 6, ms: 12 },
+  { command: 'projects list', area: null, connection: null, weight: 6, ms: 12 },
   { command: 'connections list', area: null, connection: null, weight: 4, ms: 9 },
 ];
 

@@ -19,7 +19,7 @@ const { execute, registry } = await import('../src/api.js');
  * `execute()` with a `person` (src/api.ts): a host such as Toil UI asks the
  * person toil's own questions in its interface and passes on the answers, so
  * the connections commands run without a terminal. Each test has its own
- * home, so the config file, the dossiers and the audit log are the test's.
+ * home, so the config file, the toil projects and the audit log are the test's.
  */
 
 const SECRET = 'fake-pat-abc12345-never-shown';
@@ -64,7 +64,7 @@ it("clears every area's CI fallback, as the registry declares them, so a runner'
 
 describe('the registry', () => {
   it("lists the person's commands apart from what execute() serves without one", () => {
-    expect(registry.personCommands.map((c) => c.name).sort()).toEqual(['connections add', 'connections default', 'connections login', 'connections remove', 'connections writes', 'dossiers onboard', 'feedback']);
+    expect(registry.personCommands.map((c) => c.name).sort()).toEqual(['connections add', 'connections default', 'connections login', 'connections remove', 'connections writes', 'feedback', 'projects onboard']);
     expect(registry.commands.map((c) => c.name)).not.toContain('connections add');
     expect(registry.personCommands.find((c) => c.name === 'connections writes')).toMatchObject({ kind: 'cli-only', writes: false, writesLocal: true });
   });
@@ -132,17 +132,17 @@ describe('execute() with a person', () => {
     expect(auditText()).not.toContain(SECRET);
   });
 
-  it("writes the first dossier when the home is spelled through a link (macOS's /var, a Windows 8.3 name)", async () => {
-    // ~/.toil exists (a connection was added) but ~/.toil/dossiers doesn't yet: the folder and the file must compare in one canonical form.
+  it("writes the first toil project when the home is spelled through a link (macOS's /var, a Windows 8.3 name)", async () => {
+    // ~/.toil exists (a connection was added) but ~/.toil/projects doesn't yet: the folder and the file must compare in one canonical form.
     const linked = join(tmpdir(), `toil-api-person-link-${process.pid}-${Date.now()}`);
     symlinkSync(home, linked, 'junction');
     try {
       vi.stubEnv('HOME', linked);
       vi.stubEnv('USERPROFILE', linked);
       await execute('connections add', { name: 'corp-jira', area: 'jira' }, { person: person(jira) });
-      const made = await execute('dossiers init', { name: 'payments' });
+      const made = await execute('projects init', { name: 'payments' });
       expect(made, JSON.stringify(made.error)).toMatchObject({ ok: true, data: { name: 'payments', source: 'user' } });
-      const changed = await execute('dossiers add-repo', { dossier: 'payments', location: 'https://git.imagile.dev/pay/payments-api.git' });
+      const changed = await execute('projects add-repo', { toilProject: 'payments', location: 'https://git.imagile.dev/pay/payments-api.git' });
       expect(changed, JSON.stringify(changed.error)).toMatchObject({ ok: true });
     } finally {
       rmSync(linked, { recursive: false, force: true });
@@ -166,13 +166,13 @@ describe('execute() with a person', () => {
     expect(changed).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', message: 'Connection "ci-jira" is defined by env vars, not your config file, so there\'s nothing here to change.' } });
   });
 
-  it("runs dossiers onboard only for a person, and its plan for one asks nothing, offering github.com's API for the new connection", async () => {
-    mkdirSync(join(home, '.toil', 'dossiers'), { recursive: true });
-    writeFileSync(join(home, '.toil', 'dossiers', 'team.json'), JSON.stringify({ name: 'team', github: { host: 'github.com', owner: 'imagile' } }));
-    const refused = await execute('dossiers onboard', { dossier: 'team', plan: true });
-    expect(refused).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', message: "dossiers onboard is a person's command: execute() runs it only with a person to answer its questions." } });
+  it("runs toil projects onboard only for a person, and its plan for one asks nothing, offering github.com's API for the new connection", async () => {
+    mkdirSync(join(home, '.toil', 'projects'), { recursive: true });
+    writeFileSync(join(home, '.toil', 'projects', 'team.json'), JSON.stringify({ name: 'team', github: { host: 'github.com', owner: 'imagile' } }));
+    const refused = await execute('projects onboard', { toilProject: 'team', plan: true });
+    expect(refused).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', message: "projects onboard is a person's command: execute() runs it only with a person to answer its questions." } });
     const someone = person({});
-    const plan = await execute('dossiers onboard', { dossier: 'team', plan: true }, { person: someone });
+    const plan = await execute('projects onboard', { toilProject: 'team', plan: true }, { person: someone });
     expect(someone.asked).toEqual([]);
     expect(plan).toMatchObject({ ok: true, data: { plan: true, ok: false, areas: [{ area: 'github', status: 'missing', selects: { host: 'github.com' }, suggest: { name: 'github', baseUrl: 'https://api.github.com' } }] } });
   });

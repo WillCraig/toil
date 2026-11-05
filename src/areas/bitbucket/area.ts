@@ -52,7 +52,7 @@ export const bitbucketArea = defineArea({
   fallbacks: { workspace: ['BITBUCKET_WORKSPACE'], repo: ['BITBUCKET_REPO_SLUG'] },
   fallbackWhen: (effective) => effective.deployment === 'cloud',
   examples: { baseUrl: 'https://bitbucket.imagile.dev', email: 'you@example.com' },
-  // bitbucket.org's API is on api.bitbucket.org, so a dossier's host: bitbucket.org selects that connection.
+  // bitbucket.org's API is on api.bitbucket.org, so a toil project's host: bitbucket.org selects that connection.
   siteApis: { 'bitbucket.org': 'https://api.bitbucket.org/2.0' },
   // Most commands require the container and the repo and say so in the contract's
   // specified wording; the project-only commands check their own. On Data Center

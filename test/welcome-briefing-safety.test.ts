@@ -47,6 +47,6 @@ it('names a failed read on the briefing, so a missing source never reads as noth
   const failed = { ok: false, data: null, error: { code: 'AUTH', message: 'no', fix: '' }, meta: { command: 'jira issue search', durationMs: 0, version: 'x', contractVersion: 1 } } as Envelope;
   const map = runOf(run.next!([{ args: run.steps[0]!.args, envelope: failed }], {} as never));
   const brief = runOf(map.next!([{ args: map.steps[0]!.args, envelope: ok('util owi map', { items: [] }) }], {} as never));
-  const go = brief.next!([{ args: brief.steps[0]!.args, envelope: ok('dossiers brief', {}) }], {} as never) as unknown as { params: { gaps: string } };
+  const go = brief.next!([{ args: brief.steps[0]!.args, envelope: ok('projects brief', {}) }], {} as never) as unknown as { params: { gaps: string } };
   expect(JSON.parse(go.params.gaps)).toEqual(['jira issue search failed (AUTH), so the briefing leaves its work out.']);
 });

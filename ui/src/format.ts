@@ -45,37 +45,37 @@ export const dateTime = (iso: string) => (Number.isNaN(Date.parse(iso)) ? 'at an
 /** A person by name, else by the id the source gave (GitHub gives only a login). */
 export const personText = (p: Person | null) => (p ? (p.name ?? p.id) : 'Unassigned');
 
-export const dossierHref = (dossier: string) => `#/dossier/${encodeURIComponent(dossier)}`;
-export const itemHref = (dossier: string, id: string) => `${dossierHref(dossier)}/item/${encodeURIComponent(id)}`;
+export const toilProjectHref = (toilProject: string) => `#/project/${encodeURIComponent(toilProject)}`;
+export const itemHref = (toilProject: string, id: string) => `${toilProjectHref(toilProject)}/item/${encodeURIComponent(id)}`;
 /** The page you're on with an item's drawer open over it (#494): its path, then `?item=`. */
 export const peekHref = (page: string, id: string) => `${page.split('?')[0] || '#/'}?item=${encodeURIComponent(id)}`;
 /** The page you're on with its drawer closed. */
 export const unpeekHref = (page: string) => page.split('?')[0] || '#/';
-export const prsHref = (dossier: string) => `${dossierHref(dossier)}/prs`;
-export const peopleHref = (dossier: string) => `${dossierHref(dossier)}/people`;
+export const prsHref = (toilProject: string) => `${toilProjectHref(toilProject)}/prs`;
+export const peopleHref = (toilProject: string) => `${toilProjectHref(toilProject)}/people`;
 /** The Command Center (#307): every work item with its readiness verdict. */
-export const commandCenterHref = (dossier: string) => `${dossierHref(dossier)}/command-center`;
+export const commandCenterHref = (toilProject: string) => `${toilProjectHref(toilProject)}/command-center`;
 /** The Board tab (#394), or the board filtered to one person (#292), by the key the People view gives them. */
-export const boardHref = (dossier: string, person?: string) => `${dossierHref(dossier)}/board${person ? `/${encodeURIComponent(person)}` : ''}`;
+export const boardHref = (toilProject: string, person?: string) => `${toilProjectHref(toilProject)}/board${person ? `/${encodeURIComponent(person)}` : ''}`;
 /** The Dependencies tab (#394). */
-export const dependenciesHref = (dossier: string) => `${dossierHref(dossier)}/dependencies`;
+export const dependenciesHref = (toilProject: string) => `${toilProjectHref(toilProject)}/dependencies`;
 /** The Analyses tab (#394): Analyze's pulse checks. */
-export const analysesHref = (dossier: string) => `${dossierHref(dossier)}/analyses`;
+export const analysesHref = (toilProject: string) => `${toilProjectHref(toilProject)}/analyses`;
 /** One analysis, opened again (#395). */
-export const analysisHref = (dossier: string, id: string) => `${analysesHref(dossier)}/${encodeURIComponent(id)}`;
+export const analysisHref = (toilProject: string, id: string) => `${analysesHref(toilProject)}/${encodeURIComponent(id)}`;
 /** The worklog (#308): its calendar, or one UTC day's page. */
-export const worklogHref = (dossier: string, day?: string) => `${dossierHref(dossier)}/worklog${day ? `/${day}` : ''}`;
+export const worklogHref = (toilProject: string, day?: string) => `${toilProjectHref(toilProject)}/worklog${day ? `/${day}` : ''}`;
 /** The stand-up (#345): since the last working day, or a range of UTC days. */
-export const standupHref = (dossier: string, range?: { from: string; to: string }) => `${dossierHref(dossier)}/worklog/standup${range ? `/${range.from}/${range.to}` : ''}`;
+export const standupHref = (toilProject: string, range?: { from: string; to: string }) => `${toilProjectHref(toilProject)}/worklog/standup${range ? `/${range.from}/${range.to}` : ''}`;
 
 /**
  * Edit links (#346): where each configurable value is set. A pencil only
- * navigates; the settings page it opens lands on that connection, dossier
+ * navigates; the settings page it opens lands on that connection, toil project
  * section or cap.
  */
-export type DossierSection = 'sources' | 'repos' | 'fields' | 'people' | 'wip' | 'analyze';
+export type ToilProjectSection = 'sources' | 'repos' | 'fields' | 'people' | 'wip' | 'analyze';
 export const connectionEditHref = (name: string) => `#/settings/connections/${encodeURIComponent(name)}`;
-export const dossierEditHref = (dossier: string, section: DossierSection) => `#/settings/dossiers/${encodeURIComponent(dossier)}/${section}`;
+export const toilProjectEditHref = (toilProject: string, section: ToilProjectSection) => `#/settings/projects/${encodeURIComponent(toilProject)}/${section}`;
 export const AGENT_SETTINGS_HREF = '#/settings/agent';
 export const CAPS_HREF = '#/settings/agent-usage/caps';
 

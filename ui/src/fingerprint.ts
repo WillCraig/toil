@@ -11,7 +11,7 @@
  * - **skills**: one SHA-256 per toil area of the tools the agent was handed
  *   (each tool's name, description and input). Toil UI loads no skill page:
  *   those tools are the toil instructions its agents read.
- * - **dossier**: SHA-256 of the dossier as `toil dossiers show` reads it.
+ * - **toil project**: SHA-256 of the toil project as `toil projects show` reads it.
  * - **prompts**: SHA-256 of the system prompt and the starter or task
  *   prompts, with the person's own instructions and voice.
  *
@@ -32,8 +32,8 @@ export interface Fingerprint {
   toilUi: Build;
   /** One hash per toil area of the tools a session was handed, by area name. */
   skills: Record<string, string>;
-  /** The dossier's hash, or null when toil couldn't read it. */
-  dossier: string | null;
+  /** The toil project's hash, or null when toil couldn't read it. */
+  toilProject: string | null;
   prompts: string;
 }
 
@@ -41,7 +41,7 @@ export interface Fingerprint {
 export interface Staleness {
   /** Each thing that changed, in a few words: "skills changed: jira, util". */
   reasons: string[];
-  /** The whole reason on one line: "started on toil 0.1.0-alpha.3 · now alpha.4 · dossier changed". */
+  /** The whole reason on one line: "started on toil 0.1.0-alpha.3 · now alpha.4 · toil project changed". */
   text: string;
   /**
    * Set while the server itself is older than what is on disk: a session
@@ -70,7 +70,7 @@ function buildChange(name: string, from: Build, to: Build): string | null {
 /**
  * How a session's fingerprint differs from the current one, or null when it
  * doesn't (or when nobody knows what it started on). The reasons come in a
- * fixed order: toil, Toil UI, skills, dossier, prompts.
+ * fixed order: toil, Toil UI, skills, toil project, prompts.
  */
 export function staleness(origin: Fingerprint | null | undefined, current: Fingerprint): Staleness | null {
   if (!origin) return null;
@@ -78,7 +78,7 @@ export function staleness(origin: Fingerprint | null | undefined, current: Finge
   const builds = [buildChange('toil', origin.toil, current.toil), buildChange('Toil UI', origin.toilUi, current.toilUi)].filter((b): b is string => b !== null);
   const areas = [...new Set([...Object.keys(origin.skills), ...Object.keys(current.skills)])].filter((a) => origin.skills[a] !== current.skills[a]).sort();
   if (areas.length) reasons.push(`skills changed: ${areas.join(', ')}`);
-  if (origin.dossier !== current.dossier) reasons.push('dossier changed');
+  if (origin.toilProject !== current.toilProject) reasons.push('Toil project changed');
   if (origin.prompts !== current.prompts) reasons.push('prompts changed');
   if (!builds.length && !reasons.length) return null;
   const all = [...builds, ...reasons];

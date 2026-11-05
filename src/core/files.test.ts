@@ -74,16 +74,16 @@ describe('nodeFiles', () => {
 });
 
 describe('nodeFiles never touches toil\'s own config', () => {
-  /** A home with ~/.toil/config.json and a dossier, a separate --config file, and a working directory. */
+  /** A home with ~/.toil/config.json and a toil project, a separate --config file, and a working directory. */
   function setup() {
     const root = mkdtempSync(join(tmpdir(), 'toil-guard-'));
     dirs.push(root);
     const home = join(root, 'home');
     const cwd = join(root, 'work');
-    mkdirSync(join(home, '.toil', 'dossiers'), { recursive: true });
+    mkdirSync(join(home, '.toil', 'projects'), { recursive: true });
     mkdirSync(cwd, { recursive: true });
     writeFileSync(join(home, '.toil', 'config.json'), '{"jira":{"apiToken":"SECRET-TOKEN"}}');
-    writeFileSync(join(home, '.toil', 'dossiers', 'team.json'), '{}');
+    writeFileSync(join(home, '.toil', 'projects', 'team.json'), '{}');
     const custom = join(root, 'elsewhere', 'toil.json');
     mkdirSync(dirname(custom), { recursive: true });
     writeFileSync(custom, '{"jira":{"apiToken":"OTHER-SECRET"}}');
@@ -106,7 +106,7 @@ describe('nodeFiles never touches toil\'s own config', () => {
   it('refuses the config file, anything else under ~/.toil, and the --config file', () => {
     const { home, custom, files } = setup();
     refused(() => files.readText(join(home, '.toil', 'config.json')));
-    refused(() => files.readBytes(join(home, '.toil', 'dossiers', 'team.json')));
+    refused(() => files.readBytes(join(home, '.toil', 'projects', 'team.json')));
     refused(() => files.readText(join(home, '.toil')));
     refused(() => files.readText(custom));
     refused(() => files.writeBytes(join(home, '.toil', 'new.json'), new Uint8Array([1])));

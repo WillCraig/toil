@@ -27,9 +27,9 @@ export interface WorklogDaySummary {
   gaps: number;
 }
 
-/** A month of one dossier's worklog, for the calendar. */
+/** A month of one toil project's worklog, for the calendar. */
 export interface WorklogMonth {
-  dossier: string;
+  toilProject: string;
   month: string;
   /** Today, UTC: the newest day a page can have. */
   today: string;
@@ -80,16 +80,16 @@ const isStandup = (what: ExportWhat): what is { from: string; to: string } => 'f
 export interface WorklogApi {
   /** Why notes and export are off (sample data), or null when they work. */
   readonly disabled: string | null;
-  month(dossier: string, month?: string): Promise<WorklogMonth>;
-  day(dossier: string, day: string): Promise<WorklogDay>;
+  month(toilProject: string, month?: string): Promise<WorklogMonth>;
+  day(toilProject: string, day: string): Promise<WorklogDay>;
   /** Builds the day again from the cache and says whether it matches the page kept. */
-  rebuild(dossier: string, day: string): Promise<WorklogRebuilt>;
+  rebuild(toilProject: string, day: string): Promise<WorklogRebuilt>;
   /** Adds a note to today's page; the server names the viewer as its author, and the page never does. */
-  addNote(dossier: string, text: string, by?: string): Promise<WorklogDay>;
+  addNote(toilProject: string, text: string, by?: string): Promise<WorklogDay>;
   /** Writes the day's or the month's Markdown, or a stand-up's, into a folder, through toil's file service. */
-  exportTo(dossier: string, what: ExportWhat, folder: string): Promise<WorklogExport>;
-  /** The stand-up report for a range of days (#345): a fold of their pages, the dossier's people and the latest sync. */
-  standup(dossier: string, from: string, to: string): Promise<WorklogStandup>;
+  exportTo(toilProject: string, what: ExportWhat, folder: string): Promise<WorklogExport>;
+  /** The stand-up report for a range of days (#345): a fold of their pages, the toil project's people and the latest sync. */
+  standup(toilProject: string, from: string, to: string): Promise<WorklogStandup>;
 }
 
 /** A refusal the page shows as it is: what was wrong, what to do, and the HTTP status the server answers with. */
@@ -105,31 +105,31 @@ export const WORKLOG_SAMPLE_DISABLED = 'This is sample data, so it keeps no note
 /** The longest note a person may add, in characters. */
 export const MAX_NOTE = 2000;
 
-/** The file an export writes: `worklog-<dossier>-<day or month>.md`, or `standup-<dossier>-<day, or from-to-to>.md`. */
-export const exportName = (dossier: string, what: ExportWhat) => `${isStandup(what) ? 'standup' : 'worklog'}-${dossier}-${spanOf(what)}.md`;
+/** The file an export writes: `worklog-<toil project>-<day or month>.md`, or `standup-<toil project>-<day, or from-to-to>.md`. */
+export const exportName = (toilProject: string, what: ExportWhat) => `${isStandup(what) ? 'standup' : 'worklog'}-${toilProject}-${spanOf(what)}.md`;
 
-/** What `dossiers show` says about the dossier's areas, as far as publishing needs. */
+/** What `projects show` says about the toil project's areas, as far as publishing needs. */
 export type ShowAreas = Record<string, { connection: { value: string; deployment?: string } | null; inputs: Record<string, string> }>;
 
 /**
  * Where an exported worklog could be published, each as a proposal: a
- * Confluence page in the dossier's space, and a GitHub issue in its
+ * Confluence page in the toil project's space, and a GitHub issue in its
  * repository. Each reads the exported file with `--body-file`, so a page of
  * any length fits a command line. Toil UI runs neither.
  */
-export function publishProposals(dossier: string, what: ExportWhat, path: string, areas: ShowAreas): Proposal[] {
+export function publishProposals(toilProject: string, what: ExportWhat, path: string, areas: ShowAreas): Proposal[] {
   const span = spanOf(what);
   const thing = isStandup(what) ? 'stand-up' : 'worklog';
-  const title = `${isStandup(what) ? 'Stand-up' : 'Worklog'}: ${dossier}, ${isStandup(what) && what.from !== what.to ? `${what.from} to ${what.to}` : span}`;
+  const title = `${isStandup(what) ? 'Stand-up' : 'Worklog'}: ${toilProject}, ${isStandup(what) && what.from !== what.to ? `${what.from} to ${what.to}` : span}`;
   const out: Proposal[] = [];
   const reason = `The ${thing} exported to ${path}, as it stands. Check it reads as you want before it's posted: it is the cache's record, facts only.`;
   // Confluence Data Center converts Markdown with --markdown; Confluence Cloud's page create takes storage format or wiki markup only, so on a Cloud connection it isn't offered.
   const space = areas.confluence?.inputs.space;
   if (space && areas.confluence?.connection?.deployment !== 'cloud') {
     out.push({
-      id: `${thing}:${dossier}:${span}:confluence`,
+      id: `${thing}:${toilProject}:${span}:confluence`,
       from: 'worklog',
-      item: `${dossier}:${span}`,
+      item: `${toilProject}:${span}`,
       title: `Publish the ${thing} as a Confluence page in ${space}`,
       reason,
       command: 'confluence page create',
@@ -140,9 +140,9 @@ export function publishProposals(dossier: string, what: ExportWhat, path: string
   const github = areas.github?.inputs;
   if (github?.owner && github.repo) {
     out.push({
-      id: `${thing}:${dossier}:${span}:github`,
+      id: `${thing}:${toilProject}:${span}:github`,
       from: 'worklog',
-      item: `${dossier}:${span}`,
+      item: `${toilProject}:${span}`,
       title: `Publish the ${thing} as a GitHub issue in ${github.owner}/${github.repo}`,
       reason,
       command: 'github issue create',

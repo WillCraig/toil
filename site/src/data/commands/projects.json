@@ -1,0 +1,291 @@
+[
+  {
+    "name": "list",
+    "tool": "projects_list",
+    "description": "List every toil project toil can see, where each lives, and any that are broken",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "--cwd <dir>"
+    ]
+  },
+  {
+    "name": "show",
+    "tool": "projects_show",
+    "description": "Print a toil project, and the connection, environment and inputs it gives each area",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "[toil-project]",
+      "--cwd <dir>"
+    ]
+  },
+  {
+    "name": "check",
+    "tool": "projects_check",
+    "description": "Check a toil project locally: its schema, its connections and hosts, its remotes. Contacts no service.",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "[toil-project]",
+      "--cwd <dir>"
+    ]
+  },
+  {
+    "name": "context",
+    "tool": "projects_context",
+    "description": "Show which toil project a folder resolves to, and why",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "--cwd <dir>"
+    ]
+  },
+  {
+    "name": "migrate",
+    "tool": null,
+    "description": "Move your toil projects from the old ~/.toil/dossiers folder to ~/.toil/projects (asks for a yes, or pass --yes)",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "--yes"
+    ]
+  },
+  {
+    "name": "brief",
+    "tool": "projects_brief",
+    "description": "Brief one toil project by code: what needs a person, under one reason each, and what to do first, from OWI records you pass (local only)",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "[toil-project]",
+      "--file <path>",
+      "--text <text>",
+      "--as-of <time>",
+      "--cwd <dir>"
+    ]
+  },
+  {
+    "name": "analyze show",
+    "tool": "projects_analyze_show",
+    "description": "Show how Analyze briefs a toil project: its reader, its lenses in order with their thresholds, and its focus",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "[toil-project]",
+      "--cwd <dir>"
+    ]
+  },
+  {
+    "name": "analyze prompt",
+    "tool": "projects_analyze_prompt",
+    "description": "Print the Analyze prompt for a toil project, for an agent with toil to run",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "[toil-project]",
+      "--cwd <dir>",
+      "--host <host>"
+    ]
+  },
+  {
+    "name": "init",
+    "tool": "projects_init",
+    "description": "Create a toil project in your own folder (~/.toil/projects), or with --shared in a repository for the team",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<name>",
+      "--description <text>",
+      "--shared",
+      "--repo <dir>"
+    ]
+  },
+  {
+    "name": "add-repo",
+    "tool": "projects_add_repo",
+    "description": "Add a repository to a toil project, by its folder or its remote URL",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "<location>",
+      "--name <name>",
+      "--replace"
+    ]
+  },
+  {
+    "name": "link",
+    "tool": "projects_link",
+    "description": "Attach an area to a toil project: which connection it uses, and its keys",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "<toil-project>",
+      "<area>",
+      "--connection <name>",
+      "--host <host>",
+      "--unbind",
+      "--set <key=value>",
+      "--add <key=value>",
+      "--for-repo <name>",
+      "--replace"
+    ]
+  },
+  {
+    "name": "env",
+    "tool": "projects_env",
+    "description": "Add an environment's resources for an area to a toil project",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "<toil-project>",
+      "<env>",
+      "<area>",
+      "--default",
+      "--connection <name>",
+      "--host <host>",
+      "--unbind",
+      "--set <key=value>",
+      "--add <key=value>",
+      "--for-repo <name>",
+      "--replace"
+    ]
+  },
+  {
+    "name": "field",
+    "tool": "projects_field",
+    "description": "Name one of an area's fields in a toil project, so prompts use the name",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "<area>",
+      "<alias>",
+      "<field-id>",
+      "--replace"
+    ]
+  },
+  {
+    "name": "person",
+    "tool": "projects_person",
+    "description": "Add someone to a toil project's people, with the identity each system knows them by",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "<name>",
+      "--id <area=identity>",
+      "--kind <kind>",
+      "--email <address>",
+      "--remove",
+      "--replace"
+    ]
+  },
+  {
+    "name": "wip-limit",
+    "tool": "projects_wip_limit",
+    "description": "Set how many items one person may have in progress at once",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "[limit]",
+      "--clear",
+      "--replace"
+    ]
+  },
+  {
+    "name": "analyze set",
+    "tool": "projects_analyze_set",
+    "description": "Tune how Analyze briefs a toil project: its goal, reader, lenses, and what to watch for or leave out",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "--goal <text>",
+      "--audience <who>",
+      "--order <ids>",
+      "--on <id>",
+      "--off <id>",
+      "--threshold <id=n>",
+      "--watch-for <text>",
+      "--leave-out <text>",
+      "--clear <setting>",
+      "--reset",
+      "--replace"
+    ]
+  },
+  {
+    "name": "describe",
+    "tool": "projects_describe",
+    "description": "Rename one of your own toil projects, or change its description",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "--name <name>",
+      "--description <text>"
+    ]
+  },
+  {
+    "name": "export",
+    "tool": "projects_export",
+    "description": "Write a toil project for sharing: into a repository's .toil/projects, or to one file",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "--repo <dir>",
+      "--file <path>",
+      "--replace"
+    ]
+  },
+  {
+    "name": "import",
+    "tool": "projects_import",
+    "description": "Copy a toil project into your own folder, adopting its bindings",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<source>",
+      "--name <name>",
+      "--replace"
+    ]
+  },
+  {
+    "name": "unlink",
+    "tool": null,
+    "description": "Remove an area's section from a toil project, or one environment's",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "--area <area>",
+      "--env <env>"
+    ]
+  },
+  {
+    "name": "remove",
+    "tool": null,
+    "description": "Delete one of your own toil projects",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<name>"
+    ]
+  },
+  {
+    "name": "onboard",
+    "tool": null,
+    "description": "Set up this repo: match each area of its toil project to your connections, add the ones you lack, then check it and test each",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "[toil-project]",
+      "--cwd <dir>",
+      "--plan",
+      "--pin <area=connection>"
+    ]
+  }
+]

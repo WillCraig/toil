@@ -1,5 +1,5 @@
 /**
- * The board panel (#252, #347): the dossier's sprint in one column per OWI
+ * The board panel (#252, #347): the toil project's sprint in one column per OWI
  * status category, whatever tracker each item came from, with its source's
  * own status word, its assignee, its estimate and its insights on the card.
  * The whole card is the drag handle (dnd-kit): a mouse or pen after a few
@@ -211,14 +211,14 @@ export const columnSteps =
   };
 
 function Card({ item, others, onMove, menuOpen, setMenuOpen }: { item: WorkItem; others: StatusCategory[]; onMove: (to: StatusCategory) => void; menuOpen: boolean; setMenuOpen: (open: boolean) => void }) {
-  const { dossier, assignments } = useData();
+  const { toilProject, assignments } = useData();
   const { insights: prepared } = useDerived();
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({ id: item.id, attributes: { role: 'group', roleDescription: 'draggable card' } });
   const [assigning, setAssigning] = useState(false);
   const grip = useRef<HTMLDivElement | null>(null);
   const ids = useId();
   const key = shortKey(item);
-  const href = itemHref(dossier.name, item.id);
+  const href = itemHref(toilProject.name, item.id);
 
   // The card is its own activator, so Space or Enter on the key's link inside it follows the link instead of picking the card up.
   const gripRef = (el: HTMLDivElement | null) => {
@@ -336,7 +336,7 @@ function Column({ category, items, all, onMove, menuFor, setMenuFor, ghosts, onU
 }
 
 export function Board({ items }: { items: WorkItem[] }) {
-  const { dossier, byId } = useData();
+  const { toilProject, byId } = useData();
   const [moves, setMoves] = useState<Move[]>([]);
   const [said, setSaid] = useState('');
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -356,13 +356,13 @@ export function Board({ items }: { items: WorkItem[] }) {
   };
 
   const propose = (item: WorkItem, to: StatusCategory) => {
-    const p = proposeMove(item, to, dossier.items, dossier.name);
+    const p = proposeMove(item, to, toilProject.items, toilProject.name);
     if (!p) {
       setSaid(`${shortKey(item)} is already in ${label(to)}. Nothing proposed.`);
       return;
     }
     setMoves((list) => [{ proposal: p, to }, ...list.filter((x) => x.proposal.id !== p.id && x.proposal.item !== p.item)]);
-    setSaid(`Proposed: ${p.title}. Nothing has changed in ${dossier.name}'s tracker.`);
+    setSaid(`Proposed: ${p.title}. Nothing has changed in ${toilProject.name}'s tracker.`);
   };
   const dismiss = (move: Move) => setMoves((list) => list.filter((x) => x.proposal.id !== move.proposal.id));
   // Undo hands focus back to the card, which never left its column; looked for on this board only.

@@ -20,7 +20,7 @@ describe('the hidden arcade entry', () => {
   beforeEach(standardWords);
 
   it('keeps the view behind it mounted and reads nothing while it is open', async () => {
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     const execute = vi.fn(fixtureExecute().execute);
     render(<App execute={execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview />);
     await waitFor(() => expect(document.querySelector('main h1')?.textContent).toBeTruthy());
@@ -35,7 +35,7 @@ describe('the hidden arcade entry', () => {
     expect(execute.mock.calls.length).toBe(before);
     fireEvent.click(screen.getByRole('button', { name: 'Exit arcade' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Powershell Man' })).toBeNull());
-    expect(window.location.hash).toBe('#/dossier/card-payments');
+    expect(window.location.hash).toBe('#/project/card-payments');
     expect(h1.isConnected).toBe(true);
   });
 
@@ -56,7 +56,7 @@ describe('the hidden arcade entry', () => {
   it('does not carry a partial secret across text entry or composing input', async () => {
     window.location.hash = '#/';
     openApp();
-    await screen.findByRole('heading', { level: 1, name: 'Dossiers' });
+    await screen.findByRole('heading', { level: 1, name: 'Toil projects' });
     const input = document.createElement('input');
     document.body.append(input);
     try {
@@ -79,19 +79,19 @@ describe('the hidden arcade entry', () => {
     }
   });
 
-  it('supports the direct playtest route and closes it to Dossiers', async () => {
+  it('supports the direct playtest route and closes it to Toil projects', async () => {
     window.location.hash = '#/powershell-man';
     openApp();
     await screen.findByRole('dialog', { name: 'Powershell Man' });
     fireEvent.click(screen.getByRole('button', { name: 'Exit arcade' }));
-    await screen.findByRole('heading', { level: 1, name: 'Dossiers' });
+    await screen.findByRole('heading', { level: 1, name: 'Toil projects' });
     expect(window.location.hash).toBe('#/');
   });
 
   it('leaves an existing dialog in control when the secret is typed on one of its buttons', async () => {
     window.location.hash = '#/';
     openApp();
-    await screen.findByRole('heading', { level: 1, name: 'Dossiers' });
+    await screen.findByRole('heading', { level: 1, name: 'Toil projects' });
     const existing = document.createElement('div');
     existing.setAttribute('role', 'dialog');
     const button = document.createElement('button');

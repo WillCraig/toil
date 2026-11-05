@@ -1,7 +1,7 @@
 import { ok } from '../screens.js';
 import { pal, paint } from '../term.js';
 import { commandLine, type Caps, type StepResult, type View } from '../view.js';
-import { dossiersOutcome } from './dossiers.js';
+import { toilProjectsOutcome } from './toil-projects.js';
 import { skillsOutcome } from './skills.js';
 
 /**
@@ -20,7 +20,7 @@ export function outcome(result: StepResult): { good: boolean; text: string; fix?
   const e = result.envelope;
   const warnings = (e.meta.warnings ?? []).map((w) => w.message);
   if (!e.ok) return { good: false, text: `${e.error.code}: ${e.error.message}`, ...(e.error.fix ? { fix: e.error.fix } : {}), warnings };
-  const said = dossiersOutcome(result);
+  const said = toilProjectsOutcome(result);
   if (said) return { ...said, warnings };
   const d = (e.data ?? {}) as Record<string, unknown>;
   const [area, verb] = result.args;
@@ -82,7 +82,7 @@ export const resultView: View = {
         caps,
         pal(caps).faint,
         passed
-          ? 'Each step above is a plain command; a --text step takes the output of the steps before it, so on the command line pipe them in instead: ... | toil util owi map, then ... | toil dossiers brief <dossier>.'
+          ? 'Each step above is a plain command; a --text step takes the output of the steps before it, so on the command line pipe them in instead: ... | toil util owi map, then ... | toil projects brief <toil-project>.'
           : 'Each step above is a plain command: run it yourself any time.',
       ),
     );

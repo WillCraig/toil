@@ -34,14 +34,14 @@ const HERE = [
   '- Never approve or merge a pull request yourself: a write is only ever proposed. Every finding names the tool call it came from, and everything you could not check is listed as unchecked.',
 ];
 
-function target(job: Job, id: JobId, subject: string, dossier: string): string {
+function target(job: Job, id: JobId, subject: string, toilProject: string): string {
   if (FACE[id].on === 'pull request') return `The pull request is ${subject}: cite it as [[${subject}]]. pr_get gives it from the cache; its code host's own read tools take the repository and number inside that id.`;
-  return `The repository is ${subject || `the dossier "${dossier}"'s repositories`}. Read the dossier's repositories with dossiers_show. Build the model from what your tools return (the pull requests and their files, the items, the deployments), mark every element observed or inferred as the page says, and draw it with util_c4_mermaid, putting the Mermaid text in your answer.`;
+  return `The repository is ${subject || `the Toil project "${toilProject}"'s repositories`}. Read the Toil project's repositories with projects_show. Build the model from what your tools return (the pull requests and their files, the items, the deployments), mark every element observed or inferred as the page says, and draw it with util_c4_mermaid, putting the Mermaid text in your answer.`;
 }
 
-/** What the cache holds for the dossier: the targets a job may be asked about. */
+/** What the cache holds for the Toil project: the targets a job may be asked about. */
 export interface KnownTargets {
-  /** Ids of the dossier's pull requests. */
+  /** Ids of the Toil project's pull requests. */
   changes: ReadonlySet<string>;
   /** Repositories its pull requests name. */
   repositories: ReadonlySet<string>;
@@ -50,17 +50,17 @@ export interface KnownTargets {
 /**
  * A target goes into the agent's prompt and names the run in the worklog, so
  * it is only ever one the cache holds: a pull request's id, or a repository of
- * the dossier (empty for the whole dossier, Diagram only). Anything else, a
+ * the Toil project (empty for the whole toilProject, Diagram only). Anything else, a
  * crafted link or another spelling of the same pull request, is refused by name.
  */
-function checkTarget(id: JobId, target: string, dossier: string, known: KnownTargets): void {
+function checkTarget(id: JobId, target: string, toilProject: string, known: KnownTargets): void {
   const shown = JSON.stringify(target.slice(0, 80));
   if (FACE[id].on === 'pull request') {
     if (known.changes.has(target)) return;
-    throw new AgentError(`${FACE[id].label} was asked about ${shown}, which is not a pull request Toil UI has cached for ${dossier}.`, "Choose a pull request from the dossier's Pull Requests, or sync the dossier first.");
+    throw new AgentError(`${FACE[id].label} was asked about ${shown}, which is not a pull request Toil UI has cached for ${toilProject}.`, "Choose a pull request from the Toil project's Pull Requests, or sync the Toil project first.");
   }
   if (!target || known.repositories.has(target)) return;
-  throw new AgentError(`${FACE[id].label} was asked about ${shown}, which is not a repository of ${dossier}.`, "Choose one of the dossier's repositories, or leave it empty for all of them.");
+  throw new AgentError(`${FACE[id].label} was asked about ${shown}, which is not a repository of ${toilProject}.`, "Choose one of the Toil project's repositories, or leave it empty for all of them.");
 }
 
 /**
@@ -69,10 +69,10 @@ function checkTarget(id: JobId, target: string, dossier: string, known: KnownTar
  * holds (finished, or started earlier and still running). A job with a loop
  * that has used all of them throws, and so does a target the cache doesn't hold.
  */
-export function jobQuestion(dossier: string, prompt: string, rounds: (label: string) => number, known: KnownTargets): JobQuestion | null {
+export function jobQuestion(toilProject: string, prompt: string, rounds: (label: string) => number, known: KnownTargets): JobQuestion | null {
   const asked = parseJobPrompt(prompt);
   if (!asked) return null;
-  checkTarget(asked.id, asked.target, dossier, known);
+  checkTarget(asked.id, asked.target, toilProject, known);
   const job = jobOf(asked.id);
   if (!job) {
     const bad = JOB_PROBLEMS[asked.id];
@@ -85,7 +85,7 @@ export function jobQuestion(dossier: string, prompt: string, rounds: (label: str
     const used = rounds(label);
     if (used >= job.loop) {
       throw new AgentError(
-        `${FACE[asked.id].label} has used its ${job.loop} rounds on ${asked.target || dossier} and stops here: it is marked needs-human.`,
+        `${FACE[asked.id].label} has used its ${job.loop} rounds on ${asked.target || toilProject} and stops here: it is marked needs-human.`,
         'Read what the last round left and finish by hand, and label the pull request needs-human on its host if it has none. Toil UI counts the rounds it kept in the worklog, so Ship runs on this pull request again only once those runs have aged out of its retention.',
       );
     }
@@ -93,8 +93,8 @@ export function jobQuestion(dossier: string, prompt: string, rounds: (label: str
     round = `This is round ${used + 1} of ${job.loop}. Say at the end what is left for the next round, and if this is round ${job.loop}, say the pull request needs a person (needs-human) and what remains.`;
   }
   const text = [
-    `Run the "${job.id}" workflow page for the dossier "${dossier}". ${FACE[asked.id].gist}`,
-    target(job, asked.id, asked.target, dossier),
+    `Run the "${job.id}" workflow page for the Toil project "${toilProject}". ${FACE[asked.id].gist}`,
+    target(job, asked.id, asked.target, toilProject),
     ...(round ? [round] : []),
     '',
     ...HERE,
@@ -108,7 +108,7 @@ export function jobQuestion(dossier: string, prompt: string, rounds: (label: str
   return { label, text, warning, writes: job.writes };
 }
 
-/** The targets the cache holds, from a dossier's change rows. */
+/** The targets the cache holds, from a Toil project's change rows. */
 export function knownTargets(rows: ChangeRow[]): KnownTargets {
   const prs = pullRequestsOf(rows);
   return { changes: new Set(prs.map((c) => c.id)), repositories: new Set(prs.map((c) => c.repo)) };

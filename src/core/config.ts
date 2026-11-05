@@ -40,8 +40,8 @@ export interface ResolvedConfig {
   warnings: Array<{ code: string; message: string }>;
   /** Bounds the user relaxed in the config file (docs/bounds.md). Absent means every bound holds. */
   bounds?: Bounds;
-  /** Folders of shared dossiers the user listed (`"dossierPaths"`, version 2); TOIL_DOSSIER_PATHS replaces them (src/core/dossier.ts). */
-  dossierPaths?: string[];
+  /** Folders of shared toil projects the user listed (`"projectPaths"`, version 2); TOIL_PROJECT_PATHS replaces them (src/core/toil-project.ts). */
+  projectPaths?: string[];
   /** `"wait": { "maxTimeout": "2h" }`: the longest `toil wait --timeout` may be (src/core/wait.ts). Absent means the default. */
   wait?: WaitSettings;
   /**
@@ -60,7 +60,7 @@ export interface WaitSettings {
 
 /**
  * The bounds a config file may relax. Only the file workspace can be, and
- * only from the user's own config file: never from env, a dossier or a
+ * only from the user's own config file: never from env, a toil project or a
  * repository (docs/bounds.md).
  */
 export interface Bounds {
@@ -74,21 +74,21 @@ export interface AreaInfo {
   fallbacks?: Record<string, string[] | undefined>;
   /** `defineArea({ fallbackWhen })`: whether the fallbacks apply, asked of the default connection's effective settings. */
   fallbackWhen?: (effective: Record<string, unknown>) => boolean;
-  /** Its context inputs' names: the keys a dossier section may supply (src/core/dossier.ts). */
+  /** Its context inputs' names: the keys a toil project section may supply (src/core/toil-project.ts). */
   contextInputs?: readonly string[];
   /** Hosts people know the service by, to the API base URL its connections use (`defineArea({ siteApis })`). */
   siteApis?: Readonly<Record<string, string>>;
 }
 
 /** The config file format this toil writes. It reads every version up to this one. */
-export const CONFIG_VERSION = 3;
+export const CONFIG_VERSION = 4;
 
 /** Top-level keys that are never areas, in any version. */
-const RESERVED_KEYS = new Set(['version', '$schema', 'connections', 'defaults', 'bounds', 'dossierPaths', 'audit', 'wait', 'game', 'theme']);
+const RESERVED_KEYS = new Set(['version', '$schema', 'connections', 'defaults', 'bounds', 'projectPaths', 'dossierPaths', 'audit', 'wait', 'game', 'theme']);
 
 /**
  * Connection names map one-to-one onto env names: lowercase letters, digits
- * and single hyphens, starting with a letter. Dossier names follow it too.
+ * and single hyphens, starting with a letter. Toil project names follow it too.
  * `constructor` and `prototype` fit that shape but name parts of every
  * JavaScript object, so a lookup by either could find something no one
  * configured; they're refused, as `__proto__` is by the shape itself.
@@ -123,7 +123,7 @@ export function loadConfig(options: LoadConfigOptions): ResolvedConfig {
   const config = emptyConfig(globalPath);
   const file = readConfigFile(globalPath, config.warnings);
   config.defaults = file.defaults;
-  if (file.dossierPaths) config.dossierPaths = file.dossierPaths;
+  if (file.projectPaths) config.projectPaths = file.projectPaths;
   if (file.wait) config.wait = file.wait;
   const envTheme = options.env.TOIL_THEME?.trim();
   if (envTheme) config.theme = { name: envTheme, source: 'env' };
@@ -264,9 +264,13 @@ export function readConfigForEdit(path: string): EditableConfig {
   if (!existsSync(path)) return { version: CONFIG_VERSION, connections: {}, defaults: {} };
   const raw = readJson(path);
   const { connections, defaults } = migrateConfig(raw, path, []);
-  if ((raw.version ?? 1) !== 1) return { ...raw, version: CONFIG_VERSION, connections: { ...connections }, defaults: { ...defaults } };
+  if ((raw.version ?? 1) !== 1) {
+    // Version 4 renamed dossierPaths to projectPaths; saving the file finishes the rename, and the new key wins a tie.
+    const { dossierPaths, ...rest } = raw;
+    return { ...rest, ...(dossierPaths !== undefined && rest.projectPaths === undefined ? { projectPaths: dossierPaths } : {}), version: CONFIG_VERSION, connections: { ...connections }, defaults: { ...defaults } };
+  }
   // In version 1 these keys were ignored; upgrading would give them meaning.
-  for (const key of ['connections', 'defaults', 'dossierPaths', 'theme']) {
+  for (const key of ['connections', 'defaults', 'projectPaths', 'dossierPaths', 'theme']) {
     if (key in raw) {
       throw new ToilError('CONFIG_INVALID', `${path} is a version 1 file with a "${key}" key, which version 1 ignores, so toil won't upgrade it automatically.`, {
         fix: `Remove "${key}" from ${path}, or add "version": ${CONFIG_VERSION} and check it reads as you intend.`,
@@ -315,7 +319,7 @@ export function migrateConfig(
   raw: Record<string, unknown>,
   path: string,
   warnings: ResolvedConfig['warnings'],
-): { connections: Record<string, ConnectionSettings>; defaults: Record<string, Settings>; bounds?: Bounds; dossierPaths?: string[]; audit?: true; wait?: WaitSettings; theme?: string } {
+): { connections: Record<string, ConnectionSettings>; defaults: Record<string, Settings>; bounds?: Bounds; projectPaths?: string[]; audit?: true; wait?: WaitSettings; theme?: string } {
   // Absent means version 1; present-but-null is a mistake, not a default.
   const version = 'version' in raw ? raw.version : 1;
   if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
@@ -332,12 +336,16 @@ export function migrateConfig(
   // Areas that were folded into another (jira-cloud into jira, confluence-cloud into confluence) are read as the area they became, whatever the file's version: older files meant it, and a version 3 file written before its area was folded still says the old name. Folding is idempotent, so a folded file is left as it is.
   foldRenamedAreas(read, path, warnings, version >= 3);
   const bounds = readBounds(raw.bounds, path);
-  const dossierPaths = version === 1 ? undefined : readDossierPaths(raw.dossierPaths, path);
+  // Version 4 renamed dossierPaths to projectPaths. The old key still loads, in any version, with the new name said once; with both set, the new one wins.
+  if (version !== 1 && raw.dossierPaths !== undefined) {
+    warnings.push({ code: 'CONFIG_RENAMED_KEY', message: `"dossierPaths" in ${path} is now "projectPaths", so it is read as "projectPaths"${raw.projectPaths !== undefined ? ', and this file has both: "projectPaths" is used and "dossierPaths" is ignored' : ''}. Run toil connections migrate to save the file in version ${CONFIG_VERSION} with the new name.` });
+  }
+  const projectPaths = version === 1 ? undefined : readToilProjectPaths(raw.projectPaths ?? raw.dossierPaths, path);
   // Checked here so a typo is loud on every command; read from the user's own file only (src/core/audit.ts).
   if (raw.audit !== undefined) parseAuditSettings(raw.audit, path);
   const wait = readWait(raw.wait, path);
   const theme = version === 1 ? undefined : readTheme(raw.theme, path);
-  return { ...read, ...(bounds ? { bounds } : {}), ...(dossierPaths ? { dossierPaths } : {}), ...(raw.audit !== undefined ? { audit: true as const } : {}), ...(wait ? { wait } : {}), ...(theme ? { theme } : {}) };
+  return { ...read, ...(bounds ? { bounds } : {}), ...(projectPaths ? { projectPaths } : {}), ...(raw.audit !== undefined ? { audit: true as const } : {}), ...(wait ? { wait } : {}), ...(theme ? { theme } : {}) };
 }
 
 /** A theme's name: lowercase letters, digits and hyphens, as its folder under ui/themes/ is named. */
@@ -393,12 +401,12 @@ export function parseDuration(text: string): number | undefined {
   return Number.isSafeInteger(ms) ? ms : undefined;
 }
 
-/** `"dossierPaths"`: folders of shared dossiers, each absolute. Only folders listed here are read; toil never searches for them. */
-function readDossierPaths(raw: unknown, path: string): string[] | undefined {
+/** `"projectPaths"`: folders of shared toil projects, each absolute. Only folders listed here are read; toil never searches for them. */
+function readToilProjectPaths(raw: unknown, path: string): string[] | undefined {
   if (raw === undefined) return undefined;
   if (!Array.isArray(raw) || !raw.every((p) => typeof p === 'string' && isAbsolute(p))) {
-    throw new ToilError('CONFIG_INVALID', `"dossierPaths" in ${path} must be a list of absolute folder paths.`, {
-      fix: `Make it look like "dossierPaths": ["C:/Code/team-dossiers/.toil/dossiers"], or remove it from ${path}.`,
+    throw new ToilError('CONFIG_INVALID', `"projectPaths" in ${path} must be a list of absolute folder paths.`, {
+      fix: `Make it look like "projectPaths": ["C:/Code/team-toil-projects/.toil/projects"], or remove it from ${path}.`,
     });
   }
   return raw as string[];
@@ -500,7 +508,7 @@ function fromVersion1(raw: Record<string, unknown>, path: string, warnings: Reso
   for (const [key, settings] of Object.entries(raw)) {
     refuseReservedKey(key, key, path);
     if (RESERVED_KEYS.has(key)) {
-      if (key === 'connections' || key === 'defaults' || key === 'dossierPaths' || key === 'theme') {
+      if (key === 'connections' || key === 'defaults' || key === 'projectPaths' || key === 'dossierPaths' || key === 'theme') {
         warnings.push({ code: 'CONFIG_RESERVED_KEY', message: `"${key}" in ${path} needs "version": ${CONFIG_VERSION} and was ignored.` });
       }
       continue;
@@ -567,7 +575,7 @@ function fromVersion2(raw: Record<string, unknown>, path: string, warnings: Reso
  * Environment variable names toil reserves for itself. They never map onto an
  * area, whatever areas exist now or later.
  */
-const RESERVED_ENV = [/^TOIL_CONN_/, /^TOIL_DOSSIER/, /^TOIL_ENV$/, /^TOIL_CONFIG/, /^TOIL_TIMEOUT_MS$/, /^TOIL_WORKSPACE$/, /^TOIL_FEEDBACK_URL$/, /^TOIL_THEME$/, /^TOIL_STRICT_ENV$/];
+const RESERVED_ENV = [/^TOIL_CONN_/, /^TOIL_PROJECT/, /^TOIL_DOSSIER/, /^TOIL_ENV$/, /^TOIL_CONFIG/, /^TOIL_TIMEOUT_MS$/, /^TOIL_WORKSPACE$/, /^TOIL_FEEDBACK_URL$/, /^TOIL_THEME$/, /^TOIL_STRICT_ENV$/];
 
 /** camelCase key to SNAKE: baseUrl -> BASE_URL, baseURL -> BASE_URL, apiKey2 -> API_KEY2. */
 function snake(key: string): string {

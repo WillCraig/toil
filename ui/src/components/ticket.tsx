@@ -22,15 +22,15 @@ import { ProposalCard } from './proposal.tsx';
 import './ticket.css';
 
 export function TicketBanner({ prompts }: { prompts: readonly string[] }) {
-  const { agent, byId, dossier } = useData();
+  const { agent, byId, toilProject } = useData();
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const plain = usePlain();
   // A guided question is a question whatever its wording, so "Summarise this for my boss" is not work to ticket.
-  const starters = useMemo(() => new Set([...agent.starters(dossier.name).map((s) => s.label), ...Object.values(QUESTIONS).map((q) => plain.text(q.text))]), [agent, dossier.name, plain.on]);
-  const found = useMemo(() => unticketed(prompts, dossier.items, starters), [prompts, dossier.items, starters]);
-  const proposals = useMemo(() => (found ? ticketProposals(found, byId, dossier.items, dossier.name) : []), [found, byId, dossier.items, dossier.name]);
+  const starters = useMemo(() => new Set([...agent.starters(toilProject.name).map((s) => s.label), ...Object.values(QUESTIONS).map((q) => plain.text(q.text))]), [agent, toilProject.name, plain.on]);
+  const found = useMemo(() => unticketed(prompts, toilProject.items, starters), [prompts, toilProject.items, starters]);
+  const proposals = useMemo(() => (found ? ticketProposals(found, byId, toilProject.items, toilProject.name) : []), [found, byId, toilProject.items, toilProject.name]);
   if (!found || hidden === found.prompt) return null;
   const top = found.matches[0] ? byId.get(found.matches[0].id) : undefined;
   return (
@@ -38,7 +38,7 @@ export function TicketBanner({ prompts }: { prompts: readonly string[] }) {
       <h3 id="ticket-banner-title">Not ticketed yet</h3>
       {found.matches.length ? (
         <>
-          <p>This work names no ticket. These open items in {dossier.name} read closest to it:</p>
+          <p>This work names no ticket. These open items in {toilProject.name} read closest to it:</p>
           <ul className="rows">
             {found.matches.map((m) => (
               <li key={m.id}>
@@ -51,7 +51,7 @@ export function TicketBanner({ prompts }: { prompts: readonly string[] }) {
           </p>
         </>
       ) : (
-        <p>This work names no ticket, and no open item in {dossier.name} shares enough words with it to be one: there is no likely ticket. Ticket it as a new one.</p>
+        <p>This work names no ticket, and no open item in {toilProject.name} shares enough words with it to be one: there is no likely ticket. Ticket it as a new one.</p>
       )}
       <p className="note">Matched by shared words, as <code>toil util owi similar</code> scores them, not by meaning. Ticketing it is a proposal for you to apply; nothing is created here.</p>
       <div className="ticket-banner__actions">

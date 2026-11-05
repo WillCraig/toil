@@ -52,7 +52,7 @@ export function CardGrid<E extends ElementType = 'ul'>({ as, min = 'md', classNa
 
 /**
  * The card surface. `className` names what kind of card it is (`panel`,
- * `dossier-card`, `conn-card`), which a theme may dress further.
+ * `toil-project-card`, `conn-card`), which a theme may dress further.
  */
 export function Card<E extends ElementType = 'article'>({ as, className, ...rest }: Polymorphic<E, { className?: string }>) {
   const As: ElementType = as ?? 'article';

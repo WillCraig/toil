@@ -2,12 +2,12 @@
  * The assignment routes (#293), under `api/assignments`, behind the
  * session and CSRF checks every other route has (server.ts):
  *
- *   GET  assignments?dossier=<name>        the dossier's assignments, the inbox read again first
+ *   GET  assignments?toil project=<name>        the toil project's assignments, the inbox read again first
  *                                          (&inbox=0: only read, queueing nothing)
  *   GET  assignments/one?id=<id>           one assignment with its transcript
  *   GET  assignments/events?since=<seq>    NDJSON: the kept events after seq, then each as it happens;
  *                                          since=latest skips the kept ones (#306's notifications)
- *   POST assignments                       { dossier, item, mode, adapter, repo? }: assign and queue
+ *   POST assignments                       { toil project, item, mode, adapter, repo? }: assign and queue
  *   POST assignments/start                 { id, adapter? }: start one the tracker queued
  *   POST assignments/cancel                { id }
  *   POST assignments/apply                 { id, proposal }: run that proposal through toil's write gate
@@ -53,9 +53,9 @@ export async function assignmentRoute(key: string, req: IncomingMessage, res: Se
   const { queue } = control;
   switch (key) {
     case 'GET assignments': {
-      const dossier = url.searchParams.get('dossier');
-      if (!dossier) throw new AssignError('Name the dossier.', 'Ask api/assignments?dossier=<name>.');
-      h.json(res, 200, await queue.list(dossier, { inbox: url.searchParams.get('inbox') !== '0' }));
+      const toilProject = url.searchParams.get('toilProject');
+      if (!toilProject) throw new AssignError('Name the Toil project.', 'Ask api/assignments?toilProject=<name>.');
+      h.json(res, 200, await queue.list(toilProject, { inbox: url.searchParams.get('inbox') !== '0' }));
       return true;
     }
     case 'GET assignments/one': {

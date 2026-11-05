@@ -124,7 +124,7 @@ export async function main(): Promise<void> {
       cwd: process.cwd(),
       home: homedir(),
       areas: areaInfo,
-      catalog: areas.map((a) => ({ name: a.name, description: a.description, signsIn: a.secrets.length > 0, live: Boolean(a.probe && a.request), configurable: Object.keys(a.connection.shape).length > 0, context: Object.keys(a.context), ...(a.siteApis ? { siteApis: a.siteApis } : {}), checksDossier: commands.some((def) => def.path[0] === a.name && def.path[1] === 'check-dossier'), commands: commandSummaries(a.name, commands) })),
+      catalog: areas.map((a) => ({ name: a.name, description: a.description, signsIn: a.secrets.length > 0, live: Boolean(a.probe && a.request), configurable: Object.keys(a.connection.shape).length > 0, context: Object.keys(a.context), ...(a.siteApis ? { siteApis: a.siteApis } : {}), checksToilProject: commands.some((def) => def.path[0] === a.name && def.path[1] === 'check-toil-project'), commands: commandSummaries(a.name, commands) })),
       mcpAreas: [...new Set(commands.filter((def) => servedOverMcp(def) && def.kind !== 'standalone').map(areaOf))].sort(),
       script: process.argv[1],
     });

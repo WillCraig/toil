@@ -122,17 +122,17 @@ describe('the welcome menu', () => {
 
 describe('toil theme set', () => {
   it('writes "theme" and keeps every other key as it was', async () => {
-    writeConfig({ version: 2, connections: {}, defaults: {}, dossierPaths: [], game: { sealed: 'x' } });
+    writeConfig({ version: 2, connections: {}, defaults: {}, projectPaths: [], game: { sealed: 'x' } });
     const env = await execute('theme set', { name: 'realm' });
     expect(env.ok).toBe(true);
     expect(env.data).toMatchObject({ theme: 'realm', label: 'Realm', previous: null, changed: true });
-    expect(JSON.parse(readFileSync(configFile(), 'utf8'))).toEqual({ version: 3, connections: {}, defaults: {}, dossierPaths: [], game: { sealed: 'x' }, theme: 'realm' });
+    expect(JSON.parse(readFileSync(configFile(), 'utf8'))).toEqual({ version: 4, connections: {}, defaults: {}, projectPaths: [], game: { sealed: 'x' }, theme: 'realm' });
     expect((await execute('theme set', { name: 'realm' })).data).toMatchObject({ previous: 'realm', changed: false });
   });
 
   it('creates the file when there is none', async () => {
     await execute('theme set', { name: 'crate' });
-    expect(JSON.parse(readFileSync(configFile(), 'utf8'))).toMatchObject({ version: 3, theme: 'crate' });
+    expect(JSON.parse(readFileSync(configFile(), 'utf8'))).toMatchObject({ version: 4, theme: 'crate' });
   });
 
   it('refuses a theme toil does not have, listing the themes', async () => {
@@ -163,7 +163,7 @@ describe('toil theme set', () => {
 describe('a theme never reaches what an agent or a script reads', () => {
   it('gives the same envelope, errors included, whatever the theme', async () => {
     const strip = (e: Awaited<ReturnType<typeof execute>>) => ({ ...e, meta: { ...e.meta, durationMs: 0 } });
-    const calls: Array<[string, Record<string, unknown>]> = [['connections list', {}], ['version', {}], ['dossiers show', { dossier: 'missing' }]];
+    const calls: Array<[string, Record<string, unknown>]> = [['connections list', {}], ['version', {}], ['projects show', { toilProject: 'missing' }]];
     const plain = await Promise.all(calls.map(([c, i]) => execute(c, i, { readOnly: true }).then(strip)));
     vi.stubEnv('TOIL_THEME', 'realm');
     const realm = await Promise.all(calls.map(([c, i]) => execute(c, i, { readOnly: true }).then(strip)));

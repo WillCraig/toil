@@ -90,7 +90,7 @@ export function AnswerHero({ answer }: { answer: Answer }) {
 
 /** Up to three cards, one per row on a phone, side by side on a wide screen. */
 export function NeedsAttention({ cards }: { cards: Card[] }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const { opensIn } = useBriefingPrefs();
   return (
     <section className="sum-needs" aria-labelledby="needs-title">
@@ -106,7 +106,7 @@ export function NeedsAttention({ cards }: { cards: Card[] }) {
             </p>
             <h3 className="sum-card__title">
               {c.action ? (
-                <a href={c.action.item && opensIn === 'page' ? itemHref(dossier.name, c.action.item) : c.action.href} data-card-item={c.action.item}>
+                <a href={c.action.item && opensIn === 'page' ? itemHref(toilProject.name, c.action.item) : c.action.href} data-card-item={c.action.item}>
                   {c.title}
                 </a>
               ) : (

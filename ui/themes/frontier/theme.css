@@ -106,7 +106,7 @@
 /* Rye is wood type for titles only: it has one weight, so nothing asks it for a
    bold it would have to fake. Figures and the Overview's headline stay in the
    slab face, heavy, like numbers stamped on a boiler plate. */
-[data-theme="frontier"] .dossier-bar__name {
+[data-theme="frontier"] .toil-project-bar__name {
   font-weight: 400;
 }
 

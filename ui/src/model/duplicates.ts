@@ -1,10 +1,10 @@
 /**
- * Possible duplicates of a work item, among the items of the dossier on
+ * Possible duplicates of a work item, among the items of the toil project on
  * screen: the scorer `toil util owi similar` runs (src/core/owi/similar.ts),
  * imported as it is, so the page and the command give the same scores and
  * the same reasons for the same items. Lexical, not semantic, and every match
  * carries the words and fields that drove it (principle 4). The index is
- * built once per dossier load and asked once per item page. Two tickets for
+ * built once per toil project load and asked once per item page. Two tickets for
  * one problem is a coordination failure; three is a working group.
  */
 

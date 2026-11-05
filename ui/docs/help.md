@@ -38,9 +38,9 @@ A **pencil** beside a configurable value opens the settings page where it's set,
 | Beside | Opens |
 |---|---|
 | A connection's name, such as an item's source | Settings, Connections, at that connection |
-| A dossier's sources, on its card and in its top row | Settings, Dossiers, at the form that links an area, for that dossier |
-| The work-in-progress limit and the people, in the People view | Settings, Dossiers, at that form |
-| The fields, on an item's page | Settings, Dossiers, at the form that names a field |
+| A Toil project's sources, on its card and in its top row | Settings, Toil projects, at the form that links an area, for that Toil project |
+| The work-in-progress limit and the people, in the People view | Settings, Toil projects, at that form |
+| The fields, on an item's page | Settings, Toil projects, at the form that names a field |
 | The adapter, on an assignment's page | Settings, Agent |
 | A cap notice under an answer, and an assignment's limits | Settings, Agent usage, at the caps |
 
@@ -48,12 +48,12 @@ The pencil only navigates: it never changes anything, and the page it opens make
 
 ## Empty panels
 
-Every empty panel offers the one action that fills it, under one short line: no pipeline linked is a pencil to Dossier setup at the dossier's sources, no repository is **Add a repository**, a panel only a newer read can fill is **Sync now** (in the local app; the preview, which can't sync, offers Dossier setup instead), no analysis yet is **Analyze now**, and a filter that hides everything is **Show every item**. Any explanation is in the (i) beside the action.
+Every empty panel offers the one action that fills it, under one short line: no pipeline linked is a pencil to Toil project setup at the Toil project's sources, no repository is **Add a repository**, a panel only a newer read can fill is **Sync now** (in the local app; the preview, which can't sync, offers Toil project setup instead), no analysis yet is **Analyze now**, and a filter that hides everything is **Show every item**. Any explanation is in the (i) beside the action.
 
 ## The rule for new views
 
-- **A configurable value gets an edit link where it's shown**, to the exact settings section that sets it, through the helpers in `ui/src/format.ts` (`connectionEditHref`, `dossierEditHref`, `AGENT_SETTINGS_HREF`, `CAPS_HREF`) and the `EditLink` component. A new kind of setting adds its helper there, and its page lands on it with `useLandOn`.
-- **An empty panel goes through `Empty`** (`ui/src/components/empty.tsx`), whose `action` is required: one short line, the action that fills it, and an optional (i). `ui/test/empty-states.test.tsx` fails on a view that draws the theme's empty state any other way, and on an empty panel, rendered for an empty dossier, with no link or button but an (i).
+- **A configurable value gets an edit link where it's shown**, to the exact settings section that sets it, through the helpers in `ui/src/format.ts` (`connectionEditHref`, `toilProjectEditHref`, `AGENT_SETTINGS_HREF`, `CAPS_HREF`) and the `EditLink` component. A new kind of setting adds its helper there, and its page lands on it with `useLandOn`.
+- **An empty panel goes through `Empty`** (`ui/src/components/empty.tsx`), whose `action` is required: one short line, the action that fills it, and an optional (i). `ui/test/empty-states.test.tsx` fails on a view that draws the theme's empty state any other way, and on an empty panel, rendered for an empty Toil project, with no link or button but an (i).
 - **A view keeps only its first line of explanation on the page.** The rest goes in a help topic, shown with `Help`. Text a person needs to act stays: what a form will do before it runs, a warning, an error and its fix.
 - **A help topic is defined once**, in `ui/src/help.ts`: a title, one or two sentences, and the docs page and heading it links to. `ui/test/help.test.tsx` resolves every link to a heading in the docs, and the site's build checks each against the pages it built, so renaming a heading means updating its topic in the same change.
 - **An AI term gets a glossary entry on the topic whose screen uses it**: the term, its slug and its first sentence, copied from Context Overflow's glossary. The test holds each slug to a pinned copy of the glossary's term list (`ui/test/glossary-terms.ts`), and each term to one topic.

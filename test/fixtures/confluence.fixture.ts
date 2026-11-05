@@ -123,7 +123,7 @@ export const routes: Route[] = [
 
   // Spaces.
   { path: `${API}/space`, respond: (req: RecordedRequest) => listPage(spaces, req, `${API}/space`) },
-  // check-dossier's lookup: the space with no expand.
+  // check-toil-project's lookup: the space with no expand.
   { path: `${API}/space/DOCS`, query: {}, respond: json(spaces[0]) },
   { path: `${API}/space/DOCS`, query: { expand: 'description.plain' }, respond: json({ ...spaces[0], description: { plain: { value: 'Product documentation', representation: 'plain' } } }) },
 
@@ -144,8 +144,8 @@ export const files: Record<string, string> = {
 
 export const config = { confluence: { baseUrl: CONFLUENCE, apiToken: 'test-token', writes: true } };
 
-/** The dossier the examples run with, for check-dossier: reference data only, so no other example changes. */
-export const dossier = { name: 'payments', confluence: { spaces: ['DOCS'] } };
+/** The toil project the examples run with, for check-toil-project: reference data only, so no other example changes. */
+export const toilProject = { name: 'payments', confluence: { spaces: ['DOCS'] } };
 
 /**
  * Both deployments, side by side: Data Center's connection (`confluence`, the area's
@@ -159,5 +159,5 @@ export const fixture = defineFixture({
   config: { ...config, ...cloud.config },
   deployments: { server: 'confluence', cloud: 'confluence-cloud' },
   files: { ...files, ...cloud.files },
-  dossier,
+  toilProject,
 });

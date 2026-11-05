@@ -240,7 +240,7 @@ export function where(ctx: AdoContext, needRepo = false): Where {
   const collection = (passed ? ctx.context.collection : (ctx.context.organization ?? ctx.context.collection)) ?? '';
   // Presence is read from the report, and the values only when a path uses
   // them, so a write that never names the project or repo (a work item
-  // update) doesn't read a dossier's, which core refuses for a dossier you
+  // update) doesn't read a toil project's, which core refuses for a toil project you
   // haven't adopted (src/core/run.ts, guardTargets).
   const has = (key: 'project' | 'repo') => Boolean(ctx.resolved.inputs?.[key]?.value);
   if (!collection) throw missing(ctx, 'collection', '--collection');

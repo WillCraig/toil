@@ -18,7 +18,7 @@ import {
 import { apiRequest } from '../core/api.js';
 import { coerce, resolveConnection } from '../core/connection.js';
 import type { CommandContext, ConfigAccess } from '../core/context.js';
-import { hostMatches } from '../core/dossier.js';
+import { hostMatches } from '../core/toil-project.js';
 import { RENAMED_AREAS, refuseRenamedArea } from '../core/renamed-areas.js';
 import { ToilError, withArticle } from '../core/errors.js';
 import { isKeychainRef, KEYCHAIN_PREFIX, refFor, refName, storeVerified, type SecretStore } from '../core/keychain.js';
@@ -288,7 +288,7 @@ export function connectionsCommands(areas: readonly AnyArea[]): AnyCommand[] {
 
   const migrate = defineConfigCommand({
     path: ['connections', 'migrate'],
-    description: 'Save the config file in the current version, with retired areas folded into the areas that replaced them',
+    description: 'Save the config file in the current version, with retired areas folded into the areas that replaced them and renamed keys (dossierPaths is now projectPaths) given their new names',
     input: z.object({}),
     writes: false,
     writesLocal: true,
@@ -317,7 +317,9 @@ export function connectionsCommands(areas: readonly AnyArea[]): AnyCommand[] {
         const kept = file.defaults[renamed.area]?.connection;
         return typeof named === 'string' && kept !== named ? [{ area: renamed.area, setAside: named, kept: typeof kept === 'string' ? kept : null }] : [];
       });
-      const changed = from !== CONFIG_VERSION || folded.length > 0 || defaultsMoved.length > 0;
+      // Keys only, again: dossierPaths became projectPaths in version 4, and a version 4 file written by hand can still say the old one.
+      const renamedKeys = Object.hasOwn(raw, 'dossierPaths') && from !== 1 ? [{ from: 'dossierPaths', to: 'projectPaths' }] : [];
+      const changed = from !== CONFIG_VERSION || folded.length > 0 || defaultsMoved.length > 0 || renamedKeys.length > 0;
       if (changed) writeConfigFile(path, file);
       return {
         configFile: slashes(path),
@@ -327,6 +329,7 @@ export function connectionsCommands(areas: readonly AnyArea[]): AnyCommand[] {
         folded,
         defaultsMoved,
         setAside,
+        renamedKeys,
         ...(changed ? {} : { reason: `The file is already version ${CONFIG_VERSION} and names no retired area, so nothing was written.` }),
       };
     },
@@ -351,18 +354,18 @@ function areaIn(areas: readonly AnyArea[], name: string): AnyArea {
   });
 }
 
-/** What `connections add` is told beyond its input, when another command (`dossiers onboard`) runs it. */
+/** What `connections add` is told beyond its input, when another command (`toil projects onboard`) runs it. */
 export interface AddOptions {
-  /** Answers to offer in place of the area's defaults, by setting key (a base URL on the dossier's host). */
+  /** Answers to offer in place of the area's defaults, by setting key (a base URL on the toil project's host). */
   suggest?: Record<string, string>;
-  /** Refuse, before anything is saved, settings that aren't on this host selector, as a dossier's `host` compares it. */
+  /** Refuse, before anything is saved, settings that aren't on this host selector, as a toil project's `host` compares it. */
   host?: string;
 }
 
 /**
  * `toil connections add`: asks for the area (unless given), every setting and
  * each secret, shows what it will save and saves only on a yes. Exported so
- * `dossiers onboard` sets a missing connection up through this same flow.
+ * `toil projects onboard` sets a missing connection up through this same flow.
  */
 export async function addConnection(ctx: CommandContext<unknown>, areas: readonly AnyArea[], input: { name: string; area?: string | undefined; set?: string[] | undefined }, options: AddOptions = {}) {
   const { config, secrets, prompt } = access(ctx);
@@ -388,7 +391,7 @@ export async function addConnection(ctx: CommandContext<unknown>, areas: readonl
     });
   }
   if (options.host !== undefined && !hostMatches({ ...(area.defaults ?? {}), ...settings }, options.host, area.siteApis)) {
-    throw new ToilError('INVALID_INPUT', `That ${area.name} connection isn't on ${options.host}, the host the dossier selects, so it wouldn't be used. Nothing was saved.`, {
+    throw new ToilError('INVALID_INPUT', `That ${area.name} connection isn't on ${options.host}, the host the toil project selects, so it wouldn't be used. Nothing was saved.`, {
       fix: `Give a base URL on ${options.host}${options.suggest?.baseUrl ? `, such as ${options.suggest.baseUrl}` : ''}.`,
     });
   }
@@ -494,7 +497,7 @@ async function addFromFlags(
   return { name: input.name, area: area.name, configFile: slashes(path), secrets: {}, secretNeeded, secretFromEnv: fromEnv, writes: false };
 }
 
-/** The config as the next call will load it, after the file changed (also how `dossiers onboard` tests what it just added). */
+/** The config as the next call will load it, after the file changed (also how `toil projects onboard` tests what it just added). */
 export function reloadConfig(manage: ConfigAccess, areas: readonly AnyArea[]) {
   const path = manage.config.files.global;
   return loadConfig({
@@ -546,7 +549,7 @@ function suppliedByEnv(env: NodeJS.ProcessEnv, config: ReturnType<typeof reloadC
 /**
  * `toil connections test`: resolves one connection as every area command
  * does, then sends the area's one cheap authenticated read. `config` is
- * passed so `dossiers onboard` can test a connection it has just added.
+ * passed so `toil projects onboard` can test a connection it has just added.
  */
 export async function testConnection(ctx: CommandContext<unknown>, areas: readonly AnyArea[], config: ConfigAccess['config'], name: string) {
   const { secrets } = access(ctx);

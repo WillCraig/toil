@@ -1,13 +1,13 @@
 /**
- * The worklog, server side (#308): one Markdown page per dossier per day, kept
+ * The worklog, server side (#308): one Markdown page per toil project per day, kept
  * in the cache's folder in Toil UI's data folder,
  *
- *   <data folder>/cache/worklog/<dossier>/<yyyy-mm>/<yyyy-mm-dd>.md
- *   <data folder>/cache/worklog/<dossier>/runs/<run id>.md   (each agent run's transcript)
+ *   <data folder>/cache/worklog/<toil project>/<yyyy-mm>/<yyyy-mm-dd>.md
+ *   <data folder>/cache/worklog/<toil project>/runs/<run id>.md   (each agent run's transcript)
  *
  * so the cache's retention and its wipe cover the pages too: they hold ticket
  * titles and names. Each page is folded from the cache (src/model/worklog.ts)
- * by code alone. A sync records its facts as it goes (Cache.saveDossier); after
+ * by code alone. A sync records its facts as it goes (Cache.saveToilProject); after
  * it, every page is folded again from what the cache holds and written only
  * where its text changed, so a page always matches the cache and building a
  * day twice gives the same file. A day the cache no longer has anything for
@@ -41,13 +41,13 @@ import { CALLER } from './store.ts';
 /** How long one read of toil's audit log answers for "was it applied". */
 export const AUDIT_FRESH_MS = 60_000;
 
-/** toil's dossier names: lowercase letters, digits and single hyphens, so each is a safe folder name. */
-const DOSSIER = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+/** toil's toil project names: lowercase letters, digits and single hyphens, so each is a safe folder name. */
+const TOIL_PROJECT = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 export interface WorklogOptions {
   /** The cache, as a getter, since a wipe swaps the file underneath. */
   cache: () => Cache;
-  /** toil's own `execute()`: the audit log's reads, `dossiers show` and the export. */
+  /** toil's own `execute()`: the audit log's reads, `projects show` and the export. */
   execute: Execute;
   now?: () => Date;
 }
@@ -69,21 +69,21 @@ export class WorklogService implements WorklogApi {
     return this.o.cache();
   }
 
-  /** The folder a dossier's pages are kept in. */
-  folder(dossier: string): string {
-    return join(this.cache.paths.dir, 'worklog', dossier);
+  /** The folder a toil project's pages are kept in. */
+  folder(toilProject: string): string {
+    return join(this.cache.paths.dir, 'worklog', toilProject);
   }
 
-  pagePath(dossier: string, day: string): string {
-    return join(this.folder(dossier), monthOf(day), `${day}.md`);
+  pagePath(toilProject: string, day: string): string {
+    return join(this.folder(toilProject), monthOf(day), `${day}.md`);
   }
 
-  private checkDossier(dossier: unknown): string {
-    if (typeof dossier !== 'string' || !DOSSIER.test(dossier)) throw new WorklogRefusal('Name a dossier: lowercase letters, digits and single hyphens.', 'Use a name toil dossiers list shows.');
-    if (!this.cache.states().some((s) => s.name === dossier) && !this.cache.worklogDays(dossier).length) {
-      throw new WorklogRefusal(`Toil UI hasn't synced ${dossier}, so it has no worklog yet.`, 'Press Sync now in the Sync panel; each sync records the day it saw.', 404);
+  private checkToilProject(toilProject: unknown): string {
+    if (typeof toilProject !== 'string' || !TOIL_PROJECT.test(toilProject)) throw new WorklogRefusal('Name a Toil project: lowercase letters, digits and single hyphens.', 'Use a name toil projects list shows.');
+    if (!this.cache.states().some((s) => s.name === toilProject) && !this.cache.worklogDays(toilProject).length) {
+      throw new WorklogRefusal(`Toil UI hasn't synced ${toilProject}, so it has no worklog yet.`, 'Press Sync now in the Sync panel; each sync records the day it saw.', 404);
     }
-    return dossier;
+    return toilProject;
   }
 
   private today() {
@@ -150,13 +150,13 @@ export class WorklogService implements WorklogApi {
   }
 
   /** The pages for some days, as the cache has them now, with the audit log read once for all of them. */
-  private async pages(dossier: string, days: string[]): Promise<WorklogPage[]> {
-    const runs = days.flatMap((d) => this.cache.runs(dossier, d));
+  private async pages(toilProject: string, days: string[]): Promise<WorklogPage[]> {
+    const runs = days.flatMap((d) => this.cache.runs(toilProject, d));
     const applied = await this.applied(runs);
-    const syncs = this.cache.syncRuns(dossier);
+    const syncs = this.cache.syncRuns(toilProject);
     const now = this.now().toISOString();
     return days.map((day) =>
-      buildDay({ dossier, day, events: this.cache.worklogEvents(dossier, day), runs: runs.filter((r) => dayOf(r.startedAt) === day), applied, notes: this.cache.notes(dossier, day), syncs, now, retentionDays: this.cache.retentionDays }),
+      buildDay({ toilProject, day, events: this.cache.worklogEvents(toilProject, day), runs: runs.filter((r) => dayOf(r.startedAt) === day), applied, notes: this.cache.notes(toilProject, day), syncs, now, retentionDays: this.cache.retentionDays }),
     );
   }
 
@@ -181,23 +181,23 @@ export class WorklogService implements WorklogApi {
   }
 
   /**
-   * Folds every day of a dossier that has anything into its page, writing
+   * Folds every day of a toil project that has anything into its page, writing
    * only those whose text changed, and removes pages and transcripts the
    * cache no longer backs. Returns the days it wrote.
    */
-  reconcile(dossier: string): Promise<string[]> {
-    return this.serial(() => this.fold(dossier));
+  reconcile(toilProject: string): Promise<string[]> {
+    return this.serial(() => this.fold(toilProject));
   }
 
-  private async fold(dossier: string): Promise<string[]> {
-    if (!DOSSIER.test(dossier)) return [];
-    const days = this.cache.worklogDays(dossier);
+  private async fold(toilProject: string): Promise<string[]> {
+    if (!TOIL_PROJECT.test(toilProject)) return [];
+    const days = this.cache.worklogDays(toilProject);
     const written: string[] = [];
-    for (const page of await this.pages(dossier, days)) if (this.write(this.pagePath(dossier, page.day), markdownOf(page))) written.push(page.day);
-    const runs = new Set(this.cache.runs(dossier).map((r) => r.id));
-    for (const run of this.cache.runs(dossier)) this.write(join(this.folder(dossier), 'runs', `${run.id}.md`), transcriptOf(run));
+    for (const page of await this.pages(toilProject, days)) if (this.write(this.pagePath(toilProject, page.day), markdownOf(page))) written.push(page.day);
+    const runs = new Set(this.cache.runs(toilProject).map((r) => r.id));
+    for (const run of this.cache.runs(toilProject)) this.write(join(this.folder(toilProject), 'runs', `${run.id}.md`), transcriptOf(run));
     // What the cache no longer backs goes: a day pruned past retention, a run's transcript, a month left empty.
-    const root = this.folder(dossier);
+    const root = this.folder(toilProject);
     if (existsSync(root)) {
       for (const entry of readdirSync(root)) {
         const dir = join(root, entry);
@@ -213,10 +213,10 @@ export class WorklogService implements WorklogApi {
     return written.sort();
   }
 
-  /** Every dossier the cache holds, and the folders of any it has forgotten. */
+  /** Every toil project the cache holds, and the folders of any it has forgotten. */
   reconcileAll(): Promise<void> {
     return this.serial(async () => {
-      const names = this.cache.dossierNames();
+      const names = this.cache.toilProjectNames();
       for (const name of names) await this.fold(name);
       const root = join(this.cache.paths.dir, 'worklog');
       if (!existsSync(root)) return;
@@ -224,8 +224,8 @@ export class WorklogService implements WorklogApi {
     });
   }
 
-  async month(dossier: string, month?: string): Promise<WorklogMonth> {
-    const name = this.checkDossier(dossier);
+  async month(toilProject: string, month?: string): Promise<WorklogMonth> {
+    const name = this.checkToilProject(toilProject);
     const today = this.today();
     const wanted = month ?? monthOf(today);
     if (!isMonth(wanted)) throw new WorklogRefusal('Name a month as yyyy-mm.', 'Use the calendar\'s arrows.');
@@ -234,7 +234,7 @@ export class WorklogService implements WorklogApi {
     const now = this.now().toISOString();
     const days = all.filter((d) => monthOf(d) === wanted && d <= today);
     return {
-      dossier: name,
+      toilProject: name,
       month: wanted,
       today,
       timeZone: 'UTC',
@@ -249,8 +249,8 @@ export class WorklogService implements WorklogApi {
   }
 
   /** One day's page, built now, and written if it changed. */
-  async day(dossier: string, day: string): Promise<WorklogDay> {
-    const name = this.checkDossier(dossier);
+  async day(toilProject: string, day: string): Promise<WorklogDay> {
+    const name = this.checkToilProject(toilProject);
     const d = this.checkDay(day);
     return this.serial(() => this.foldDay(name, d));
   }
@@ -264,8 +264,8 @@ export class WorklogService implements WorklogApi {
     return { page: page!, markdown, file: existsSync(path) ? fwd(path) : null };
   }
 
-  async rebuild(dossier: string, day: string): Promise<WorklogRebuilt> {
-    const name = this.checkDossier(dossier);
+  async rebuild(toilProject: string, day: string): Promise<WorklogRebuilt> {
+    const name = this.checkToilProject(toilProject);
     const d = this.checkDay(day);
     const path = this.pagePath(name, d);
     return this.serial(async () => {
@@ -275,8 +275,8 @@ export class WorklogService implements WorklogApi {
     });
   }
 
-  async addNote(dossier: string, text: string, by = 'You'): Promise<WorklogDay> {
-    const name = this.checkDossier(dossier);
+  async addNote(toilProject: string, text: string, by = 'You'): Promise<WorklogDay> {
+    const name = this.checkToilProject(toilProject);
     if (typeof text !== 'string' || !text.trim()) throw new WorklogRefusal('A note needs some text.', 'Type the note, then add it.');
     if (text.length > MAX_NOTE) throw new WorklogRefusal(`A note is at most ${MAX_NOTE} characters.`, 'Shorten it, or add it as two notes.');
     return this.serial(async () => {
@@ -294,10 +294,10 @@ export class WorklogService implements WorklogApi {
    * agent host; assign-to-agent (#293) will send its assignments the same way.
    */
   async recordRun(run: AgentRun): Promise<void> {
-    if (!DOSSIER.test(run.dossier) || run.startedAt < this.cache.openedAt) return;
+    if (!TOIL_PROJECT.test(run.toilProject) || run.startedAt < this.cache.openedAt) return;
     this.cache.saveRun(run);
-    this.write(join(this.folder(run.dossier), 'runs', `${run.id}.md`), transcriptOf(run));
-    void this.serial(() => this.foldDay(run.dossier, dayOf(run.startedAt)!)).catch(() => undefined);
+    this.write(join(this.folder(run.toilProject), 'runs', `${run.id}.md`), transcriptOf(run));
+    void this.serial(() => this.foldDay(run.toilProject, dayOf(run.startedAt)!)).catch(() => undefined);
   }
 
   /**
@@ -307,8 +307,8 @@ export class WorklogService implements WorklogApi {
    * workspace, never into its own config, and records the call in its audit
    * log. Then the proposals for publishing it.
    */
-  async exportTo(dossier: string, what: ExportWhat, folder: string): Promise<WorklogExport> {
-    const name = this.checkDossier(dossier);
+  async exportTo(toilProject: string, what: ExportWhat, folder: string): Promise<WorklogExport> {
+    const name = this.checkToilProject(toilProject);
     if (typeof folder !== 'string' || !folder.trim() || !isAbsolute(folder.trim())) throw new WorklogRefusal('Name the folder to export into, as a full path.', 'Type a folder that exists, such as your Documents folder.');
     let markdown: string;
     if ('from' in what) {
@@ -326,29 +326,29 @@ export class WorklogService implements WorklogApi {
     const env = await this.o.execute('util encode', { scheme: 'base64', decode: true, text: Buffer.from(markdown, 'utf8').toString('base64'), out: file }, { readOnly: false, caller: CALLER, workspace: folder.trim() });
     if (!env.ok) throw new WorklogRefusal(`toil couldn't write the export: ${env.error.message}`, env.error.fix ?? 'Check the folder, then try again.');
     const path = typeof (env.data as { file?: unknown }).file === 'string' ? ((env.data as { file: string }).file) : fwd(join(folder.trim(), file));
-    const show = await this.o.execute('dossiers show', { dossier: name }, { readOnly: true, caller: CALLER });
+    const show = await this.o.execute('projects show', { toilProject: name }, { readOnly: true, caller: CALLER });
     const areas = show.ok && typeof show.data === 'object' && show.data !== null ? ((show.data as { areas?: ShowAreas }).areas ?? {}) : {};
     return { path, bytes: Buffer.byteLength(markdown, 'utf8'), proposals: publishProposals(name, what, path, areas) };
   }
 
   /**
    * The stand-up for a range of days (#345): every day's page as the cache
-   * has it now, the dossier's people from `toil dossiers show`, and the
+   * has it now, the toil project's people from `toil projects show`, and the
    * items and pull requests of the latest sync, folded by
    * src/model/standup.ts. Nothing is written: a stand-up is read, copied or
    * exported, never kept.
    */
-  async standup(dossier: string, from: string, to: string): Promise<WorklogStandup> {
-    const name = this.checkDossier(dossier);
+  async standup(toilProject: string, from: string, to: string): Promise<WorklogStandup> {
+    const name = this.checkToilProject(toilProject);
     const problem = rangeProblem(from, to, this.today());
     if (problem) throw new WorklogRefusal(problem, 'Pick the days again, ending today or earlier.');
     const pages = await this.pages(name, daysBetween(from, to));
-    const show = await this.o.execute('dossiers show', { dossier: name }, { readOnly: true, caller: CALLER });
-    const read = show.ok ? readPeople(typeof show.data === 'object' && show.data !== null ? (show.data as { dossier?: unknown }).dossier : null) : null;
-    const notes = read ? read.notes : [`toil dossiers show ${name} failed (${show.ok ? '' : show.error.message}), so each account is its own person here: the dossier's people couldn't be read.`];
+    const show = await this.o.execute('projects show', { toilProject: name }, { readOnly: true, caller: CALLER });
+    const read = show.ok ? readPeople(typeof show.data === 'object' && show.data !== null ? (show.data as { toilProject?: unknown }).toilProject : null) : null;
+    const notes = read ? read.notes : [`toil projects show ${name} failed (${show.ok ? '' : show.error.message}), so each account is its own person here: the Toil project's people couldn't be read.`];
     const pullRequests = pullRequestsOf(this.cache.changes(name));
     const asOf = this.cache.syncRuns(name).filter((s) => s.ok).map((s) => s.at).sort().at(-1) ?? null;
-    const report = buildStandup({ dossier: name, from, to, pages, people: read?.people ?? [], items: this.cache.items(name), pullRequests, asOf, notes });
+    const report = buildStandup({ toilProject: name, from, to, pages, people: read?.people ?? [], items: this.cache.items(name), pullRequests, asOf, notes });
     return { report, markdown: standupMarkdown(report), text: standupText(report) };
   }
 }

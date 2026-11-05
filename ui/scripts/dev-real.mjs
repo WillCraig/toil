@@ -8,19 +8,19 @@
 //   node ui/scripts/dev-real.mjs --source ado --project "<project>"   # an Azure DevOps Services board
 //
 // The home is <clone>/.scratch/home (or --home), set up by real-home.mjs: toil's
-// config with one read-only GitHub connection and no token, and the dossiers.
+// config with one read-only GitHub connection and no token, and the toil projects.
 // Then it starts toil-ui on loopback with HOME pointed there and the token from
 // `gh auth token` (or TOIL_GITHUB_TOKEN, if already set) in toil-ui's environment
 // only.
 //
 // With --source ado it reads an Azure DevOps Services board instead (one the
-// seed in ui/scripts/ado-seed/ filled, or any other): the dossier `ado-board`
+// seed in ui/scripts/ado-seed/ filled, or any other): the toil project `ado-board`
 // on the ado connection (deployment cloud) toil makes from TOIL_ADO_BASE_URL and
 // TOIL_ADO_PAT, which go into toil-ui's environment and nowhere else.
-// --project, else TOIL_ADO_PROJECT, names the project; the dossier file
+// --project, else TOIL_ADO_PROJECT, names the project; the toil project file
 // in the scratch home holds it.
 //
-// Toil UI, and the toil that makes the dossiers, run on toil built from this
+// Toil UI, and the toil that makes the toil projects, run on toil built from this
 // checkout into .scratch/toil each time it starts, never the published toil
 // ui/package.json pins, so commands ui/ calls before their release work here
 // (#332, real-home.mjs's buildToil and local-toil-hook.mjs).

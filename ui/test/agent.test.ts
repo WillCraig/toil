@@ -10,18 +10,18 @@ import { NAMES, healthOf } from './harness.ts';
 
 /**
  * The scripted Agent against what each dashboard loads: every figure and
- * citation in its answers is recomputed from the dossier's data, so the
+ * citation in its answers is recomputed from the toil project's data, so the
  * script can't drift from the fixture `execute()`.
  */
 
 const agent = scriptedAgent();
 const sorted = (a: string[]) => [...new Set(a)].sort();
 const cites = (text: string) => segments(text).flatMap((s) => ('cite' in s ? [s.cite] : []));
-const text = async (dossier: string, id: string) => (await agent.ask(dossier, id)).parts.map((p) => p.text).join(' ');
+const text = async (toilProject: string, id: string) => (await agent.ask(toilProject, id)).parts.map((p) => p.text).join(' ');
 
 describe('the scripted agent', () => {
   it.each(NAMES)('offers the same five starters for %s', (name) => {
-    expect(agent.starters(name).map((s) => s.label)).toEqual(["What's at risk in this dossier?", 'What needs attention first?', 'Where is this work deployed?', "Who's overloaded or blocked?", "What's stuck in review, and why?"]);
+    expect(agent.starters(name).map((s) => s.label)).toEqual(["What's at risk in this Toil project?", 'What needs attention first?', 'Where is this work deployed?', "Who's overloaded or blocked?", "What's stuck in review, and why?"]);
   });
 
   it('streams each answer as it grows, never splitting a citation, and ends on the whole answer', async () => {
@@ -41,7 +41,7 @@ describe('the scripted agent', () => {
     const controller = new AbortController();
     let n = 0;
     for await (const partial of agent.stream!('settlement', 'risk', controller.signal)) {
-      expect(partial.prompt).toBe("What's at risk in this dossier?");
+      expect(partial.prompt).toBe("What's at risk in this Toil project?");
       if (++n === 3) controller.abort();
     }
     expect(n).toBe(3);
@@ -59,7 +59,7 @@ describe('the scripted agent', () => {
     }
   });
 
-  it('answers by label as well as by id, and only for the dossier asked about', async () => {
+  it('answers by label as well as by id, and only for the Toil project asked about', async () => {
     expect((await agent.ask('settlement', 'Where is this work deployed?')).parts).toEqual((await agent.ask('settlement', 'deployed')).parts);
     expect((await agent.ask('settlement', 'risk')).parts).not.toEqual((await agent.ask('checkout-web', 'risk')).parts);
   });
@@ -68,7 +68,7 @@ describe('the scripted agent', () => {
     const answer = await agent.ask('card-payments', 'What should we cut?');
     expect(answer.citations).toEqual([]);
     expect(answer.parts[0]!.text).toMatch(/only its starter questions/);
-    expect(agent.starters('no-such-dossier')).toEqual([]);
+    expect(agent.starters('no-such-toil-project')).toEqual([]);
   });
 });
 
@@ -127,7 +127,7 @@ describe.each(NAMES)('the %s review answer agrees with the open queue', (name) =
 describe.each(NAMES)('the %s people answer agrees with the People view (#292)', (name) => {
   it("cites everyone's work in progress, every blocked item and its blocker, and every review waiting on someone, and names anyone over the limit", async () => {
     const { data } = await healthOf(name);
-    const view = people({ dossier: name, entries: data.people, wipLimit: data.wipLimit, items: data.items, changes: data.pullRequests, now: FIXTURE_NOW });
+    const view = people({ toilProject: name, entries: data.people, wipLimit: data.wipLimit, items: data.items, changes: data.pullRequests, now: FIXTURE_NOW });
     const answer = await agent.ask(name, 'people');
     const all = answer.parts.map((p) => p.text).join(' ');
     const cards = [...view.people, ...view.unmapped];
@@ -165,7 +165,7 @@ describe.each(NAMES)('the %s attention answer agrees with the insights', (name) 
 });
 
 describe('the scripts', () => {
-  it('cover every dossier the fixture serves', () => {
+  it('cover every Toil project the fixture serves', () => {
     expect(Object.keys(SCRIPTS).sort()).toEqual([...NAMES].sort());
   });
 });
@@ -197,7 +197,7 @@ describe('the scripted answers in each theme\'s voice (#283)', () => {
     expect((await agent.ask('card-payments', 'risk', { theme: 'plain', voice: true })).parts).toEqual(standard.parts);
     expect((await agent.ask('card-payments', 'deployed', { theme: 'crate', voice: true })).parts).toEqual((await agent.ask('card-payments', 'deployed')).parts);
     // By label too, as the pane sends a typed question.
-    expect((await agent.ask('settlement', "What's at risk in this dossier?", { theme: 'realm', voice: true })).parts[0]!.text).toMatch(/points is won; 15 remain as hit points\./);
+    expect((await agent.ask('settlement', "What's at risk in this Toil project?", { theme: 'realm', voice: true })).parts[0]!.text).toMatch(/points is won; 15 remain as hit points\./);
   });
 
   it('streams the voiced answer and ends on the whole of it', async () => {

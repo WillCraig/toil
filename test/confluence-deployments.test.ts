@@ -59,10 +59,10 @@ describe('paging: each deployment keeps the idea it pages by, and the other refu
     expect(cursorOnServer.envelope?.error).toMatchObject({ code: 'UNSUPPORTED', message: expect.stringContaining('--cursor') });
   });
 
-  it('check-dossier exists on Data Center only, and says so on Cloud before any request', async () => {
+  it('check-toil-project exists on Data Center only, and says so on Cloud before any request', async () => {
     const t = ctx();
-    const run = await runCli(['confluence', 'check-dossier', '--connection', 'confluence-cloud'], { commands, context: t.context });
-    expect(run.envelope?.error).toMatchObject({ code: 'UNSUPPORTED', message: expect.stringContaining('confluence check-dossier') });
+    const run = await runCli(['confluence', 'check-toil-project', '--connection', 'confluence-cloud'], { commands, context: t.context });
+    expect(run.envelope?.error).toMatchObject({ code: 'UNSUPPORTED', message: expect.stringContaining('confluence check-toil-project') });
     expect(t.http.calls).toHaveLength(0);
   });
 });

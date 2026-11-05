@@ -16,7 +16,7 @@ import type { Envelope } from '../src/toil.ts';
 
 type Rec = Record<string, unknown>;
 const read = { readOnly: true, caller: 'toil-ui' };
-const searchEnvelope = async (): Promise<Envelope & { ok: true }> => (await fixtureExecute().execute('jira issue search', { dossier: 'card-payments', jql: JQL('PAY'), changelog: true }, read)) as Envelope & { ok: true };
+const searchEnvelope = async (): Promise<Envelope & { ok: true }> => (await fixtureExecute().execute('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true }, read)) as Envelope & { ok: true };
 
 /** The search with every issue's changelog whole and inline, as Jira sends it for short histories. */
 const wholeInline = (search: Envelope & { ok: true }): Envelope => {

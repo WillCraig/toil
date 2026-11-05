@@ -1,11 +1,11 @@
 /**
- * Which GitHub repositories a dossier covers, worked out from the dossier
+ * Which GitHub repositories a toil project covers, worked out from the toil project
  * itself and nothing else: the `github` section's `owner` and `repo` (one
- * value for the whole dossier, or one per repo name, `{ "app": "app-repo" }`),
- * the owner and repo `dossiers show` resolved, and the dossier's own `repos`
+ * value for the whole toil project, or one per repo name, `{ "app": "app-repo" }`),
+ * the owner and repo `projects show` resolved, and the toil project's own `repos`
  * remotes that sit on the same GitHub host. The loader reads each one with
  * `owner` and `repo` passed explicitly, so it never depends on toil guessing a
- * repository from a folder the dossier may not have.
+ * repository from a folder the toil project may not have.
  *
  * A remote has no label saying which service it belongs to, so a host counts
  * as GitHub's when it is github.com or the host of a remote whose owner and
@@ -45,25 +45,25 @@ const forName = (value: unknown, name: string): string | undefined => {
 };
 
 /**
- * The dossier's GitHub repositories, deduplicated without regard to case:
- * the ones the dossier names first, then the ones only a remote shows.
- * `resolved` is `areas.github.inputs` from `dossiers show` (it follows the
- * dossier's environment); `dossier` is the dossier as written.
+ * The toil project's GitHub repositories, deduplicated without regard to case:
+ * the ones the toil project names first, then the ones only a remote shows.
+ * `resolved` is `areas.github.inputs` from `projects show` (it follows the
+ * toil project's environment); `toil project` is the toil project as written.
  */
-export function githubRepos(dossier: Rec, resolved: Record<string, string> | undefined): GithubRepo[] {
+export function githubRepos(toilProject: Rec, resolved: Record<string, string> | undefined): GithubRepo[] {
   const found: GithubRepo[] = [];
   const has = (owner: string, repo: string) => found.some((f) => f.slug.toLowerCase() === `${owner}/${repo}`.toLowerCase());
   const add = (owner: string | undefined, repo: string | undefined) => {
     if (owner && repo && !has(owner, repo)) found.push(make(owner, repo));
   };
-  const section = isRec(dossier.github) ? dossier.github : {};
+  const section = isRec(toilProject.github) ? toilProject.github : {};
   add(resolved?.owner, resolved?.repo);
 
   const names = new Set([...(isRec(section.owner) ? Object.keys(section.owner) : []), ...(isRec(section.repo) ? Object.keys(section.repo) : [])]);
   if (names.size) for (const name of names) add(forName(section.owner, name), forName(section.repo, name));
   else add(forName(section.owner, ''), forName(section.repo, ''));
 
-  const remotes = (Array.isArray(dossier.repos) ? dossier.repos : []).flatMap((r) =>
+  const remotes = (Array.isArray(toilProject.repos) ? toilProject.repos : []).flatMap((r) =>
     isRec(r) && Array.isArray(r.remotes) ? r.remotes.flatMap((u) => (typeof u === 'string' ? [parseRemote(u)] : [])) : [],
   );
   const hosts = new Set(['github.com']);

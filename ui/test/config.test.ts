@@ -30,7 +30,7 @@ const { execute, registry } = await import('../../src/api.ts');
  * The settings pages' path end to end (#253, item 4): the page's request to
  * `/api/config`, the server's allowlist and its CSRF and Origin checks, and
  * toil's own config commands run in-process from source (src/api.ts) against
- * a temp home, so the config file, the dossiers and the audit log are this
+ * a temp home, so the config file, the toil projects and the audit log are this
  * test's, never the user's. The credential store is the in-memory fake.
  * Every secret typed is swept for afterwards in every response, the audit
  * log, the config file and everything the process printed.
@@ -155,28 +155,28 @@ describe('the allowlist', () => {
   it('is exactly the config commands the pages need, each one toil has, the changes local writes only', () => {
     const served = new Map([...registry.commands, ...registry.personCommands].map((c) => [c.name, c]));
     expect([...CONFIG_COMMANDS].sort()).toEqual(
-      ['audit list', 'audit stats', 'connections add', 'connections default', 'connections list', 'connections login', 'connections remove', 'connections test', 'connections writes', 'dossiers add-repo', 'dossiers analyze set', 'dossiers check', 'dossiers field', 'dossiers init', 'dossiers link', 'dossiers list', 'dossiers onboard', 'dossiers person', 'dossiers show', 'dossiers wip-limit', 'dossiers describe', 'theme list', 'theme set'].sort(),
+      ['audit list', 'audit stats', 'connections add', 'connections default', 'connections list', 'connections login', 'connections remove', 'connections test', 'connections writes', 'projects add-repo', 'projects analyze set', 'projects check', 'projects field', 'projects init', 'projects link', 'projects list', 'projects onboard', 'projects person', 'projects show', 'projects wip-limit', 'projects describe', 'theme list', 'theme set'].sort(),
     );
     for (const name of CONFIG_READS) expect(served.get(name), name).toMatchObject({ writes: false, writesLocal: false, writesDependOnInput: false });
     // A change writes only toil's own config on this machine, never a service.
-    // dossiers onboard writes only when it adds or pins a connection; its plan writes nothing, and asks nothing.
-    for (const name of CONFIG_CHANGES) expect(served.get(name), name).toMatchObject(name === 'dossiers onboard' ? { writes: false, writesLocal: false, writesDependOnInput: true } : { writes: false, writesLocal: true });
+    // projects onboard writes only when it adds or pins a connection; its plan writes nothing, and asks nothing.
+    for (const name of CONFIG_CHANGES) expect(served.get(name), name).toMatchObject(name === 'projects onboard' ? { writes: false, writesLocal: false, writesDependOnInput: true } : { writes: false, writesLocal: true });
   });
 
   it("runs Set up this repo's plan as a person's command, which asks nothing and writes nothing", async () => {
-    mkdirSync(join(home, '.toil', 'dossiers'), { recursive: true });
-    writeFileSync(join(home, '.toil', 'dossiers', 'team.json'), JSON.stringify({ name: 'team', github: { host: 'github.com' } }));
+    mkdirSync(join(home, '.toil', 'projects'), { recursive: true });
+    writeFileSync(join(home, '.toil', 'projects', 'team.json'), JSON.stringify({ name: 'team', github: { host: 'github.com' } }));
     const { config } = await serve();
-    const { status, envelope } = await config('dossiers onboard', { dossier: 'team', plan: true });
+    const { status, envelope } = await config('projects onboard', { toilProject: 'team', plan: true });
     expect(status).toBe(200);
     expectEnvelope({ envelope }).toMatchObject({ ok: true, data: { plan: true, ok: false, areas: [{ area: 'github', status: 'missing', suggest: { name: 'github', baseUrl: 'https://api.github.com' } }] } });
     expect(existsSync(configFile())).toBe(false);
-    expect(audit().map((l) => [l.command, l.caller])).toEqual([['dossiers onboard', 'toil-ui']]);
+    expect(audit().map((l) => [l.command, l.caller])).toEqual([['projects onboard', 'toil-ui']]);
   });
 
   it("refuses a tracker write and every other command before toil sees it, so the audit log has no line for it", async () => {
     const { config } = await serve();
-    for (const command of ['jira issue create', 'jira issue transition', 'github issue create', 'connections import', 'dossiers remove', 'setup alias']) {
+    for (const command of ['jira issue create', 'jira issue transition', 'github issue create', 'connections import', 'projects remove', 'setup alias']) {
       const { status, envelope } = await config(command, { project: 'PAY', summary: 'x', allowWrite: true });
       expect(status, command).toBe(403);
       expect(envelope).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
@@ -290,20 +290,20 @@ describe('connections, through toil', () => {
   });
 });
 
-describe('dossiers, through toil', () => {
+describe('Toil projects, through toil', () => {
   it('creates one, adds a repo, links an area, names a field, and lists, shows and checks it', async () => {
     const { config } = await serve();
     await config('connections add', { name: 'corp-jira', area: 'jira' }, { answers: jiraAnswers(), secrets: { apiToken: SECRET } });
-    expectEnvelope(await config('dossiers init', { name: 'payments', description: 'Payments platform' })).toMatchObject({ ok: true, data: { name: 'payments', source: 'user' } });
-    expectEnvelope(await config('dossiers add-repo', { dossier: 'payments', location: 'https://git.imagile.dev/pay/payments-api.git' })).toMatchObject({ ok: true, data: { repo: { name: 'payments-api' } } });
-    expectEnvelope(await config('dossiers link', { dossier: 'payments', area: 'jira', connection: 'corp-jira', set: ['project=PAY'], add: ['projects=FEES'] })).toMatchObject({ ok: true });
-    expectEnvelope(await config('dossiers field', { dossier: 'payments', area: 'jira', alias: 'storyPoints', id: 'customfield_10002' })).toMatchObject({ ok: true, data: { fields: { storyPoints: 'customfield_10002' } } });
-    const file = JSON.parse(readFileSync(join(home, '.toil', 'dossiers', 'payments.json'), 'utf8'));
+    expectEnvelope(await config('projects init', { name: 'payments', description: 'Payments platform' })).toMatchObject({ ok: true, data: { name: 'payments', source: 'user' } });
+    expectEnvelope(await config('projects add-repo', { toilProject: 'payments', location: 'https://git.imagile.dev/pay/payments-api.git' })).toMatchObject({ ok: true, data: { repo: { name: 'payments-api' } } });
+    expectEnvelope(await config('projects link', { toilProject: 'payments', area: 'jira', connection: 'corp-jira', set: ['project=PAY'], add: ['projects=FEES'] })).toMatchObject({ ok: true });
+    expectEnvelope(await config('projects field', { toilProject: 'payments', area: 'jira', alias: 'storyPoints', id: 'customfield_10002' })).toMatchObject({ ok: true, data: { fields: { storyPoints: 'customfield_10002' } } });
+    const file = JSON.parse(readFileSync(join(home, '.toil', 'projects', 'payments.json'), 'utf8'));
     expect(file).toMatchObject({ name: 'payments', jira: { connection: 'corp-jira', project: 'PAY', projects: ['FEES'], fields: { storyPoints: 'customfield_10002' } } });
 
-    expect((await config('dossiers list')).envelope.data.dossiers.map((d: { name: string }) => d.name)).toEqual(['payments']);
-    expectEnvelope(await config('dossiers show', { dossier: 'payments' })).toMatchObject({ ok: true, data: { areas: { jira: { connection: { value: 'corp-jira' }, writes: false, inputs: { project: 'PAY' } } } } });
-    expectEnvelope(await config('dossiers check', { dossier: 'payments' })).toMatchObject({ ok: true, data: { ok: true } });
+    expect((await config('projects list')).envelope.data.toilProjects.map((d: { name: string }) => d.name)).toEqual(['payments']);
+    expectEnvelope(await config('projects show', { toilProject: 'payments' })).toMatchObject({ ok: true, data: { areas: { jira: { connection: { value: 'corp-jira' }, writes: false, inputs: { project: 'PAY' } } } } });
+    expectEnvelope(await config('projects check', { toilProject: 'payments' })).toMatchObject({ ok: true, data: { ok: true } });
     sweep();
   });
 
@@ -311,22 +311,22 @@ describe('dossiers, through toil', () => {
     const { config } = await serve();
     expectEnvelope(await config('theme list')).toMatchObject({ ok: true, data: { current: 'crate', source: 'default', default: 'crate' } });
     expectEnvelope(await config('theme set', { name: 'realm' })).toMatchObject({ ok: true, data: { theme: 'realm', changed: true } });
-    expect(JSON.parse(readFileSync(join(home, '.toil', 'config.json'), 'utf8'))).toMatchObject({ version: 3, theme: 'realm' });
+    expect(JSON.parse(readFileSync(join(home, '.toil', 'config.json'), 'utf8'))).toMatchObject({ version: 4, theme: 'realm' });
     expectEnvelope(await config('theme list')).toMatchObject({ ok: true, data: { current: 'realm', source: 'file' } });
     expectEnvelope(await config('theme set', { name: 'vaporwave' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
   });
 
   it('maps people and sets the limit, and leaves removing either to the CLI', async () => {
     const { config } = await serve();
-    await config('dossiers init', { name: 'payments' });
-    expectEnvelope(await config('dossiers person', { dossier: 'payments', name: 'Pat Example', id: ['jira=pat', 'github=pat-ex'], email: 'you@example.com' })).toMatchObject({ ok: true, data: { person: { name: 'Pat Example', ids: { jira: 'pat', github: 'pat-ex' } } } });
-    expectEnvelope(await config('dossiers person', { dossier: 'payments', name: 'Claude', kind: 'agent' })).toMatchObject({ ok: true });
-    expectEnvelope(await config('dossiers wip-limit', { dossier: 'payments', limit: 3 })).toMatchObject({ ok: true, data: { wipLimit: 3 } });
-    expectEnvelope(await config('dossiers show', { dossier: 'payments' })).toMatchObject({ ok: true, data: { dossier: { people: [{ name: 'Pat Example' }, { name: 'Claude', kind: 'agent' }], wipLimit: 3 } } });
+    await config('projects init', { name: 'payments' });
+    expectEnvelope(await config('projects person', { toilProject: 'payments', name: 'Pat Example', id: ['jira=pat', 'github=pat-ex'], email: 'you@example.com' })).toMatchObject({ ok: true, data: { person: { name: 'Pat Example', ids: { jira: 'pat', github: 'pat-ex' } } } });
+    expectEnvelope(await config('projects person', { toilProject: 'payments', name: 'Claude', kind: 'agent' })).toMatchObject({ ok: true });
+    expectEnvelope(await config('projects wip-limit', { toilProject: 'payments', limit: 3 })).toMatchObject({ ok: true, data: { wipLimit: 3 } });
+    expectEnvelope(await config('projects show', { toilProject: 'payments' })).toMatchObject({ ok: true, data: { toilProject: { people: [{ name: 'Pat Example' }, { name: 'Claude', kind: 'agent' }], wipLimit: 3 } } });
     // A removal is a delete: the API is held to MCP's rules, so the page can't make one.
-    expectEnvelope(await config('dossiers person', { dossier: 'payments', name: 'Claude', remove: true })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', fix: 'Only a person can make this call, on the CLI with toil dossiers person.' } });
-    expectEnvelope(await config('dossiers wip-limit', { dossier: 'payments', clear: true })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
-    expect(JSON.parse(readFileSync(join(home, '.toil', 'dossiers', 'payments.json'), 'utf8'))).toMatchObject({ people: [{ name: 'Pat Example' }, { name: 'Claude' }], wipLimit: 3 });
+    expectEnvelope(await config('projects person', { toilProject: 'payments', name: 'Claude', remove: true })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', fix: 'Only a person can make this call, on the CLI with toil projects person.' } });
+    expectEnvelope(await config('projects wip-limit', { toilProject: 'payments', clear: true })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    expect(JSON.parse(readFileSync(join(home, '.toil', 'projects', 'payments.json'), 'utf8'))).toMatchObject({ people: [{ name: 'Pat Example' }, { name: 'Claude' }], wipLimit: 3 });
     sweep();
   });
 
@@ -335,18 +335,18 @@ describe('dossiers, through toil', () => {
     await config('connections add', { name: 'corp-jira', area: 'jira' }, { answers: jiraAnswers(), secrets: { apiToken: SECRET } });
     await config('connections add', { name: 'admin-jira', area: 'jira' }, { answers: jiraAnswers('https://jira2.imagile.dev'), secrets: { apiToken: SECOND } });
     await config('connections writes', { name: 'admin-jira', state: 'on' }, { answers: { 'confirm-name': 'admin-jira' } });
-    await config('dossiers init', { name: 'payments' });
-    const linked = await config('dossiers link', { dossier: 'payments', area: 'jira', connection: 'admin-jira' });
+    await config('projects init', { name: 'payments' });
+    const linked = await config('projects link', { toilProject: 'payments', area: 'jira', connection: 'admin-jira' });
     expectEnvelope(linked).toMatchObject({ ok: false, error: { code: 'WRITE_DISABLED' } });
-    expect(JSON.parse(readFileSync(join(home, '.toil', 'dossiers', 'payments.json'), 'utf8')).jira).toBeUndefined();
+    expect(JSON.parse(readFileSync(join(home, '.toil', 'projects', 'payments.json'), 'utf8')).jira).toBeUndefined();
   });
 
   it('runs the reads read-only: a change named as a read is still refused by toil', async () => {
     const { config } = await serve();
-    // The page's reads go read-only even on the config path; a dossiers init can't hide behind one.
-    const readOnly = await execute('dossiers init', { name: 'x' }, { readOnly: true, caller: 'toil-ui' });
+    // The page's reads go read-only even on the config path; a projects init can't hide behind one.
+    const readOnly = await execute('projects init', { name: 'x' }, { readOnly: true, caller: 'toil-ui' });
     expect(readOnly).toMatchObject({ ok: false, error: { code: 'WRITE_DISABLED' } });
-    expectEnvelope(await config('dossiers list')).toMatchObject({ ok: true });
+    expectEnvelope(await config('projects list')).toMatchObject({ ok: true });
   });
 });
 
@@ -385,8 +385,8 @@ describe("the preview's sample config", () => {
   });
 
   it.each(CONFIG_CANNED.map((c) => [`${c.command} ${JSON.stringify(c.input)}`, c] as const))("%s is a config read whose input validates against toil's schema", (_label, call) => {
-    // dossiers onboard's plan, with no pin, asks nothing and changes nothing: the preview answers it like a read.
-    if (call.command === 'dossiers onboard') expect(call.input).toEqual({ plan: true });
+    // projects onboard's plan, with no pin, asks nothing and changes nothing: the preview answers it like a read.
+    if (call.command === 'projects onboard') expect(call.input).toEqual({ plan: true });
     else expect(CONFIG_READS as readonly string[]).toContain(call.command);
     const def = served.get(call.command)!;
     const result = new Validator(def.inputSchema as object, '2020-12', false).validate(call.input);
@@ -414,40 +414,40 @@ it('runs in a temp home, never the real ~/.toil', () => {
   expect(process.env.HOME).toBe(home);
 });
 
-describe("a dossier's name and description, from its card or dashboard (#342)", () => {
-  it("describes and renames through toil dossiers describe, then moves Toil UI's own records, labelled toil-ui in the audit log", async () => {
+describe("a Toil project's name and description, from its card or dashboard (#342)", () => {
+  it("describes and renames through toil projects describe, then moves Toil UI's own records, labelled toil-ui in the audit log", async () => {
     const moved: Array<[string, string]> = [];
     let holds = 0;
     let released = 0;
     const { config } = await serve({ renames: { hold: () => (holds++, () => void released++), blocked: () => null, moved: async (from, to) => (moved.push([from, to]), []) } });
-    expectEnvelope(await config('dossiers init', { name: 'scratch' })).toMatchObject({ ok: true });
-    expectEnvelope(await config('dossiers describe', { dossier: 'scratch', description: 'A scratch dossier' })).toMatchObject({ ok: true, data: { renamed: null, description: 'A scratch dossier' } });
+    expectEnvelope(await config('projects init', { name: 'scratch' })).toMatchObject({ ok: true });
+    expectEnvelope(await config('projects describe', { toilProject: 'scratch', description: 'A scratch Toil project' })).toMatchObject({ ok: true, data: { renamed: null, description: 'A scratch Toil project' } });
     expect(moved).toEqual([]);
-    const renamed = await config('dossiers describe', { dossier: 'scratch', name: 'scratch-two' });
+    const renamed = await config('projects describe', { toilProject: 'scratch', name: 'scratch-two' });
     expectEnvelope(renamed).toMatchObject({ ok: true, data: { name: 'scratch-two', renamed: { from: 'scratch', to: 'scratch-two' } } });
     expect(moved).toEqual([['scratch', 'scratch-two']]);
-    expect(existsSync(join(home, '.toil', 'dossiers', 'scratch.json'))).toBe(false);
-    expect(JSON.parse(readFileSync(join(home, '.toil', 'dossiers', 'scratch-two.json'), 'utf8'))).toMatchObject({ name: 'scratch-two', description: 'A scratch dossier' });
-    expect(audit().filter((l) => l.command === 'dossiers describe').map((l) => l.caller)).toEqual(['toil-ui', 'toil-ui']);
+    expect(existsSync(join(home, '.toil', 'projects', 'scratch.json'))).toBe(false);
+    expect(JSON.parse(readFileSync(join(home, '.toil', 'projects', 'scratch-two.json'), 'utf8'))).toMatchObject({ name: 'scratch-two', description: 'A scratch Toil project' });
+    expect(audit().filter((l) => l.command === 'projects describe').map((l) => l.caller)).toEqual(['toil-ui', 'toil-ui']);
     // Syncs were held for the rename only, and let go after it.
     expect([holds, released]).toEqual([1, 1]);
-    // A rename names the dossier as Toil UI keeps it, by name, never a path.
-    const byPath = await config('dossiers describe', { dossier: join(home, '.toil', 'dossiers', 'scratch-two.json'), name: 'scratch-three' });
+    // A rename names the toil project as Toil UI keeps it, by name, never a path.
+    const byPath = await config('projects describe', { toilProject: join(home, '.toil', 'projects', 'scratch-two.json'), name: 'scratch-three' });
     expect(byPath.status).toBe(400);
-    expect(byPath.envelope.error.message).toBe('Toil UI renames a dossier by its name, not a path to its file.');
+    expect(byPath.envelope.error.message).toBe('Toil UI renames a Toil project by its name, not a path to its file.');
   });
 
   it('refuses a rename while a sync or an assignment of it runs, before toil sees it, and says what Toil UI could not move', async () => {
     const { config } = await serve({ renames: { hold: () => () => undefined, blocked: (d) => (d === 'busy' ? { message: "A sync is running, so busy can't be renamed until it ends.", fix: 'Wait for it.' } : null), moved: async () => ["Toil UI couldn't move its cache."] } });
-    await config('dossiers init', { name: 'busy' });
-    await config('dossiers init', { name: 'idle' });
-    const refused = await config('dossiers describe', { dossier: 'busy', name: 'busy-two' });
+    await config('projects init', { name: 'busy' });
+    await config('projects init', { name: 'idle' });
+    const refused = await config('projects describe', { toilProject: 'busy', name: 'busy-two' });
     expect(refused.status).toBe(409);
     expect(refused.envelope).toMatchObject({ ok: false, error: { code: 'CONFLICT', fix: 'Wait for it.' } });
-    expect(existsSync(join(home, '.toil', 'dossiers', 'busy.json'))).toBe(true);
+    expect(existsSync(join(home, '.toil', 'projects', 'busy.json'))).toBe(true);
     // A description alone isn't a rename, so it goes ahead.
-    expectEnvelope(await config('dossiers describe', { dossier: 'busy', description: 'Still busy' })).toMatchObject({ ok: true });
-    const warned = await config('dossiers describe', { dossier: 'idle', name: 'idle-two' });
+    expectEnvelope(await config('projects describe', { toilProject: 'busy', description: 'Still busy' })).toMatchObject({ ok: true });
+    const warned = await config('projects describe', { toilProject: 'idle', name: 'idle-two' });
     expectEnvelope(warned).toMatchObject({ ok: true });
     expect(warned.envelope.meta.warnings).toContainEqual({ code: 'TOIL_UI_RENAME', message: "Toil UI couldn't move its cache." });
   });

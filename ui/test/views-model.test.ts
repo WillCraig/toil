@@ -13,7 +13,7 @@ import { healthOf } from './harness.ts';
 
 /**
  * The models behind the board, the flow panels, the dependency graph and the
- * insights (#252, #253): on each dossier as the dashboard loads it, and on
+ * insights (#252, #253): on each toil project as the dashboard loads it, and on
  * small items made here for the edges the fixture doesn't reach.
  */
 
@@ -148,12 +148,12 @@ describe('the dependency graph', () => {
     expect(g.cycle).toBe(false);
   });
 
-  it("names Azure DevOps' own wording, and draws nothing for a dossier without links", async () => {
+  it("names Azure DevOps' own wording, and draws nothing for a Toil project without links", async () => {
     expect(dependencyGraph((await healthOf('settlement')).data.items).edges).toEqual([{ id: 'blocks:corp-ado:2302->corp-ado:2303', type: 'blocks', source: 'corp-ado:2302', target: 'corp-ado:2303', name: 'Successor' }]);
     expect(dependencyGraph((await healthOf('checkout-web')).data.items)).toEqual({ nodes: [], edges: [], cycle: false });
   });
 
-  it('keeps a link to an item outside the dossier, marked unknown, and stops on a cycle', () => {
+  it('keeps a link to an item outside the Toil project, marked unknown, and stops on a cycle', () => {
     const a = item({ id: 'c:G-1', links: [{ type: 'blocks', direction: 'outward', target: 'c:G-2', name: 'blocks' }, { type: 'blocks', direction: 'outward', target: 'other:X-9', name: 'blocks' }] });
     const b = item({ id: 'c:G-2', links: [{ type: 'blocks', direction: 'outward', target: 'c:G-1', name: 'blocks' }] });
     const g = dependencyGraph([a, b]);
@@ -188,11 +188,11 @@ describe('the board', () => {
     const pay102 = byId.get('corp-jira:PAY-102')!;
     expect(proposeMove(pay102, 'TODO', data.items, 'card-payments')).toBeNull();
     const p = proposeMove(pay102, 'IN_PROGRESS', data.items, 'card-payments')!;
-    expect(p).toMatchObject({ from: 'board', item: 'corp-jira:PAY-102', title: 'Move PAY-102 to In progress', command: 'jira issue transition', input: { dossier: 'card-payments', key: 'PAY-102', transition: 'In Progress' } });
-    expect(commandLine(p, 'posix').line).toBe("toil jira issue transition 'PAY-102' --dossier 'card-payments' --transition 'In Progress' --allow-write");
-    expect(commandLine(p, 'powershell').line).toBe("toil jira issue transition 'PAY-102' --dossier 'card-payments' --transition 'In Progress' --allow-write");
+    expect(p).toMatchObject({ from: 'board', item: 'corp-jira:PAY-102', title: 'Move PAY-102 to In progress', command: 'jira issue transition', input: { toilProject: 'card-payments', key: 'PAY-102', transition: 'In Progress' } });
+    expect(commandLine(p, 'posix').line).toBe("toil jira issue transition 'PAY-102' --toil-project 'card-payments' --transition 'In Progress' --allow-write");
+    expect(commandLine(p, 'powershell').line).toBe("toil jira issue transition 'PAY-102' --toil-project 'card-payments' --transition 'In Progress' --allow-write");
     const settle = await healthOf('settlement');
-    expect(commandLine(proposeMove(settle.byId.get('corp-ado:2303')!, 'IN_PROGRESS', settle.data.items, 'settlement')!, 'posix').line).toBe("toil ado work-item transition '2303' --dossier 'settlement' --state 'Active' --allow-write");
+    expect(commandLine(proposeMove(settle.byId.get('corp-ado:2303')!, 'IN_PROGRESS', settle.data.items, 'settlement')!, 'posix').line).toBe("toil ado work-item transition '2303' --toil-project 'settlement' --state 'Active' --allow-write");
   });
 
   it("says where toil has no command, rather than inventing one", async () => {
@@ -204,27 +204,27 @@ describe('the board', () => {
     const lone = item({ id: 'c:L-1' });
     expect(statusFor(lone, 'DONE', [lone])).toBeNull();
     const p2 = proposeMove(lone, 'DONE', [lone], 'd')!;
-    expect(p2.note).toBe('No Done item in this dossier shows which status to use.');
-    expect(readLine(p2.hint!, 'posix').line).toBe("toil jira issue transitions 'L-1' --dossier 'd'");
+    expect(p2.note).toBe('No Done item in this Toil project shows which status to use.');
+    expect(readLine(p2.hint!, 'posix').line).toBe("toil jira issue transitions 'L-1' --toil-project 'd'");
   });
 
   it("proposes a Jira Cloud item's move with the jira commands, which route to its connection's deployment", () => {
     const todo = item({ id: 'cloud-jira:PAY-1', source: { area: 'jira', connection: 'cloud-jira', key: 'PAY-1', command: 'jira issue search', deployment: 'cloud' }, statusCategory: 'TODO', status: 'To Do' });
     const wip = item({ id: 'cloud-jira:PAY-2', source: { area: 'jira', connection: 'cloud-jira', key: 'PAY-2', command: 'jira issue search', deployment: 'cloud' }, statusCategory: 'IN_PROGRESS', status: 'In Progress' });
     const p = proposeMove(todo, 'IN_PROGRESS', [todo, wip], 'd')!;
-    expect(p).toMatchObject({ command: 'jira issue transition', input: { dossier: 'd', key: 'PAY-1', transition: 'In Progress' }, hint: { command: 'jira issue transitions', input: { dossier: 'd', key: 'PAY-1' } } });
+    expect(p).toMatchObject({ command: 'jira issue transition', input: { toilProject: 'd', key: 'PAY-1', transition: 'In Progress' }, hint: { command: 'jira issue transitions', input: { toilProject: 'd', key: 'PAY-1' } } });
     expect(proposeMove(todo, 'DONE', [todo], 'd')!.hint).toMatchObject({ command: 'jira issue transitions' });
   });
 
   it('builds its hints through the same quoting, so a hostile type name stays one inert argument', () => {
     const odd = item({ id: 'corp-ado:9', source: { area: 'ado', connection: 'corp-ado', key: '9', command: 'ado work-item get-many' }, typeName: "$(rm -rf ~) `id` it's" });
     const p = proposeMove(odd, 'DONE', [odd], 'settlement')!;
-    expect(p.hint).toEqual({ text: 'List the states the work item type has:', command: 'ado work-item states', input: { dossier: 'settlement', type: "$(rm -rf ~) `id` it's" } });
-    expect(readLine(p.hint!, 'posix').line).toBe("toil ado work-item states --dossier 'settlement' --type '$(rm -rf ~) `id` it'\\''s'");
-    expect(readLine(p.hint!, 'powershell').line).toBe("toil ado work-item states --dossier 'settlement' --type '$(rm -rf ~) `id` it''s'");
+    expect(p.hint).toEqual({ text: 'List the states the work item type has:', command: 'ado work-item states', input: { toilProject: 'settlement', type: "$(rm -rf ~) `id` it's" } });
+    expect(readLine(p.hint!, 'posix').line).toBe("toil ado work-item states --toil-project 'settlement' --type '$(rm -rf ~) `id` it'\\''s'");
+    expect(readLine(p.hint!, 'powershell').line).toBe("toil ado work-item states --toil-project 'settlement' --type '$(rm -rf ~) `id` it''s'");
 
     const cloud = item({ id: 'ado-board:9', source: { area: 'ado', connection: 'ado-board', key: '9', command: 'ado work-item get-many', deployment: 'cloud' }, typeName: 'Bug' });
-    expect(readLine(proposeMove(cloud, 'DONE', [cloud], 'ado-board')!.hint!, 'posix').line).toBe("toil ado work-item states --dossier 'ado-board' --type 'Bug'");
+    expect(readLine(proposeMove(cloud, 'DONE', [cloud], 'ado-board')!.hint!, 'posix').line).toBe("toil ado work-item states --toil-project 'ado-board' --type 'Bug'");
   });
 });
 
@@ -240,7 +240,7 @@ describe('insights', () => {
       ['corp-jira:PAY-107', 2, ['unestimated', 'added']],
     ]);
     const pay104 = ranked[1]!.insights[0]!;
-    expect(pay104.text).toBe("In progress for 13.9 days, longer than 85% of this dossier's finished items took (11 days)");
+    expect(pay104.text).toBe("In progress for 13.9 days, longer than 85% of this Toil project's finished items took (11 days)");
     expect(pay104.evidence).toBe('history.transitions, against 6 cycle times');
     expect(ranked.flatMap((a) => a.insights).every((i) => i.evidence.length > 0)).toBe(true);
   });
@@ -284,11 +284,11 @@ describe('insights', () => {
 });
 
 describe('a proposal', () => {
-  it('reads as one command line, dossier first, every value single quoted, with --allow-write', () => {
-    const p = { command: 'ado work-item update', input: { id: 2303, dossier: 'settlement', field: ['System.IterationPath=Payments\\Sprint 43'] } };
+  it('reads as one command line, Toil project first, every value single quoted, with --allow-write', () => {
+    const p = { command: 'ado work-item update', input: { id: 2303, toilProject: 'settlement', field: ['System.IterationPath=Payments\\Sprint 43'] } };
     // A backslash is literal inside single quotes in both shells: one stays one.
-    expect(commandLine(p, 'posix').line).toBe("toil ado work-item update '2303' --dossier 'settlement' --field 'System.IterationPath=Payments\\Sprint 43' --allow-write");
-    expect(commandLine(p, 'powershell').line).toBe("toil ado work-item update '2303' --dossier 'settlement' --field 'System.IterationPath=Payments\\Sprint 43' --allow-write");
+    expect(commandLine(p, 'posix').line).toBe("toil ado work-item update '2303' --toil-project 'settlement' --field 'System.IterationPath=Payments\\Sprint 43' --allow-write");
+    expect(commandLine(p, 'powershell').line).toBe("toil ado work-item update '2303' --toil-project 'settlement' --field 'System.IterationPath=Payments\\Sprint 43' --allow-write");
     expect(commandLine({ command: null, input: null }, 'posix').line).toBeNull();
   });
 
@@ -305,7 +305,7 @@ describe('a proposal', () => {
   });
 
   it('puts the ids first as positional arguments, and refuses one that starts with a dash, pointing at MCP', () => {
-    expect(readLine({ command: 'jira issue download', input: { dossier: 'd', attachmentId: '10', key: 'A-1' } }, 'posix').line).toBe("toil jira issue download 'A-1' '10' --dossier 'd'");
+    expect(readLine({ command: 'jira issue download', input: { toilProject: 'd', attachmentId: '10', key: 'A-1' } }, 'posix').line).toBe("toil jira issue download 'A-1' '10' --toil-project 'd'");
     for (const shell of ['posix', 'powershell'] as const) {
       const out = commandLine({ command: 'jira issue update', input: { key: '--allow-write', summary: 's' } }, shell);
       expect(out.line).toBeNull();
@@ -341,7 +341,7 @@ describe('a proposal', () => {
     const qa = item({ id: 'corp-jira:QA-2', status: 'Code Review & QA', statusCategory: 'IN_PROGRESS' });
     const todo = item({ id: 'corp-jira:QA-1', status: 'To Do' });
     const p = proposeMove(todo, 'IN_PROGRESS', [todo, qa], 'card-payments')!;
-    expect(p.input).toEqual({ dossier: 'card-payments', key: 'QA-1', transition: 'Code Review & QA' });
+    expect(p.input).toEqual({ toilProject: 'card-payments', key: 'QA-1', transition: 'Code Review & QA' });
     const ps = commandLine(p, 'powershell');
     expect(ps.line).toBeNull();
     // transition-issue has no --input-file, so the advice never names it: bash/zsh or MCP instead.
@@ -349,8 +349,8 @@ describe('a proposal', () => {
     expect(ps.reason).toContain('it holds &');
     expect(ps.reason).toContain('Switch this card to bash/zsh');
     expect(ps.reason).toContain('the tool jira_issue_transition');
-    expect(ps.mcp).toEqual({ tool: 'jira_issue_transition', input: { dossier: 'card-payments', key: 'QA-1', transition: 'Code Review & QA', allowWrite: true } });
-    expect(commandLine(p, 'posix').line).toBe("toil jira issue transition 'QA-1' --dossier 'card-payments' --transition 'Code Review & QA' --allow-write");
+    expect(ps.mcp).toEqual({ tool: 'jira_issue_transition', input: { toilProject: 'card-payments', key: 'QA-1', transition: 'Code Review & QA', allowWrite: true } });
+    expect(commandLine(p, 'posix').line).toBe("toil jira issue transition 'QA-1' --toil-project 'card-payments' --transition 'Code Review & QA' --allow-write");
   });
 
   it('never offers bash/zsh for a line break, which no shell line carries', () => {

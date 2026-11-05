@@ -15,7 +15,7 @@ import { Loader, MomentsProvider, resetSplash, Splash, useMomentPlayer, type Mom
 import { progressText, trackCalls } from '../src/moments/progress.ts';
 import { rememberSprint, renameSprint, splashDataFor } from '../src/moments/splash-data.ts';
 import { health } from '../src/model/sprint.ts';
-import { loadDossier } from '../src/load.ts';
+import { loadToilProject } from '../src/load.ts';
 import { ENTER_MOTIFS, LOADER_DELAY_MS, LOOP_MOTIFS, MOMENT_KINDS } from '../src/moments/schema.ts';
 import { resetMotionChoice, resetThemeMotion, setMotionChoice, setThemeMotion } from '../src/motion.ts';
 import { SkinProvider, ThemeChoiceProvider, ThemeProvider, skinsFor } from '../src/skins.tsx';
@@ -94,8 +94,8 @@ describe('the loader', () => {
   });
 
   it("keeps a theme's Loading skin, and Plain's text, when the theme declares no loader, with a plain tip", () => {
-    render(inTheme('plain', <Loader immediate message="Reading the dossiers…" />));
-    expect(screen.getByRole('status').textContent).toBe('Reading the dossiers…');
+    render(inTheme('plain', <Loader immediate message="Reading the Toil projects…" />));
+    expect(screen.getByRole('status').textContent).toBe('Reading the Toil projects…');
     expect(document.querySelector('.loader--skin')).not.toBeNull();
     expect(document.querySelector('[data-tip]')!.textContent).toMatch(/^Tip /);
   });
@@ -122,7 +122,7 @@ describe('the loader', () => {
       if (command === 'jira issue search') await slow;
       return { ok: true, data: null, error: null, meta: { command } } as never;
     }, (p) => seen.push(progressText(p)!));
-    const a = exec('dossiers show');
+    const a = exec('projects show');
     const b = exec('jira issue search');
     await a;
     expect(seen.at(-1)).toBe('1 of 2 toil calls answered; reading toil jira issue search.');
@@ -261,10 +261,10 @@ describe('the event moments', () => {
 describe('the splash', () => {
   it('plays once per launch, only while the first read lasts past 300 ms, and ends when the data is ready', () => {
     vi.useFakeTimers();
-    const { rerender } = render(inTheme('harvest', <Splash ready={false} detail="Reading the dossiers with toil dossiers list." />));
+    const { rerender } = render(inTheme('harvest', <Splash ready={false} detail="Reading the Toil projects with toil projects list." />));
     expect(document.querySelector('.splash')).toBeNull();
     act(() => vi.advanceTimersByTime(LOADER_DELAY_MS));
-    expect(screen.getByRole('status').textContent).toBe('Starting Toil UI. Reading the dossiers with toil dossiers list.');
+    expect(screen.getByRole('status').textContent).toBe('Starting Toil UI. Reading the Toil projects with toil projects list.');
     rerender(inTheme('harvest', <Splash ready detail={null} />));
     expect(document.querySelector('.splash')).toBeNull();
     // A second App (remounted after a sync) plays no splash.
@@ -301,7 +301,7 @@ describe("the splash's data (#462)", () => {
   // A sprint of ten working days from Monday 5 October 2026; the fixture's clock is the Tuesday of its second week.
   const SPRINT = { start: '2026-10-05T00:00:00.000Z', end: '2026-10-17T00:00:00.000Z' };
   const keep = (kept: unknown) => localStorage.setItem('toil-ui:splash', JSON.stringify(kept));
-  const DATA = { dossier: 'card-payments', day: 7, days: 10, done: 4 };
+  const DATA = { toilProject: 'card-payments', day: 7, days: 10, done: 4 };
   const played = (theme: string, data: typeof DATA | null) => {
     cleanup();
     resetSplash();
@@ -328,13 +328,13 @@ describe("the splash's data (#462)", () => {
     expect(splashDataFor('card-payments', FIXTURE_NOW)).toBeNull();
   });
 
-  it("remembers a dossier's sprint as its page loads, forgets one with no sprint, and follows a rename", async () => {
-    const d = await loadDossier(fixtureExecute().execute, 'card-payments');
+  it("remembers a Toil project's sprint as its page loads, forgets one with no sprint, and follows a rename", async () => {
+    const d = await loadToilProject(fixtureExecute().execute, 'card-payments');
     const h = health(d.items, d.changes, FIXTURE_NOW)!;
     rememberSprint('card-payments', h);
     const kept = JSON.parse(localStorage.getItem('toil-ui:splash')!) as Record<string, unknown>;
     expect(kept['card-payments']).toEqual({ start: h.sprint.start, end: h.sprint.end, done: h.done.count });
-    expect(splashDataFor('card-payments', FIXTURE_NOW)).toEqual({ dossier: 'card-payments', day: h.days.gone, days: h.days.total, done: h.done.count });
+    expect(splashDataFor('card-payments', FIXTURE_NOW)).toEqual({ toilProject: 'card-payments', day: h.days.gone, days: h.days.total, done: h.done.count });
     renameSprint('card-payments', 'payments');
     expect(splashDataFor('card-payments', FIXTURE_NOW)).toBeNull();
     expect(splashDataFor('payments', FIXTURE_NOW)?.day).toBe(h.days.gone);
@@ -348,7 +348,7 @@ describe("the splash's data (#462)", () => {
     expect(art.tagName).toBe('SPAN');
     expect(art.querySelector('.m-face')?.textContent).toBe('7');
     expect(art.querySelector('img')?.className).toBe('');
-    expect(splash.dataset).toMatchObject({ sprintDay: '7', sprintDays: '10', itemsDone: '4', dossier: 'card-payments' });
+    expect(splash.dataset).toMatchObject({ sprintDay: '7', sprintDays: '10', itemsDone: '4', toilProject: 'card-payments' });
     expect(played('realm', { ...DATA, day: 23, days: 28 }).querySelector('.m-face')?.textContent).toBe('20');
   });
 
@@ -362,10 +362,10 @@ describe("the splash's data (#462)", () => {
     expect(crate.dataset.sprintDay).toBe('7');
   });
 
-  it("plays the remembered day on the next launch of that dossier's page, and never on sample data", async () => {
+  it("plays the remembered day on the next launch of that Toil project's page, and never on sample data", async () => {
     localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'realm' }));
     keep({ 'card-payments': { ...SPRINT, done: 4 } });
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     // A first read that never ends, so the splash plays over it.
     const slow = () => new Promise<never>(() => undefined);
     const live = render(<App execute={slow} agent={scriptedAgent()} now={FIXTURE_NOW} preview={false} />);
@@ -379,14 +379,14 @@ describe("the splash's data (#462)", () => {
   }, 15_000);
 
   it('remembers nothing from sample data', async () => {
-    window.location.hash = '#/dossier/card-payments';
+    window.location.hash = '#/project/card-payments';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 });
     expect(localStorage.getItem('toil-ui:splash')).toBeNull();
   });
 
-  it('remembers the sprint of the dossier on screen from real data', async () => {
-    window.location.hash = '#/dossier/card-payments';
+  it('remembers the sprint of the Toil project on screen from real data', async () => {
+    window.location.hash = '#/project/card-payments';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview={false} />);
     await screen.findByRole('heading', { level: 1 });
     await waitFor(() => expect(splashDataFor('card-payments', FIXTURE_NOW)).not.toBeNull());
@@ -453,8 +453,8 @@ describe('in the app', () => {
   });
 
   it('plays the moments of the facts a sync recorded for the first time, once', async () => {
-    window.location.hash = '#/dossier/card-payments';
-    const news = { id: '2026-10-13T08:00:00.000Z', byDossier: [{ dossier: 'card-payments', events: [fact({ kind: 'pr-merged', label: '#52', title: 'Vault' })] }, { dossier: 'settlement', events: [fact({ kind: 'build-failed' })] }] };
+    window.location.hash = '#/project/card-payments';
+    const news = { id: '2026-10-13T08:00:00.000Z', byToilProject: [{ toilProject: 'card-payments', events: [fact({ kind: 'pr-merged', label: '#52', title: 'Vault' })] }, { toilProject: 'settlement', events: [fact({ kind: 'build-failed' })] }] };
     const { unmount } = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview news={news} />);
     await screen.findByRole('heading', { level: 1 });
     expect(document.querySelector('[data-moment="pr-merged"]')).not.toBeNull();

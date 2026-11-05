@@ -18,7 +18,7 @@
     {
       "allows": [],
       "old": "The Kibana space from --space or the connection taken as any non-empty text and encoded into the /s/<space> path prefix",
-      "toil": "A space ID holding /, , ?, #, % or a control character is refused with INVALID_INPUT before anything is sent, however it arrives: --space, the MCP field, the dossier, an env var or the connection setting. Rule IDs are still encoded as one path segment",
+      "toil": "A space ID holding /, , ?, #, % or a control character is refused with INVALID_INPUT before anything is sent, however it arrives: --space, the MCP field, the toil project, an env var or the connection setting. Rule IDs are still encoded as one path segment",
       "why": "Kibana space IDs are lowercase letters, digits, _ and -, so a value with path syntax in it names no space.",
       "principle": "2"
     }

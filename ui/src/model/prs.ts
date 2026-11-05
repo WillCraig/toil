@@ -2,7 +2,7 @@
  * Pull request tracking (#291): what each open pull request waits on and for
  * how long, the flags a lead would raise, flow metrics split by who wrote the
  * change, and reviewers to suggest. Pure functions of OWI 0.2 changes
- * (src/core/owi/), the dossier's work items and a clock, like sprint.ts. A
+ * (src/core/owi/), the toil project's work items and a clock, like sprint.ts. A
  * figure the data can't support is unknown, counted beside the figure, and
  * every figure carries its sample size (principle 4). Time waiting is
  * counted in working days, Monday to Friday UTC, since nobody reviews at the
@@ -105,7 +105,7 @@ export interface FlagHit {
   text: string;
 }
 
-/** The dossier's work items a change names: the ones the dossier's own queries returned. */
+/** The toil project's work items a change names: the ones the toil project's own queries returned. */
 export const linked = (c: Change, byId: Map<string, WorkItem>) => c.workItems.filter((id) => byId.has(id));
 
 export function flagsOf(c: Change, byId: Map<string, WorkItem>, now: string): FlagHit[] {
@@ -120,7 +120,7 @@ export function flagsOf(c: Change, byId: Map<string, WorkItem>, now: string): Fl
       out.push({ flag: 'failing-checks', text: `Failing since ${c.checksAt.slice(0, 16).replace('T', ' ')} UTC, ${round1((Date.parse(now) - Date.parse(c.checksAt)) / DAY)} days.` });
     }
     if (c.mergeable === false) out.push({ flag: 'conflict', text: `It doesn't merge cleanly into ${c.branch.target ?? 'its target'}.` });
-    if (!items.length) out.push({ flag: 'no-work-item', text: c.workItems.length ? `It names ${c.workItems.join(', ')}, none of which this dossier holds.` : 'Its title, branch and description name no work item.' });
+    if (!items.length) out.push({ flag: 'no-work-item', text: c.workItems.length ? `It names ${c.workItems.join(', ')}, none of which this Toil project holds.` : 'Its title, branch and description name no work item.' });
     for (const i of items.filter((i) => i.statusCategory === 'DONE')) out.push({ flag: 'item-done', text: `[[${i.id}]] is ${i.status ?? 'done'} while this is still open.` });
   }
   if (c.state === 'MERGED') {
@@ -346,18 +346,18 @@ export function suggestReviewers(c: Change, others: Change[], rules: OwnerRule[]
 }
 
 /** A suggestion as a proposal: asking for a review is a write, which a person applies through toil's write gate. */
-export function reviewProposal(c: Change, s: Suggested, dossier: string): Proposal {
+export function reviewProposal(c: Change, s: Suggested, toilProject: string): Proposal {
   const number = Number(c.id.slice(c.id.lastIndexOf('#') + 1));
   const base = { id: `review:${c.id}:${s.id}`, from: 'reviewers' as const, item: c.id, title: `Ask ${s.id} to review ${prName(c.id)}`, reason: `${s.id} ${s.why.join('; ')}.` };
   const area = c.source.area;
   if (area === 'github') {
     const team = s.id.includes('/');
-    return { ...base, command: 'github pr add-reviewers', input: { dossier, number, ...(team ? { teamReviewer: [s.id.slice(s.id.indexOf('/') + 1)] } : { reviewer: [s.id] }) }, note: null };
+    return { ...base, command: 'github pr add-reviewers', input: { toilProject, number, ...(team ? { teamReviewer: [s.id.slice(s.id.indexOf('/') + 1)] } : { reviewer: [s.id] }) }, note: null };
   }
   if (area === 'bitbucket') {
     // Data Center adds one reviewer; Cloud has no such command, so the list is replaced.
-    if (c.source.deployment !== 'cloud') return { ...base, command: 'bitbucket pr add-reviewer', input: { dossier, id: number, user: s.id }, note: null };
-    return { ...base, command: 'bitbucket pr update', input: { dossier, id: number, reviewers: s.id }, note: 'This replaces the reviewer list, which is empty now: check nobody was added since the last sync.' };
+    if (c.source.deployment !== 'cloud') return { ...base, command: 'bitbucket pr add-reviewer', input: { toilProject, id: number, user: s.id }, note: null };
+    return { ...base, command: 'bitbucket pr update', input: { toilProject, id: number, reviewers: s.id }, note: 'This replaces the reviewer list, which is empty now: check nobody was added since the last sync.' };
   }
   return { ...base, command: null, input: null, note: `toil has no command that adds a reviewer on ${sourceLabel(area)} yet. Add ${s.id} on the pull request's page${c.url ? `: ${c.url}` : ''}.` };
 }

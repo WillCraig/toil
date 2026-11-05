@@ -65,12 +65,12 @@ export function selectCommands(commands: AnyCommand[], areas: string[] | undefin
 }
 
 /** The tool the Analyze prompt is built by, and the prompt as clients list it. */
-const ANALYZE_TOOL = 'dossiers_analyze_prompt';
+const ANALYZE_TOOL = 'projects_analyze_prompt';
 export const ANALYZE_PROMPT = {
   name: 'analyze',
-  title: 'Analyze a dossier',
-  description: "Brief one dossier: what needs a person, why, and what to do first, read through toil's tools, with every work item and pull request linked.",
-  arguments: [{ name: 'dossier', description: 'The dossier to analyze (default: the one the folder matches)', required: false }],
+  title: 'Analyze a toil project',
+  description: "Brief one toil project: what needs a person, why, and what to do first, read through toil's tools, with every work item and pull request linked.",
+  arguments: [{ name: 'toilProject', description: 'The toil project to analyze (default: the one the folder matches)', required: false }],
 };
 
 /**
@@ -182,17 +182,17 @@ export function createMcpServer(options: {
     if (err instanceof ToilError) throw new McpError(ErrorCode.InternalError, `${err.message}${err.fix ? ` ${err.fix}` : ''}`);
     throw err;
   };
-  // The one prompt, Analyze (#494), is the dossiers_analyze_prompt tool's answer, so it's served exactly when that tool is.
+  // The one prompt, Analyze (#494), is the projects_analyze_prompt tool's answer, so it's served exactly when that tool is.
   const analyze = byName.get(ANALYZE_TOOL);
   server.setRequestHandler(ListPromptsRequestSchema, () => ({ prompts: analyze ? [ANALYZE_PROMPT] : [] }));
   server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     if (request.params.name !== ANALYZE_PROMPT.name || !analyze) throw new McpError(ErrorCode.InvalidParams, `Unknown prompt: ${request.params.name}`);
-    const dossier = request.params.arguments?.dossier?.trim();
+    const toilProject = request.params.arguments?.toilProject?.trim();
     const shared = await clientRoots();
-    const envelope = await runCommand(analyze, dossier ? { dossier } : {}, (d) => options.context(d, undefined, shared), startup.version, 'mcp', { targets: selected });
+    const envelope = await runCommand(analyze, toilProject ? { toilProject } : {}, (d) => options.context(d, undefined, shared), startup.version, 'mcp', { targets: selected });
     if (!envelope.ok) throw new McpError(ErrorCode.InvalidParams, `${envelope.error!.message}${envelope.error!.fix ? ` ${envelope.error!.fix}` : ''}`);
-    const data = envelope.data as { prompt: string; dossier: { dossier: string } };
-    return { description: `Analyze the dossier ${data.dossier.dossier}`, messages: [{ role: 'user' as const, content: { type: 'text' as const, text: data.prompt } }] };
+    const data = envelope.data as { prompt: string; toilProject: { toilProject: string } };
+    return { description: `Analyze the toil project ${data.toilProject.toilProject}`, messages: [{ role: 'user' as const, content: { type: 'text' as const, text: data.prompt } }] };
   });
   server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: await listResources(await host()).catch(asMcpError) }));
   server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({ resourceTemplates: listTemplates(await host()) }));

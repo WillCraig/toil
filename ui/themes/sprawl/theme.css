@@ -156,8 +156,8 @@
   text-shadow: 0 0 8px rgba(var(--sprawl-cyan), calc(0.35 * var(--sprawl-glow)));
 }
 
-/* A dossier's name is an identifier, so it keeps its own case. */
-[data-theme="sprawl"] .dossier-card h2 {
+/* A toil project's name is an identifier, so it keeps its own case. */
+[data-theme="sprawl"] .toil-project-card h2 {
   text-transform: none;
   letter-spacing: 0.03em;
 }

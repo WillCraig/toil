@@ -3,7 +3,7 @@
  * whether the first opens, whether the numbers start open, whether an item
  * opens in its drawer or on its page, whether Analyze runs after each
  * sync, and whether the Summary tab's full briefing is open. Kept in this
- * browser only: they're conveniences for the person at the screen, never what Analyze looks for (that's the dossier's, in its
+ * browser only: they're conveniences for the person at the screen, never what Analyze looks for (that's the toil project's, in its
  * file) and never shared. Storage that's blocked or full leaves the
  * defaults, quietly, since nothing here is worth an error. Personal
  * preferences, filed in the one cabinet nobody else has a key to.

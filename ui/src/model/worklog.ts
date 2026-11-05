@@ -1,5 +1,5 @@
 /**
- * The worklog (#308): one page per dossier per day, facts only, folded from
+ * The worklog (#308): one page per toil project per day, facts only, folded from
  * what Toil UI already holds. A page is a pure function of its inputs: the
  * day's events, the agent runs and notes recorded that day, and the syncs
  * that say how much of the day the cache can vouch for. No model writes a
@@ -129,7 +129,7 @@ export type Applied =
 export interface AgentRun {
   id: string;
   kind: 'ask' | 'assignment';
-  dossier: string;
+  toilProject: string;
   startedAt: string;
   finishedAt: string | null;
   outcome: 'running' | 'finished' | 'failed' | 'stopped' | 'capped';
@@ -163,7 +163,7 @@ export interface SyncRun {
 
 /** Everything one day's page is folded from. */
 export interface WorklogInput {
-  dossier: string;
+  toilProject: string;
   /** `yyyy-mm-dd`, UTC. */
   day: string;
   events: WorklogEvent[];
@@ -171,7 +171,7 @@ export interface WorklogInput {
   /** By proposal id. */
   applied: Record<string, Applied>;
   notes: WorklogNote[];
-  /** Every sync of the dossier the cache still holds. */
+  /** Every sync of the toil project the cache still holds. */
   syncs: SyncRun[];
   /** The clock: only which day it is matters to the page, never the time. */
   now: string;
@@ -187,7 +187,7 @@ export interface RunLine {
 }
 
 export interface WorklogPage {
-  dossier: string;
+  toilProject: string;
   day: string;
   timeZone: 'UTC';
   /** What the cache can't vouch for on this day, said at the top. */
@@ -317,7 +317,7 @@ function itemEvent(item: WorkItem, kind: WorklogKind, at: string, text: string, 
 }
 
 /**
- * What the dossier's history records, with each fact's own time: status and
+ * What the toil project's history records, with each fact's own time: status and
  * sprint changes, pull requests opened, reviewed, merged and declined, and
  * failing builds, with a recovery wherever a passing build follows a failing
  * one in the same pull request's builds. `known` is what earlier syncs
@@ -452,7 +452,7 @@ export function observedEvents(before: Snapshot | null, after: Snapshot, at: str
   const stamp = isoOf(at);
   const old = blockers(before.items);
   const byId = new Map(after.items.map((i) => [i.id, i]));
-  // A source the last picture didn't have (an area just linked to the dossier) brings its blockers with it, not new ones.
+  // A source the last picture didn't have (an area just linked to the toil project) brings its blockers with it, not new ones.
   const watched = new Set(before.items.map((i) => i.source.area));
   for (const [blocked, now] of blockers(after.items)) {
     const item = byId.get(blocked)!;
@@ -466,7 +466,7 @@ export function observedEvents(before: Snapshot | null, after: Snapshot, at: str
   }
   // A blocker gone since the last picture, on an item still open: the item it blocked can move (#419). A blocker that
   // left the picture counts (a done item can drop out of the query), unless its whole source did: an area unlinked from
-  // the dossier, or one that read nothing, clears nothing.
+  // the toil project, or one that read nothing, clears nothing.
   const now = blockers(after.items);
   const areas = new Set(after.items.map((i) => i.source.area));
   for (const [blocked, was] of old) {
@@ -552,7 +552,7 @@ export function gapsFor(input: Pick<WorklogInput, 'day' | 'syncs' | 'now' | 'ret
     out.push(`This day is older than the cache's ${plural(retentionDays, 'day')} retention: anything not synced again since has been deleted, so what's left here is what the cache still held when the page was built.`);
   }
   if (!ok.length) {
-    out.push("Toil UI hasn't synced this dossier successfully yet, so this page holds only what was recorded without a sync: notes and agent runs.");
+    out.push("Toil UI hasn't synced this Toil project successfully yet, so this page holds only what was recorded without a sync: notes and agent runs.");
     return out;
   }
   const first = ok[0]!;
@@ -604,7 +604,7 @@ export function buildDay(input: WorklogInput): WorklogPage {
   const notes = input.notes.filter((n) => dayOf(n.at) === input.day).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : 1));
   const areas = [...new Set(input.syncs.map((s) => s.area))].sort();
   return {
-    dossier: input.dossier,
+    toilProject: input.toilProject,
     day: input.day,
     timeZone: 'UTC',
     gaps: gapsFor(input),
@@ -684,7 +684,7 @@ export function runLine(r: RunLine): string[] {
 
 /** A page as Markdown: deterministic, so the same page always gives the same text. */
 export function markdownOf(page: WorklogPage): string {
-  const out = [`# Worklog: ${escapeMd(page.dossier)}, ${longDay(page.day)}`, '', `Dossier \`${page.dossier}\`, ${page.day}, times in UTC. Built by Toil UI from its cache: facts only, each linked to its source.`, ''];
+  const out = [`# Worklog: ${escapeMd(page.toilProject)}, ${longDay(page.day)}`, '', `Toil project \`${page.toilProject}\`, ${page.day}, times in UTC. Built by Toil UI from its cache: facts only, each linked to its source.`, ''];
   if (page.gaps.length) {
     out.push('## Coverage', '');
     for (const g of page.gaps) out.push(`- ${escapeMd(g)}`);
@@ -716,14 +716,14 @@ export function markdownOf(page: WorklogPage): string {
 }
 
 /** A month's pages as one Markdown file, oldest first. */
-export function monthMarkdown(dossier: string, month: string, pages: WorklogPage[]): string {
-  const head = [`# Worklog: ${escapeMd(dossier)}, ${monthName(month)}`, '', `${plural(pages.length, 'day')} with a page, times in UTC.`, ''];
+export function monthMarkdown(toilProject: string, month: string, pages: WorklogPage[]): string {
+  const head = [`# Worklog: ${escapeMd(toilProject)}, ${monthName(month)}`, '', `${plural(pages.length, 'day')} with a page, times in UTC.`, ''];
   return [...head, ...pages.map((p) => markdownOf(p).replace(/^# /, '## ').replace(/\n## /g, '\n### '))].join('\n');
 }
 
 /** A run's transcript as Markdown: the question, the answer as the person saw it, and its proposals. */
 export function transcriptOf(run: AgentRun): string {
-  const out = [`# ${run.kind === 'ask' ? 'Question' : 'Assignment'} to ${escapeMd(run.by)}`, '', `Dossier \`${run.dossier}\`, started ${when(run.startedAt)}${run.finishedAt ? `, ${OUTCOME_TEXT[run.outcome]} ${when(run.finishedAt)}` : `, ${OUTCOME_TEXT[run.outcome]}`}. Written by the agent, not by Toil UI: its citations were checked against what its tools returned.`, '', '## Asked', '', escapeMd(run.prompt), '', '## Answer', ''];
+  const out = [`# ${run.kind === 'ask' ? 'Question' : 'Assignment'} to ${escapeMd(run.by)}`, '', `Toil project \`${run.toilProject}\`, started ${when(run.startedAt)}${run.finishedAt ? `, ${OUTCOME_TEXT[run.outcome]} ${when(run.finishedAt)}` : `, ${OUTCOME_TEXT[run.outcome]}`}. Written by the agent, not by Toil UI: its citations were checked against what its tools returned.`, '', '## Asked', '', escapeMd(run.prompt), '', '## Answer', ''];
   out.push(run.answer ?? (run.error ? `No answer: ${escapeMd(run.error)}` : 'No answer.'), '');
   if (run.citations.length) out.push('## Citations', '', ...run.citations.map((c) => `- \`${c}\`${run.unverified.includes(c) ? ' (unverified: no tool returned it)' : ''}`), '');
   if (run.proposals.length) out.push('## Proposals', '', ...run.proposals.map((p) => `- ${escapeMd(p.title)}${p.command ? ` (\`toil ${p.command}\`)` : ''}`), '');
@@ -731,7 +731,7 @@ export function transcriptOf(run: AgentRun): string {
 }
 
 /** A finished answer as the run record keeps it. */
-export function runFromAnswer(base: Pick<AgentRun, 'id' | 'kind' | 'dossier' | 'startedAt' | 'by' | 'prompt'>, finishedAt: string, answer: Answer): AgentRun {
+export function runFromAnswer(base: Pick<AgentRun, 'id' | 'kind' | 'toilProject' | 'startedAt' | 'by' | 'prompt'>, finishedAt: string, answer: Answer): AgentRun {
   return {
     ...base,
     finishedAt,

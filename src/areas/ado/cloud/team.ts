@@ -37,7 +37,7 @@ async function teamPath(ctx: AdoCloudContext): Promise<string> {
     name = project.defaultTeam?.id;
     if (!name) {
       throw new ToilError('NOT_FOUND', `Azure DevOps didn't name a default team for project "${ctx.context.project}".`, {
-        fix: 'Pass --team <name>, or set team on the connection or in the dossier. The project\'s teams are under Project settings → Teams.',
+        fix: 'Pass --team <name>, or set team on the connection or in the toil project. The project\'s teams are under Project settings → Teams.',
       });
     }
     // meta.context lists only the inputs that resolved, so say which team was read.

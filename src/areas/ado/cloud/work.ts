@@ -114,14 +114,14 @@ export const workUpdateCommand = adoArea.command({
   },
 });
 
-/** What a transition's errors name: the exact flag, and where a dossier pins an intent for a type. */
+/** What a transition's errors name: the exact flag, and where a toil project pins an intent for a type. */
 const TRANSITION_HELP = { explicit: '--state <state>', pinKey: 'ado.transitions' };
 
 export const workTransitionCommand = adoArea.command({
   path: ['ado', 'work-item', 'transition'],
   description: 'Set the state of a work item',
   toolDescription:
-    "Sets System.State on a work item and returns it. Give state with an exact state, or to with an intent (start, review, done, reopen) or a state name, and toil resolves it against the states this item's own type has: a pin in the dossier first, then an exact state name, then the intent's state category (start InProgress, review Resolved, done Completed, reopen Proposed), then a single state named for it. No match, or more than one, is refused with the states the type does have; meta.transition says what it resolved to. Needs no project. ado_work_item_states lists the states a type has.",
+    "Sets System.State on a work item and returns it. Give state with an exact state, or to with an intent (start, review, done, reopen) or a state name, and toil resolves it against the states this item's own type has: a pin in the toil project first, then an exact state name, then the intent's state category (start InProgress, review Resolved, done Completed, reopen Proposed), then a single state named for it. No match, or more than one, is refused with the states the type does have; meta.transition says what it resolved to. Needs no project. ado_work_item_states lists the states a type has.",
   input: z.object({
     id,
     state: z.string().min(1).optional().describe('New state (e.g. Active, Resolved, Closed)'),
@@ -150,7 +150,7 @@ export const workTransitionCommand = adoArea.command({
       const type = String(item.fields['System.WorkItemType'] ?? '');
       const states = await adoc<{ value?: AdoState[] }>(ctx, `/${enc(project)}/_apis/wit/workitemtypes/${enc(type)}/states`);
       const { item: moving, candidates } = adoMoves(input.id, item.fields, states.value ?? []);
-      const resolved = resolveTransition(input.to, moving, candidates, intentOf(input.to) ? ctx.dossierTransitions() : {}, TRANSITION_HELP);
+      const resolved = resolveTransition(input.to, moving, candidates, intentOf(input.to) ? ctx.toilProjectTransitions() : {}, TRANSITION_HELP);
       state = resolved.candidate.id;
       report = resolved.report;
     }

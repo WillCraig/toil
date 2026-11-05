@@ -39,7 +39,7 @@ export function httpAssignments(session: Session & { assignments?: boolean }, ba
   };
   return {
     disabled: session.assignments ? null : NO_ASSIGNMENTS,
-    list: (dossier, o) => call<AssignmentList>(`assignments?dossier=${encodeURIComponent(dossier)}${o?.inbox === false ? '&inbox=0' : ''}`, 'Reading the assignments'),
+    list: (toilProject, o) => call<AssignmentList>(`assignments?toilProject=${encodeURIComponent(toilProject)}${o?.inbox === false ? '&inbox=0' : ''}`, 'Reading the assignments'),
     get: (id) => call<AssignmentRecord>(`assignments/one?id=${encodeURIComponent(id)}`, 'Reading the assignment'),
     assign: (request) => call<Assignment>('assignments', 'Assigning the item', request),
     start: (id, adapter) => call<Assignment>('assignments/start', 'Starting the assignment', { id, ...(adapter ? { adapter } : {}) }),

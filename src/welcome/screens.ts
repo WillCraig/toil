@@ -21,12 +21,12 @@ export interface AreaSummary {
   live: boolean;
   /** Whether a connection to it has settings at all (local git has none). */
   configurable: boolean;
-  /** Its context inputs (project, owner, env), which a dossier section can supply. */
+  /** Its context inputs (project, owner, env), which a toil project section can supply. */
   context?: string[];
-  /** Hosts people know the service by, to its API's base URL (`defineArea({ siteApis })`), so the menu matches a dossier host as a call does. */
+  /** Hosts people know the service by, to its API's base URL (`defineArea({ siteApis })`), so the menu matches a toil project host as a call does. */
   siteApis?: Readonly<Record<string, string>>;
-  /** Whether it has `toil <area> check-dossier`, which looks a dossier's values up on the service. */
-  checksDossier?: boolean;
+  /** Whether it has `toil <area> check-toil-project`, which looks a toil project's values up on the service. */
+  checksToilProject?: boolean;
   /** Its commands, as the Services browser lists them: `<area> <resource> <action>`. */
   commands?: CommandSummary[];
 }
@@ -41,7 +41,7 @@ export interface CommandSummary {
   /** Some calls write, as the input decides (`<area> api` with a POST); they still need --allow-write. */
   mayWrite?: boolean;
   args: Array<{ name: string; description: string; required: boolean; variadic: boolean }>;
-  /** Its own flags, never the ones core adds to every command (--connection, --dossier, --cwd). */
+  /** Its own flags, never the ones core adds to every command (--connection, --toil-project, --cwd). */
   flags: Array<{ flags: string; description: string; required: boolean }>;
 }
 

@@ -40,16 +40,16 @@ function Unknowns({ list, what }: { list: Unknown[]; what: string }) {
 }
 
 export function Burnup() {
-  const { now, dossier, sync } = useData();
+  const { now, toilProject, sync } = useData();
   const { health: h } = useDerived();
   const words = useWords();
-  if (!h) return <Empty message={words('empty.burnup')} action={<TrackerAction dossier={dossier.name} sync={sync} />} />;
+  if (!h) return <Empty message={words('empty.burnup')} action={<TrackerAction toilProject={toilProject.name} sync={sync} />} />;
   return <BurnupChart b={burnup(h, now)} sprint={h.sprint.name} />;
 }
 
 export function Throughput() {
-  const { dossier, now } = useData();
-  const t = throughput(dossier.items, now);
+  const { toilProject, now } = useData();
+  const t = throughput(toilProject.items, now);
   const total = t.weeks.reduce((n, w) => n + w.items.length, 0);
   const full = t.weeks.filter((w) => !w.partial);
   const mean = full.length ? full.reduce((n, w) => n + w.items.length, 0) / full.length : 0;
@@ -67,9 +67,9 @@ export function Throughput() {
 }
 
 export function CycleTime() {
-  const { dossier, byId } = useData();
+  const { toilProject, byId } = useData();
   const { insights } = useDerived();
-  const c = cycleTimes(dossier.items);
+  const c = cycleTimes(toilProject.items);
   const points = c.known.map((k) => {
     const item = byId.get(k.id)!;
     return { id: k.id, label: `${sourceLabel(item.source.area)} ${shortKey(item)}`, end: k.end, days: k.days };
@@ -102,9 +102,9 @@ export function CycleTime() {
 }
 
 export function Aging() {
-  const { dossier, now, byId } = useData();
+  const { toilProject, now, byId } = useData();
   const { insights } = useDerived();
-  const a = aging(dossier.items, now);
+  const a = aging(toilProject.items, now);
   const max = Math.max(1, ...a.known.map((k) => k.days), insights.p85?.days ?? 0);
   return (
     <>
@@ -136,7 +136,7 @@ export function Aging() {
       ) : (
         <p>Nothing in progress has a recorded start.</p>
       )}
-      {insights.p85 && <p className="note">The marker on each bar is p{AGING_PERCENTILE} of this dossier's cycle times, {daysText(insights.p85.days)}.</p>}
+      {insights.p85 && <p className="note">The marker on each bar is p{AGING_PERCENTILE} of this Toil project's cycle times, {daysText(insights.p85.days)}.</p>}
       <Unknowns list={a.unknown} what="start" />
     </>
   );

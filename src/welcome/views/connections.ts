@@ -142,7 +142,7 @@ export const addName: View = {
   ],
   input: {
     label: () => 'Connection name',
-    // Another module that sends someone here may suggest the name (one a dossier names), and say where to go after.
+    // Another module that sends someone here may suggest the name (one a toil project names), and say where to go after.
     initial: (p) => (p.frame.params.suggest && !connectionNames(p.data).includes(p.frame.params.suggest) ? p.frame.params.suggest : suggestName(p.data, p.frame.params.area!)),
     submit: (text, p): Action | { error: string } => {
       const then = p.frame.params.then ? (JSON.parse(p.frame.params.then) as Action) : undefined;
@@ -160,7 +160,7 @@ export const addName: View = {
           ],
           next: (results): Action | undefined => {
             if (!results[0]?.envelope.ok) return undefined;
-            // Another module may ask for its own commands first (a dossier's check), then where to go.
+            // Another module may ask for its own commands first (a toil project's check), then where to go.
             const thenRun = p.frame.params.thenRun ? (JSON.parse(p.frame.params.thenRun) as string[][]) : undefined;
             if (then && thenRun) return { run: { title: 'Check again', steps: thenRun.map((args) => ({ args })), next: () => then } };
             if (then) return then;

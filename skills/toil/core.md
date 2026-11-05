@@ -1,5 +1,5 @@
 ---
-description: What every toil command shares, in detail - the envelope and errors, the contract version, --select, big results (--summary-file and --output-format toon), toil wait, paging and progress, writes and their exceptions, global flags, files and the workspace, configuration, the raw API passthrough, dossiers, the audit log, using toil from a program (@imagile-dev/toil/api), sending feedback, certificates and proxies
+description: What every toil command shares, in detail - the envelope and errors, the contract version, --select, big results (--summary-file and --output-format toon), toil wait, paging and progress, writes and their exceptions, global flags, files and the workspace, configuration, the raw API passthrough, toil projects, the audit log, using toil from a program (@imagile-dev/toil/api), sending feedback, certificates and proxies
 ---
 
 # Using toil
@@ -45,8 +45,8 @@ one item offers right now, by its own workflow, because a workflow belongs to th
 or work item type: a Story may go through In Review while a Task goes straight to Done.
 In order, the first that gives exactly one move wins:
 
-1. **The dossier's pin** for the item's type: `"transitions": { "Story": { "review":
-   "Peer Review" } }` in the area's section (**Dossiers**, below).
+1. **The toil project's pin** for the item's type: `"transitions": { "Story": { "review":
+   "Peer Review" } }` in the area's section (**Toil projects**, below).
 2. **An exact name**: a transition or status called what you passed, ignoring case.
 3. **The intent's status category**: Jira's To Do, In Progress and Done categories
    serve `reopen`, `start` and `done`, and Jira files review under In Progress, so a
@@ -60,7 +60,7 @@ In order, the first that gives exactly one move wins:
 It never guesses. No match, more than one, or an item already where the intent leads is
 `INVALID_INPUT`, and the fix lists every move the item offers, by name, target status,
 category and id. On success `meta.transition` says what was resolved: `{ intent,
-transition, toStatus, resolvedBy }`, `resolvedBy` being `dossier`, `status`,
+transition, toStatus, resolvedBy }`, `resolvedBy` being `toil-project`, `status`,
 `category` or `name`. Resolving only reads (Jira: the issue with its transitions; Azure
 DevOps: the item and its type's states), after the write gate, which is unchanged:
 writes on for the connection and `--allow-write`. `--transition` (Jira) and `--state`
@@ -77,7 +77,7 @@ Before you start work that no ticket covers (a prompt or a branch that names no
 issue key), find the open ticket it belongs to and ask the person what to do with
 it. Never decide on your own, and never start the work untracked without asking.
 
-1. **List the person's open items** in the dossier's trackers (`toil dossiers show`
+1. **List the person's open items** in the toil project's trackers (`toil projects show`
    names them): theirs and not done, through each tracker's own search, mapped
    with `toil util owi map`. Each tracker's page gives its search under **Ticket the
    work**.
@@ -89,7 +89,7 @@ it. Never decide on your own, and never start the work untracked without asking.
    - **Attach** the work to a match. Nothing is written: use its key in the branch
      name and in every commit message.
    - **Create a sub-task** under it.
-   - **Create a new ticket**, letting the dossier and the connection fill the
+   - **Create a new ticket**, letting the toil project and the connection fill the
      project and the issue type.
 
    With no match (an `OWI_SIMILAR_NO_MATCH` warning), say there is no likely
@@ -359,64 +359,68 @@ request to `meta.requests`, credentials redacted), `--debug` (traces on stderr),
 `--output-format json|toon` (**Big results**). `--help` on any command lists its own
 flags.
 
-## Dossiers
+## Toil projects
 
-`dossiers.md` explains what a dossier is, with an example file field by field; this
+`projects.md` explains what a toil project is, with an example file field by field; this
 section is the short form.
 
-A **dossier** holds what toil knows about one body of work: its repositories, and per
+A **toil project** holds what toil knows about one body of work: its repositories, and per
 area the keys a call needs (`project`, `owner`, a namespace per environment), which
 connection to use (by name, or by `host`), and reference data such as board lists.
-It holds no secret and can't add a host or turn on writes. toil reads dossiers on
-every area command from `~/.toil/dossiers/`, the folders in `dossierPaths` (or
-`TOIL_DOSSIER_PATHS`), and `.toil/dossiers/` in the repository you're in, and uses
-the one that applies: `--dossier <name|file>` (`dossier` over MCP, or
-`TOIL_DOSSIER`), else the one whose repo matches the folder by path or `origin`
+It holds no secret and can't add a host or turn on writes. toil reads toil projects on
+every area command from `~/.toil/projects/`, the folders in `projectPaths` (or
+`TOIL_PROJECT_PATHS`), and `.toil/projects/` in the repository you're in, and uses
+the one that applies: `--toil-project <name|file>` (`toilProject` over MCP, or
+`TOIL_PROJECT`), else the one whose repo matches the folder by path or `origin`
 remote. `--cwd <dir>` (`cwd` over MCP) looks from another folder. A value you pass
-always beats the dossier's, and `meta.context.dossier` says which dossier applied and
-why. When two different dossiers match, the call fails with `INVALID_INPUT` until you
-pick one. A write on a connection a dossier chose is `WRITE_DISABLED` unless the
-dossier is in your own folder; pass `--connection` to choose it yourself. To see what
-a call will use before making it: `toil dossiers context` (which dossier a folder
-resolves to and why), `toil dossiers show [name]` (per area: the connection and why,
-whether writes are on, the environment and the inputs), `toil dossiers list`, and
-`toil dossiers check [name]`, which checks one locally and contacts no service.
-`toil dossiers brief [name]` says what in the dossier's work needs a person, from
-Open Work Item records you pass it, and `toil dossiers analyze prompt [name]` (the
-MCP prompt `analyze`) is the prompt an agent runs to analyze it (`dossiers.md`,
+always beats the toil project's, and `meta.context.toilProject` says which toil project applied and
+why. When two different toil projects match, the call fails with `INVALID_INPUT` until you
+pick one. A write on a connection a toil project chose is `WRITE_DISABLED` unless the
+toil project is in your own folder; pass `--connection` to choose it yourself. To see what
+a call will use before making it: `toil projects context` (which toil project a folder
+resolves to and why), `toil projects show [name]` (per area: the connection and why,
+whether writes are on, the environment and the inputs), `toil projects list`, and
+`toil projects check [name]`, which checks one locally and contacts no service.
+`toil projects brief [name]` says what in the toil project's work needs a person, from
+Open Work Item records you pass it, and `toil projects analyze prompt [name]` (the
+MCP prompt `analyze`) is the prompt an agent runs to analyze it (`projects.md`,
 **Brief** and **Analyze**).
 
-In a repository that already has one checked in, `toil dossiers onboard` sets you
-up: for each area it finds your connection on the dossier's host, offers to add one
+In a repository that already has one checked in, `toil projects onboard` sets you
+up: for each area it finds your connection on the toil project's host, offers to add one
 you lack (asking for the token on the terminal), asks which to pin in your own copy
-when several match, then runs `dossiers check` and one test read per connection. It
+when several match, then runs `toil projects check` and one test read per connection. It
 is CLI only; with no terminal, or `--plan`, it adds no connection and says what each
 area needs.
 
 To build one for a product: `toil repos scan` lists the git repositories under the
 workspace. Then:
-- `toil dossiers init <name>` creates the dossier; `--shared` creates it in the
-  repository's `.toil/dossiers/` for the team, and a `--connection` linked into a
-  shared dossier is recorded as that connection's `host`.
-- `toil dossiers add-repo <name> <folder|remote>` adds each repository.
-- `toil dossiers link <name> <area> --host <host> --set project=PAY [--for-repo <repo>]`
+- `toil projects init <name>` creates the toil project; `--shared` creates it in the
+  repository's `.toil/projects/` for the team, and a `--connection` linked into a
+  shared toil project is recorded as that connection's `host`.
+- `toil projects add-repo <name> <folder|remote>` adds each repository.
+- `toil projects link <name> <area> --host <host> --set project=PAY [--for-repo <repo>]`
   says which connection an area uses and the keys it supplies.
-- `toil dossiers env <name> <env> <area> --set namespace=...` adds an environment.
-- `toil dossiers field <name> jira storyPoints customfield_10002` names a field, so
+- `toil projects env <name> <env> <area> --set namespace=...` adds an environment.
+- `toil projects field <name> jira storyPoints customfield_10002` names a field, so
   `--field storyPoints=5` works.
-- `toil <area> check-dossier` checks a section against the service, for the call's
+- `toil <area> check-toil-project` checks a section against the service, for the call's
   environment (jira, confluence, sonar, ado, bitbucket, github, openshift,
   dynatrace).
-- `toil dossiers export <name> --repo <root>` writes a shareable copy into a
-  repository's `.toil/dossiers/`. It uses host selectors and no local paths, and toil
+- `toil projects export <name> --repo <root>` writes a shareable copy into a
+  repository's `.toil/projects/`. It uses host selectors and no local paths, and toil
   never commits it.
-- `toil dossiers unlink <name> --area <area> [--env <env>]` removes a section (CLI only).
-- `toil dossiers import <file>` copies a teammate's into your own folder. A connection
+- `toil projects unlink <name> --area <area> [--env <env>]` removes a section (CLI only).
+- `toil projects import <file>` copies a teammate's into your own folder. A connection
   or host you lack is listed under `toSetUp`; toil never creates one.
+- `toil projects migrate` (CLI only) moves `~/.toil/dossiers/*.json`, the folder earlier
+  versions used, to `~/.toil/projects/` on the person's `yes` (or `--yes`), never
+  overwriting a file. Earlier versions called a toil project a dossier; `projects.md`,
+  **Moving from dossiers**, lists the old names, and `upgrading.md` converts a setup.
 
 These are local writes and need no `--allow-write`. Each refuses a value that's already
-set unless `--replace`. Over MCP they refuse to make a dossier select a connection
-with writes on; the user does that on the command line, or under **Dossiers** in the
+set unless `--replace`. Over MCP they refuse to make a toil project select a connection
+with writes on; the user does that on the command line, or under **Toil projects** in the
 menu bare `toil` opens, which runs these same commands and asks them to type the
 connection's name first.
 
@@ -475,13 +479,13 @@ const envelope = await execute('jira issue search', { jql: 'project = PAY', limi
   exactly as the CLI prints it. `command` is the name `meta.command` reports
   (`jira issue search`); `input` is the command's MCP fields, checked strictly. It never
   throws: an unknown command or a bad option is an `INVALID_INPUT` envelope.
-  Connections, env vars, the credential store, dossiers, the workspace (the program's
+  Connections, env vars, the credential store, toil projects, the workspace (the program's
   working directory, else `workspace`), the write gate and the audit log all apply as
   they do on the CLI. It serves what MCP serves: commands that prompt or change
   connections, and deletes, stay on the CLI, except as `person` below allows.
 - **`options`**: `readOnly` refuses, with `WRITE_DISABLED` and before anything is sent,
   any call that would change anything, whatever the config says: a write to a service,
-  and a local one too (toil's config or dossiers, a download, a file named with
+  and a local one too (toil's config or toil projects, a download, a file named with
   `out`). A read-only call writes nothing but its audit line. `caller` names the program in the audit log (lowercase letters, digits,
   `.`, `_` and `-`, up to 64), and `actor`, in the same characters, who it called
   for (Toil UI names an agent assignment, `assignment-<id>`). `signal` cancels the call (`CANCELLED`). `onProgress`
@@ -490,14 +494,14 @@ const envelope = await execute('jira issue search', { jql: 'project = PAY', limi
 - **`person`** is for a program with its own interface for a person, such as Toil
   UI's settings pages. It is `{ ask(question) }`, and with it `execute()` also runs
   the connections commands a person runs on a terminal: `connections add`, `login`,
-  `remove`, `writes` and `default`, `dossiers onboard`, and `feedback`
+  `remove`, `writes` and `default`, `toil projects onboard`, and `feedback`
   (`registry.personCommands`). Each question arrives as `{ id, text, secret,
   fallback }`, and `ask` returns what the person typed. The `id` is one of `area`,
   `setting:<key>`, `secret:<key>`, `confirm` (`y` saves what they reviewed),
   `confirm-name` (the connection's name, typed to turn writes on), `unwrap:<key>`
   (the secret is in quotes or starts with `Bearer ` or `token `: `y` stores it
   without them, `n` as typed; call `checkSecret` first to know whether it will be
-  asked), for `dossiers onboard` `create:<section>` (`y` adds the connection that
+  asked), for `toil projects onboard` `create:<section>` (`y` adds the connection that
   section needs), `name:<section>` (its name) and `pin:<section>` (the matching
   connection their own copy uses), or `consent` (`yes` sends the feedback report and
   disclaimer the question shows, **Feedback**, above). A secret is checked as on a
@@ -520,7 +524,7 @@ const envelope = await execute('jira issue search', { jql: 'project = PAY', limi
 - **`mapOwi(input, options)`** maps envelopes you already hold (one, an array, or
   JSON Lines text) to Open Work Items and pull requests to changes, the way `toil
   util owi map` does (`util.md`), synchronously and without the schema check:
-  `{ items, changes, histories, skipped, warnings }`. `options.fields` is a dossier
+  `{ items, changes, histories, skipped, warnings }`. `options.fields` is a toil project
   section's `fields` object (`{ estimate: 'customfield_10234', estimateUnit: 'points' }`),
   `command` names the command for bare `data`, `key` the item a keyless history
   belongs to, `keyPatterns` where work item keys in a pull request point

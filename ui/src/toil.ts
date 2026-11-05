@@ -2,7 +2,7 @@
  * The seam Toil UI is built on (#206, #228): toil itself. Every panel is
  * filled by calling toil commands through `execute()` from
  * `@imagile-dev/toil/api`, read-only, which call the tools' REST APIs with the
- * user's own connections and dossiers. The UI holds no credential and talks to
+ * user's own connections and toil projects. The UI holds no credential and talks to
  * no service on its own. The site preview passes a fixture `execute()`
  * (src/fixtures/execute.ts) with the same signature, which answers from canned,
  * sanitized envelopes; test/registry.test.ts holds every call it answers to the
@@ -65,7 +65,7 @@ export interface Call {
   error: string | null;
 }
 
-/** The services a dossier's panels read from. */
+/** The services a toil project's panels read from. */
 export type SourceKind = 'jira' | 'ado' | 'github' | 'bitbucket' | 'jenkins' | 'openshift';
 
 /**
@@ -115,6 +115,6 @@ export interface Deployment {
   includes: string[];
   /** The work items those pull requests mention. */
   items: string[];
-  /** Set when the deployed commit matches no merged pull request the dossier's repository lists. */
+  /** Set when the deployed commit matches no merged pull request the toil project's repository lists. */
   unknownCommit: boolean;
 }

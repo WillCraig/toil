@@ -80,8 +80,8 @@ const MEANING: Record<Verdict, string> = {
  * for it. Nothing here asks a model.
  */
 export function ReadinessPanel({ item }: { item: WorkItem }) {
-  const { dossier, byId, execute } = useData();
-  const settings = dossier.readiness;
+  const { toilProject, byId, execute } = useData();
+  const settings = toilProject.readiness;
   const [live, setLive] = useState<{ result: LiveWorkflow; at: string } | null>(null);
   const [reading, setReading] = useState(false);
   const r = readiness({ item, settings, byId, ...(live ? { live: live.result } : {}) });
@@ -89,7 +89,7 @@ export function ReadinessPanel({ item }: { item: WorkItem }) {
   const check = async () => {
     if (!execute || !read) return;
     setReading(true);
-    const env = await execute(read.command, { dossier: dossier.name, ...read.input }, CALL_OPTIONS);
+    const env = await execute(read.command, { toilProject: toilProject.name, ...read.input }, CALL_OPTIONS);
     setLive({ result: liveWorkflow(item, read.command, env.ok ? env.data : null, env.ok ? undefined : `${env.error.message}${env.error.fix ? ` ${env.error.fix}` : ''}`), at: new Date().toISOString() });
     setReading(false);
   };

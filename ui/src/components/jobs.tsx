@@ -1,11 +1,11 @@
 /**
  * The workflow jobs where they apply (#532, part of #526): Review and Ship in
- * a pull request's menu, Diagram on a dossier's overview, each in the command
- * palette and at its own address (`#/dossier/<name>/job/<review|ship|diagram>`,
+ * a pull request's menu, Diagram on a Toil project's overview, each in the command
+ * palette and at its own address (`#/project/<name>/job/<review|ship|diagram>`,
  * the target after `?target=`). A job is never a button on every row and never
  * a catalog: the pull request's one "Actions" menu holds it, and a connection
  * it lacks is named in place of the action vanishing (principle 11). Pressing
- * one asks the dossier's agent to follow the toil skill's page for the job,
+ * one asks the Toil project's agent to follow the toil skill's page for the job,
  * in the Ask pane, where every toil call shows as it runs and every write
  * comes back as a card to review (src/model/jobs.ts, server/agents/jobs.ts).
  * Nothing here writes. A menu that lists only what is within reach.
@@ -17,13 +17,13 @@ import { sendCommand } from '../commands.ts';
 import type { ConfigApi, ConnectionRow, ConnectionsData } from '../config.ts';
 import { useData } from '../data.ts';
 import { useChatScope } from './ask.tsx';
-import { dossierHref } from '../format.ts';
+import { toilProjectHref } from '../format.ts';
 import { FACE, availability, jobOf, jobPrompt, jobLabel, type Availability, type Face, type JobId } from '../model/jobs.ts';
 import type { Change } from '../toil.ts';
 import './jobs.css';
 
 /** The address of a job: its own page, which says what it does and has the Run button. */
-export const jobHref = (dossier: string, id: JobId, target?: string): string => `${dossierHref(dossier)}/job/${FACE[id].segment}${target ? `?target=${encodeURIComponent(target)}` : ''}`;
+export const jobHref = (toilProject: string, id: JobId, target?: string): string => `${toilProjectHref(toilProject)}/job/${FACE[id].segment}${target ? `?target=${encodeURIComponent(target)}` : ''}`;
 
 export interface ConnectionInfo {
   /** Set when the connections could not be read: every job is then offered, and the page says the check didn't happen. */
@@ -65,7 +65,7 @@ export const areaOfChange = (c: Change, info: ConnectionInfo | null): string => 
   return info?.byName.get(name) ?? name;
 };
 
-/** Runs a job in the dossier's Ask pane. The pane is on every dossier page, and picks the request up. */
+/** Runs a job in the Toil project's Ask pane. The pane is on every toilProject page, and picks the request up. */
 export function runJob(id: JobId, target: string): void {
   sendCommand({ kind: 'job', prompt: jobPrompt(id, target), label: jobLabel(id, target) });
 }
@@ -88,7 +88,7 @@ export function jobsFor(change: Change, info: ConnectionInfo | null): Array<{ id
  * the connection that would enable it written under it.
  */
 export function PullRequestActions({ change, info, plain }: { change: Change; info: ConnectionInfo | null; plain: boolean }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   const jobs = jobsFor(change, info);
   if (!jobs.length) return null;
   return (
@@ -104,7 +104,7 @@ export function PullRequestActions({ change, info, plain }: { change: Change; in
             const id = String(key) as JobId;
             const job = jobs.find((j) => j.id === id);
             if (job?.ready.ready) runJob(id, change.id);
-            else window.location.hash = jobHref(dossier.name, id, change.id);
+            else window.location.hash = jobHref(toilProject.name, id, change.id);
           }}
         >
           {jobs.map(({ id, face, ready }) => (
@@ -123,15 +123,15 @@ export function PullRequestActions({ change, info, plain }: { change: Change; in
   );
 }
 
-/** The repositories a dossier's pull requests name, for Diagram's target. */
+/** The repositories a Toil project's pull requests name, for Diagram's target. */
 export const repositoriesOf = (prs: readonly Change[]): string[] => [...new Set(prs.map((c) => c.repo))].sort();
 
-/** A link to Diagram on a dossier's overview: one line, since the page it opens says the rest. */
+/** A link to Diagram on a Toil project's overview: one line, since the page it opens says the rest. */
 export function DiagramLink() {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   return (
     <p className="note jobs-link">
-      <a href={jobHref(dossier.name, 'map-codebase')} data-job-link="map-codebase">
+      <a href={jobHref(toilProject.name, 'map-codebase')} data-job-link="map-codebase">
         Draw its architecture
       </a>
     </p>
@@ -144,12 +144,12 @@ export function DiagramLink() {
  * writes it may propose and its steps' rules stay a step further in.
  */
 export function JobPage({ id, target }: { id: JobId; target: string | null }) {
-  const { dossier, config } = useData();
+  const { toilProject, config } = useData();
   const info = useConnectionInfo(config);
   const busy = useChatScope()?.busy ?? false;
   const job = jobOf(id);
   const face = FACE[id];
-  const prs = dossier.pullRequests ?? [];
+  const prs = toilProject.pullRequests ?? [];
   const change = target ? prs.find((c) => c.id === target) : undefined;
   if (!job) {
     return (
@@ -162,14 +162,14 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
   const ready = availability(job, info && !info.problem ? info.areas : null, host);
   const targets = face.on === 'pull request' ? prs.filter((c) => c.state === 'OPEN' || c.state === 'DRAFT') : repositoriesOf(prs);
   const subject = target ?? '';
-  // A pull request job runs only on an open pull request of this dossier, and Ship only on a person's.
+  // A pull request job runs only on an open pull request of this Toil project, and Ship only on a person's.
   const runnable = face.on === 'repository' || (change !== undefined && (change.state === 'OPEN' || change.state === 'DRAFT') && (id !== 'ship' || change.authorKind === 'HUMAN'));
   const canRun = ready.ready && runnable && !busy;
   return (
     <div className="job-page" data-job={id}>
       <div className="view-head">
         <p className="eyebrow">
-          <a href={dossierHref(dossier.name)}>{dossier.name}</a>
+          <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a>
         </p>
         <h1 tabIndex={-1}>
           {face.label}
@@ -187,7 +187,7 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
       )}
       {subject && face.on === 'pull request' && !runnable && (
         <p role="note" className="failure" data-job-target="">
-          {subject} isn&apos;t an open {id === 'ship' ? "pull request a person wrote in this dossier, so Ship can't answer its review" : 'pull request in this dossier'}. Choose another from the list.
+          {subject} isn&apos;t an open {id === 'ship' ? "pull request a person wrote in this Toil project, so Ship can't answer its review" : 'pull request in this Toil project'}. Choose another from the list.
         </p>
       )}
       {busy && (
@@ -208,7 +208,7 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
         <>
           <p>
             <Button className="btn btn--accent" isDisabled={!canRun} onPress={() => runJob(id, subject)} data-job-run="">
-              Draw {subject || dossier.name}
+              Draw {subject || toilProject.name}
             </Button>
           </p>
           {targets.length > 0 && (
@@ -217,7 +217,7 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
               {(targets as string[]).map((r, i) => (
                 <span key={r}>
                   {i > 0 && ', '}
-                  <a href={jobHref(dossier.name, id, r)}>{r}</a>
+                  <a href={jobHref(toilProject.name, id, r)}>{r}</a>
                 </span>
               ))}
             </p>
@@ -235,10 +235,10 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
           <ul className="rows">
             {(targets as Change[]).map((c) => (
               <li key={c.id}>
-                <a href={jobHref(dossier.name, id, c.id)}>{c.title}</a> <span className="field">{c.repo}</span>
+                <a href={jobHref(toilProject.name, id, c.id)}>{c.title}</a> <span className="field">{c.repo}</span>
               </li>
             ))}
-            {targets.length === 0 && <li className="note">No open pull requests for this dossier.</li>}
+            {targets.length === 0 && <li className="note">No open pull requests for this Toil project.</li>}
           </ul>
         </>
       )}

@@ -1,6 +1,6 @@
 /**
  * The sample's assignments (#293): the real queue (src/assign/queue.ts) on
- * the sample dossiers, with a scripted runner in place of a model, for the
+ * the sample toil projects, with a scripted runner in place of a model, for the
  * site preview, `toil-ui --sample` and the layout check. It seeds one
  * assignment in every state, so each view has something to show: one
  * working, one that needs you (a refine with proposals and a question), one
@@ -13,7 +13,7 @@
  * Rehearsal footage, clearly labelled, with the extras in costume.
  */
 
-import { loadDossier, type DossierData } from '../load.ts';
+import { loadToilProject, type ToilProjectData } from '../load.ts';
 import type { Proposal } from '../proposal.ts';
 import type { Envelope, Execute, WorkItem } from '../toil.ts';
 import { ADAPTER_NAME, branchName, proposalDiff, type AdapterChoice, type AssignmentRecord, type AssignmentsApi, type AssignSettings, type StartedOn } from '../assign/model.ts';
@@ -40,7 +40,7 @@ export const SAMPLE_FINGERPRINT_NOW: Fingerprint = {
   toil: { version: '0.1.0-alpha.4', commit: null },
   toilUi: { version: '0.1.0-alpha.2', commit: null },
   skills: { github: 'sample-github-2', jira: 'sample-jira-2' },
-  dossier: 'sample-dossier',
+  toilProject: 'sample-toil-project',
   prompts: 'sample-prompts',
 };
 export const SAMPLE_FINGERPRINT_BEFORE: Fingerprint = { ...SAMPLE_FINGERPRINT_NOW, toil: { version: '0.1.0-alpha.3', commit: null }, skills: { github: 'sample-github-2', jira: 'sample-jira-1' } };
@@ -53,7 +53,7 @@ const startedOn = (item: string, adapter: StartedOn['adapter'], at: string, tool
   model: null,
   skills: [],
   tools,
-  dossier: { name: 'card-payments', fingerprint: SAMPLE_FINGERPRINT },
+  toilProject: { name: 'card-payments', fingerprint: SAMPLE_FINGERPRINT },
   item: { id: item, updated: null, fingerprint: SAMPLE_FINGERPRINT },
   prompt: SAMPLE_FINGERPRINT,
   fingerprint,
@@ -62,7 +62,7 @@ const startedOn = (item: string, adapter: StartedOn['adapter'], at: string, tool
 const READ_TOOLS = ['owi_query', 'owi_get', 'owi_history', 'owi_similar', 'pr_query', 'pr_get', 'pr_metrics', 'proposal_fields'];
 
 /** The acceptance criteria, and an estimate where there is none, that the sample's refine proposes for one Jira item. */
-function refineProposals(dossier: string, item: WorkItem): Proposal[] {
+function refineProposals(toilProject: string, item: WorkItem): Proposal[] {
   const key = item.source.key;
   const criteria = [`${item.title}.`, '', 'Acceptance criteria:', '- It works for every card scheme the gateway takes.', '- A failure is logged with its reason and no card data.', '- A test covers the happy path and one failure.'].join('\n');
   const out: Proposal[] = [
@@ -73,7 +73,7 @@ function refineProposals(dossier: string, item: WorkItem): Proposal[] {
       title: `Add acceptance criteria to ${key}`,
       reason: `${item.title} has no acceptance criteria, so nobody can say when it is done.`,
       command: 'jira issue update',
-      input: { dossier, key, description: criteria },
+      input: { toilProject, key, description: criteria },
       note: 'Replaces the description. Check the wording with the team first.',
     },
   ];
@@ -85,19 +85,19 @@ function refineProposals(dossier: string, item: WorkItem): Proposal[] {
     title: `Estimate ${key} at 3 points`,
     reason: `About the size of ${J(105)}, which took 3 points.`,
     command: 'jira issue update',
-    input: { dossier, key, field: ['Story Points=3'] },
+    input: { toilProject, key, field: ['Story Points=3'] },
     note: 'A suggested size. Agree it with the team before applying.',
   });
   return out;
 }
 
 /** The seeded assignments, one in every state, worked out from the sample's own items. */
-export function sampleRecords(cards: DossierData): AssignmentRecord[] {
+export function sampleRecords(cards: ToilProjectData): AssignmentRecord[] {
   const byId = new Map(cards.items.map((i) => [i.id, i]));
   const item = (id: string) => byId.get(id)!;
   const base = (id: string, itemId: string, over: Partial<AssignmentRecord>): AssignmentRecord => ({
     id,
-    dossier: 'card-payments',
+    toilProject: 'card-payments',
     item: itemId,
     itemTitle: item(itemId).title,
     mode: 'refine',
@@ -185,7 +185,7 @@ export function sampleRecords(cards: DossierData): AssignmentRecord[] {
           title: 'Post the report as a comment on PAY-98',
           reason: 'The investigation above, as one comment, so the people on the item can read it where they work.',
           command: 'jira issue comment',
-          input: { dossier: 'card-payments', key: 'PAY-98', body: 'corp-jira:PAY-98 shipped the decline codes in the merchant report.' },
+          input: { toilProject: 'card-payments', key: 'PAY-98', body: 'corp-jira:PAY-98 shipped the decline codes in the merchant report.' },
           note: 'The comment is the report exactly as shown above.',
           status: 'applied',
           diff: [{ field: 'body', before: null, after: 'corp-jira:PAY-98 shipped the decline codes in the merchant report.' }],
@@ -247,23 +247,23 @@ export function scriptedRunner(delay = 600): Runner {
       await wait(delay, signal);
       const cite = `[[${item.id}]]`;
       const report = {
-        parts: [{ text: a.mode === 'investigate' ? `${cite} is ${item.status ?? 'open'}. This is the sample's canned report; a real run reads the dossier's sources and cites each one.` : `${cite}: the sample's canned ${a.mode} run. A real run would ${a.mode === 'refine' ? 'draft criteria and an estimate' : 'clone the repository and stage a change'}.` }],
+        parts: [{ text: a.mode === 'investigate' ? `${cite} is ${item.status ?? 'open'}. This is the sample's canned report; a real run reads the Toil project's sources and cites each one.` : `${cite}: the sample's canned ${a.mode} run. A real run would ${a.mode === 'refine' ? 'draft criteria and an estimate' : 'clone the repository and stage a change'}.` }],
         citations: [item.id],
         unverified: [],
         warnings: [],
       };
       const proposals: Proposal[] =
         a.mode === 'refine' && item.source.area === 'jira'
-          ? refineProposals(a.dossier, item)
+          ? refineProposals(a.toilProject, item)
           : a.mode === 'investigate' && item.source.area === 'jira'
-            ? [{ id: `agent:${item.id}:comment:report`, from: 'agent', item: item.id, title: `Post the report as a comment on ${item.source.key}`, reason: 'The investigation above, as one comment.', command: 'jira issue comment', input: { dossier: a.dossier, key: item.source.key, body: report.parts[0]!.text.replace(/\[\[([^\]]+)\]\]/g, '$1') }, note: null }]
+            ? [{ id: `agent:${item.id}:comment:report`, from: 'agent', item: item.id, title: `Post the report as a comment on ${item.source.key}`, reason: 'The investigation above, as one comment.', command: 'jira issue comment', input: { toilProject: a.toilProject, key: item.source.key, body: report.parts[0]!.text.replace(/\[\[([^\]]+)\]\]/g, '$1') }, note: null }]
             : [];
       return {
         report,
         proposals,
         questions: a.mode === 'refine' ? ['Is this sample question answered by the item itself?'] : [],
         injection: null,
-        usage: sampleAnswerUsage(a.id, 1, a.dossier),
+        usage: sampleAnswerUsage(a.id, 1, a.toilProject),
         startedOn: startedOn(item.id, a.adapter!, FIXTURE_NOW, READ_TOOLS),
         branch:
           a.mode === 'implement'
@@ -281,33 +281,33 @@ const memory = (seed: AssignmentRecord[]): Keeper => {
 
 /** Applying in the sample: refused, as the sample has no tracker to change. */
 const refuse = (command: string): Envelope =>
-  ({ ok: false, data: null, error: { code: 'WRITE_DISABLED', message: `This is sample data, so toil ${command} wasn't run: there is no tracker to change.`, fix: 'Start toil-ui on your own dossiers to apply proposals.' }, meta: { command, durationMs: 0, version: 'sample', contractVersion: 1 } }) as Envelope;
+  ({ ok: false, data: null, error: { code: 'WRITE_DISABLED', message: `This is sample data, so toil ${command} wasn't run: there is no tracker to change.`, fix: 'Start toil-ui on your own Toil projects to apply proposals.' }, meta: { command, durationMs: 0, version: 'sample', contractVersion: 1 } }) as Envelope;
 
 export interface SampleQueue {
   queue: AssignmentQueue;
-  /** Resolves once the sample dossiers are loaded; the queue reads their items from then on. */
+  /** Resolves once the sample toil projects are loaded; the queue reads their items from then on. */
   ready: Promise<void>;
 }
 
 /** The sample's queue: the real one, on the sample's items, its seeds and the scripted runner. */
 export function sampleQueue(execute: Execute = fixtureExecute().execute, o: { delay?: number; now?: () => string; restartNeeded?: () => string | null } = {}): SampleQueue {
-  const data = new Map<string, DossierData>();
+  const data = new Map<string, ToilProjectData>();
   let seq = 0;
   // The sample's clock starts at its own fixed day and runs from there, so seeds and new runs share one timeline.
   const loaded = Date.now();
   const clock = () => new Date(Date.parse(FIXTURE_NOW) + (Date.now() - loaded)).toISOString();
   let queue!: AssignmentQueue;
   const ready = (async () => {
-    for (const name of ['card-payments', 'settlement', 'checkout-web']) data.set(name, await loadDossier(execute, name));
+    for (const name of ['card-payments', 'settlement', 'checkout-web']) data.set(name, await loadToilProject(execute, name));
     queue = new AssignmentQueue({
       keeper: memory(sampleRecords(data.get('card-payments')!)),
       runner: scriptedRunner(o.delay),
-      items: (dossier) => {
-        const items = data.get(dossier)?.items ?? null;
+      items: (toilProject) => {
+        const items = data.get(toilProject)?.items ?? null;
         return items?.map((i) => (i.id === SAMPLE_INBOX.item ? { ...i, labels: [...i.labels, SAMPLE_INBOX.label] } : i)) ?? null;
       },
-      people: async (dossier) => data.get(dossier)?.people ?? [],
-      repos: async (dossier) => (dossier === 'card-payments' ? [{ name: 'payments-core', path: '~/src/payments-core' }] : []),
+      people: async (toilProject) => data.get(toilProject)?.people ?? [],
+      repos: async (toilProject) => (toilProject === 'card-payments' ? [{ name: 'payments-core', path: '~/src/payments-core' }] : []),
       apply: async (_a, p) => refuse(p.command ?? 'that'),
       settings: () => SAMPLE_ASSIGN_SETTINGS,
       current: () => SAMPLE_FINGERPRINT_NOW,
@@ -331,7 +331,7 @@ export function fixtureAssignments(o: { delay?: number } = {}): AssignmentsApi {
   const q = async () => (await s.ready, s.queue);
   return {
     disabled: null,
-    list: async (dossier, o) => (await q()).list(dossier, o),
+    list: async (toilProject, o) => (await q()).list(toilProject, o),
     get: async (id) => (await q()).read(id),
     assign: async (r) => (await q()).assign(r),
     start: async (id, adapter) => (await q()).start(id, adapter),

@@ -13,7 +13,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { actorOf, branchName, inboxMatch, proposalDiff, settledState, type AdapterChoice, type AssignmentEvent } from '../src/assign/model.ts';
 import { AssignError, AssignmentQueue, RunStopped, type QueueOptions, type RunContext, type RunResult } from '../src/assign/queue.ts';
 import { sampleQueue, SAMPLE_INBOX } from '../src/fixtures/assignments.ts';
-import { loadDossier } from '../src/load.ts';
+import { loadToilProject } from '../src/load.ts';
 import { fixtureExecute } from '../src/fixtures/execute.ts';
 import type { Envelope } from '../src/toil.ts';
 import type { Proposal } from '../src/proposal.ts';
@@ -30,7 +30,7 @@ import { parseSettings } from '../server/settings.ts';
 const folder = mkdtempSync(join(tmpdir(), 'toil-ui-assign-'));
 afterAll(() => rmSync(folder, { recursive: true, force: true }));
 
-const cards = await loadDossier(fixtureExecute().execute, 'card-payments');
+const cards = await loadToilProject(fixtureExecute().execute, 'card-payments');
 const ITEMS = cards.items;
 const item = (id: string) => ITEMS.find((i) => i.id === id)!;
 
@@ -49,8 +49,8 @@ function harness(over: Partial<QueueOptions> = {}, results: Partial<RunResult> =
   const runs: Array<{ ctx: RunContext; resolve: (r: RunResult) => void; reject: (e: unknown) => void }> = [];
   const applied: Array<{ id: string; proposal: Proposal }> = [];
   const timers: Array<{ fn: () => void; ms: number; cleared: boolean }> = [];
-  const proposal: Proposal = { id: 'p1', from: 'agent', item: 'corp-jira:PAY-107', title: 'Estimate PAY-107', reason: 'r', command: 'jira issue update', input: { dossier: 'card-payments', key: 'PAY-107', field: ['Story Points=3'] }, note: null };
-  const result = (): RunResult => ({ report: { parts: [{ text: 'x' }], citations: [], unverified: [], warnings: [] }, proposals: [proposal], questions: [], injection: null, usage: null, startedOn: { at: '', toil: 't', toilUi: 't', adapter: 'codex', model: null, skills: [], tools: [], dossier: { name: 'card-payments', fingerprint: null }, item: { id: 'x', updated: null, fingerprint: 'f' }, prompt: 'p' }, branch: null, ...results });
+  const proposal: Proposal = { id: 'p1', from: 'agent', item: 'corp-jira:PAY-107', title: 'Estimate PAY-107', reason: 'r', command: 'jira issue update', input: { toilProject: 'card-payments', key: 'PAY-107', field: ['Story Points=3'] }, note: null };
+  const result = (): RunResult => ({ report: { parts: [{ text: 'x' }], citations: [], unverified: [], warnings: [] }, proposals: [proposal], questions: [], injection: null, usage: null, startedOn: { at: '', toil: 't', toilUi: 't', adapter: 'codex', model: null, skills: [], tools: [], toilProject: { name: 'card-payments', fingerprint: null }, item: { id: 'x', updated: null, fingerprint: 'f' }, prompt: 'p' }, branch: null, ...results });
   const keeper = memoryKeeper();
   const events: AssignmentEvent[] = [];
   const queue = new AssignmentQueue({
@@ -83,8 +83,8 @@ function harness(over: Partial<QueueOptions> = {}, results: Partial<RunResult> =
 describe('the assignment queue', () => {
   it('runs one at a time, oldest first, and settles in needs you while a proposal waits', async () => {
     const h = harness();
-    const a = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
-    const b = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-102', mode: 'investigate', adapter: 'claude' });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const b = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-102', mode: 'investigate', adapter: 'claude' });
     expect(a.state).toBe('working');
     expect(b).toMatchObject({ state: 'queued', waiting: 'slot' });
     expect(h.runs).toHaveLength(1);
@@ -102,7 +102,7 @@ describe('the assignment queue', () => {
 
   it('applies a proposal through the apply function, with the assignment, then settles done', async () => {
     const h = harness();
-    const a = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     h.runs[0]!.resolve(h.result());
     await h.tick();
     const after = await h.queue.apply(a.id, 'p1');
@@ -117,7 +117,7 @@ describe('the assignment queue', () => {
     const gate = new Promise<void>((r) => (release = r));
     let calls = 0;
     const h = harness({ apply: async (_a, p) => (calls++, await gate, ok(p.command!)) });
-    const a = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     h.runs[0]!.resolve(h.result());
     await h.tick();
     const first = h.queue.apply(a.id, 'p1');
@@ -130,7 +130,7 @@ describe('the assignment queue', () => {
 
   it("keeps a proposal toil refused open, saying toil's own reason, and dismissing it settles done", async () => {
     const h = harness({ apply: async (_a, p) => ({ ok: false, data: null, error: { code: 'WRITE_DISABLED', message: 'Writes are off on corp-jira.', fix: 'toil connections writes corp-jira on' }, meta: { command: p.command!, durationMs: 0, version: 't', contractVersion: 1 } }) as unknown as Envelope });
-    const a = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     h.runs[0]!.resolve(h.result());
     await h.tick();
     const tried = await h.queue.apply(a.id, 'p1');
@@ -141,14 +141,14 @@ describe('the assignment queue', () => {
 
   it('fails a run at the time limit, saying so, and a usage cap the same way, saying which', async () => {
     const h = harness();
-    const a = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     expect(h.timers[0]!.ms).toBe(20 * 60_000);
     h.timers[0]!.fn();
     expect(h.runs[0]!.ctx.signal.aborted).toBe(true);
     h.runs[0]!.reject(new Error('aborted'));
     await h.tick();
     expect(h.queue.get(a.id)).toMatchObject({ state: 'failed', stop: { reason: 'time', message: 'Stopped at the time limit of 20 minutes, before the agent finished.' } });
-    const b = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-102', mode: 'refine', adapter: 'codex' });
+    const b = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-102', mode: 'refine', adapter: 'codex' });
     h.runs[1]!.reject(new RunStopped('usage', "Codex's per-chat cap (codex.chat) stopped this question.", 'Raise the cap.'));
     await h.tick();
     expect(h.queue.get(b.id)).toMatchObject({ state: 'failed', stop: { reason: 'usage' } });
@@ -157,8 +157,8 @@ describe('the assignment queue', () => {
 
   it('stops a run on Stop, and takes a queued one off the queue', async () => {
     const h = harness();
-    const a = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
-    const b = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-102', mode: 'refine', adapter: 'codex' });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const b = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-102', mode: 'refine', adapter: 'codex' });
     expect(h.queue.cancel(b.id)).toMatchObject({ state: 'failed', stop: { reason: 'cancelled' } });
     h.queue.cancel(a.id);
     expect(h.runs[0]!.ctx.signal.aborted).toBe(true);
@@ -169,7 +169,7 @@ describe('the assignment queue', () => {
 
   it('marks an item that looked like an injection attempt as needing you, with no proposals', async () => {
     const h = harness();
-    const a = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     h.runs[0]!.resolve({ ...h.result(), proposals: [], injection: 'asks to change settings' });
     await h.tick();
     expect(h.queue.get(a.id)).toMatchObject({ state: 'needs-you', stop: { reason: 'injection' } });
@@ -193,24 +193,24 @@ describe('the assignment queue', () => {
     await expect(h.queue.start(inbox[0]!.id)).rejects.toThrow(/isn't waiting for Start/);
   });
 
-  it('refuses what it cannot run: an unknown mode, an adapter not set up, implement on an adapter without the sandbox, an unsynced dossier', async () => {
+  it('refuses what it cannot run: an unknown mode, an adapter not set up, implement on an adapter without the sandbox, an unsynced Toil project', async () => {
     const h = harness();
-    await expect(h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'deploy' as never, adapter: 'codex' })).rejects.toThrow(/isn't a mode/);
-    await expect(h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'copilot' })).rejects.toThrow('Not installed.');
-    await expect(h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'implement', adapter: 'claude' })).rejects.toThrow('Claude cannot take implement mode.');
-    await expect(h.queue.assign({ dossier: 'settlement', item: 'corp-ado:2304', mode: 'refine', adapter: 'codex' })).rejects.toThrow(/hasn't synced/);
-    await expect(h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-1', mode: 'refine', adapter: 'codex' })).rejects.toBeInstanceOf(AssignError);
-    const impl = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'implement', adapter: 'codex' });
+    await expect(h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'deploy' as never, adapter: 'codex' })).rejects.toThrow(/isn't a mode/);
+    await expect(h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'copilot' })).rejects.toThrow('Not installed.');
+    await expect(h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'implement', adapter: 'claude' })).rejects.toThrow('Claude cannot take implement mode.');
+    await expect(h.queue.assign({ toilProject: 'settlement', item: 'corp-ado:2304', mode: 'refine', adapter: 'codex' })).rejects.toThrow(/hasn't synced/);
+    await expect(h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-1', mode: 'refine', adapter: 'codex' })).rejects.toBeInstanceOf(AssignError);
+    const impl = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'implement', adapter: 'codex' });
     expect(impl.repo).toBe('payments-core');
   });
 
   it('fails a run Toil UI lost when it stopped, and starts nothing while the settings are broken', async () => {
     const seed = harness();
-    const a = await seed.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const a = await seed.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     const reopened = harness({ keeper: seed.keeper });
     expect(reopened.queue.get(a.id)).toMatchObject({ state: 'failed', stop: { reason: 'interrupted' } });
     const off = harness({ settings: () => ({ concurrent: 0, timeLimitMinutes: 20, problem: 'broken' }) });
-    const b = await off.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const b = await off.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     expect(b.state).toBe('queued');
     expect(off.runs).toHaveLength(0);
   });
@@ -233,7 +233,7 @@ describe('the assignment model', () => {
 
   it('diffs each field a proposal sets against the synced item', () => {
     const i = item('corp-jira:PAY-102');
-    expect(proposalDiff({ input: { dossier: 'card-payments', key: 'PAY-102', summary: 'New', field: ['Story Points=5'] } }, i)).toEqual([
+    expect(proposalDiff({ input: { toilProject: 'card-payments', key: 'PAY-102', summary: 'New', field: ['Story Points=5'] } }, i)).toEqual([
       { field: 'summary', before: i.title, after: 'New' },
       { field: 'Story Points', before: null, after: '5' },
     ]);
@@ -294,15 +294,15 @@ describe('the assigned agent\'s prompts', () => {
 
 describe("the runner's own proposals", () => {
   const writes = writeCommands(registry.commands);
-  it("posts an investigation as the tracker's comment, with the dossier, or says toil can't", () => {
+  it("posts an investigation as the tracker's comment, with the Toil project, or says toil can't", () => {
     const i = item('corp-jira:PAY-107');
-    expect(commentProposal('card-payments', i, 'body', writes)).toMatchObject({ command: 'jira issue comment', input: { dossier: 'card-payments', key: 'PAY-107', body: 'body' } });
+    expect(commentProposal('card-payments', i, 'body', writes)).toMatchObject({ command: 'jira issue comment', input: { toilProject: 'card-payments', key: 'PAY-107', body: 'body' } });
     // Found live on the sandbox (#317): a GitHub investigation's report had no command, though toil has github pr comment (issue comment on the CLI).
     const gh = { ...i, source: { ...i.source, area: 'github' as const, key: 'imagile-dev/toil-sandbox#12' } };
-    expect(commentProposal('sandbox', gh, 'body', writes)).toMatchObject({ command: 'github pr comment', input: { dossier: 'sandbox', owner: 'imagile-dev', repo: 'toil-sandbox', number: 12, body: 'body' } });
-    // An item from a repository the dossier doesn't name (a board spans several) is commented on in its own repository.
+    expect(commentProposal('sandbox', gh, 'body', writes)).toMatchObject({ command: 'github pr comment', input: { toilProject: 'sandbox', owner: 'imagile-dev', repo: 'toil-sandbox', number: 12, body: 'body' } });
+    // An item from a repository the toil project doesn't name (a board spans several) is commented on in its own repository.
     const elsewhere = { ...gh, source: { ...gh.source, key: 'imagile-dev/other-repo#7' } };
-    expect(commentProposal('sandbox', elsewhere, 'body', writes).input).toEqual({ dossier: 'sandbox', owner: 'imagile-dev', repo: 'other-repo', number: 7, body: 'body' });
+    expect(commentProposal('sandbox', elsewhere, 'body', writes).input).toEqual({ toilProject: 'sandbox', owner: 'imagile-dev', repo: 'other-repo', number: 7, body: 'body' });
     const other = { ...i, source: { ...i.source, area: 'bitbucket' as unknown as 'github' } };
     expect(commentProposal('card-payments', other, 'body', writes)).toMatchObject({ command: null, input: null, note: expect.stringMatching(/no command that comments on a bitbucket item/) });
     expect(commentText([{ text: 'See [[corp-jira:PAY-1]].' }], 'Codex')).toMatch(/^See corp-jira:PAY-1\.\n\nInvestigated by Codex through Toil UI/);
@@ -364,7 +364,7 @@ describe('assignment files and settings', () => {
   it('keeps each assignment in its own file under the cache, and skips one it did not write', async () => {
     const dir = mkdtempSync(join(folder, 'data-'));
     const h = harness({ keeper: fileKeeper(dir) });
-    const a = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     const file = join(dir, 'cache', 'assignments', `${a.id}.json`);
     expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({ id: a.id, transcript: expect.any(Array) });
     writeFileSync(join(dir, 'cache', 'assignments', 'stray.json'), '{}');
@@ -397,7 +397,7 @@ describe("the sample's assignments", () => {
   it('runs a new assignment through the scripted runner, and refuses to apply', async () => {
     const s = sampleQueue(fixtureExecute().execute, { delay: 1 });
     await s.ready;
-    const a = await s.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' });
+    const a = await s.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' });
     for (let i = 0; i < 50 && s.queue.get(a.id).state === 'working'; i++) await new Promise((r) => setTimeout(r, 10));
     const done = s.queue.get(a.id);
     expect(done.state).toBe('needs-you');
@@ -431,15 +431,15 @@ describe('the assignment routes', () => {
     const ui = createUiServer({ settings: settings(), store: fixtureStore(), agent: fixtureAgent(), appDir: folder, version: 't', toil: { version: 't', contractVersion: 1 }, token: 'tok', assignments: { queue: s.queue } });
     const { origin } = await ui.listen();
     try {
-      expect((await call(origin, '/api/assignments?dossier=card-payments')).status).toBe(401);
+      expect((await call(origin, '/api/assignments?toilProject=card-payments')).status).toBe(401);
       const signed = await call(origin, '/api/session', { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: { token: 'tok' } });
       const session = JSON.parse(signed.body) as { session: string; csrf: string; assignments: boolean };
       expect(session.assignments).toBe(true);
       const h = { 'x-toil-ui-session': session.session };
       const post = { ...h, origin, 'content-type': 'application/json', 'x-toil-ui-csrf': session.csrf };
-      const list = JSON.parse((await call(origin, '/api/assignments?dossier=card-payments', { headers: h })).body) as { assignments: unknown[] };
+      const list = JSON.parse((await call(origin, '/api/assignments?toilProject=card-payments', { headers: h })).body) as { assignments: unknown[] };
       expect(list.assignments).toHaveLength(5);
-      const made = await call(origin, '/api/assignments', { method: 'POST', headers: post, body: { dossier: 'card-payments', item: 'corp-jira:PAY-103', mode: 'investigate', adapter: 'codex' } });
+      const made = await call(origin, '/api/assignments', { method: 'POST', headers: post, body: { toilProject: 'card-payments', item: 'corp-jira:PAY-103', mode: 'investigate', adapter: 'codex' } });
       expect(made.status).toBe(201);
       // Without the CSRF token, nothing is applied.
       expect((await call(origin, '/api/assignments/apply', { method: 'POST', headers: { ...h, origin, 'content-type': 'application/json' }, body: { id: 'sample-needsyou-0002', proposal: 'x' } })).status).toBe(403);
@@ -452,7 +452,7 @@ describe('the assignment routes', () => {
       // since=latest (#306) skips what already happened: the first line is the next event, carrying what a notice says.
       const next = call(origin, '/api/assignments/events?since=latest', { headers: h });
       await new Promise((r) => setTimeout(r, 50));
-      await call(origin, '/api/assignments', { method: 'POST', headers: post, body: { dossier: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' } });
+      await call(origin, '/api/assignments', { method: 'POST', headers: post, body: { toilProject: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' } });
       expect(JSON.parse((await next).body.split('\n')[0]!)).toMatchObject({ kind: 'created', item: 'corp-jira:PAY-103', itemTitle: expect.any(String), adapter: 'codex', origin: 'person', stop: null, pending: 0, questions: 0 });
     } finally {
       await ui.close();
@@ -494,20 +494,20 @@ describe('a staged diff that stops short (#293 review round 6)', () => {
   });
 });
 
-describe('a dossier renamed (#342)', () => {
+describe('a Toil project renamed (#342)', () => {
   it("moves its assignments to the new name, saying so in each transcript, and waits for a running one", async () => {
     const h = harness();
-    const a = await h.queue.assign({ dossier: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     await h.tick();
     expect(h.queue.runningIn('card-payments')).toBe(true);
-    expect(() => h.queue.renameDossier('card-payments', 'payments-v2')).toThrow(/is running/);
+    expect(() => h.queue.renameToilProject('card-payments', 'payments-v2')).toThrow(/is running/);
     h.runs[0]!.resolve(h.result());
     await h.tick();
-    expect(h.queue.renameDossier('card-payments', 'payments-v2')).toBe(1);
-    expect(h.queue.get(a.id).dossier).toBe('payments-v2');
-    expect(h.queue.get(a.id).transcript.at(-1)!.title).toBe('The dossier was renamed from card-payments to payments-v2.');
-    expect(h.keeper.saved.get(a.id)!.dossier).toBe('payments-v2');
-    expect(h.events.at(-1)).toMatchObject({ kind: 'renamed', dossier: 'payments-v2' });
-    expect(h.queue.renameDossier('card-payments', 'payments-v2')).toBe(0);
+    expect(h.queue.renameToilProject('card-payments', 'payments-v2')).toBe(1);
+    expect(h.queue.get(a.id).toilProject).toBe('payments-v2');
+    expect(h.queue.get(a.id).transcript.at(-1)!.title).toBe('The Toil project was renamed from card-payments to payments-v2.');
+    expect(h.keeper.saved.get(a.id)!.toilProject).toBe('payments-v2');
+    expect(h.events.at(-1)).toMatchObject({ kind: 'renamed', toilProject: 'payments-v2' });
+    expect(h.queue.renameToilProject('card-payments', 'payments-v2')).toBe(0);
   });
 });

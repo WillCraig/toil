@@ -86,7 +86,7 @@
   {
     "name": "migrate",
     "tool": null,
-    "description": "Save the config file in the current version, with retired areas folded into the areas that replaced them",
+    "description": "Save the config file in the current version, with retired areas folded into the areas that replaced them and renamed keys (dossierPaths is now projectPaths) given their new names",
     "writes": false,
     "connection": false,
     "flags": []

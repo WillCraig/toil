@@ -1,9 +1,9 @@
 /**
- * The Analyses tab (#394, #395): every Analyze kept for the dossier, newest
+ * The Analyses tab (#394, #395): every Analyze kept for the toil project, newest
  * first, each with when it was made, the adapter and model that wrote it,
  * its one-line recommendation, and what changed since the one before (new
  * blockers, cleared ones, points moved, items newly cited or dropped),
- * worked out by code from a snapshot of the dossier each one kept. Any of
+ * worked out by code from a snapshot of the toil project each one kept. Any of
  * them opens again at its own address, laid out top-down like the chat's.
  * They are kept by the server in its cache, so they outlast a reload and a
  * restart, and `toil-ui wipe` takes them with the rest. Minutes of the
@@ -21,7 +21,7 @@ import { useChatScope } from '../components/ask.tsx';
 import { ProposalCard } from '../components/proposal.tsx';
 import { UsageFooter } from '../components/usage.tsx';
 import { useData } from '../data.ts';
-import { analysesHref, analysisHref, dateTime, dossierHref } from '../format.ts';
+import { analysesHref, analysisHref, dateTime, toilProjectHref } from '../format.ts';
 import { Empty, EmptyButton, EmptyLink } from '../components/empty.tsx';
 import { unchanged, type AnalysisSummary, type AnalysisView } from '../model/analysis.ts';
 import { Loader } from '../moments/Moments.tsx';
@@ -39,14 +39,14 @@ function AnalysisList() {
   const list = history?.list ?? null;
   const term = useTerm();
   const plain = usePlain();
-  const { dossier } = useData();
+  const { toilProject } = useData();
   return (
     <Card as="section" className="panel analyses" aria-labelledby="analyses-title">
       <h2 id="analyses-title" title={plain.title('Analyses')}>
         {term('analyses', plain.pw('Analyses', 'Past briefings'))}
       </h2>
       <p className="note">
-        {plain.pw('Every Analyze kept for', 'Every briefing kept for')} {dossier.name}, newest first. <Help topic="analyses" />
+        {plain.pw('Every Analyze kept for', 'Every briefing kept for')} {toilProject.name}, newest first. <Help topic="analyses" />
       </p>
       {/* With none kept yet, Analyze now is the empty list's own action (#417), so it isn't drawn twice. */}
       {chat && (list === null || list.length > 0 || running) && (
@@ -68,14 +68,14 @@ function AnalysisList() {
         </ol>
       ) : running ? null : (
         <Empty
-          message={plain.pw('No analysis kept for this dossier yet.', 'No briefing kept for this Toil project yet.')}
+          message={plain.pw('No analysis kept for this Toil project yet.', 'No briefing kept for this Toil project yet.')}
           action={
             chat ? (
               <EmptyButton onPress={() => void chat.ask(ANALYZE, plain.pw('Analyze', 'Get a briefing'))} disabled={chat.busy}>
                 {plain.pw('Analyze now', 'Get a briefing now')}
               </EmptyButton>
             ) : (
-              <EmptyLink href={dossierHref(dossier.name)}>Open the Overview</EmptyLink>
+              <EmptyLink href={toilProjectHref(toilProject.name)}>Open the Overview</EmptyLink>
             )
           }
         />
@@ -85,7 +85,7 @@ function AnalysisList() {
 }
 
 function AnalysisEntry({ a }: { a: AnalysisSummary }) {
-  const { dossier } = useData();
+  const { toilProject } = useData();
   return (
     <li className="analysis" data-analysis={a.id}>
       <p className="note analysis__meta">
@@ -102,7 +102,7 @@ function AnalysisEntry({ a }: { a: AnalysisSummary }) {
         <p className="note analysis__changes">{changesLine(a.changes)}</p>
       )}
       <p className="analysis__open">
-        <a href={analysisHref(dossier.name, a.id)}>
+        <a href={analysisHref(toilProject.name, a.id)}>
           Open<span className="sr-only"> the analysis of {dateTime(a.at)}</span>
         </a>
       </p>
@@ -111,7 +111,7 @@ function AnalysisEntry({ a }: { a: AnalysisSummary }) {
 }
 
 function OpenAnalysis({ id }: { id: string }) {
-  const { analyses, dossier } = useData();
+  const { analyses, toilProject } = useData();
   const [view, setView] = useState<AnalysisView | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -119,17 +119,17 @@ function OpenAnalysis({ id }: { id: string }) {
     let live = true;
     setView(undefined);
     if (!analyses) return void setView(null);
-    analyses.get(dossier.name, id).then(
+    analyses.get(toilProject.name, id).then(
       (v) => live && setView(v),
       (e: unknown) => live && setError(`The analysis didn't load: ${e instanceof Error ? e.message : String(e)}`),
     );
     return () => {
       live = false;
     };
-  }, [analyses, dossier.name, id]);
+  }, [analyses, toilProject.name, id]);
   const back = (
     <p className="analysis-open__back">
-      <a href={analysesHref(dossier.name)}>All analyses</a>
+      <a href={analysesHref(toilProject.name)}>All analyses</a>
     </p>
   );
   if (error || view === null) {
@@ -137,7 +137,7 @@ function OpenAnalysis({ id }: { id: string }) {
       <Card as="section" className="panel analyses" aria-labelledby="analysis-title">
         {back}
         <h2 id="analysis-title">Analysis not found</h2>
-        <p className={error ? 'failure' : undefined}>{error ?? `${dossier.name} has no analysis by that id: it may have passed the cache's retention period, or the cache was wiped.`}</p>
+        <p className={error ? 'failure' : undefined}>{error ?? `${toilProject.name} has no analysis by that id: it may have passed the cache's retention period, or the cache was wiped.`}</p>
       </Card>
     );
   }

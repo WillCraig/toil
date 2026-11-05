@@ -189,7 +189,7 @@ function ConnectionCard({ connection: c, areas, config, configFile, onChanged }:
       {open === 'default' && (
         <ChangeForm
           title={`Make ${c.name} the ${c.area} default`}
-          explain={`${c.area} commands use it when a call names no connection and its dossier names none. The previous default stays as it is, just no longer the default.`}
+          explain={`${c.area} commands use it when a call names no connection and its Toil project names none. The previous default stays as it is, just no longer the default.`}
           runs={commandLine('connections default', [c.name])}
           submit="Make default"
           disabled={config.disabled}
@@ -201,7 +201,7 @@ function ConnectionCard({ connection: c, areas, config, configFile, onChanged }:
       {open === 'remove' && (
         <ChangeForm
           title={`Remove ${c.name}`}
-          explain={`Takes ${c.name} out of ${configFile} and deletes its secrets from the OS credential store, unless another connection uses them. A dossier that names it then fails until it names another. This can't be undone here: adding it again means typing its secret again.`}
+          explain={`Takes ${c.name} out of ${configFile} and deletes its secrets from the OS credential store, unless another connection uses them. A Toil project that names it then fails until it names another. This can't be undone here: adding it again means typing its secret again.`}
           runs={commandLine('connections remove', [c.name])}
           submit={`Remove ${c.name}`}
           danger
@@ -345,7 +345,7 @@ function AddConnection({ areas, config, onChanged }: { areas: AreaInfo[] | null;
 /**
  * The form `toil connections add` is from the page. With `area`, it adds a
  * connection to that area only, and `suggest` fills the name and settings in
- * (Set up this repo offers a base URL on the dossier's host); the person can
+ * (Set up this repo offers a base URL on the toil project's host); the person can
  * change any of them before saving.
  */
 export function NewConnectionForm({

@@ -33,7 +33,7 @@ describe('the briefing the page shows', async () => {
     expect(v.reasons.flatMap((r) => r.items).every((i) => i.next === null)).toBe(true);
   });
 
-  it("is Analyze's when it is current, and lists what the code flagged that it left unmentioned, and ids that aren't the dossier's", () => {
+  it("is Analyze's when it is current, and lists what the code flagged that it left unmentioned, and ids that aren't the Toil project's", () => {
     const flagged = briefingOf(input([])).reasons.flatMap((r) => r.items.map((i) => i.id));
     const v = briefingOf(
       input([
@@ -69,7 +69,7 @@ describe('the briefing the page shows', async () => {
 describe("the server's answer", () => {
   const ledger = new Ledger();
   ledger.add('corp-jira:PAY-101');
-  const f = { dossier: 'card-payments', prompt: 'Analyze', by: 'Codex', ledger, writes: writeCommands(registry.commands) };
+  const f = { toilProject: 'card-payments', prompt: 'Analyze', by: 'Codex', ledger, writes: writeCommands(registry.commands) };
 
   it('lifts the briefing block out of the text, and checks the ids it names against what the tools read', () => {
     const b = { recommendation: 'Fix [[corp-jira:PAY-101]].', reasons: [{ lens: 'failing', label: 'Failing checks', line: 'one', text: null, items: [{ id: 'corp-jira:PAY-101', why: 'Checks fail.', next: 'Fix it.' }, { id: 'corp-jira:PAY-404', why: 'Invented.', next: null }] }], onTrack: null, changed: [], leftOut: [] };
@@ -96,16 +96,16 @@ describe("the server's answer", () => {
 
 describe("Analyze's question", () => {
   const answering = (envelope: Envelope): Execute => async () => envelope;
-  const meta = { command: 'dossiers analyze prompt', durationMs: 1, version: 'x', contractVersion: 1 };
+  const meta = { command: 'projects analyze prompt', durationMs: 1, version: 'x', contractVersion: 1 };
 
-  it("comes from toil, with the dossier's own settings", async () => {
-    const q = await analyzeQuestion(answering({ ok: true, data: { prompt: 'Analyze the dossier "card-payments" …' }, error: null, meta } as Envelope), 'card-payments');
-    expect(q).toEqual({ label: 'Analyze', text: 'Analyze the dossier "card-payments" …', warning: null });
+  it("comes from toil, with the Toil project's own settings", async () => {
+    const q = await analyzeQuestion(answering({ ok: true, data: { prompt: 'Analyze the Toil project "card-payments" …' }, error: null, meta } as Envelope), 'card-payments');
+    expect(q).toEqual({ label: 'Analyze', text: 'Analyze the Toil project "card-payments" …', warning: null });
   });
 
   it("falls back to Toil UI's own question on a toil without the command, and says so", async () => {
-    const q = await analyzeQuestion(answering({ ok: false, data: null, error: { code: 'INVALID_INPUT', message: "Unknown command 'dossiers analyze prompt'.", fix: '' }, meta } as Envelope), 'card-payments');
-    expect(q.text).toContain('Give a pulse check of the dossier "card-payments"');
-    expect(q.warning).toMatch(/^Analyze used Toil UI's own question, not the dossier's: toil dossiers analyze prompt failed \(Unknown command/);
+    const q = await analyzeQuestion(answering({ ok: false, data: null, error: { code: 'INVALID_INPUT', message: "Unknown command 'projects analyze prompt'.", fix: '' }, meta } as Envelope), 'card-payments');
+    expect(q.text).toContain('Give a pulse check of the Toil project "card-payments"');
+    expect(q.warning).toMatch(/^Analyze used Toil UI's own question, not the Toil project's: toil projects analyze prompt failed \(Unknown command/);
   });
 });

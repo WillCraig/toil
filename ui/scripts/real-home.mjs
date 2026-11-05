@@ -2,18 +2,18 @@
 // hand) and verify.mjs (`npm run verify:ui`). In <home> it sets up, once:
 //   - ~/.toil/config.json with one connection, `github`, to https://api.github.com,
 //     writes off. It holds no token.
-//   - for GitHub (prepareRealHome), the dossier for a repository (named after
+//   - for GitHub (prepareRealHome), the toil project for a repository (named after
 //     it; `sandbox` for imagile-dev/toil-sandbox), and `toil-self` for
 //     imagile-dev/toil unless asked not to;
-//   - or, for an Azure DevOps Services board (prepareAdoHome), the dossier
+//   - or, for an Azure DevOps Services board (prepareAdoHome), the toil project
 //     `ado-board` on the ado connection (deployment cloud) toil makes from
 //     TOIL_ADO_BASE_URL and TOIL_ADO_PAT, for one project. Nothing
 //     about the organization is written to the config file, and writes stay off.
-// Dossiers are made through toil's own dossiers commands. The environment it
+// Toil projects are made through toil's own toil projects commands. The environment it
 // hands back points HOME there and carries the GitHub token from `gh auth
 // token` (or TOIL_GITHUB_TOKEN, if already set), or the two ADO variables, for
 // toil-ui's process only: never written to a file or printed.
-// Both run Toil UI, and the toil CLI that makes the dossiers, on toil built
+// Both run Toil UI, and the toil CLI that makes the toil projects, on toil built
 // from this checkout into <clone>/.scratch/toil (buildToil, and the resolve hook
 // in local-toil-hook.mjs), never on the published toil Toil UI pins, so a
 // command ui/ calls before its release still works here (#332).
@@ -137,8 +137,8 @@ export function claudeSignIn(base = process.env, now = Date.now()) {
   return { token: oauth.accessToken, from: file };
 }
 
-/** The dossier name a repository gets: `sandbox` for the sandbox, else its name made safe. */
-export const dossierFor = (name) => (name === 'toil-sandbox' ? 'sandbox' : name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+/** The toil project name a repository gets: `sandbox` for the sandbox, else its name made safe. */
+export const toilProjectFor = (name) => (name === 'toil-sandbox' ? 'sandbox' : name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
 
 const say = (line) => process.stdout.write(`${line}\n`);
 
@@ -165,21 +165,21 @@ export function toilIn(home, env) {
   };
 }
 
-/** A dossier made or updated with toil's own commands (`link` takes `linkArgs`), then checked. */
-function ensureDossier(toil, name, description, linkArgs) {
-  if (!toil('dossiers', 'show', name).ok) {
-    const init = toil('dossiers', 'init', name, '--description', description);
-    if (!init.ok) throw new RealHomeError(`toil dossiers init ${name}: ${init.error.message}`, init.error.fix ?? 'See toil dossiers init --help.');
+/** A toil project made or updated with toil's own commands (`link` takes `linkArgs`), then checked. */
+function ensureToilProject(toil, name, description, linkArgs) {
+  if (!toil('projects', 'show', name).ok) {
+    const init = toil('projects', 'init', name, '--description', description);
+    if (!init.ok) throw new RealHomeError(`toil projects init ${name}: ${init.error.message}`, init.error.fix ?? 'See toil projects init --help.');
   }
-  const link = toil('dossiers', 'link', name, ...linkArgs, '--replace');
-  if (!link.ok) throw new RealHomeError(`toil dossiers link ${name}: ${link.error.message}`, link.error.fix ?? 'See toil dossiers link --help.');
-  const check = toil('dossiers', 'check', name);
-  if (!check.ok || !check.data.ok) throw new RealHomeError(`toil dossiers check ${name} found problems: ${JSON.stringify(check.data?.problems ?? check.error)}`, 'Fix the dossier in the scratch home, or delete it and run this again.');
+  const link = toil('projects', 'link', name, ...linkArgs, '--replace');
+  if (!link.ok) throw new RealHomeError(`toil projects link ${name}: ${link.error.message}`, link.error.fix ?? 'See toil projects link --help.');
+  const check = toil('projects', 'check', name);
+  if (!check.ok || !check.data.ok) throw new RealHomeError(`toil projects check ${name} found problems: ${JSON.stringify(check.data?.problems ?? check.error)}`, 'Fix the Toil project in the scratch home, or delete it and run this again.');
 }
 
 /**
- * Writes toil's config and a GitHub repository's dossiers into the home.
- * Resolves with the repository's dossier name. Throws a RealHomeError when a
+ * Writes toil's config and a GitHub repository's toil projects into the home.
+ * Resolves with the repository's toil project name. Throws a RealHomeError when a
  * step fails.
  */
 export function prepareRealHome({ home, repo, self = true, env, log = say }) {
@@ -187,28 +187,28 @@ export function prepareRealHome({ home, repo, self = true, env, log = say }) {
   if (!owner || !name || repo.split('/').length !== 2) throw new RealHomeError(`--repo ${repo} isn't owner/name.`, 'Pass it as --repo imagile-dev/toil-sandbox.');
   writeConfig(home, log);
   const toil = toilIn(home, env);
-  const dossier = (dossierName, description, repoOwner, repoName) => {
-    ensureDossier(toil, dossierName, description, ['github', '--connection', 'github', '--set', `owner=${repoOwner}`, '--set', `repo=${repoName}`]);
-    log(`Dossier ${dossierName}: ${repoOwner}/${repoName} on GitHub, checked.`);
+  const toilProject = (toilProjectName, description, repoOwner, repoName) => {
+    ensureToilProject(toil, toilProjectName, description, ['github', '--connection', 'github', '--set', `owner=${repoOwner}`, '--set', `repo=${repoName}`]);
+    log(`Toil project ${toilProjectName}: ${repoOwner}/${repoName} on GitHub, checked.`);
   };
-  const main = dossierFor(name);
-  dossier(main, `${owner}/${name} on GitHub`, owner, name);
-  if (self && repo !== 'imagile-dev/toil') dossier('toil-self', 'Toil itself: imagile-dev/toil on GitHub', 'imagile-dev', 'toil');
+  const main = toilProjectFor(name);
+  toilProject(main, `${owner}/${name} on GitHub`, owner, name);
+  if (self && repo !== 'imagile-dev/toil') toilProject('toil-self', 'Toil itself: imagile-dev/toil on GitHub', 'imagile-dev', 'toil');
   return main;
 }
 
 /**
- * The board's dossier, `ado-board`, on the ado connection the env makes (deployment cloud),
+ * The board's toil project, `ado-board`, on the ado connection the env makes (deployment cloud),
  * for one project, after `toil connections test` proves the token. Resolves
- * with the dossier name.
+ * with the toil project name.
  */
 export function prepareAdoHome({ home, project, env, log = say }) {
   writeConfig(home, log);
   const toil = toilIn(home, env);
   const test = toil('connections', 'test', 'ado');
   if (!test.ok || !test.data.authenticated) throw new RealHomeError(`toil couldn't reach the ado connection: ${test.error?.message ?? 'the token was refused'}`, test.error?.fix ?? 'Check TOIL_ADO_BASE_URL and TOIL_ADO_PAT.');
-  ensureDossier(toil, 'ado-board', 'An Azure DevOps Services board, read-only', ['ado', '--connection', 'ado', '--set', `project=${project}`]);
-  log('Dossier ado-board: the project on Azure DevOps Services, checked.');
+  ensureToilProject(toil, 'ado-board', 'An Azure DevOps Services board, read-only', ['ado', '--connection', 'ado', '--set', `project=${project}`]);
+  log('Toil project ado-board: the project on Azure DevOps Services, checked.');
   return 'ado-board';
 }
 
