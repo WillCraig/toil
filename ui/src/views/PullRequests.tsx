@@ -24,6 +24,7 @@ import {
 } from '../model/prs.ts';
 import type { Change } from '../toil.ts';
 import { usePlain } from '../plain-words.ts';
+import { PullRequestActions, useConnectionInfo, type ConnectionInfo } from '../components/jobs.tsx';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const ALL: KindOrAll[] = ['ALL', ...KINDS];
@@ -53,7 +54,7 @@ function Items({ ids }: { ids: string[] }) {
   );
 }
 
-const queueColumns: Array<Column<OpenRow>> = [
+const queueColumns = (info: ConnectionInfo | null, plain: boolean): Array<Column<OpenRow>> => [
   {
     header: 'Pull request',
     label: 'Pull request',
@@ -62,6 +63,8 @@ const queueColumns: Array<Column<OpenRow>> = [
       <>
         <PrLink change={r.change} withTitle />
         <span className="field"> {r.change.repo}</span>
+        {/* One menu in the pull request's own cell, not a column and not a button a row (principle 11): the jobs that apply, and what a missing one needs. */}
+        <PullRequestActions change={r.change} info={info} plain={plain} />
       </>
     ),
   },
@@ -122,8 +125,9 @@ const metricColumns: Array<Column<MetricRow>> = [
 ];
 
 export function PullRequests() {
-  const { dossier, byId, now, sync } = useData();
+  const { dossier, byId, now, sync, config } = useData();
   const plain = usePlain();
+  const connections = useConnectionInfo(config);
   const prs = dossier.pullRequests ?? [];
   const queue = openQueue(prs, byId, now);
   const flags = allFlags(prs, byId, now);
@@ -158,7 +162,7 @@ export function PullRequests() {
 
       <Panel id="queue" title="Waiting now" calls={calls}>
         <p className="note">Open pull requests, longest wait first, each with what it waits on and since when. Drafts come last. Waits count working days, Monday to Friday UTC.</p>
-        {queue.length ? <DataTable className="pr-queue" label="Open pull requests" wide rows={queue} rowKey={(r) => r.change.id} columns={queueColumns} /> : <Empty message="No open pull requests for this dossier." action={<SyncOr sync={sync}><EmptyLink edit href={dossierEditHref(dossier.name, 'repos')}>Add a repository</EmptyLink></SyncOr>} />}
+        {queue.length ? <DataTable className="pr-queue" label="Open pull requests" wide rows={queue} rowKey={(r) => r.change.id} columns={queueColumns(connections, plain.on)} /> : <Empty message="No open pull requests for this dossier." action={<SyncOr sync={sync}><EmptyLink edit href={dossierEditHref(dossier.name, 'repos')}>Add a repository</EmptyLink></SyncOr>} />}
       </Panel>
 
       <Panel id="flags" title="Flags" calls={calls} alerts={false}>

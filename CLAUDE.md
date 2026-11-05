@@ -406,7 +406,7 @@ GitHub Actions; its build tooling is out of scope.
   exactly and has no other runtime dependency. The app is built on toil's own
   `execute()` and an `Agent` interface, and imports a few of toil's pure modules
   from source where it needs them in the page (`src/core/brief/`, the briefing and
-  the Analyze prompt, #494; `src/core/owi/similar.ts`), which is why it releases with
+  the Analyze prompt, #494; `src/core/owi/similar.ts`; the workflow pages in `skills/toil/workflows/`, read when it is built for its Review, Ship and Diagram jobs, #532), which is why it releases with
   the toil it needs; the server answers both behind its `Store`
   and `Agent` interfaces, behind a launch token. It reads by default and writes only
   what a person presses: a worklog export, through `util encode --out` and toil's file

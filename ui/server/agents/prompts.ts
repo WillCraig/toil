@@ -16,6 +16,7 @@
 
 import { MAX_HISTORY_ANSWER, MAX_HISTORY_TURNS, type Starter } from '../../src/agent.ts';
 import type { Execute } from '../../src/toil.ts';
+import { jobLabel, parseJobPrompt } from '../../src/model/jobs.ts';
 import { MAX_PROPOSALS } from './answer.ts';
 
 export { MAX_HISTORY_ANSWER, MAX_HISTORY_TURNS } from '../../src/agent.ts';
@@ -166,6 +167,9 @@ export async function analyzeQuestion(execute: Execute, dossier: string): Promis
 /** The question for a starter id or Analyze (#343), or the typed text as it is; "Prepare my 1:1 notes for <person>" typed out gets the 1:1 instructions, and "Write up the stand-up for <from> to <to>" the stand-up's. */
 export function promptFor(dossier: string, prompt: string): { label: string; text: string } {
   if (prompt === 'analyze') return { label: ANALYZE_LABEL, text: analyzePrompt(dossier) };
+  // A workflow job (#532): only its label here; the question is built where its rounds are known (jobs.ts).
+  const job = parseJobPrompt(prompt);
+  if (job) return { label: jobLabel(job.id, job.target), text: prompt };
   const starter = STARTERS.find((s) => s.id === prompt);
   if (starter) return { label: starter.label, text: starter.prompt(dossier) };
   const standup = STANDUP.exec(prompt);

@@ -56,7 +56,7 @@ request to the page in `SKILL.md`, **By job**.
 ## The frontmatter
 
 Every page starts with the same keys, each on one line. `needs`, `inputs` and
-`writes` are JSON.
+`writes` are JSON. Toil UI reads `needs`, `inputs`, `writes` and `loop` when it is built, to offer the job where it applies, name a missing connection and limit its proposals, so keep each key's shape as this section gives it.
 
 | Key | Meaning |
 |-----|---------|

@@ -10,7 +10,9 @@
 
 import { useEffect, useRef } from 'react';
 
-export type UiCommand = { kind: 'ask' } | { kind: 'analyze' } | { kind: 'agents' } | { kind: 'assign'; id: string } | { kind: 'agent'; name: string | null; label: string };
+export type UiCommand = { kind: 'ask' } | { kind: 'analyze' } | { kind: 'agents' } | { kind: 'assign'; id: string } | { kind: 'agent'; name: string | null; label: string }
+  /** A workflow job (#532): its prompt (`job:review:<change id>`) and what the chat shows for it. */
+  | { kind: 'job'; prompt: string; label: string };
 
 const bus = new EventTarget();
 

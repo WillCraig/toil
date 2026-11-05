@@ -88,6 +88,7 @@ export const HELP = {
   'analyze-settings': { title: 'how Analyze briefs a dossier', text: "Each dossier sets its goal, its reader, its lenses in order with their thresholds, and what to watch for or leave out, while toil's rules and the answer's shape stay fixed. Clearing a setting is a delete, made in a terminal with toil dossiers analyze set --clear or --reset.", page: '/docs/ui/', anchor: 'tuning-analyze' },
   insights: { title: 'flagged cards and insights', text: 'A flagged card needs action now or a look: it is blocked, its build fails, it is aging or stale. An insight is something about an item that deserves a look, weightiest first, and each names the field, history or command it rests on.', page: '/docs/ui/', anchor: 'insights' },
   prs: { title: 'pull requests', text: "Read from every code host the dossier names, the open ones ranked by how long each has waited and on what. Flow figures are the team's, never one person's.", page: '/docs/ui/', anchor: 'pull-requests' },
+  jobs: { title: 'jobs', text: 'A workflow page from toil, run by the agent: it reads through toil and turns every write into a proposal for you.', page: '/docs/ui/', anchor: 'pull-requests' },
   people: { title: 'the People view', text: "What is on each person's plate, from the dossier's people section and the same items and pull requests as the dashboard. It never ranks or scores anyone.", page: '/docs/ui/', anchor: 'people' },
   readiness: { title: 'the Command Center', text: 'Each verdict is worked out from the cached records, with no model call and no live read. Only ready items are slated, in the dossier\'s order.', page: '/docs/ui/', anchor: 'readiness-and-the-command-center' },
   worklog: { title: 'the worklog', text: "One page a day, folded by code from the sync, the pull requests, the builds and the agent's runs: facts only, each line linked to where it came from. Days and times are UTC.", page: '/docs/ui/', anchor: 'worklog' },
@@ -133,7 +134,7 @@ export type HelpTopicId = keyof typeof HELP;
 export const helpHref = (topic: HelpTopic): string => `${DOCS_SITE}${topic.page}#${topic.anchor}`;
 
 /** The header's Help entry: the docs section for the view in front of you. */
-export type HelpView = 'dossiers' | 'dashboard' | 'prs' | 'people' | 'command-center' | 'worklog' | 'standup' | 'item' | 'assignment' | 'settings';
+export type HelpView = 'dossiers' | 'dashboard' | 'prs' | 'people' | 'command-center' | 'worklog' | 'standup' | 'item' | 'assignment' | 'job' | 'settings';
 const VIEW_TOPIC: Record<HelpView, HelpTopicId> = {
   dossiers: 'dossiers',
   dashboard: 'dashboard',
@@ -144,6 +145,7 @@ const VIEW_TOPIC: Record<HelpView, HelpTopicId> = {
   standup: 'standup',
   item: 'readiness',
   assignment: 'assignments',
+  job: 'jobs',
   settings: 'settings',
 };
 /** Settings pages whose section isn't the settings overview. */

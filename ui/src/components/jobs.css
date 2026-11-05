@@ -1,0 +1,37 @@
+/* The workflow jobs (#532): a pull request's Actions menu, and a job's own page. */
+.jobs-trigger {
+  white-space: nowrap;
+  margin-left: 0.5rem;
+}
+.jobs-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.jobs-item__why {
+  max-width: 28ch;
+  margin: 0;
+  white-space: normal;
+}
+.jobs-link {
+  margin: 0.25rem 0 0;
+}
+.job-page__target {
+  font-weight: 400;
+}
+.job-page__more {
+  margin-top: 1.25rem;
+}
+.job-page h1,
+.job-page .btn {
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.job-page .btn {
+  white-space: normal;
+  text-align: left;
+}
+.jobs-item--off [slot='label'] {
+  opacity: 0.6;
+}

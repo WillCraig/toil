@@ -120,6 +120,10 @@ export const LIVE_COMMANDS: readonly string[] = [
   'ado work-item iterations',
   'ado pr list',
   'ado pr get',
+  'ado pr files',
+  'ado pr diff',
+  'ado pr threads',
+  'ado pr builds',
   'ado run list',
   'github issue get',
   'github issue history',
@@ -127,14 +131,23 @@ export const LIVE_COMMANDS: readonly string[] = [
   'github pr list',
   'github pr get',
   'github commit checks',
+  'github pr files',
+  'github pr diff',
+  'github pr threads',
+  'github pr status',
   'bitbucket pr list',
   'bitbucket pr get',
+  'bitbucket pr files',
+  'bitbucket pr diff',
+  'bitbucket pr builds',
   'jenkins pipeline runs',
   'openshift deployment list',
+  // The workflow jobs (#532): a review reads a pull request's files and diff, and Diagram draws its model, local and read-only.
+  'util c4 mermaid',
 ];
 
 /** Fields a live tool never offers: the dossier is fixed, and a file or folder on this machine is not the agent's to name. */
-const HIDDEN_FIELDS = new Set(['dossier', 'cwd', 'connection', 'select']);
+export const HIDDEN_FIELDS = new Set(['dossier', 'cwd', 'connection', 'select', 'file']);
 const hidden = (field: string) => HIDDEN_FIELDS.has(field) || /File$/.test(field) || field === 'out' || field === 'allowWrite';
 
 /** The bounds on what one tool call returns (Bounds). */

@@ -90,6 +90,9 @@ export const ROUTES = [
   '#/dossier/card-payments/analyses/sample-analysis-2',
   '#/dossier/checkout-web/prs',
   '#/dossier/card-payments/prs',
+  '#/dossier/card-payments/job/review?target=github%3Aimagile%2Fpayments-web%2343',
+  '#/dossier/card-payments/job/ship',
+  '#/dossier/card-payments/job/diagram',
   // The People view (#292): mapped people with a suggested match, people plus agents and an unmapped account, a dossier listing nobody, and the board filtered to one person.
   '#/dossier/card-payments/people',
   '#/dossier/checkout-web/people',

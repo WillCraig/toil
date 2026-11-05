@@ -365,6 +365,10 @@ export function AskBar() {
     if (c.kind === 'ask') input.current?.focus();
     else if (c.kind === 'analyze' && !chat.busy) analyze();
     else if (c.kind === 'agent') chat.switchTo(c.name, c.label);
+    else if (c.kind === 'job' && !chat.busy) {
+      openView();
+      void chat.ask(c.prompt, c.label);
+    }
   });
 
   return (

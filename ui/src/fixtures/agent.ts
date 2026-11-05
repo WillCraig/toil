@@ -14,6 +14,7 @@ import type { ChatTurn } from '../model-usage.ts';
 import type { Proposal } from '../proposal.ts';
 import { plainify } from '../plainify.ts';
 import { sampleAnswerUsage } from './model-usage.ts';
+import { jobLabel, parseJobPrompt } from '../model/jobs.ts';
 
 const J = (n: number) => `[[corp-jira:PAY-${n}]]`;
 const A = (n: number) => `[[corp-ado:${n}]]`;
@@ -443,8 +444,44 @@ export function analyzeParts(dossier: string): string[] {
   return [`\`\`\`briefing\n${JSON.stringify(briefing)}\n\`\`\``, ...evidence];
 }
 
+/**
+ * A workflow job in the preview (#532): what the scripted agent says for the
+ * page it was asked to run. It reads no tool, so it says what the page would
+ * have it read, cites only the pull request it was handed, and for a GitHub
+ * pull request proposes the one comment a review ends on, as a card to press.
+ * Invented, not captured, and labelled as the preview's everywhere it shows.
+ */
+export function scriptedJob(prompt: string): Answer | null {
+  const job = parseJobPrompt(prompt);
+  if (!job) return null;
+  const { id, target } = job;
+  const gh = /^github:([^/]+)\/([^#]+)#(\d+)$/.exec(target);
+  const text: Record<typeof id, string[]> = {
+    review: [
+      `Review of ${P(target)}, as the scripted preview would read it: its description and reviewers (pr_get), the files it changes and its diff (pr_files, pr_diff), then its checks. A real agent reads each of those and cites the command behind every finding.`,
+      'Nothing was checked here: the preview reads no tools, so every check below is unchecked, not passed. Findings would be drafted as inline comments, each a proposal you press.',
+    ],
+    ship: [
+      `Round 1 of 3 on ${P(target)}, as the scripted preview would answer it: read the review threads and the failing check, draft a reply to each thread, and list what only your terminal can do (edit, run the gate, push).`,
+      'Nothing was read here, so nothing below is checked. After round 3 the loop stops and the pull request is marked needs-human.',
+    ],
+    'map-codebase': [
+      `Architecture of ${target || 'the dossier'}, as the scripted preview would draw it: containers from the dossier's repositories, components from the folders the pull requests touch, each element marked observed (read from a command) or inferred (with the reason).`,
+      ['```mermaid', 'C4Container', '  title Preview only, nothing read', '  Person(user, "User")', '  Container(app, "App", "TypeScript", "inferred")', '  Rel(user, app, "uses")', '```'].join(String.fromCharCode(10)),
+    ],
+  };
+  const parts: AnswerPart[] = text[id].map((t) => ({ text: t }));
+  const proposals: Proposal[] =
+    id === 'review' && gh
+      ? [{ id: `job-review-${target}`, from: 'agent', item: target, title: `Comment on ${gh[2]}#${gh[3]}`, reason: `The review's summary, for the author to read. ${P(target)}`, command: 'github pr comment', input: { owner: gh[1], repo: gh[2], number: gh[3], body: 'Reviewed in Toil UI (scripted preview): no findings, nothing was checked.' }, note: 'Preview only: a real review drafts findings from the diff.' }]
+      : [];
+  return { prompt: jobLabel(id, target), parts, citations: citationsOf(parts), by: 'scripted', adapter: 'scripted', model: null, proposals, ...(id === 'ship' ? { warnings: [`Round 1 of 3. After round 3 it stops and the pull request is for a person.`] } : {}) };
+}
+
 export function scriptedAgent({ delay = 0 }: ScriptedOptions = {}): Agent {
   const answer = (dossier: string, prompt: string, style?: AskStyle, chat?: ChatTurn): Answer => {
+    const job = scriptedJob(prompt);
+    if (job) return job;
     const script = SCRIPTS[dossier] ?? {};
     if (prompt === ANALYZE && SCRIPTS[dossier]) {
       const parts: AnswerPart[] = analyzeParts(dossier).map((text) => ({ text }));

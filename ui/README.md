@@ -157,7 +157,7 @@ sync reads the dossier afresh under its new name.
 
 A dossier opens on its **Overview**, the briefing, in a frame all of its pages share:
 
-- **The top row:** its name, with the pencil that renames it; **Switch**, for another
+- **The top row:** on the Overview, a **Diagram** link (`#/dossier/<name>/job/diagram`) draws the dossier's repositories as a C4 diagram in Mermaid; the steps that need a folder on disk (`util size`, `git log`, `deps scan`) are reported unchecked. Its name, with the pencil that renames it; **Switch**, for another
   dossier or the Dossiers view; the sprint and its day; its description, cut to one
   line with the whole of it in its tooltip, and its sources (on a phone, a **Details** button beside the name opens them); and the Ask bar, with the
   **AI helpers** button beside it (The agent, below).
@@ -349,6 +349,7 @@ changes:
   merge (approval to merge) times, review rounds, sizes and merges per week, over six
   weeks, each split by people, agents and bots and each with its sample size and what
   couldn't be measured.
+- **Actions:** each open pull request has one **Actions** menu with **Review** (reads the pull request, its diff and checks, and drafts findings as comments you can post) and **Ship** (on a pull request a person wrote: drafts replies to its review; editing, the gate and pushing stay in your terminal). Each opens its own page, `#/dossier/<name>/job/review?target=<change id>` or `/job/ship?…`, which says what the job does and needs and has **Run**. The run goes through the Ask bar, so every write is a proposal card and the run is kept in the worklog. A job missing its code host's connection stays in the menu, dimmed, naming the connection to add. Ship stops after 3 finished rounds on one pull request; the next run is refused and says it needs a person (`needs-human`). The steps come from toil's workflow pages (`skills/toil/workflows/`).
 - **Suggested reviewers:** for an open pull request with nobody asked, the CODEOWNERS
   of its paths and the earlier reviewers of the same files and folders, each as a
   proposal with the `toil … --allow-write` line to ask them.
@@ -626,7 +627,7 @@ until you call it up.
   Pull requests, People, Worklog, Analyses), a saved analysis, a settings page, or a
   theme.
 - **Run** Sync now (where Toil UI keeps a cache), **Use plain words** / **Use toil's own terms**, and on a dossier's page Ask (it
-  focuses the Ask bar), Analyze, **Open the Agents panel** (**Open the AI helpers panel** in plain words), the agent that answers this chat, and Assign the
+  focuses the Ask bar), Analyze, **Review a pull request**, **Ship: answer a review** and **Diagram <dossier>** (each opens its job's page), **Open the Agents panel** (**Open the AI helpers panel** in plain words), the agent that answers this chat, and Assign the
   item you were on to an agent: the board card that had focus, or the item whose
   page is open.
 - Matching is fuzzy and ignores case: `pay12` finds `PAY-12`, and each word you
@@ -938,7 +939,7 @@ choose an installed one for that chat. The notice goes as soon as a helper can a
 reads the helpers again whenever the page moves, so installing on the Settings page needs no
 reload. A helper that is installed but can't start yet says so instead, with the reason one step
 in. `toil-ui --sample` keeps the scripted agent,
-which answers its starter questions and Analyze from the sample data.
+which answers its starter questions, Analyze and the workflow jobs from the sample data (a job's answer says nothing was read and lists every check as unchecked).
 
 ### Not ticketed yet
 
