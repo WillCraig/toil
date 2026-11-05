@@ -1,6 +1,6 @@
 {
   "name": "@imagile-dev/toil",
-  "version": "0.1.0-beta.3",
+  "version": "0.1.0-beta.4",
   "description": "The token-efficient alternative to MCP: one CLI for enterprise tools and databases, with compact JSON envelopes, --select for only the fields needed, and a skill read on demand instead of every tool schema. toil mcp stays available.",
   "license": "Apache-2.0",
   "author": "Imagile",

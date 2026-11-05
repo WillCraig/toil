@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.1.0-beta.4](https://github.com/imagile-dev/toil/compare/v0.1.0-beta.3...v0.1.0-beta.4) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* contractVersion is 3. The MCP tools dossiers_* and <area>_check_dossier are now projects_* and <area>_check_toil_project, the input dossier is toilProject, and the resources toil://dossiers* are toil://projects*; the old names are gone, so update agent configs and allowed-tools lists. In envelopes, meta.context.dossier is meta.context.toilProject, the source value "dossier" is "toil-project", projects list returns toilProjects and projects show returns toilProject, and warning codes DOSSIER_* are TOIL_PROJECT_*. Still working for one beta, with a warning: `toil dossiers` and `<area> check-dossier` (use `toil projects` and `<area> check-toil-project`), --dossier (use --toil-project), TOIL_DOSSIER and TOIL_DOSSIER_PATHS (use TOIL_PROJECT and TOIL_PROJECT_PATHS), the dossierPaths config key (now projectPaths, config version 4; run `toil connections migrate`), and the dossiers/ folders (run `toil projects migrate` for ~/.toil/dossiers, and `git mv .toil/dossiers .toil/projects` in a repository). See skills/toil/upgrading.md.
+
+### Features
+
+* rename dossier to toil project across the CLI, MCP, config, env, UI and docs ([#559](https://github.com/imagile-dev/toil/issues/559)) ([f9368d6](https://github.com/imagile-dev/toil/commit/f9368d6dbd1b923b50e36a9ca98ce139c72e6107))
+* **skill:** close the gaps found running map-codebase, and commit toil's map ([#539](https://github.com/imagile-dev/toil/issues/539)) ([a1d8708](https://github.com/imagile-dev/toil/commit/a1d87085a12251388f2e7e64108305577ccea2a3))
+* **skill:** workflow pages for review, ship and map-codebase ([#535](https://github.com/imagile-dev/toil/issues/535)) ([a1e04e8](https://github.com/imagile-dev/toil/commit/a1e04e8ac02e87e53a786371755ebaf7d59d6390))
+* **ui:** offer the workflow jobs (Review, Ship, Diagram) where they apply ([#558](https://github.com/imagile-dev/toil/issues/558)) ([1f47622](https://github.com/imagile-dev/toil/commit/1f476229b24554c7a725d871a5afa7120e1dadf5))
+* **ui:** read every repository and project a dossier names ([#544](https://github.com/imagile-dev/toil/issues/544)) ([f9c7bab](https://github.com/imagile-dev/toil/commit/f9c7babd81dc3da38d2f4b7b07d63478f9f3a6a2))
+* **ui:** Toil UI for people new to AI: plain words, quieter screens, guided Ask ([#553](https://github.com/imagile-dev/toil/issues/553)) ([89022f5](https://github.com/imagile-dev/toil/commit/89022f5841464b9d6e99b61806c2a062a5962128))
+* **util:** list each file's imports in util size outlines ([#534](https://github.com/imagile-dev/toil/issues/534)) ([496d331](https://github.com/imagile-dev/toil/commit/496d331e03df5a0885102ae6ff2bedcc1b779f43))
+
+
+### Bug Fixes
+
+* **dossiers:** a per-repo value no repo matches no longer falls through to git or the connection ([#546](https://github.com/imagile-dev/toil/issues/546)) ([420ed8d](https://github.com/imagile-dev/toil/commit/420ed8dfa5bed3139f22e05c70b896efbbe5625a))
+* **release:** fail loudly when a merged release PR isn't released, and escape its body first ([#537](https://github.com/imagile-dev/toil/issues/537)) ([333cf9c](https://github.com/imagile-dev/toil/commit/333cf9ca77a624b21b1604f44946327318ba660d))
+* **ui:** AI helper setup first, calm first run, stale notice, inline citations, Ask row ([#556](https://github.com/imagile-dev/toil/issues/556)) ([#557](https://github.com/imagile-dev/toil/issues/557)) ([19606dc](https://github.com/imagile-dev/toil/commit/19606dc6db9b43431ff7815566b7c56a4ab3f524))
+* **ui:** give the dossier tabs the whole row on a phone, with Agents beside Ask ([#549](https://github.com/imagile-dev/toil/issues/549)) ([5a73395](https://github.com/imagile-dev/toil/commit/5a73395b11a030cbe5e94c0a607e08462ad9e5e0))
+* **ui:** one chip per insight code on a board card, with a count ([#545](https://github.com/imagile-dev/toil/issues/545)) ([f934f23](https://github.com/imagile-dev/toil/commit/f934f23338c215a32676213becb954a76b8f97d5))
+* **ui:** scope theme decoration to the app's own elements ([#550](https://github.com/imagile-dev/toil/issues/550)) ([4fe197f](https://github.com/imagile-dev/toil/commit/4fe197f49ab490ffd67d57def75033c85e39070a))
+* **ui:** start the chat on an agent that can answer, and remember the one picked ([#547](https://github.com/imagile-dev/toil/issues/547)) ([d5fad57](https://github.com/imagile-dev/toil/commit/d5fad57a21e6bf743786af9bb39a48622b10cdc0))
+
 ## [0.1.0-beta.3](https://github.com/imagile-dev/toil/compare/v0.1.0-beta.2...v0.1.0-beta.3) (2026-10-29)
 
 
