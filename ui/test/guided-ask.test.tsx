@@ -7,6 +7,7 @@ import { seenCounts } from '../src/components/guided.tsx';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
 import { GROUPS, QUESTIONS } from '../src/guided-questions.ts';
+import { sourceLabel, sourceShort } from '../src/format.ts';
 import { resetPlain, setPlain } from '../src/plain-words.ts';
 import { loaded } from './harness.ts';
 
@@ -250,6 +251,54 @@ describe('with no agent set up', () => {
     expect(questions).toHaveLength(9);
     expect([...questions].every((b) => b.hasAttribute('disabled'))).toBe(true);
     expect(chat.querySelector('.ask-strip__context')!.textContent).toContain('Nobody yet');
+  });
+});
+
+describe('after an AI helper is installed (the notice must not outlive it)', () => {
+  type Option = { name: string; label: string; model: null; ready: boolean; problem: string | null; fix: string | null; action: 'install' | 'fix' | null };
+  const option = (over: Partial<Option>): Option => ({ name: 'claude', label: 'Claude', model: null, ready: false, problem: null, fix: null, action: null, ...over });
+  /** An agent whose helpers the test changes between calls, as an install on the Settings page would. */
+  function changing() {
+    const state = { options: [option({ ready: false, problem: "The Claude adapter needs @anthropic-ai/claude-agent-sdk, which isn't installed beside Toil UI.", action: 'install' })] };
+    const agent: Agent = { notice: NO_AGENT_NOTICE, noticeDetails: NO_AGENT_DETAILS, starters: () => [], ask: () => Promise.reject(new Error('none')), adapters: async () => ({ chosen: null, options: state.options }) };
+    return { agent, state };
+  }
+
+  it('drops the notice once a helper can answer, when the page moves, without a reload', async () => {
+    const { agent, state } = changing();
+    window.location.hash = '#/dossier/card-payments';
+    render(<App execute={fixtureExecute().execute} agent={agent} now={FIXTURE_NOW} preview={false} />);
+    await screen.findByRole('heading', { level: 1 }, { timeout: 3000 });
+    // The person installs on the Settings page and comes back.
+    state.options = [option({ ready: true })];
+    await act(async () => {
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    await userEvent.click(screen.getByRole('textbox', { name: 'Your question' }));
+    const chat = await screen.findByRole('dialog', { name: 'Ask about card-payments' });
+    // At once: not after the dialog's own read of the helpers, which used to be the only one.
+    expect(chat.querySelector('[data-no-agent]')).toBeNull();
+    expect(chat.querySelector('.ask-strip__context')!.textContent).not.toContain('Nobody yet');
+  });
+
+  it('says a helper that is installed but cannot start yet is unfinished, not missing', async () => {
+    const { agent, state } = changing();
+    state.options = [option({ problem: "Toil UI found no claude on PATH, so it can't start Claude Code.", fix: 'Install it.', action: 'fix' })];
+    const chat = await openChat(agent, 'card-payments', false);
+    const notice = await waitFor(() => {
+      const n = chat.querySelector('[data-no-agent]');
+      if (!n || !n.textContent?.includes('installed')) throw new Error('not yet');
+      return n as HTMLElement;
+    });
+    expect(notice.querySelector('p')!.textContent).toBe("Claude is installed but can't start yet. Finish setting it up");
+    expect(notice.querySelector('details')!.textContent).toContain('Toil UI found no claude on PATH');
+  });
+});
+
+describe('a citation in an answer', () => {
+  it('names the source short and the title cut, with the full name and the status in the hover', () => {
+    expect([sourceShort('ado'), sourceShort('github'), sourceShort('jira'), sourceShort('ado-cloud')]).toEqual(['ADO', 'GH', 'Jira', 'ADO']);
+    expect(sourceLabel('ado')).toBe('Azure DevOps');
   });
 });
 

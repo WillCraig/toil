@@ -419,7 +419,7 @@ function states(route, width, sample = true) {
   if (/\/analyses\/[^/]+$/.test(route)) {
     // A real agent's briefing may legitimately have no evidence paragraphs (a Codex run can), and a state that opens nothing is a problem, so only the sample (whose analysis always has some) is held to it.
     out.push({ name: 'evidence-open', undoJs: 'window.scrollTo(0, 0)', setup: `(() => { const d = [...document.querySelectorAll('details.analysis-evidence')]; for (const x of d) x.open = true; d[0]?.scrollIntoView({ block: 'start' }); return d.length || ${sample ? 0 : 1}; })()` });
-    const chip = `[...document.querySelectorAll('main .ticket-chip--cite')].find((c) => c.getClientRects().length)`;
+    const chip = `[...document.querySelectorAll('main .cite-link')].find((c) => c.getClientRects().length)`;
     out.push({ name: 'cite-tooltip', clearOverlays: true, key: 'Tab', setup: `(async () => { const c = ${chip}; if (!c) return 0; c.scrollIntoView({ block: 'center' }); for (let i = 0; i < 3; i++) { c.blur(); c.focus(); const deadline = Date.now() + 2000; while (!document.querySelector('.cite-tooltip') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (document.querySelector('.cite-tooltip')) return 1; } return 'no tooltip after three focuses on the first citation chip'; })()`, undo: 'Escape', undoJs: 'document.activeElement?.blur()' });
   }
   if (route === '#/dossier/card-payments/board') out.push({ name: 'attention-only', setup: clickAll('[data-attention-only]'), undoJs: clickAll('[data-attention-only]') });

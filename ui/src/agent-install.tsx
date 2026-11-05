@@ -16,6 +16,7 @@ import { useRef, useState } from 'react';
 import { Button, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import type { AdapterStatus, AgentSettingsClient, InstallPlan } from './server-client.ts';
 import { Card } from './components/layout.tsx';
+import { usePlain } from './plain-words.ts';
 
 /** What the preview's Install shows instead of running anything. */
 export const INSTALL_PREVIEW = 'This is the preview, so nothing is installed. Toil UI on your own machine runs this command when you press Install.';
@@ -26,37 +27,53 @@ function statusLines(a: AdapterStatus): string[] {
   return [`${sdk}.`, cli.endsWith('.') ? cli : `${cli}.`, ...a.notes];
 }
 
+/**
+ * Where each helper stands, in a word: ready, not set up yet (the normal first
+ * run, so a calm note and never red) or installed but unable to start, which says
+ * why and what to do, one step further in than the word and never hidden (principle 4).
+ */
+export const helperState = (a: AdapterStatus): 'ready' | 'new' | 'fix' => (a.installed && a.cli.path !== null ? 'ready' : a.installed ? 'fix' : 'new');
+export const STATE_WORD = { ready: 'Ready', new: 'Not set up yet', fix: 'Needs one more step' } as const;
+
 export function AdaptersCard({ adapters, client, onInstalled }: { adapters: AdapterStatus[]; client: Pick<AgentSettingsClient, 'install'> | null; onInstalled?: (a: AdapterStatus) => void }) {
   const [installing, setInstalling] = useState<AdapterStatus | null>(null);
+  const plain = usePlain();
   return (
     <Card as="section" className="panel" aria-labelledby="agent-adapters">
-      <h2 id="agent-adapters">Adapters on this machine</h2>
-      <p className="note">Each adapter needs its SDK beside Toil UI and its own CLI on this machine. Install runs one npm command, shown to you first, at the version Toil UI was tested with.</p>
+      <h2 id="agent-adapters">{plain.pw('Agents on this machine', 'Your AI helpers')}</h2>
       <ul className="adapter-status">
         {adapters.map((a) => {
-          const ready = a.installed && a.cli.path !== null;
+          const state = helperState(a);
           return (
-            <li key={a.name} className="adapter-status__row" data-adapter={a.name}>
+            <li key={a.name} className="adapter-status__row" data-adapter={a.name} data-state={state}>
               <div className="adapter-status__head">
                 <strong>{a.label}</strong>
-                <span className={ready ? 'agent-pick__ready' : 'agent-missing'}>{ready ? 'Ready' : a.installed ? 'Needs a fix' : 'Not installed'}</span>
-              </div>
-              {statusLines(a).map((line, i) => (
-                <p key={i} className={i === 1 && !a.cli.path ? 'agent-missing' : 'note'}>
-                  {line}
-                </p>
-              ))}
-              {!a.installed && (
-                <div className="proposal-actions">
+                <span className={state === 'ready' ? 'agent-pick__ready' : 'note'}>{STATE_WORD[state]}</span>
+                {!a.installed && (
                   <Button className="btn btn--accent" onPress={() => setInstalling(a)} data-install={a.name}>
                     Install {a.label}
                   </Button>
-                </div>
+                )}
+              </div>
+              {state === 'fix' && (
+                <p className="agent-notice" data-needs-fix="">
+                  {a.cli.problem ?? 'Its command-line program was not found.'}
+                  {a.cli.fix ? ` ${a.cli.fix}` : ''}
+                </p>
               )}
+              <details className="agent-details">
+                <summary>Details for whoever sets it up</summary>
+                {statusLines(a).map((line, i) => (
+                  <p key={i} className="note">
+                    {line}
+                  </p>
+                ))}
+              </details>
             </li>
           );
         })}
       </ul>
+      <p className="note">Install runs one npm command, shown to you first, at the version Toil UI was tested with. Nothing runs until you press Install in that window.</p>
       {installing && (
         <InstallDialog
           adapter={installing}
@@ -119,7 +136,7 @@ export function InstallDialog({ adapter, plan, client, onClose, onInstalled }: {
         <Dialog className="feedback-dialog" aria-labelledby="install-title">
           <div className="feedback-body">
             <Heading slot="title" id="install-title">
-              Install {adapter.label}'s SDK
+              Install {adapter.label}
             </Heading>
             <p>
               Toil UI runs this one command, through the npm that came with your Node and with your own npm config, so your organization's registry and proxy apply. It installs {adapter.package} {adapter.tested}, the version Toil UI was tested with, beside Toil UI, runs no install scripts, and takes nothing published in the last 14 days.

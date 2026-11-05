@@ -99,7 +99,7 @@ export function BeforeYouAsk() {
 }
 
 /** The chat's empty state: the question to answer, the questions to start from, and what the AI can and can't do. */
-export function GuidedStart({ noAgent, notice, details, busy, onPick }: { noAgent: boolean; notice?: string; details?: string; busy: boolean; onPick: (q: GuidedQuestion, text: string) => void }) {
+export function GuidedStart({ noAgent, notice, details, link, busy, onPick }: { noAgent: boolean; notice?: string; details?: string; link?: string; busy: boolean; onPick: (q: GuidedQuestion, text: string) => void }) {
   const { dossier } = useData();
   const plain = usePlain();
   return (
@@ -109,7 +109,7 @@ export function GuidedStart({ noAgent, notice, details, busy, onPick }: { noAgen
         {notice && (
           <div className="agent-notice guided__notice" data-no-agent="">
             <p>
-              {plain.text(notice)} <a href="#/settings/agent">{plain.pw('Set up an agent', 'Set up an AI helper')}</a>
+              {plain.text(notice)} <a href="#/settings/agent">{link ?? plain.pw('Set up an agent', 'Set up an AI helper')}</a>
             </p>
             {details && (
               <details>

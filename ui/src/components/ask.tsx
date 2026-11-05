@@ -173,6 +173,16 @@ function useChat() {
     agent.adapters(dossier.name).then(setAdapters, () => setAdapters(null));
   };
 
+  // With the "no helper" notice up, read who can answer now, and again whenever the page moves: setting one up
+  // happens on another page (Settings, Install), and this chat outlives the visit, so what it read before is stale.
+  useEffect(() => {
+    if (!agent.notice) return;
+    refreshAdapters();
+    window.addEventListener('hashchange', refreshAdapters);
+    return () => window.removeEventListener('hashchange', refreshAdapters);
+    // refreshAdapters only reads the agent and the dossier, which are fixed for this chat's life.
+  }, []);
+
   const ask = async (prompt: string, shown = prompt) => {
     if (busy || asking.current || !prompt.trim()) return;
     // Analyze can start before the strip has read the agents (the palette, the button): read them now, so the dossier's own is not missed (#494).
@@ -424,6 +434,8 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
   const current = options.find((o) => o.name === (chat.adapter ?? from?.name ?? chat.adapters?.chosen));
   const hint = sourceHint(chat.adapter !== null, from);
   const noAgent = Boolean(agent.notice) && !current;
+  // A helper that is installed but can't start yet is not "no helper": say what is left to do, not that nothing was set up.
+  const unfinished = noAgent ? options.find((o) => o.action === 'fix') : undefined;
   const answering = current ? optionLabel(current) : noAgent ? 'Nobody yet' : (agent.label ?? 'the agent chosen in Settings');
   const usages = turns.flatMap((t) => (t.done && (t.answer?.usage ?? t.usage) ? [(t.answer?.usage ?? t.usage)!] : []));
   const status = last ? statusLine(last, words, now) : null;
@@ -510,7 +522,7 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
           </p>
         )}
         <div className="log" role="log" aria-live="polite" aria-busy={busy} aria-label="Conversation">
-          {entries.length === 0 && <GuidedStart noAgent={noAgent} {...(agent.notice ? { notice: agent.notice } : {})} {...(agent.noticeDetails ? { details: agent.noticeDetails } : {})} busy={busy} onPick={pick} />}
+          {entries.length === 0 && <GuidedStart noAgent={noAgent} {...(unfinished ? { notice: `${unfinished.label} is installed but can't start yet.`, details: `${unfinished.problem ?? ''} ${unfinished.fix ?? ''}`.trim(), link: 'Finish setting it up' } : { ...(noAgent && agent.notice ? { notice: agent.notice } : {}), ...(noAgent && agent.noticeDetails ? { details: agent.noticeDetails } : {}) })} busy={busy} onPick={pick} />}
           {entries.map((e) =>
             e.kind === 'renew' ? (
               <p key={`r${e.id}`} className="ask-switch note">

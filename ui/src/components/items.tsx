@@ -10,7 +10,7 @@ import { createContext, useContext } from 'react';
 import { Link, Tooltip, TooltipTrigger } from 'react-aria-components';
 import { segments } from '../agent.ts';
 import { useData } from '../data.ts';
-import { STATUS_CATEGORY_LABEL, dateTime, estimateText, itemHref, personText, prName, shortKey, sourceLabel } from '../format.ts';
+import { STATUS_CATEGORY_LABEL, dateTime, estimateText, itemHref, personText, prName, shortKey, sourceLabel, sourceShort } from '../format.ts';
 import { themed } from '../theme-context.ts';
 import './analysis.css';
 import type { ThemeManifest } from '../themes.ts';
@@ -74,6 +74,9 @@ export function Cited({ text, chips = false }: { text: string; chips?: boolean }
   );
 }
 
+/** A title cut for running text: the whole of it is in the tooltip. */
+const cut = (title: string, max = 32) => (title.length <= max ? title : `${title.slice(0, max - 1).trimEnd()}…`);
+
 const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ');
 
 /** The lines a chip's detail shows: what the chip has no room for. */
@@ -125,15 +128,23 @@ export function TicketChip({ id, detail = false }: { id: string; detail?: boolea
   const label = `${key} ${title}, ${status}`;
   const href = item ? itemHref(dossier.name, id) : pr!.url;
   if (detail && href) {
+    // In running text a citation reads as a link: a short source name, the key and a cut title. The status, the full
+    // title and the source are in the tooltip (hover or focus) and in the name a screen reader reads.
+    const short = item ? `${sourceShort(item.source.area)} ${shortKey(item)}` : key;
     return (
       <TooltipTrigger delay={300} closeDelay={150}>
-        <Link className="ticket-chip ticket-chip--cite" href={href} data-truncate="" data-cite={id}>
-          {body}
+        <Link className="cite-link" href={href} data-cite={id}>
+          {short} {cut(title)}
+          <span className="sr-only">, {status}</span>
         </Link>
         <Tooltip className="cite-tooltip" offset={6}>
           <strong className="cite-tooltip__title">
             {key} {title}
           </strong>
+          <span className="cite-tooltip__line">
+            {item ? `${sourceLabel(item.source.area)}, ` : ''}
+            {status}
+          </span>
           {detailLines(item, pr).map((l) => (
             <span key={l} className="cite-tooltip__line">
               {l}

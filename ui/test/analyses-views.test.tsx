@@ -168,10 +168,10 @@ describe('Analyze in the chat', () => {
     const kept = await within(chat).findByRole('link', { name: 'Kept in Analyses' }, { timeout: 5000 });
     expect(within(chat).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Recommendation', 'Reasons']);
     expect((chat.querySelector('details.analysis-evidence') as HTMLDetailsElement).open).toBe(false);
-    // Every citation in the answer is a chip naming its key, title and status.
-    const chips = chat.querySelectorAll('.ticket-chip--cite');
+    // Every citation in the answer is a plain link: a short source name, its key and a cut title, with the status in the name a screen reader reads.
+    const chips = chat.querySelectorAll('.cite-link');
     expect(chips.length).toBeGreaterThan(5);
-    expect([...chips].every((c) => c.querySelector('.ticket-chip__key') && c.querySelector('.ticket-chip__title') && c.querySelector('.ticket-chip__status'))).toBe(true);
+    expect([...chips].every((c) => c.getAttribute('data-cite') && c.querySelector('.sr-only')!.textContent!.startsWith(', ') && !c.classList.contains('ticket-chip'))).toBe(true);
 
     await userEvent.click(kept);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Ask about checkout-web' })).toBeNull());

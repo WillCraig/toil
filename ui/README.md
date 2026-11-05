@@ -786,9 +786,11 @@ conversation stays, for the rest of the dossier's pages, until you reload.
   toil that has no `dossiers analyze prompt`, Analyze asks Toil UI's own question
   instead, and the answer warns that it did. Each whole Analyze is kept in the
   dossier's **Analyses** tab, and the answer links to it.
-- **Citations are chips**: in every answer, each `[[id]]` is a chip with the item's
-  key, title and status, linking to its page (a pull request to its host). Hovering or
-  focusing one shows its type, assignee, estimate, sprint and last update. An id the
+- **Citations are links in the text**: in every answer, each `[[id]]` is an ordinary link
+  (a short source name such as ADO or GH, the item's key and a cut title) to its page (a
+  pull request to its host). Hovering or focusing one shows the whole title, its source and
+  status, type, assignee, estimate, sprint and last update; the status is also in the
+  link's name for a screen reader. An id the
   dossier doesn't hold stays the bare id, marked, and the server's check above the
   answer still names any id its tools never returned.
 - **Each question carries the chat so far**: its last 8 questions and answers, each
@@ -829,9 +831,12 @@ toil's config, and has no field for a key: each SDK signs in the way its CLI doe
 
 ### Installing an adapter's SDK
 
-**Settings, Agent** lists each adapter: whether its SDK is installed and at which
-version against the one Toil UI was tested with, which CLI it would start, and
-anything worth knowing. A missing SDK has an **Install** button, which shows the one
+**Settings, Agent** (**AI helper** in plain words) opens on the steps to get going and each
+helper with its state (Ready, Not set up yet in a calm tone, or Needs one more step with the
+reason shown), and an **Install** button on each helper that isn't installed. Whether its SDK
+is installed and at which version against the one Toil UI was tested with, which CLI it would
+start, and anything worth knowing, are one step in under **Details for whoever sets it up**;
+models, the CLI path and the endpoint are behind **Advanced**. A missing SDK has an **Install** button, which shows the one
 command it will run, word for word, before anything runs:
 
 ```bash
@@ -929,7 +934,10 @@ for (docs/decisions/343-ask-up-front.md).
 With no adapter chosen, the chat says in plain words that no AI helper is set up and where
 an engineer sets one up (Settings, Agent), with the three adapters and their packages one
 step in, behind **Details for whoever sets it up**; its switcher can still
-choose an installed one for that chat. `toil-ui --sample` keeps the scripted agent,
+choose an installed one for that chat. The notice goes as soon as a helper can answer: the chat
+reads the helpers again whenever the page moves, so installing on the Settings page needs no
+reload. A helper that is installed but can't start yet says so instead, with the reason one step
+in. `toil-ui --sample` keeps the scripted agent,
 which answers its starter questions and Analyze from the sample data.
 
 ### Not ticketed yet

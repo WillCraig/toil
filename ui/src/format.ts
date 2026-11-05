@@ -21,6 +21,13 @@ export function sourceLabel(area: string): string {
   return SOURCE_LABEL[family] ?? area;
 }
 
+/** A source's short name, for a citation in running text, where the full name is one hover away. */
+const SOURCE_SHORT: Partial<Record<SourceKind, string>> = { ado: 'ADO', github: 'GH', bitbucket: 'BB' };
+export function sourceShort(area: string): string {
+  const family = area.split('-')[0] as SourceKind;
+  return SOURCE_SHORT[family] ?? sourceLabel(area);
+}
+
 /** The source's own key, shortened where the owner repeats on every item (`payments-web#41`). */
 export function shortKey(item: WorkItem): string {
   return item.source.key.replace(/^[^/]+\//, '');

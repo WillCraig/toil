@@ -279,7 +279,9 @@
 .adapter-status { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
 .adapter-status__row { display: grid; gap: 0.3rem; padding: 0.6rem 0.75rem; border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
 .adapter-status__row p { margin: 0; overflow-wrap: anywhere; }
-.adapter-status__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.adapter-status__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; }
+.adapter-status__head .btn { margin-left: auto; }
+.adapter-status__row .agent-notice { padding: 0.35rem 0.6rem; border-left: 4px solid var(--warn); background: var(--raised); font-size: 0.875rem; }
 .agent-models { border: 0; padding: 0; margin: 0; display: grid; gap: 0.5rem; min-width: 0; }
 .agent-models legend { font-weight: 600; padding: 0; }
 .agent-adapters { display: grid; gap: 0.5rem; }
@@ -351,3 +353,11 @@
 /* The usage lines (#552): one readable line, the breakdown behind a fold. */
 .usage-details summary, .chat-usage summary { cursor: pointer; }
 .chat-usage[open] > summary, .usage-details[open] > summary { margin-bottom: 0.15rem; }
+/* First-run setup is not a fault: the AI helper page says so calmly, in the info tone, with the steps first and the detail one step in. */
+.agent-hint { display: grid; gap: 0.4rem; padding: 0.6rem 0.75rem; border: 1px solid var(--line); border-left: 4px solid var(--link); border-radius: var(--radius); background: var(--raised); }
+.agent-hint p, .agent-steps { margin: 0; }
+.agent-steps { padding-left: 1.25rem; display: grid; gap: 0.2rem; }
+.agent-details > summary, .agent-advanced > summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; color: var(--link); font-size: 0.875rem; }
+.agent-details p { margin: 0.25rem 0 0; font-size: 0.875rem; overflow-wrap: anywhere; }
+.agent-advanced { display: grid; gap: 0.6rem; }
+.agent-advanced[open] > summary { margin-bottom: 0.25rem; }

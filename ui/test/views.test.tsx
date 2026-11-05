@@ -1149,9 +1149,9 @@ describe('settings', () => {
       },
     };
     const { container } = await open('#/settings/agent', { preview: false, agentSettings: { client } });
-    const card = await screen.findByRole('region', { name: 'Adapters on this machine' });
+    const card = await screen.findByRole('region', { name: 'Agents on this machine' });
     await userEvent.click(within(card).getByRole('button', { name: 'Install GitHub Copilot' }));
-    const dialog = await screen.findByRole('dialog', { name: "Install GitHub Copilot's SDK" });
+    const dialog = await screen.findByRole('dialog', { name: 'Install GitHub Copilot' });
     expect(within(dialog).getByRole('region', { name: 'The command' }).textContent).toBe('npm install --global --prefix /usr/local --ignore-scripts @x/y@1');
     expect(ran).toEqual([]);
     expect(within(dialog).getByRole('button', { name: 'Copy command' })).toBeTruthy();
@@ -1181,29 +1181,60 @@ describe('settings', () => {
     ],
   });
 
-  it('in the local app, says plainly when no SDK is installed and names the three', async () => {
+  it('in the local app, shows first-run setup as steps in a calm tone, the packages one step in, and never in red', async () => {
     const client = { status: async () => STATUS({ adapter: 'none', model: null, cliPath: null, endpoint: null, instructions: null, voice: null, models: {}, cliPaths: {} }), save: async (s: AgentSettings) => STATUS(s), prompt: async () => '', ...NO_INSTALL };
     const { container } = await open('#/settings/agent', { preview: false, agentSettings: { client } });
     const agentPanel = panel('Agent');
-    await within(agentPanel).findByRole('radiogroup', { name: 'Adapter' });
-    expect(agentPanel.textContent).toContain('None of the three agent SDKs is installed beside Toil UI: Claude (@anthropic-ai/claude-agent-sdk), GitHub Copilot (@github/copilot-sdk), Codex (@openai/codex-sdk).');
-    expect(agentPanel.textContent).toContain('Toil UI found no claude on PATH');
+    const choice = await screen.findByRole('region', { name: 'Which one answers' });
+    await within(choice).findByRole('radiogroup', { name: 'Which one answers' });
+    // The steps come first, in the info tone, and the install buttons sit right under them.
+    const steps = agentPanel.querySelector('[data-setup-steps]') as HTMLElement;
+    expect(steps.textContent).toContain('Press Install');
+    expect(steps.querySelector('.failure')).toBeNull();
+    expect(document.querySelector('.agent-missing, .failure')).toBeNull();
+    const rows = [...document.querySelectorAll('.adapter-status__row')];
+    expect(rows.map((r) => r.getAttribute('data-state'))).toEqual(['new', 'new', 'new']);
+    expect(rows[0]!.textContent).toContain('Not set up yet');
+    // The package, the tested version and the CLI problem are one step in, behind the details.
+    const fold = rows[0]!.querySelector('details')!;
+    expect(fold.open).toBe(false);
+    expect(fold.textContent).toContain('@anthropic-ai/claude-agent-sdk');
+    expect(fold.textContent).toContain('Toil UI found no claude on PATH');
+    // Models, CLI path and endpoint are advanced: behind a fold, below the steps.
+    expect((choice.querySelector('details[data-advanced]') as HTMLDetailsElement).open).toBe(false);
     expect(within(agentPanel).queryByLabelText(/key|token/i)).toBeNull();
     expect(await violations(container)).toEqual([]);
   }, AXE_TIMEOUT);
+
+  it('says an installed helper that cannot start yet needs one more step, with the reason on screen and not in red', async () => {
+    const base = STATUS({ adapter: 'none', model: null, cliPath: null, endpoint: null, instructions: null, voice: null, models: {}, cliPaths: {} });
+    const adapters = base.adapters.map((a) => (a.name === 'claude' ? { ...a, installed: true, version: '0.3.289' } : a));
+    const client = { status: async () => ({ ...base, adapters }), save: async (s: AgentSettings) => STATUS(s), prompt: async () => '', ...NO_INSTALL };
+    await open('#/settings/agent', { preview: false, agentSettings: { client } });
+    const row = await waitFor(() => {
+      const r = document.querySelector('.adapter-status__row[data-adapter="claude"]');
+      if (!r) throw new Error('not yet');
+      return r as HTMLElement;
+    });
+    expect(row.getAttribute('data-state')).toBe('fix');
+    expect(row.querySelector('[data-needs-fix]')!.textContent).toContain('Toil UI found no claude on PATH');
+    expect(row.querySelector('.failure, .agent-missing')).toBeNull();
+    expect(within(row).queryByRole('button', { name: 'Install Claude' })).toBeNull();
+  });
 
   it('saves the adapter, model, CLI path and Claude endpoint, and says so', async () => {
     const saves: AgentSettings[] = [];
     const changed: AgentStatus[] = [];
     const client = { status: async () => STATUS({ adapter: 'none', model: null, cliPath: null, endpoint: null, instructions: null, voice: null, models: {}, cliPaths: {} }, true), save: async (s: AgentSettings) => (saves.push(s), STATUS(s, true)), prompt: async () => '', ...NO_INSTALL };
     const { container } = await open('#/settings/agent', { preview: false, agentSettings: { client, onChange: (s) => changed.push(s) } });
-    const agentPanel = panel('Agent');
-    await userEvent.click(await within(agentPanel).findByRole('radio', { name: /^Claude/ }));
-    await userEvent.type(within(agentPanel).getByRole('textbox', { name: "Claude's model" }), 'sonnet');
-    await userEvent.click(within(agentPanel).getByRole('radio', { name: 'Amazon Bedrock' }));
+    const choice = await screen.findByRole('region', { name: 'Which one answers' });
+    await userEvent.click(await within(choice).findByRole('radio', { name: /^Claude/ }));
+    await userEvent.click(within(choice).getByText(/^Advanced:/));
+    await userEvent.type(within(choice).getByRole('textbox', { name: "Claude's model" }), 'sonnet');
+    await userEvent.click(within(choice).getByRole('radio', { name: 'Amazon Bedrock' }));
     expect(await violations(container)).toEqual([]);
-    await userEvent.click(within(agentPanel).getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(within(agentPanel).getByRole('status').textContent).toBe('Saved: Claude answers from the next question.'));
+    await userEvent.click(within(choice).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(within(choice).getByRole('status').textContent).toBe('Saved: Claude answers from the next question.'));
     expect(saves).toEqual([{ adapter: 'claude', model: 'sonnet', cliPath: null, endpoint: 'bedrock', instructions: null, voice: null, models: { claude: 'sonnet' }, cliPaths: {} }]);
     expect(changed).toHaveLength(1);
   }, AXE_TIMEOUT);

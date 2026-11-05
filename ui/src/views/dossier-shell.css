@@ -15,9 +15,10 @@ main:has(> .dossier-shell) { max-width: 1680px; padding-top: 0.5rem; padding-bot
 .dossier-bar__id { display: grid; gap: 0.2rem; min-width: 0; }
 .dossier-bar__line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; min-width: 0; }
 .dossier-bar__name { margin: 0; font-family: var(--font-display); font-size: clamp(1.3rem, 1.1rem + 0.6vw, 1.6rem); font-weight: 600; line-height: 1.2; min-width: 0; overflow-wrap: anywhere; }
-.dossier-bar__ask { display: flex; flex-wrap: wrap; align-items: start; gap: 0.5rem; min-width: 0; }
+.dossier-bar__ask { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; min-width: 0; }
 .dossier-bar__ask .ask-bar { flex: 1 1 20rem; }
-.dossier-bar__ask .agents-open { margin-left: auto; }
+/* On the field's own row, not the bar's: the bar's 4px top border and padding come first, and the note under it can make the bar taller. */
+.dossier-bar__ask .agents-open { margin: calc(4px + 0.4rem) 0 0; min-height: 44px; }
 .dossier-bar .ask-bar { min-width: 0; margin: 0; padding: 0.4rem 0.6rem; }
 .sprint-chip { display: inline-flex; align-items: center; padding: 0.1rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }
 .dossier-switch { gap: 0.35rem; }
@@ -35,9 +36,9 @@ main:has(> .dossier-shell) { max-width: 1680px; padding-top: 0.5rem; padding-bot
 .agents-open__short { display: none; }
 @media (max-width: 599px) {
   /* The Ask row on a phone: the field, Ask and a compact AI helpers button with its count, on one line. The full label stays as the name. */
-  .dossier-bar__ask { flex-wrap: nowrap; align-items: start; }
+  .dossier-bar__ask { flex-wrap: nowrap; align-items: flex-start; }
   .dossier-bar__ask .ask-bar { flex: 1 1 0; }
-  .dossier-bar__ask .agents-open { margin: 0; min-height: 44px; min-width: 44px; padding-inline: 0.6rem; }
+  .dossier-bar__ask .agents-open { margin: calc(4px + 0.4rem) 0 0; min-height: 44px; min-width: 44px; padding-inline: 0.6rem; }
   .agents-open__short { display: inline; }
   .agents-open__label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
   .dossier-bar__about { flex-wrap: wrap; }
