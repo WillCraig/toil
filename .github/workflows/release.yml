@@ -127,7 +127,10 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.imagile-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
-          PR: ${{ fromJSON(needs.release-please.outputs.pr).number }}
+          # `|| '{}'` because this env block is evaluated even when the `if` above skips
+          # the step, and release-please's `pr` output is empty on a run that opened
+          # no PR (such as the one that releases one); fromJSON('') fails the job.
+          PR: ${{ fromJSON(needs.release-please.outputs.pr || '{}').number }}
         run: |
           gh pr view "$PR" --json body -q .body > "$RUNNER_TEMP/body.md"
           node scripts/release-pr-body.mjs < "$RUNNER_TEMP/body.md" > "$RUNNER_TEMP/escaped.md"
