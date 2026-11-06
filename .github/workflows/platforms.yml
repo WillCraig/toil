@@ -84,11 +84,10 @@ jobs:
       - run: npm run build -w ui
       - run: npm run check:package -w ui
       # The toil npm ci installed for Toil UI is the one ui/package.json pins
-      # (#299). Not on the release PR: its pin is the toil that PR releases,
-      # which npm can't serve before it merges; release.yml's lockfile job
-      # points the lockfile at that toil once it is published.
-      - if: ${{ !startsWith(github.head_ref, 'release-please--') }}
-        run: npm run check:lockfile -w ui
+      # (#299), on every PR, the release PR too. The state a release leaves, the
+      # new pin over the previous toil's tarball, passes with a warning until
+      # release.yml's lockfile PR merges (ui/scripts/package-rules.mjs, lockfileLag).
+      - run: npm run check:lockfile -w ui
       - run: npm run smoke -w ui
 
   # The skill installs through a real skill manager on every OS: Claude Code

@@ -1276,9 +1276,11 @@ npm run verify:ui -- --no-build --starter standup
   `.scratch/toil`, which Toil UI runs on, as `dev-real.mjs` does (above). The report's
   header and its **Toil** row name that toil: its version, the commit it was built
   at, and whether `src/` had uncommitted changes. The run fails if Toil UI didn't
-  resolve `@imagile-dev/toil/api` to it. It also confirms that the toil `npm ci`
+  resolve `@imagile-dev/toil/api` to it. It also checks that the toil `npm ci`
   installs is the one `ui/package.json` pins (`npm run check:lockfile -w ui`), which
-  is what the published package runs on.
+  is what the published package runs on. Right after a release, until its lockfile PR
+  merges, that check passes with a warning naming the previous toil, and the
+  **Pinned toil** row carries it.
 - **Sample data:** `toil-ui --sample` in a throwaway home, every view through the
   layout check (`scripts/layout-check.mjs`) in every theme and scheme at 375, 768 and
   1440px. On each Toil project's dashboard it also drags a board card to the next column

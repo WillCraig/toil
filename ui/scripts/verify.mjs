@@ -445,7 +445,9 @@ try {
   // The published Toil UI still installs the toil it pins; a wrong lockfile would install another one (#299).
   const lock = spawnSync(process.execPath, [join(ui, 'scripts', 'check-lockfile.mjs')], { encoding: 'utf8' });
   if (lock.status !== 0) problems.push(lock.stderr.trim());
-  step('Pinned toil', lock.status === 0 ? 'pass' : 'fail', `${(lock.status === 0 ? lock.stdout : lock.stderr).trim().replace(/^check:lockfile (ok|found)[^:]*: ?/, '')} That is what the published package installs; this run uses the build above.`);
+  // Right after a release the check passes with a warning on stderr (the lockfile PR is pending); the row says so.
+  const lockSaid = (lock.status === 0 ? lock.stdout || lock.stderr : lock.stderr).trim();
+  step('Pinned toil', lock.status === 0 ? 'pass' : 'fail', `${lockSaid.replace(/^(::warning::)?check:lockfile (ok|found|WARNING)[^:]*: ?/, '')} That is what the published package installs; this run uses the build above.`);
 
   // 1. Sample data, in a throwaway home.
   const work = join(tmpdir(), `toil-ui-verify-${process.pid}`);

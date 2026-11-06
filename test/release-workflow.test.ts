@@ -66,8 +66,9 @@ describe('release-please', () => {
   // already has. Three runs see the manifest at that version with the override
   // still in, and all are exempt: the release PR, which is what moves the
   // manifest up to it; publish-toil, which tests the release's tag before
-  // publishing it; and the lockfile PR the release opens, which has to merge
-  // before any other PR passes check:lockfile, the removal included (#299).
+  // publishing it; and the lockfile PR the release opens, which has to be able
+  // to land while the override is still in (#299; other PRs pass check:lockfile
+  // with a warning until it merges).
   // Every other run fails here, with the fix, until a PR removes the override (#478).
   const head = process.env.GITHUB_HEAD_REF ?? '';
   const releasing = head.startsWith('release-please--') || head.startsWith('imagile-bot/lockfile-toil-') || process.env.GITHUB_JOB === 'publish-toil';
@@ -213,6 +214,8 @@ describe('the lockfile after a release (#299)', () => {
     const fix = runs.find((r) => r.includes('--package-lock-only'))!;
     expect(fix).toContain('npm install --package-lock-only --prefer-online --ignore-scripts --no-audit --no-fund "@imagile-dev/toil@$PIN" -w ui --save-exact');
     expect(fix.indexOf('npm ci --ignore-scripts')).toBeLessThan(fix.indexOf('npm run check:lockfile -w ui'));
+    // check:lockfile passes with a warning on the very state this job fixes, so only its `ok` line proves the fix.
+    expect(fix).toContain("grep -q '^check:lockfile ok'");
     const pr = step('lockfile', 'Open the lockfile PR')!.run!;
     // The release-as check above skips this branch by its prefix.
     expect(pr).toContain('BRANCH="imagile-bot/lockfile-toil-$PIN"');
@@ -222,9 +225,11 @@ describe('the lockfile after a release (#299)', () => {
     expect(pr).toContain('git commit -m "chore(deps):');
   });
 
-  it("is held by CI's check:lockfile on every PR but the release PR", () => {
+  it("is held by CI's check:lockfile on every PR, the release PR included", () => {
     const check = ci.jobs.ui.steps.find((s) => s.run === 'npm run check:lockfile -w ui')!;
-    expect(check.if).toBe("${{ !startsWith(github.head_ref, 'release-please--') }}");
+    expect(check.if).toBeUndefined();
+    const platforms = load(readFileSync(join(root, '.github', 'workflows', 'platforms.yml'), 'utf8')) as { jobs: { gate: { steps: Step[] } } };
+    expect(platforms.jobs.gate.steps.find((s) => s.run === 'npm run check:lockfile -w ui')!.if).toBeUndefined();
   });
 });
 

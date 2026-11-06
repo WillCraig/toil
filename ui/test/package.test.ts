@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { allowed, lockfileProblems, npmCli, packageProblems, REQUIRED } from '../scripts/package-rules.mjs';
+import { allowed, lockfileLag, lockfileProblems, npmCli, packageProblems, REQUIRED } from '../scripts/package-rules.mjs';
 
 /**
  * What `npm pack` would put in @imagile-dev/toil-ui's tarball, on every test
@@ -72,12 +72,31 @@ describe('the lockfile check (#299)', () => {
     expect(lockfileProblems(lock(good), PIN, PIN)).toEqual([]);
   });
 
-  it("fails #299's lockfile: the pin's version, the previous toil's tarball, and that toil installed", () => {
-    const problems = lockfileProblems(lock({ ...good, resolved: tgz('0.1.0-alpha.2') }), PIN, '0.1.0-alpha.2');
-    expect(problems).toHaveLength(2);
+  it("lets through the state a release leaves, with a note: the pin's version over the previous toil's tarball, and that toil installed (#299)", () => {
+    const stale = lock({ ...good, resolved: tgz('0.1.0-alpha.2') });
+    expect(lockfileProblems(stale, PIN, '0.1.0-alpha.2')).toEqual([]);
+    expect(lockfileLag(stale, PIN, '0.1.0-alpha.2')).toBe('0.1.0-alpha.2');
+    expect(lockfileLag(lock(good), PIN, PIN)).toBeNull();
+  });
+
+  it('still fails a stale tarball once npm ci installed something else, or the pin is not what the lockfile records', () => {
+    const stale = lock({ ...good, resolved: tgz('0.1.0-alpha.2') });
+    // Installed copy and tarball disagree: the integrity is another toil's.
+    const problems = lockfileProblems(stale, PIN, PIN);
     expect(problems[0]).toContain(`resolves to ${tgz('0.1.0-alpha.2')}, not ${tgz(PIN)}`);
-    expect(problems[1]).toContain('npm ci installed toil 0.1.0-alpha.2 for Toil UI, which pins 0.1.0-alpha.3');
     for (const p of problems) expect(p).toContain(`npm install --package-lock-only --ignore-scripts @imagile-dev/toil@${PIN} -w ui --save-exact`);
+    expect(lockfileLag(stale, PIN, PIN)).toBeNull();
+    // Not a release's leftovers: the dependency, the entry's version or its integrity is off, or the tarball is not the registry's.
+    expect(lockfileProblems(lock({ ...good, resolved: tgz('0.1.0-alpha.2') }, '0.1.0-alpha.2'), PIN, '0.1.0-alpha.2')).not.toEqual([]);
+    expect(lockfileProblems(lock({ ...good, version: '0.1.0-alpha.2', resolved: tgz('0.1.0-alpha.2') }), PIN, '0.1.0-alpha.2')).not.toEqual([]);
+    expect(lockfileProblems(lock({ version: PIN, resolved: tgz('0.1.0-alpha.2') }), PIN, '0.1.0-alpha.2')).toContainEqual(expect.stringContaining('has no sha512 integrity'));
+    // The tarball must be an older toil: a newer one, installed, is not a release's leftovers.
+    expect(lockfileProblems(lock({ ...good, resolved: tgz('0.1.0-alpha.9') }), PIN, '0.1.0-alpha.9')).not.toEqual([]);
+    // Prerelease parts compare as numbers, not text: alpha.9 is older than alpha.10, and alpha.12 is not.
+    expect(lockfileLag(lock({ ...good, version: '0.1.0-alpha.10', resolved: tgz('0.1.0-alpha.9') }, '0.1.0-alpha.10'), '0.1.0-alpha.10', '0.1.0-alpha.9')).toBe('0.1.0-alpha.9');
+    expect(lockfileLag(lock({ ...good, version: '0.1.0-alpha.11', resolved: tgz('0.1.0-alpha.12') }, '0.1.0-alpha.11'), '0.1.0-alpha.11', '0.1.0-alpha.12')).toBeNull();
+    expect(lockfileLag(lock({ ...good, version: '0.1.0', resolved: tgz('0.1.0-beta.4') }, '0.1.0'), '0.1.0', '0.1.0-beta.4')).toBe('0.1.0-beta.4');
+    expect(lockfileProblems(lock({ ...good, resolved: 'https://registry.example.com/toil-0.1.0-alpha.2.tgz' }), PIN, '0.1.0-alpha.2')).not.toEqual([]);
   });
 
   it('fails an entry whose integrity is another tarball, proved by what got installed', () => {
