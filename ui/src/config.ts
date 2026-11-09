@@ -21,9 +21,11 @@
  */
 
 import type { Envelope } from './toil.ts';
+import type { FormChoices } from '../../src/core/connection-form.ts';
+import type { DescribedScopes } from '../../src/core/scopes.ts';
 
 /** The reads the pages make: run read-only, even on the config path. The audit reads fill Usage (#309). */
-export const CONFIG_READS = ['connections list', 'connections test', 'projects list', 'projects show', 'projects check', 'audit stats', 'audit list', 'theme list'] as const;
+export const CONFIG_READS = ['connections list', 'connections test', 'projects list', 'projects show', 'projects check', 'jira field discover', 'audit stats', 'audit list', 'theme list'] as const;
 
 /** The changes, each only to toil's own config or toil projects. */
 export const CONFIG_CHANGES = [
@@ -37,12 +39,17 @@ export const CONFIG_CHANGES = [
   'projects link',
   'projects field',
   'projects person',
+  // Saving the people into the repository's own .toil/projects file, to be reviewed and committed with the code (#561).
+  'projects people save',
   'projects wip-limit',
   // How Analyze briefs a toil project (#494): its goal, reader, lenses and focus.
   'projects analyze set',
   'projects onboard',
   // A toil project's name and description, edited in place on its card and dashboard (#342).
   'projects describe',
+  // Archiving puts a toil project away without deleting it (#561); unarchive is the undo.
+  'projects archive',
+  'projects unarchive',
   // The theme a person picks, as toil's own setting, which the welcome menu follows too (#427).
   'theme set',
 ] as const;
@@ -58,6 +65,10 @@ export interface ConnectionField {
   password: boolean;
   default: string | null;
   required: boolean;
+  /** Presets the form shows as radio buttons (older toil: absent). */
+  choices?: FormChoices;
+  appliesTo?: readonly string[];
+  requiredFor?: readonly string[];
 }
 
 export interface AreaInfo {
@@ -65,6 +76,9 @@ export interface AreaInfo {
   description: string;
   /** Empty when the toil the server runs doesn't describe its connections. */
   connection: ConnectionField[];
+  /** What its credential must be allowed to do (older toil: absent). */
+  scopes?: DescribedScopes;
+  variantBy?: string;
 }
 
 /** What a person typed for one call: answers by question id, and secrets by key. */

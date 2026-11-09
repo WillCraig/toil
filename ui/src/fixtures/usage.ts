@@ -9,7 +9,7 @@
  * Thirty days of activity, none of it billable.
  */
 
-import { matchesFilter, summarize, unusedCommands, type AuditLine, type UnusedCommand } from '../../../src/audit/stats.ts';
+import { matchesFilter, summarize, type AuditLine } from '../../../src/audit/stats.ts';
 import { failuresInput, USAGE_CALLS, type UsageStats } from '../usage.ts';
 
 /** The sample month: the 30 days before 19 October 2026, UTC. */
@@ -90,35 +90,23 @@ export function sampleEntries(): ListedLine[] {
   return out.sort((a, b) => (a.time < b.time ? -1 : 1));
 }
 
-/** A few real commands nobody called in the sample month. */
-const SAMPLE_UNUSED: UnusedCommand[] = [
-  { command: 'audit path', area: null, mcp: true },
-  { command: 'connections login', area: null, mcp: false },
-  { command: 'github pr resolve', area: 'github', mcp: true },
-  { command: 'jira issue log-work', area: 'jira', mcp: true },
-  { command: 'jira issue set-sprint', area: 'jira', mcp: true },
-  { command: 'ado work-item attach', area: 'ado', mcp: true },
-];
-
-const stats = (entries: ListedLine[], by: UsageStats['by'], unused?: UnusedCommand[]): UsageStats => ({
+const stats = (entries: ListedLine[], by: UsageStats['by']): UsageStats => ({
   window: { since: SINCE, until: UNTIL },
   by,
   ...summarize(entries, by as Parameters<typeof summarize>[1]),
-  ...(unused ? { unused: unusedCommands(unused, new Set(), {}) } : {}),
 });
 
 /** The calls the Usage page makes, answered from the sample month. */
 export function usageCanned(): Array<{ command: string; input: Record<string, unknown>; data: unknown }> {
   const entries = sampleEntries();
-  const byCommand = stats(entries, ['command'], SAMPLE_UNUSED);
+  const byCommand = stats(entries, ['command', 'caller']);
   return [
-    { command: 'audit stats', input: { ...USAGE_CALLS.days, by: [...USAGE_CALLS.days.by] }, data: stats(entries, ['day']) },
+    { command: 'audit stats', input: { ...USAGE_CALLS.days, by: [...USAGE_CALLS.days.by] }, data: stats(entries, ['day', 'caller']) },
     { command: 'audit stats', input: { ...USAGE_CALLS.commands, by: [...USAGE_CALLS.commands.by] }, data: byCommand },
     { command: 'audit stats', input: { ...USAGE_CALLS.doors, by: [...USAGE_CALLS.doors.by] }, data: stats(entries, ['via', 'caller']) },
-    ...byCommand.groups
-      .filter((g) => g.failed > 0)
-      .map((g) => {
-        const input = failuresInput(g.command ?? '');
+    ...[...new Set(byCommand.groups.filter((g) => g.failed > 0).map((g) => g.command ?? ''))]
+      .map((command) => {
+        const input = failuresInput(command);
         return { command: 'audit list', input, data: entries.filter((e) => matchesFilter(e, input)).reverse().slice(0, input.limit) };
       }),
   ];

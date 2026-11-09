@@ -12,6 +12,7 @@
 import type { ToilProjectData } from '../load.ts';
 import type { WorkItem } from '../toil.ts';
 import { burnup } from './burnup.ts';
+import { doneAt } from './flow.ts';
 import { people } from './people.ts';
 import { waitOf } from './prs.ts';
 import { daysLeft, health } from './sprint.ts';
@@ -36,8 +37,19 @@ export interface PreviewPerson {
   kind: 'human' | 'agent';
 }
 
+/** How many days the card's small trends cover. */
+export const TREND_DAYS = 7;
+
+/** Items closed and pull requests merged each day, oldest first, today last. A series is null where nothing it counts was read (principle 12): no work items, or no pull requests, is unknown, not zero. */
+export interface PreviewTrend {
+  closed: number[] | null;
+  merged: number[] | null;
+}
+
 export interface ToilProjectPreview {
   sprint: PreviewSprint | null;
+  /** The past week, a day at a time, whether or not the toil project runs sprints. */
+  trend: PreviewTrend;
   inProgress: number;
   blocked: number;
   /** Open pull requests waiting on a review. */
@@ -56,6 +68,22 @@ const isDone = (i: WorkItem) => i.statusCategory === 'DONE';
 export function isBlocked(item: WorkItem, byId: Map<string, WorkItem>): boolean {
   if (isDone(item)) return false;
   return item.links.some((l) => l.type === 'blocks' && l.direction === 'inward' && byId.has(l.target) && !isDone(byId.get(l.target)!));
+}
+
+const DAY = 86_400_000;
+
+/** Counts the timestamps that fall on each of the `days` UTC days ending with `now`'s. */
+export function perDay(stamps: Array<string | null | undefined>, now: string, days = TREND_DAYS): number[] {
+  const end = Date.parse(now.slice(0, 10) + 'T00:00:00Z');
+  const out = new Array<number>(days).fill(0);
+  for (const s of stamps) {
+    if (!s) continue;
+    const t = Date.parse(s.slice(0, 10) + 'T00:00:00Z');
+    if (Number.isNaN(t)) continue;
+    const back = Math.round((end - t) / DAY);
+    if (back >= 0 && back < days) out[days - 1 - back]!++;
+  }
+  return out;
 }
 
 export function previewOf(d: ToilProjectData, now: string, since: string | null): ToilProjectPreview {
@@ -81,5 +109,7 @@ export function previewOf(d: ToilProjectData, now: string, since: string | null)
   const view = people({ toilProject: d.name, entries: d.people ?? [], wipLimit: d.wipLimit ?? null, items: d.items, changes: prs, now });
   const who = [...view.people, ...view.unmapped].map((c) => ({ key: c.who.key, name: c.who.name, kind: c.who.kind }));
   const changedSince = since === null ? null : d.items.filter((i) => i.updated !== null && i.updated > since).length + prs.filter((c) => c.updated !== null && c.updated > since).length;
-  return { sprint, inProgress, blocked, awaitingReview, people: who, changedSince, motion: inProgress + blocked + awaitingReview };
+  const closed = d.items.length > 0 ? perDay(d.items.filter(isDone).map((i) => doneAt(i) ?? i.resolved), now) : null;
+  const merged = prs.length > 0 ? perDay(prs.filter((c) => c.state === 'MERGED').map((c) => c.mergedAt), now) : null;
+  return { sprint, trend: { closed, merged }, inProgress, blocked, awaitingReview, people: who, changedSince, motion: inProgress + blocked + awaitingReview };
 }

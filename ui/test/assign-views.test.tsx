@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
-import { standardWords } from './words.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureAssignments } from '../src/fixtures/assignments.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
@@ -29,14 +28,13 @@ async function violations(container: HTMLElement) {
 
 beforeEach(() => {
   localStorage.clear();
-  standardWords();
 });
 afterEach(cleanup);
 
 /** The Agents sidebar (#394): a drawer below 1200px, which jsdom always is, behind the tab row's Agents button. */
 async function agents() {
-  await userEvent.click(screen.getByRole('button', { name: /^Agents/ }));
-  return screen.findByRole('region', { name: 'Agents' });
+  await userEvent.click(screen.getByRole('button', { name: /^AI agents/ }));
+  return screen.findByRole('region', { name: 'AI agents' });
 }
 
 describe('the Agents sidebar', () => {
@@ -44,29 +42,29 @@ describe('the Agents sidebar', () => {
     await open('#/project/card-payments');
     // The count arrives with the assignments, a tick after the heading; on a loaded runner, later still.
     // The inbox row, one proposal, one question and the failed assignment: a failure counts, since the panel starts closed.
-    expect(await screen.findByRole('button', { name: 'Agents, 4 waiting on you' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'AI agents, 4 waiting on you' })).toBeTruthy();
     const lane = await agents();
-    const inbox = await within(lane).findByRole('region', { name: 'Agent inbox' });
+    const inbox = await within(lane).findByRole('region', { name: 'Asked for AI help' });
     // The raw label is the item's detail (the Start dialog), not the inbox row.
     expect(inbox.textContent).not.toContain('agent:refine');
     expect(within(inbox).getByRole('button', { name: /^Start/ })).toBeTruthy();
-    expect(within(lane).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Agent inbox', 'Needs you 1', 'Working 1', 'Stale 1', 'Recent analyses']);
+    expect(within(lane).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Asked for AI help', 'Needs you 1', 'Working 1', 'Out of date 1', 'Recent briefings']);
     expect([...lane.querySelectorAll('.agent-card .assign-state')].map((c) => c.textContent)).toEqual(['Needs you', 'Working', 'Failed', 'Done']);
     expect(lane.querySelector('details.agents-group--earlier summary')!.textContent).toBe('Earlier (1)');
     // The limits sentence is in the (i) beside the heading.
     await userEvent.click(within(lane).getAllByRole('button', { name: /^About assigning work/ })[0]!);
-    expect((await screen.findAllByText(/2 run at a time, for up to 20 minutes each/)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/2 work at once, for up to 20 minutes each/)).length).toBeGreaterThan(0);
   }, 20_000);
 
   it('assigns from a board card, through the dialog, onto the assignment page', async () => {
     await open('#/project/card-payments/board');
     const user = userEvent.setup();
     fireEvent.contextMenu(screen.getByRole('group', { name: 'PAY-103 Charge a stored token' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Assign to an agent…' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Assign to an agent' });
-    await within(dialog).findByRole('radiogroup', { name: 'Adapter' });
-    await user.click(within(dialog).getByRole('radio', { name: /Investigate/ }));
-    await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Give to an AI agent…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ask an AI agent' });
+    await within(dialog).findByRole('radiogroup', { name: 'Which AI' });
+    await user.click(within(dialog).getByRole('radio', { name: /Look into/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Ask the AI agent' }));
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/project\/card-payments\/assignment\/sample-new-/));
   }, 20_000);
 });
@@ -75,7 +73,7 @@ describe('the assignment page', () => {
   it('shows the report, the question and each proposal with its diff and Apply, with no axe violations', async () => {
     const { container } = await open('#/project/card-payments/assignment/sample-needsyou-0002');
     await screen.findByRole('heading', { name: 'Proposals' });
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Refine: Store tokens in the vault');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Tidy up: Store tokens in the vault');
     expect(screen.getByText(/Which vault holds the tokens in staging/)).toBeTruthy();
     const card = screen.getByRole('article', { name: /Add acceptance criteria to PAY-102/ });
     expect(within(card).getByRole('region', { name: /What Add acceptance criteria to PAY-102 changes/ })).toBeTruthy();
@@ -96,7 +94,7 @@ describe('the assignment page', () => {
 describe('the People view', () => {
   it("lists each agent's assignments as a teammate's", async () => {
     await open('#/project/card-payments/people');
-    const section = await screen.findByRole('region', { name: "Agents' assignments" });
+    const section = await screen.findByRole('region', { name: "AI agents' work" });
     await within(section).findByRole('heading', { name: 'Codex' });
     expect(within(section).getByRole('heading', { name: 'Claude' })).toBeTruthy();
   }, 20_000);
@@ -137,14 +135,14 @@ describe('stale sessions (#305)', () => {
     expect(cards.map((c) => (c.querySelector('[data-stale]') ? c.querySelector('.assign-state')!.textContent : null)).filter(Boolean)).toEqual(['Needs you', 'Failed']);
     expect(lane.textContent).toContain('started on toil 0.1.0-alpha.3 · now alpha.4 · skills changed: jira.');
     const user = userEvent.setup();
-    await user.click(within(lane).getByRole('button', { name: 'Renew all stale…' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Renew stale sessions' });
+    await user.click(within(lane).getByRole('button', { name: 'Restart out-of-date…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Restart out-of-date sessions' });
     const rows = within(dialog).getAllByRole('listitem').map((li) => li.textContent);
-    expect(rows).toEqual([expect.stringMatching(/^Skipped: Refine corp-jira:PAY-102 on Codex, needs you: .* It is waiting on you/), expect.stringMatching(/^Renews: Implement corp-jira:PAY-101 on Codex, failed: started on toil/)]);
+    expect(rows).toEqual([expect.stringMatching(/^Skipped: Tidy up corp-jira:PAY-102 on Codex, needs you: .* It is waiting on you/), expect.stringMatching(/^Renews: Try a fix corp-jira:PAY-101 on Codex, failed: started on toil/)]);
     expect(await violations(container.ownerDocument.body)).toEqual([]);
     await user.click(within(dialog).getByRole('button', { name: 'Renew 1' }));
     const said = await within(dialog).findByRole('status', { name: 'What was renewed' });
-    expect(said.textContent).toMatch(/^Renewed: Implement corp-jira:PAY-101/);
+    expect(said.textContent).toMatch(/^Renewed: Try a fix corp-jira:PAY-101/);
     await waitFor(() => expect(within(lane).getAllByText(/Renewed as/).length).toBe(1));
   }, 20_000);
 
@@ -160,7 +158,7 @@ describe('stale sessions (#305)', () => {
 
   it("says on an agent's card how many of its assignments are stale", async () => {
     await open('#/project/card-payments/people');
-    const section = await screen.findByRole('region', { name: "Agents' assignments" });
+    const section = await screen.findByRole('region', { name: "AI agents' work" });
     await within(section).findByText(/2 started on instructions that have changed since/);
   }, 20_000);
 });
@@ -184,11 +182,11 @@ describe("a stale chat (#305)", () => {
     await user.click(screen.getByRole('textbox', { name: 'Your question' }));
     const chat = await screen.findByRole('dialog', { name: 'Ask about card-payments' });
     await user.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
-    await within(chat).findByText('prompts changed since it started.');
+    await within(chat).findByText('Started before an update: prompts changed since it started.');
     await user.click(within(chat).getByRole('button', { name: 'Renew' }));
     await within(chat).findByText(/^Renewed on today's instructions\./);
     expect(renewed).toHaveLength(1);
-    expect(within(chat).queryByText('prompts changed since it started.')).toBeNull();
+    expect(within(chat).queryByText('Started before an update: prompts changed since it started.')).toBeNull();
     expect(within(chat).queryByRole('button', { name: 'Renew' })).toBeNull();
   }, 20_000);
 });

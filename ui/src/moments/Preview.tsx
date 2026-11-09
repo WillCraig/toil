@@ -65,7 +65,7 @@ export function MomentsPreview() {
             <Heading slot="title" id="moment-preview-title" className="sr-only">
               Preview of a loading screen
             </Heading>
-            <Loader immediate message="Preview of a loading screen, reading card-payments…" detail="3 of 7 toil calls answered; reading toil jira issue search." />
+            <Loader immediate message="Preview of a loading screen, reading card-payments…" detail="3 of 7 reads answered; reading Jira issues." />
             <Button className="btn" onPress={() => setOpen(null)} data-preview-close="">
               Close the preview
             </Button>

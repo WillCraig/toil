@@ -19,8 +19,7 @@
  * picks up where the last one left off. Citations link to items, suggested
  * changes are proposal cards, never applied, and a failure says so in the
  * pane. Usage is counted per answer and per chat (#295). The agent reads; it
- * never changes a ticket. Work that names no ticket gets the "Not ticketed
- * yet" banner (#304, ./ticket.tsx). An open-door policy, with the door on a closer.
+ * never changes a ticket. An open-door policy, with the door on a closer.
  */
 
 import { createContext, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
@@ -33,7 +32,6 @@ import { voiceOn } from '../theme-context.ts';
 import { Cited } from './items.tsx';
 import { useMediaQuery } from './layout.tsx';
 import { ProposalCard } from './proposal.tsx';
-import { TicketBanner } from './ticket.tsx';
 import { ChatUsage, UsageFooter } from './usage.tsx';
 import type { AnswerUsage } from '../model-usage.ts';
 import type { ChatSession } from '../fingerprint.ts';
@@ -47,6 +45,8 @@ import { AnalysisBody } from './analysis.tsx';
 import { Loader } from '../moments/Moments.tsx';
 import { useUiCommand } from '../commands.ts';
 import { usePlain } from '../plain-words.ts';
+import { STANDARD_THINKING, thinkingPhrase } from '../thinking.ts';
+import { ThinkingIcon, useNow, useThinkingPhrases } from './thinking.tsx';
 import { AnswerChecks, GuidedStart, PHONE } from './guided.tsx';
 import { GROUPS, QUESTIONS, type GuidedQuestion } from '../guided-questions.ts';
 
@@ -57,7 +57,7 @@ export interface Turn {
   kind: 'turn';
   id: number;
   prompt: string;
-  /** Analyze's pulse check (#343), which is a question about the toil project, never work to ticket (#304). */
+  /** Analyze's pulse check (#343), which is a question about the toil project. */
   analyze?: boolean;
   answer: Answer | null;
   error: string | null;
@@ -100,14 +100,15 @@ function useAskPlaceholder(name: string): string {
 }
 
 /** The words of the status line (#343): what the agent is doing now, or how the last answer ended. */
-export function statusLine(t: Turn, words: ReturnType<typeof useWords>, now: number): { text: string; tool: string | null; elapsed: string | null } | null {
+export function statusLine(t: Turn, words: ReturnType<typeof useWords>, now: number, phrases: readonly string[] = STANDARD_THINKING): { text: string; tool: string | null; elapsed: string | null } | null {
   if (t.error && !t.stopped) return null;
   if (t.done) return { text: words(t.stopped ? 'status.stopped' : 'status.done', { seconds: seconds(t.ms ?? 0) }), tool: null, elapsed: null };
   const a = t.answer?.activity;
   const elapsed = `${Math.max(0, Math.floor((now - t.started) / 1000))} s`;
   if (a?.phase === 'tool') return { text: words(a.source === 'live' ? 'status.live' : a.source === 'registry' ? 'status.registry' : 'status.cache'), tool: a.tool ?? null, elapsed };
   if (a?.phase === 'writing' || (t.answer && t.answer.parts.length > 0)) return { text: words('status.writing'), tool: null, elapsed };
-  return { text: words('loading.answer'), tool: null, elapsed };
+  // Nothing has come back yet: all that is known is the wait, so the phrase is flavour and the time beside it is the fact (#561).
+  return { text: thinkingPhrase(phrases, now - t.started), tool: null, elapsed };
 }
 
 /**
@@ -327,6 +328,8 @@ export function AskBar() {
   const words = useWords();
   const placeholder = useAskPlaceholder(toilProject.name);
   const scoped = useChatScope();
+  const phrases = useThinkingPhrases();
+  const now = useNow(Boolean(scoped?.turns.length && !scoped.turns[scoped.turns.length - 1]!.done));
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   // A link followed from the conversation (an item, a kept analysis) puts the focused view away, so the page it opens is in front.
@@ -338,6 +341,7 @@ export function AskBar() {
   if (!scoped) throw new Error("The Ask bar needs the ChatScope the App puts around a Toil project's pages.");
   const chat = scoped;
   const last = chat.turns[chat.turns.length - 1];
+  const status = last && !last.done ? statusLine(last, words, now, phrases) : null;
 
   const openView = () => {
     setOpen(true);
@@ -384,7 +388,31 @@ export function AskBar() {
       {chat.session?.stale && !open && <StaleNote stale={chat.session.stale} className="ask-bar__stale" />}
       {last && !open && (
         <p className="ask-bar__resume note">
-          {chat.turns.length} {chat.turns.length === 1 ? 'question' : 'questions'} in this chat{!last.done ? `, ${statusLine(last, words, Date.now())?.text ?? ''}` : ''}.{' '}
+          <span>
+            <span className="ask-bar__count">
+              {status && <ThinkingIcon />}
+              <span>
+                {chat.turns.length} {chat.turns.length === 1 ? 'question' : 'questions'} in this chat
+              </span>
+            </span>
+            {status && ', '}
+            {/* Always in the page, so a change inside it is announced; it changes when the phrase does (every 6 s) or the agent names a tool, never each second. */}
+            <span role="status" aria-live="polite" aria-label="Answer progress" data-ask-thinking="">
+              {status && (
+                <>
+                  {status.text}
+                  {status.tool && (
+                    <>
+                      {': '}
+                      <code>{status.tool}</code>
+                    </>
+                  )}
+                  {status.elapsed && <span aria-hidden="true" className="ask-status__time"> · {status.elapsed}</span>}
+                </>
+              )}
+            </span>
+            .
+          </span>
           <Button className="btn btn--small" onPress={openView} data-ask-resume="">
             Open the conversation
           </Button>
@@ -442,7 +470,8 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
   const unfinished = noAgent ? options.find((o) => o.action === 'fix') : undefined;
   const answering = current ? optionLabel(current) : noAgent ? 'Nobody yet' : (agent.label ?? 'the agent chosen in Settings');
   const usages = turns.flatMap((t) => (t.done && (t.answer?.usage ?? t.usage) ? [(t.answer?.usage ?? t.usage)!] : []));
-  const status = last ? statusLine(last, words, now) : null;
+  const phrases = useThinkingPhrases();
+  const status = last ? statusLine(last, words, now, phrases) : null;
   // "Nothing was changed" is said under the first answer, not under every one.
   const firstAnswered = turns.find((t) => t.done && !t.stopped && !t.error && t.answer && (t.answer.parts.length > 0 || t.answer.briefing))?.id;
   /** A guided question asked as typing it would be, except the briefing, which is Analyze. */
@@ -608,7 +637,6 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
               </div>
             ),
           )}
-          <TicketBanner prompts={turns.filter((t) => !t.analyze).map((t) => t.prompt)} />
           <div ref={end} />
         </div>
       </div>
@@ -616,7 +644,8 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
       <div className="ask-foot">
         {status && (
           <div className="ask-status">
-            <p role="status" className="ask-status__line" data-ask-status="">
+            <p role="status" aria-label="Answer progress" className="ask-status__line" data-ask-status="">
+              {busy && <ThinkingIcon />}
               {status.text}
               {status.tool && (
                 <>
@@ -668,11 +697,12 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
 /**
  * The agent switcher in the chat's strip (#344): every adapter, its model,
  * and whether it can answer. One that can't says why, with Install or Fix
- * pointing at Settings, Agent; it is never left out. A choice here holds for
+ * pointing at Settings, AI agent; it is never left out. A choice here holds for
  * this chat only, from its next question; the default stays in Settings.
  */
 function AgentSwitch({ label, list, current, onPick, compact = false }: { label: string; list: AdapterList | null; current: string | null; onPick: (name: string | null, label: string) => void; compact?: boolean }) {
   const plain = usePlain();
+  const words = useWords();
   return (
     <DialogTrigger>
       <Button className="btn btn--small agent-switch" data-agent-switch="">
@@ -688,7 +718,7 @@ function AgentSwitch({ label, list, current, onPick, compact = false }: { label:
                 {plain.text('Agent for this chat')}
               </Heading>
               {!list ? (
-                <p className="note">Reading the agents…</p>
+                <p className="note">{words('loading.agents')}</p>
               ) : (
                 <ul className="agent-picks">
                   {list.options.map((o) => {
@@ -730,7 +760,7 @@ function AgentSwitch({ label, list, current, onPick, compact = false }: { label:
                   })}
                 </ul>
               )}
-              <p className="note">{plain.text("Switching holds for this chat, from its next question. The chat starts on the agent last used for this Toil project, else your default under Settings, Agent, else the first agent that's ready.")}</p>
+              <p className="note">{plain.text("Switching holds for this chat, from its next question. The chat starts on the agent last used for this Toil project, else your default under Settings, AI agent, else the first agent that's ready.")}</p>
             </>
           )}
         </Dialog>
@@ -769,10 +799,10 @@ export function AskInfo({ agentLabel }: { agentLabel: string | undefined }) {
             About these answers
           </Heading>
           <p>{voice}</p>
-          <p>{plain.text(`Answered by ${agentLabel ?? 'the agent chosen in Settings'}. The chat starts on the agent last used for this Toil project, else your default under Settings, Agent, else the first agent that's ready.`)}</p>
+          <p>{plain.text(`Answered by ${agentLabel ?? 'the agent chosen in Settings'}. The chat starts on the agent last used for this Toil project, else your default under Settings, AI agent, else the first agent that's ready.`)}</p>
           <p>{plain.text("The agent only reads: its tools can't change a ticket, and anything it suggests comes back as a proposal for you to apply.")}</p>
           <p>
-            Change the voice under <a href="#/settings/toil">Settings, General</a>, and add your own instructions or voice under <a href="#/settings/agent">Settings, Agent</a>.
+            Change the voice under <a href="#/settings/appearance">Settings, Appearance</a>, and add your own instructions or voice under <a href="#/settings/agent">Settings, AI agent</a>.
           </p>
           <Glossary entries={HELP.answers.glossary} />
         </Dialog>

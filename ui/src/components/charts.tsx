@@ -206,7 +206,7 @@ export function CallsPerDay({ days }: { days: DayCalls[] }) {
   return <DayBars days={days} value={(d) => d.calls} label={label} max={String} figures={<Figures caption="Calls per day, UTC" head={['Day', 'Calls', 'Failed']} rows={days.map((d) => [day(d.day), d.calls, d.failed])} />} />;
 }
 
-/** Tokens per day (#295), for Settings, Agent usage: the same bars, in the meter's figures. */
+/** Tokens per day (#295), for Settings, Usage: the same bars, in the meter's figures. */
 export function TokensPerDay({ days, compact }: { days: Array<{ day: string; tokens: number }>; compact: (n: number) => string }) {
   const total = days.reduce((n, d) => n + d.tokens, 0);
   const busiest = days.reduce<{ day: string; tokens: number } | null>((b, d) => (!b || d.tokens > b.tokens ? d : b), null);

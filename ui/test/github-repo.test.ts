@@ -29,7 +29,7 @@ import type { Change, Execute } from '../src/toil.ts';
 const API = 'https://api.github.com';
 const REPO = `${API}/repos/imagile/payments-sandbox`;
 const HTML = 'https://github.com/imagile/payments-sandbox';
-const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'launch-token' }, signal: new AbortController().signal };
+const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'loopback' }, signal: new AbortController().signal };
 
 const user = (login: string) => ({ login, id: 1, type: 'User', html_url: `https://github.com/${login}` });
 const label = (name: string) => ({ id: 1, name, color: 'c5def5' });

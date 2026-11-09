@@ -442,3 +442,12 @@ export function factsCited(text: string, report: StandupReport): string[] {
   for (const m of text.matchAll(/\bF(\d+)\b/g)) if (known.has(`F${m[1]}`)) seen.add(`F${m[1]}`);
   return [...seen];
 }
+
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** The range in plain words for the Summary's card: "Yesterday", "Since Friday (9 Oct 2026)", or the dates when it isn't the default range. */
+export function sinceText(r: Pick<StandupReport, 'from' | 'to'>, today: string): string {
+  if (r.to !== today) return rangeText(r);
+  if (r.from === today) return 'Today';
+  if (r.from === addDays(today, -1)) return 'Yesterday';
+  return `Since ${WEEKDAY_NAMES[new Date(`${r.from}T00:00:00Z`).getUTCDay()]} (${shortDay(r.from)})`;
+}

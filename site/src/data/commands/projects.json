@@ -6,7 +6,9 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "--cwd <dir>"
+      "--cwd <dir>",
+      "--all",
+      "--archived"
     ]
   },
   {
@@ -176,9 +178,37 @@
       "<toil-project>",
       "<name>",
       "--id <area=identity>",
+      "--github <login>",
+      "--jira <identity>",
+      "--ado <identity>",
+      "--bitbucket <identity>",
       "--kind <kind>",
       "--email <address>",
       "--remove",
+      "--replace"
+    ]
+  },
+  {
+    "name": "people suggest",
+    "tool": "projects_people_suggest",
+    "description": "Suggest which accounts in work items and pull requests are the toil project's people, from OWI records you pass (local only)",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "--file <path>",
+      "--text <text>"
+    ]
+  },
+  {
+    "name": "people save",
+    "tool": "projects_people_save",
+    "description": "Save a toil project's people into a repository's .toil/projects, so the mapping is checked in with the code",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "--repo <dir>",
       "--replace"
     ]
   },
@@ -273,6 +303,26 @@
     "connection": false,
     "flags": [
       "<name>"
+    ]
+  },
+  {
+    "name": "archive",
+    "tool": "projects_archive",
+    "description": "Archive one of your own toil projects: hidden from lists, kept on disk, reversible",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>"
+    ]
+  },
+  {
+    "name": "unarchive",
+    "tool": "projects_unarchive",
+    "description": "Bring an archived toil project back",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>"
     ]
   },
   {

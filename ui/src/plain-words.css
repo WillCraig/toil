@@ -5,6 +5,5 @@
   text-underline-offset: 0.2em;
   cursor: help;
 }
-.plain-switch { font-weight: 600; }
 /* A wrapper that carries a control's hover and draws nothing of its own. */
 .plain-hint { display: contents; }

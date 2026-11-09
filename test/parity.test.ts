@@ -17,6 +17,7 @@ import { clearTokenCache, watchTokenExchanges } from '../src/core/token.js';
 import { argvFor, routedArgvFor } from '../src/program.js';
 import { areas as registeredAreas, commands, routedAliases } from '../src/registry.js';
 import { EXAMPLE_BRIEF_RECORDS } from '../src/projects/brief.js';
+import { EXAMPLE_PEOPLE_RECORDS } from '../src/projects/build.js';
 import { demoCommands } from './fixtures/demo-commands.js';
 import { runCli } from './harness/cli.js';
 import { testContext } from './harness/context.js';
@@ -53,7 +54,7 @@ type Files = Record<string, string | Uint8Array>;
 // Config, files and routes are read from the fixture when each test runs, after setup.
 // Two connections the toil project build examples bind to, both with writes off, and the
 // OWI records `toil projects brief` reads from a file.
-const outside: LoadedFixture = { area: '', routes: [], config: { jira: { baseUrl: 'https://jira.imagile.dev' }, openshift: { baseUrl: 'https://api.ocp.imagile.dev:6443' } }, files: { 'owi/brief.owi.json': EXAMPLE_BRIEF_RECORDS }, commands: [], trace: [] };
+const outside: LoadedFixture = { area: '', routes: [], config: { jira: { baseUrl: 'https://jira.imagile.dev' }, openshift: { baseUrl: 'https://api.ocp.imagile.dev:6443' } }, files: { 'owi/brief.owi.json': EXAMPLE_BRIEF_RECORDS, 'owi/people.owi.json': EXAMPLE_PEOPLE_RECORDS }, commands: [], trace: [] };
 // A group of standalone commands that read files or run git (`util`) brings
 // its own fixture, named after the group, and runs in that suite instead.
 const grouped = new Set(fixtures.map((f) => f.area));
@@ -79,6 +80,7 @@ const outsideDisk = toilProjectDisk({
       { name: 'ledger-svc', remotes: ['https://bitbucket.imagile.dev/scm/pay/ledger-svc.git'] },
     ],
     jira: { project: 'PAY', projects: ['PAY', 'LEDG'] },
+    people: [{ name: 'Pat Example', email: 'you@example.com', ids: { jira: 'pat' } }],
   },
   'work/.git/HEAD': 'ref: refs/heads/main\n',
   'work/.toil/projects/team.json': { name: 'team', description: 'Shared by the team', repos: [{ name: 'payments-api', remotes: ['https://bitbucket.imagile.dev/scm/pay/payments-api.git'] }] },

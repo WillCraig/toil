@@ -18,7 +18,7 @@ import { ADO_FEED_FIELDS } from '../ado-revisions.ts';
 import { CODEOWNERS_PATHS, JQL, PR_INCLUDE, WIQL } from '../load.ts';
 import type { Call, Envelope, Execute, ExecuteOptions } from '../toil.ts';
 import { ADO_CI_RUNS, ADO_DEPLOY_RUNS, ADO_PR_GETS, ADO_PRS, BITBUCKET_CLOUD_PR_GETS, BITBUCKET_CLOUD_PRS, BITBUCKET_PR_GETS, BITBUCKET_PRS, GITHUB_CODEOWNERS, GITHUB_PR_GETS, GITHUB_PRS, JENKINS_RUNS, OPENSHIFT } from './delivery.ts';
-import { TOIL_PROJECTS, fileOf, listData, showData, type ToilProjectFile } from './toil-projects.ts';
+import { TOIL_PROJECTS, archivedListData, fileOf, listData, showData, type ToilProjectFile } from './toil-projects.ts';
 import {
   ADO_BATCH, ADO_FEED, ADO_FEED_GAPS, ADO_IDS, ADO_ITERATIONS, ADO_REVISIONS, ADO_WIQL, GITHUB_EVENTS, GITHUB_ISSUES, GITHUB_NUMBERS, GITHUB_PROJECT_ITEMS,
   ADO_STATES, JIRA_CHANGELOGS, JIRA_CUT_SHORT, JIRA_SEARCH_WITH_CHANGELOGS, JIRA_TRANSITIONS,
@@ -53,6 +53,7 @@ const gets = (toilProject: string, area: string, field: string, byNumber: Record
 
 export const CANNED: Canned[] = [
   { command: 'projects list', input: {}, data: listData() },
+  { command: 'projects list', input: { archived: true }, data: archivedListData() },
   ...TOIL_PROJECTS.map((d) => ({ command: 'projects show', input: { toilProject: d.name }, data: showData(d) })),
 
   // card-payments

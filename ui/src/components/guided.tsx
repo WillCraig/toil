@@ -109,7 +109,7 @@ export function GuidedStart({ noAgent, notice, details, link, busy, onPick }: { 
         {notice && (
           <div className="agent-notice guided__notice" data-no-agent="">
             <p>
-              {plain.text(notice)} <a href="#/settings/agent">{link ?? plain.pw('Set up an agent', 'Set up an AI helper')}</a>
+              {plain.text(notice)} <a href="#/settings/agent">{link ?? plain.pw('Set up an agent', 'Set up an AI agent')}</a>
             </p>
             {details && (
               <details>

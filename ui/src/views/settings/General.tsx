@@ -1,22 +1,88 @@
 /**
- * Bounds and the time limit (#253, item 4). toil has no command that changes
- * either, and Toil UI doesn't edit toil's files, so this page shows them
- * read-only, with where each is set. The file workspace bound is the one a
- * config file can relax (docs/bounds.md), and toil says so on every envelope
- * when it is relaxed, which is how this page knows; the time limit is
- * TOIL_TIMEOUT_MS in the environment toil runs in, which here is the server's.
+ * Settings, General: notifications and links to learning content (their own
+ * components), then one closed "Advanced" disclosure (principle 11) holding
+ * what few people need: wiping the cache Toil UI keeps, the file bound and the
+ * time limit. Toil has no command that changes the last two, and Toil UI
+ * doesn't edit toil's files, so they are shown read-only in plain words, with
+ * no file path or variable name: the people who read this page don't set
+ * either (the maintainer's decision, 2026-11-09). The file workspace bound is
+ * the one a config file can relax, and toil says so on every envelope when it
+ * is, which is how this page knows.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ConfigApi, SettingsInfo } from '../../config.ts';
-import { Card, Path } from '../../components/layout.tsx';
+import { Card } from '../../components/layout.tsx';
 import { Help } from '../../components/help.tsx';
 import { Loader } from '../../moments/Moments.tsx';
+import { matches } from '../../shortcuts.ts';
 
 const seconds = (ms: number) => (ms % 1000 === 0 ? `${ms / 1000} s` : `${ms} ms`);
 
-export function General({ config }: { config: ConfigApi }) {
-  const [file, setFile] = useState<string | null>(null);
+/** What wiping the cache needs from the page that holds it (src/local.tsx), and when it last ran. */
+export interface CacheControl {
+  wipe: () => Promise<void>;
+  /** Kept by the page, not by this screen, because a wipe makes every view read again and this one with them. */
+  wipedAt: string | null;
+}
+
+/** The cache Toil UI keeps of what it read: wiping it asks first, with Cancel focused. */
+export function WipeCache({ cache }: { cache: CacheControl }) {
+  const [confirming, setConfirming] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (confirming) cancel.current?.focus();
+  }, [confirming]);
+  const close = () => {
+    setConfirming(false);
+    trigger.current?.focus();
+  };
+  return (
+    <div className="wipe-cache">
+      <h3>Wipe the cache</h3>
+      <p className="note">Deletes everything Toil UI saved on this computer from your tools. The dashboards are empty until the next sync, which reads everything again. Your tools are not touched.</p>
+      <button type="button" className="btn" ref={trigger} onClick={() => setConfirming(true)} aria-expanded={confirming} aria-controls="wipe-confirm">
+        Wipe the cache…
+      </button>
+      {confirming && (
+        <div className="sync-confirm" id="wipe-confirm" role="group" aria-labelledby="wipe-confirm-text" onKeyDown={(e) => matches('wipeCancel', e) && close()}>
+          <p id="wipe-confirm-text">Delete everything Toil UI synced to this computer? Your tools are not touched.</p>
+          <div className="sync-actions">
+            <button
+              type="button"
+              className="sync-danger"
+              onClick={() =>
+                cache.wipe().then(
+                  () => setConfirming(false),
+                  (e: unknown) => setProblem(e instanceof Error ? e.message : String(e)),
+                )
+              }
+            >
+              Wipe it
+            </button>
+            <button type="button" ref={cancel} onClick={close}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {problem && (
+        <p role="alert" className="failure">
+          The cache wasn't wiped: {problem}
+        </p>
+      )}
+      {cache.wipedAt && !problem && (
+        <p role="status" className="note">
+          The cache is wiped. Nothing synced is left on this computer.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Limits({ config }: { config: ConfigApi }) {
   const [relaxed, setRelaxed] = useState<string | null>(null);
   const [settings, setSettings] = useState<SettingsInfo | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -24,7 +90,6 @@ export function General({ config }: { config: ConfigApi }) {
     config.run('connections list', {}).then(
       (e) => {
         if (!e.ok) return setFailed(e.error.message);
-        setFile((e.data as { configFile: string }).configFile);
         setRelaxed(e.meta.warnings?.find((w) => w.code === 'BOUND_RELAXED')?.message ?? null);
       },
       (e: unknown) => setFailed(e instanceof Error ? e.message : String(e)),
@@ -35,47 +100,48 @@ export function General({ config }: { config: ConfigApi }) {
   if (failed) {
     return (
       <div role="alert" className="failure">
-        <p>The settings didn't load: {failed}</p>
+        <p>The limits didn't load: {failed}</p>
       </div>
     );
   }
-  if (!file || !settings) return <Loader size="panel" message={"Reading toil's settings…"} />;
+  if (!settings) return <Loader size="panel" message="Reading the limits…" />;
   const t = settings.timeout;
   return (
     <>
-      <p className="lede">
-        Shown as toil reports them, with where each is set. <Help topic="bounds" />
-      </p>
       <Card as="section" className="panel" aria-labelledby="bounds">
-        <h2 id="bounds">Bounds</h2>
+        <h3 id="bounds">Bounds</h3>
         <dl className="fields">
-          <dt>The file workspace</dt>
-          <dd>{relaxed ? 'Relaxed: commands may read and write files anywhere you can, except toil\'s own files.' : 'Held: commands read and write files only inside the workspace.'}</dd>
-          <dt>Set in</dt>
-          <dd>
-            <Path value={file} what="config file path" />, as <code>"bounds": {'{'} "files": "unbounded" {'}'}</code>
-          </dd>
+          <dt>Files</dt>
+          <dd>{relaxed ? "Relaxed: Toil may read and write files anywhere you can, except its own settings." : 'Held: Toil reads and writes files only inside your working folder.'}</dd>
         </dl>
-        {relaxed && <p className="note">toil says: {relaxed}</p>}
-      </Card>
-      <Card as="section" className="panel" aria-labelledby="timeout">
-        <h2 id="timeout">Time limit</h2>
-        <dl className="fields">
-          <dt>Each command stops after</dt>
-          <dd>
-            {seconds(t.effectiveMs)}
-            {t.effectiveMs === t.defaultMs ? ", toil's default" : ''}
-          </dd>
-          <dt>Set by</dt>
-          <dd>
-            <code>{t.variable}</code>
-            {t.value === null ? ', which is not set' : `=${t.value}`}, in the environment <code>toil-ui</code> was started from
-          </dd>
-        </dl>
+        {relaxed && <p className="note">Toil says: {relaxed}</p>}
         <p className="note">
-          Without the variable, a command that declares a longer limit (a scan, a report) gets its own. <code>toil wait</code> has its own <code>--timeout</code>, capped by <code>"wait": {'{'} "maxTimeout" {'}'}</code> in <code>{file}</code>. To change the limit, set {t.variable} and start <code>toil-ui</code> again.
+          Limits Toil keeps on itself. <Help topic="bounds" />
         </p>
       </Card>
+      <Card as="section" className="panel" aria-labelledby="timeout">
+        <h3 id="timeout">Time limit</h3>
+        <dl className="fields">
+          <dt>Each request stops after</dt>
+          <dd>
+            {seconds(t.effectiveMs)}
+            {t.effectiveMs === t.defaultMs ? ", Toil's default" : ', set outside Toil UI'}
+          </dd>
+        </dl>
+        <p className="note">A longer job, such as a scan or a report, gets its own limit. This one is set outside Toil UI, so it can't be changed here.</p>
+      </Card>
     </>
+  );
+}
+
+/** Closed by default: the page's own settings come first, and these are one step further in. */
+export function Advanced({ config, cache }: { config: ConfigApi | null; cache?: CacheControl | undefined }) {
+  if (!config && !cache) return null;
+  return (
+    <details className="advanced" data-advanced="">
+      <summary>Advanced</summary>
+      {cache && <WipeCache cache={cache} />}
+      {config && <Limits config={config} />}
+    </details>
   );
 }

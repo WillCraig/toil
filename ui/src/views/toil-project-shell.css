@@ -21,7 +21,8 @@ main:has(> .toil-project-shell) { max-width: 1680px; padding-top: 0.5rem; paddin
 .toil-project-bar__ask .agents-open { margin: calc(4px + 0.4rem) 0 0; min-height: 44px; }
 .toil-project-bar .ask-bar { min-width: 0; margin: 0; padding: 0.4rem 0.6rem; }
 .sprint-chip { display: inline-flex; align-items: center; padding: 0.1rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }
-.toil-project-switch { gap: 0.35rem; }
+/* Edit: a quiet link at the end of the about row; the row's other parts shrink first. */
+.toil-project-bar__edit { flex: none; display: inline-flex; align-items: center; min-height: 24px; padding: 0 0.25rem; }
 
 /* The description and the sources, on one line where they fit. */
 .toil-project-bar__about { display: flex; align-items: center; gap: 0.25rem 0.75rem; color: var(--muted); font-size: 0.875rem; min-width: 0; }
@@ -35,7 +36,7 @@ main:has(> .toil-project-shell) { max-width: 1680px; padding-top: 0.5rem; paddin
 .toil-project-bar__about:has(.editable--open) .toil-project-bar__desc { flex: 1 1 100%; }
 .agents-open__short { display: none; }
 @media (max-width: 599px) {
-  /* The Ask row on a phone: the field, Ask and a compact AI helpers button with its count, on one line. The full label stays as the name. */
+  /* The Ask row on a phone: the field, Ask and a compact AI agents button with its count, on one line. The full label stays as the name. */
   .toil-project-bar__ask { flex-wrap: nowrap; align-items: flex-start; }
   .toil-project-bar__ask .ask-bar { flex: 1 1 0; }
   .toil-project-bar__ask .agents-open { margin: calc(4px + 0.4rem) 0 0; min-height: 44px; min-width: 44px; padding-inline: 0.6rem; }

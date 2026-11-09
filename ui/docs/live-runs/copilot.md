@@ -35,7 +35,6 @@ behaved differently, it says so.
 | Apply | the comment proposal, with the connection's writes off | refused by toil's write gate, naming the connection | No; nothing was written to the sandbox |
 | Notifications | the page open while assignments ran | "GitHub Copilot needs you … 1 proposal to review"; "GitHub Copilot stopped at a usage cap" | No |
 | Readiness gate | the "Which items are ready for an agent?" starter, and the Command Center | 0 ready, 15 thin, 3 blocked in both; Start every ready item slates nothing and says why | No |
-| Not ticketed yet | "Add exponential backoff to the payout webhook retries" in the Ask bar, then Ticket this | banner matched `#5` at 63% alike; sub-task and new-ticket proposals with `toil github issue create` lines | No (the banner uses no model) |
 | `verify:ui --ask` | `npm run verify:ui -- --ask --adapter copilot --model mai-code-1.1-flash` | first run: every Ask check passed but "proposals parsed" (11 written, 1 cut); after the limit went into the prompt, PASS: 10 proposals, 12 cited, 0 unverified, premium requests 0.25 then 0 for each follow-up call, Analyze carried the first turn | No |
 
 ## Excerpts

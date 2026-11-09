@@ -4,12 +4,11 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetLearningLinks, setLearningLinks } from '../src/learning.ts';
-import { resetPlain } from '../src/plain-words.ts';
 import { GLOSSARY_SLUGS } from './glossary-terms.ts';
 import { openChat } from './chat.ts';
-import { standardWords } from './words.ts';
 import { App, parseRoute, upgradeHash } from '../src/App.tsx';
 import { EditLink, Help } from '../src/components/help.tsx';
+import { plainify } from '../src/plain-words.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureConfig } from '../src/fixtures/config.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
@@ -76,10 +75,12 @@ describe('the help topics', () => {
   });
 });
 
+/** What the (i) shows for a topic: its sentences in plain words, with the topic's plain note after them. */
+const shown = (t: HelpTopic) => plainify(t.text) + (t.plainNote ? ` ${t.plainNote}` : '');
+
 describe('the (i)', () => {
   beforeEach(() => {
     localStorage.clear();
-    standardWords();
   });
 
   it('names its topic, shows its sentences on focus, and opens them with Read more when pressed', async () => {
@@ -87,10 +88,10 @@ describe('the (i)', () => {
     const button = screen.getByRole('button', { name: 'About the worklog' });
     await userEvent.tab();
     expect(document.activeElement).toBe(button);
-    await waitFor(() => expect(screen.getByRole('tooltip').textContent).toBe(HELP.worklog.text));
+    await waitFor(() => expect(screen.getByRole('tooltip').textContent).toBe(shown(HELP.worklog)));
     await userEvent.keyboard('{Enter}');
     const dialog = await screen.findByRole('dialog', { name: 'About the worklog' });
-    expect(within(dialog).getByText(HELP.worklog.text)).toBeTruthy();
+    expect(within(dialog).getByText(shown(HELP.worklog))).toBeTruthy();
     const link = within(dialog).getByRole('link', { name: /^Read more/ });
     expect(link.getAttribute('href')).toBe('https://imagile-dev.github.io/toil/docs/ui/#worklog');
     expect(link.textContent).toBe('Read more about the worklog in the docs (opens in a new tab)');
@@ -103,19 +104,12 @@ describe('the (i)', () => {
 
 describe('the (i) in plain words (#552)', () => {
   it('swaps the jargon in the one catalogue as it draws it, name and sentences alike', async () => {
-    resetPlain();
     localStorage.clear();
     render(<Help topic="prs" />);
     const button = screen.getByRole('button', { name: 'About code reviews' });
     await userEvent.tab();
     expect(document.activeElement).toBe(button);
     await waitFor(() => expect(screen.getByRole('tooltip').textContent).toBe("Read from every code host the Toil project names, the open ones ranked by how long each has waited and on what. Flow figures are the team's, never one person's."));
-  });
-
-  it('says the same as the catalogue with plain words off', async () => {
-    standardWords();
-    render(<Help topic="prs" />);
-    expect(screen.getByRole('button', { name: 'About pull requests' })).toBeTruthy();
   });
 });
 
@@ -129,7 +123,13 @@ describe('edit links', () => {
   it('routes a settings page to the place an edit link names', () => {
     expect(parseRoute('#/settings/connections/corp-jira')).toEqual({ view: 'settings', page: 'connections', at: ['corp-jira'] });
     expect(parseRoute('#/settings/projects/card-payments/wip')).toEqual({ view: 'settings', page: 'projects', at: ['card-payments', 'wip'] });
-    expect(parseRoute('#/settings/agent-usage/caps')).toEqual({ view: 'settings', page: 'agent-usage', at: ['caps'] });
+    expect(parseRoute('#/settings/agent-usage/caps')).toEqual({ view: 'settings', page: 'usage', at: ['caps'] });
+    expect(parseRoute('#/settings/agent/caps')).toEqual({ view: 'settings', page: 'usage', at: ['caps'] });
+    expect(parseRoute('#/settings/agent')).toEqual({ view: 'settings', page: 'agent' });
+    // General is first: the bare address, its own and the old one all open it.
+    expect(parseRoute('#/settings')).toEqual({ view: 'settings', page: 'general' });
+    expect(parseRoute('#/settings/general')).toEqual({ view: 'settings', page: 'general' });
+    expect(parseRoute('#/settings/general')).toEqual({ view: 'settings', page: 'general' });
     expect(parseRoute('#/settings/projects')).toEqual({ view: 'settings', page: 'projects' });
     expect(parseRoute('#/settings/connections/100%')).toEqual({ view: 'settings', page: 'connections', at: ['100%'] });
   });
@@ -160,7 +160,7 @@ describe('edit links', () => {
     await waitFor(() => expect(document.activeElement?.id).toBe('conn-corp-jira'));
     window.location.hash = '#/settings/connections/gone';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
-    expect((await screen.findByText(/toil has no connection named/)).textContent).toContain('gone');
+    expect((await screen.findByText(/There is no connection named/)).textContent).toContain('gone');
   });
 
   it('lands on the Toil project section it names, with that Toil project chosen', async () => {
@@ -189,7 +189,6 @@ describe('edit links', () => {
 describe('learning links (#418)', () => {
   beforeEach(() => {
     localStorage.clear();
-    standardWords();
     resetLearningLinks();
   });
   const entries = Object.entries(HELP).flatMap(([id, t]) => ((t as HelpTopic).glossary ?? []).map((g) => [id, g] as const));
@@ -217,8 +216,8 @@ describe('learning links (#418)', () => {
 
   it("puts a topic's terms in its popover, each with Read more on Context Overflow, and none once the setting is off", async () => {
     const { unmount } = render(<Help topic="model-usage" />);
-    await userEvent.click(screen.getByRole('button', { name: "About the agent's usage" }));
-    const dialog = await screen.findByRole('dialog', { name: "About the agent's usage" });
+    await userEvent.click(screen.getByRole('button', { name: "About the AI agent's usage" }));
+    const dialog = await screen.findByRole('dialog', { name: "About the AI agent's usage" });
     const list = within(dialog).getByRole('list', { name: "Terms, from Context Overflow's glossary" });
     expect(within(list).getAllByRole('listitem')[0]!.textContent).toBe('Token: The atomic unit a model reads and writes. Read more on Context Overflow about Token (opens in a new tab)');
     const link = within(list).getByRole('link', { name: /^Read more on Context Overflow ?about Cache tokens/ });
@@ -228,8 +227,8 @@ describe('learning links (#418)', () => {
     unmount();
     setLearningLinks(false);
     render(<Help topic="model-usage" />);
-    await userEvent.click(screen.getByRole('button', { name: "About the agent's usage" }));
-    const plain = await screen.findByRole('dialog', { name: "About the agent's usage" });
+    await userEvent.click(screen.getByRole('button', { name: "About the AI agent's usage" }));
+    const plain = await screen.findByRole('dialog', { name: "About the AI agent's usage" });
     expect(plain.querySelector('[data-glossary]')).toBeNull();
     expect(plain.textContent).not.toContain('Context Overflow');
     expect(within(plain).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([helpHref(HELP['model-usage'])]);
@@ -246,18 +245,19 @@ describe('learning links (#418)', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Help/ }));
     const menu = await screen.findByRole('menu', { name: 'Help' });
     const items = within(menu).getAllByRole('menuitem');
-    expect(items.map((i) => i.getAttribute('href'))).toEqual([helpHref(HELP.people), null, ...LEARN.map(learnHref)]);
+    expect(items.map((i) => i.getAttribute('href'))).toEqual([helpHref(HELP.people), null, null, ...LEARN.map(learnHref)]);
     expect(items[1]!.textContent).toBe("What's new");
+    expect(items[2]!.textContent).toBe('Keyboard shortcuts');
     for (const i of items.filter((x) => x.getAttribute('href'))) {
       expect(i.getAttribute('target')).toBe('_blank');
       expect(i.getAttribute('rel')).toBe('noopener noreferrer');
     }
-    expect(items[4]!.textContent).toBe('The Autonomy SpectrumDeciding how much to hand an agent (opens in a new tab)');
+    expect(items[5]!.textContent).toBe('The Autonomy SpectrumDeciding how much to hand an agent (opens in a new tab)');
     await userEvent.keyboard('{Escape}');
     act(() => setLearningLinks(false));
     await userEvent.click(screen.getByRole('button', { name: /^Help/ }));
     const off = await screen.findByRole('menu', { name: 'Help' });
-    expect(within(off).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Help for this view (opens in a new tab)', "What's new"]);
+    expect(within(off).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Help for this view (opens in a new tab)', "What's new", 'Keyboard shortcuts']);
     await userEvent.keyboard('{Escape}');
     expect(document.querySelector('a[href*="context-overflow"], [data-learn-link], [data-learn]')).toBeNull();
   });
@@ -272,7 +272,7 @@ describe('learning links (#418)', () => {
   });
 
   it('turns off from Settings, General, and is remembered in this browser', async () => {
-    await open('#/settings/toil');
+    await open('#/settings/general');
     const box = screen.getByRole('checkbox', { name: 'Links to learning content' });
     expect(box).toHaveProperty('checked', true);
     await userEvent.click(box);
@@ -291,9 +291,9 @@ describe('learning links (#418)', () => {
       return real(input);
     }) as typeof fetch;
     try {
-      await open('#/settings/agent-usage');
-      await userEvent.click(screen.getAllByRole('button', { name: "About the agent's usage" })[0]!);
-      await screen.findByRole('dialog', { name: "About the agent's usage" });
+      await open('#/settings/agent');
+      await userEvent.click(screen.getAllByRole('button', { name: /^About the AI agent/ })[0]!);
+      await screen.findByRole('dialog', { name: /^About the AI agent/ });
       expect(fetched.filter((u) => u.includes('context-overflow'))).toEqual([]);
       expect(document.querySelector('link[href*="context-overflow"]')).toBeNull();
     } finally {

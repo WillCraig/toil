@@ -29,7 +29,9 @@ toil needs **Node.js 24.22.1 or later on 24.x, or 26.12.1 or later** (`node
 --version`) and nothing else: no executable, no native module, no install script and
 no admin rights. Those are the releases that fix CVE-2026-111497, a remote code
 execution in Node's Brotli decoder, which every `fetch()` goes through. On any other
-Node, 25.x included, every command returns `UNSUPPORTED_NODE`. Windows, macOS and Linux all work the same.
+Node, 25.x included, toil still runs, but prints a large warning on stderr (and an
+`UNSUPPORTED_NODE` entry in `meta.warnings`) on every call. Install a patched Node
+rather than live with it. Windows, macOS and Linux all work the same.
 
 ## From npm (recommended)
 

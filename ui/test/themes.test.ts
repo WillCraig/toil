@@ -1,10 +1,10 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { alignmentProblems, cssProblems, fileProblems, lexiconProblems, manifestProblems, momentsProblems, voiceProblems } from './theme-rules.ts';
+import { alignmentProblems, cssProblems, fileProblems, lexiconProblems, manifestProblems, momentsProblems, thinkingProblems, voiceProblems } from './theme-rules.ts';
 import { rolled } from '../src/model/alignment.ts';
 import { initialChoice } from '../src/theme-choice.ts';
-import { STANDARD, WORD_KEYS, wordFor } from '../src/wording.ts';
+import { FLAVOUR_KEYS, STANDARD, commandsIn, wordFor } from '../src/wording.ts';
 import { themed } from '../src/theme-context.ts';
 import { DEFAULT_THEME, TERMS, THEMES, TOKENS, themeNamed, tokenCss, type Token } from '../src/themes.ts';
 
@@ -118,9 +118,15 @@ describe.each(THEMES.map((t) => [t.name, t] as const))('the %s theme', (name, th
       expect(theme.lexicon).toBeUndefined();
       expect(theme.voice).toBeUndefined();
     } else {
-      expect(Object.keys(theme.lexicon ?? {}).sort()).toEqual([...WORD_KEYS].sort());
+      expect(Object.keys(theme.lexicon ?? {}).sort()).toEqual([...FLAVOUR_KEYS].sort());
       expect(theme.voice!.length).toBeGreaterThan(300);
     }
+  });
+
+  it('has thinking phrases of its own, flavour only, or none at all in Plain (#561)', () => {
+    expect(thinkingProblems(theme.thinking)).toEqual([]);
+    if (name === 'plain') expect(theme.thinking).toBeUndefined();
+    else expect(theme.thinking!.length).toBeGreaterThanOrEqual(3);
   });
 
   // A stylesheet's own colours are theme variables set per scheme (#507): its second scheme is set twice, for
@@ -187,11 +193,11 @@ describe('Plain', () => {
 });
 
 describe('how deep a theme goes (#283)', () => {
-  it('has themed wording and the agent voice off until someone switches one on, with the address winning (#552)', () => {
+  it('has themed wording on and the agent voice off until someone changes them, with the address winning (#552, #561)', () => {
     localStorage.clear();
-    expect(initialChoice('')).toMatchObject({ wording: false, voice: false });
-    expect(initialChoice('?wording=on')).toMatchObject({ wording: true, voice: false });
-    expect(initialChoice('?voice=on')).toMatchObject({ wording: false, voice: true });
+    expect(initialChoice('')).toMatchObject({ wording: true, voice: false });
+    expect(initialChoice('?wording=off')).toMatchObject({ wording: false, voice: false });
+    expect(initialChoice('?voice=on')).toMatchObject({ wording: true, voice: true });
     // A choice saved before the default changed is kept as it was, on or off.
     localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'harvest', wording: true, voice: true }));
     expect(initialChoice('')).toMatchObject({ theme: 'harvest', wording: true, voice: true });
@@ -201,9 +207,9 @@ describe('how deep a theme goes (#283)', () => {
     expect(initialChoice('?voice=on')).toMatchObject({ wording: false, voice: true });
     // A hand-edited or older value that isn't a boolean leaves the default; it never throws.
     localStorage.setItem('toil-ui.theme', JSON.stringify({ wording: 'yes', voice: null }));
-    expect(initialChoice('')).toMatchObject({ wording: false, voice: false });
+    expect(initialChoice('')).toMatchObject({ wording: true, voice: false });
     localStorage.setItem('toil-ui.theme', '[1,2]');
-    expect(initialChoice('')).toEqual({ theme: 'crate', scheme: 'system', wording: false, voice: false });
+    expect(initialChoice('')).toEqual({ theme: 'crate', scheme: 'system', wording: true, voice: false });
     localStorage.clear();
   });
 
@@ -219,11 +225,18 @@ describe('how deep a theme goes (#283)', () => {
 
   it('refuses wording that drops an id or a command, holds markup, or uses a key that does not exist', () => {
     expect(lexiconProblems({ 'loading.toilProject': 'Pulling it off the rack…' })).toEqual(['theme.json: lexicon."loading.toilProject" must keep the placeholders {name}.']);
-    expect(lexiconProblems({ 'empty.toilProjects': 'Nothing on the floor.' })).toEqual(['theme.json: lexicon."empty.toilProjects" must keep the command toil projects init.']);
+    // No flavour key's standard text names a command today, so the rule is held on the reader it uses, which the key list would otherwise hide.
+    expect(commandsIn('Run toil projects init, then toil connections add.')).toEqual(['toil projects init', 'toil connections add']);
+    expect(commandsIn('toil sees no Toil projects yet.')).toEqual([]);
+    expect(lexiconProblems({ 'status.cache': 'Pulling from the rack' })).toEqual([expect.stringMatching(/functional word.*every theme/)]);
     expect(lexiconProblems({ 'empty.prs': '<b>None</b>' })).toEqual(['theme.json: lexicon."empty.prs" must be plain text.']);
     expect(lexiconProblems({ 'button.ask': 'Holler' })).toEqual(['theme.json: lexicon."button.ask" isn\'t a word key (src/wording.ts).']);
     expect(voiceProblems('```proposal```')).toEqual(['theme.json: "voice" must be one paragraph of plain text, with no code fence, citation or line break.']);
     expect(voiceProblems('x'.repeat(801))[0]).toMatch(/over 800/);
+    expect(thinkingProblems(['a…', 'b…'])).toEqual(['theme.json: "thinking" must be a list of 3 to 8 phrases.']);
+    expect(thinkingProblems(['Warming up', 'b…', 'c…'])[0]).toMatch(/must be plain text/);
+    expect(thinkingProblems(['Nearly 90% there…', 'b…', 'c…'])[0]).toMatch(/claims progress/);
+    expect(thinkingProblems(['a…', 'a…', 'c…'])).toEqual(['theme.json: thinking lists a phrase twice.']);
   });
 });
 
@@ -231,7 +244,7 @@ describe('the default theme (#277)', () => {
   it('is Crate until someone picks another, and an explicit choice always wins', () => {
     localStorage.clear();
     expect(DEFAULT_THEME).toBe('crate');
-    const deep = { wording: false, voice: false };
+    const deep = { wording: true, voice: false };
     expect(initialChoice('')).toEqual({ theme: 'crate', scheme: 'system', ...deep });
     expect(initialChoice('?theme=plain&scheme=light')).toEqual({ theme: 'plain', scheme: 'light', ...deep });
     localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'plain', scheme: 'dark' }));

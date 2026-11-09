@@ -62,7 +62,7 @@ describe('the install command', () => {
   it('in a project, installs into the project and saves it exactly, so the next npm install keeps it', () => {
     const plan = installPlan('copilot', { ...base, uiDir: '/work/app/node_modules/@imagile-dev/toil-ui', platform: 'linux', execPath: '/usr/bin/node', env: { npm_execpath: '/usr/lib/node_modules/npm/bin/npm-cli.js' }, exists: files('/work/app/package.json', '/usr/lib/node_modules/npm/bin/npm-cli.js') });
     expect(plan.kind).toBe('project');
-    expect(plan.command).toBe('npm install --prefix /work/app --ignore-scripts --before=2026-09-29 --no-audit --no-fund --save-exact @github/copilot-sdk@1.0.16');
+    expect(plan.command).toBe('npm install --prefix /work/app --ignore-scripts --before=2026-09-29 --no-audit --no-fund --save-exact @github/copilot-sdk@1.0.16 @github/copilot@1.0.100');
     expect(plan.argv![1]).toBe('/usr/lib/node_modules/npm/bin/npm-cli.js');
   });
 
@@ -70,7 +70,7 @@ describe('the install command', () => {
     const readText = (p: string) => (p === posix.join('/src/toil', 'package.json') ? JSON.stringify({ name: '@imagile-dev/toil', workspaces: ['ui'] }) : null);
     const plan = installPlan('copilot', { ...base, uiDir: '/src/toil/ui', platform: 'linux', execPath: '/usr/bin/node', readText, exists: files('/usr/lib/node_modules/npm/bin/npm-cli.js', '/src/toil/node_modules/@openai/codex-sdk/package.json') });
     expect(plan.kind).toBe('clone');
-    expect(plan.command).toBe('npm install --prefix /src/toil --ignore-scripts --before=2026-09-29 --no-audit --no-fund --no-save @github/copilot-sdk@1.0.16 @openai/codex-sdk@0.160.0');
+    expect(plan.command).toBe('npm install --prefix /src/toil --ignore-scripts --before=2026-09-29 --no-audit --no-fund --no-save @github/copilot-sdk@1.0.16 @github/copilot@1.0.100 @openai/codex-sdk@0.160.0');
   });
 
   it("under npx, can't run, and says why with the fix; the command is still there to copy", () => {

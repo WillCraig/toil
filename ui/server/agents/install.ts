@@ -42,7 +42,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import * as nodePath from 'node:path';
 import type { AdapterName } from './runtime.ts';
-import { beforeDate, TESTED } from './tested.ts';
+import { beforeDate, CLI_PACKAGES, TESTED } from './tested.ts';
 
 export { beforeDate, MIN_AGE_DAYS, TESTED, testedVersion } from './tested.ts';
 
@@ -57,6 +57,8 @@ export interface InstallPlan {
   kind: InstallKind;
   /** npm's --prefix: the folder the SDK goes into, or null when there is none. */
   folder: string | null;
+  /** The vendor's CLI this install also puts beside Toil UI (Copilot), or null. */
+  cli?: string | null;
   /** The command as a person would type it, which is what Install runs. */
   command: string;
   /** What runs: node, npm's own CLI script and npm's arguments, with no shell. Null when Install is off. */
@@ -135,7 +137,7 @@ export function locate(o: Pick<PlanOptions, 'uiDir' | 'platform'>, exists: (p: s
 function alreadyThere(prefix: string, except: AdapterName, path: typeof nodePath.posix, exists: (p: string) => boolean): string[] {
   return (Object.keys(TESTED) as AdapterName[])
     .filter((name) => name !== except && exists(path.join(prefix, 'node_modules', ...nameOf(TESTED[name][0]!).split('/'), 'package.json')))
-    .flatMap((name) => TESTED[name]);
+    .flatMap((name) => [...TESTED[name], ...(CLI_PACKAGES[name] ? [CLI_PACKAGES[name]!] : [])]);
 }
 
 /** The one command Install runs for an adapter, or why it can't run here. */
@@ -144,10 +146,11 @@ export function installPlan(adapter: AdapterName, o: PlanOptions): InstallPlan {
   const readText = o.readText ?? readOr;
   const path = o.platform === 'win32' ? nodePath.win32 : nodePath.posix;
   const { kind, prefix } = locate(o, exists, readText);
-  const specs = [...TESTED[adapter]];
+  const cliSpec = CLI_PACKAGES[adapter];
+  const specs = [...TESTED[adapter], ...(cliSpec ? [cliSpec] : [])];
   const common = ['--ignore-scripts', `--before=${beforeDate(o.now)}`, '--no-audit', '--no-fund'];
   let args: string[];
-  if (kind === 'global') args = ['install', '--global', '--prefix', prefix!, ...common, '--omit=optional', ...specs];
+  if (kind === 'global') args = ['install', '--global', '--prefix', prefix!, ...common, ...(cliSpec ? [] : ['--omit=optional']), ...specs];
   else if (kind === 'project') args = ['install', '--prefix', prefix!, ...common, '--save-exact', ...specs];
   else if (kind === 'clone') args = ['install', '--prefix', prefix!, ...common, '--no-save', ...new Set([...specs, ...alreadyThere(prefix!, adapter, path as typeof nodePath.posix, exists)])];
   else args = ['install', ...common, ...specs];
@@ -167,7 +170,7 @@ export function installPlan(adapter: AdapterName, o: PlanOptions): InstallPlan {
   }
   const cli = npmCli(o, exists);
   if (!cli) return off(`Toil UI found no npm beside the Node running it (${path.dirname(o.execPath)}), so it can't run the install.`, 'Copy the command and run it yourself, with the npm you use.');
-  return { adapter, kind, folder: prefix, command, argv: [o.execPath, cli, ...args], problem: null, fix: null };
+  return { adapter, kind, folder: prefix, cli: cliSpec ?? null, command, argv: [o.execPath, cli, ...args], problem: null, fix: null };
 }
 
 export interface InstallRun {

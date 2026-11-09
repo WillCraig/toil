@@ -19,7 +19,7 @@ import type { Envelope } from './toil.ts';
 export type FeedbackKind = 'bug' | 'feature';
 
 /** Why sample data sends nothing, said beside the Send button. */
-export const FEEDBACK_SAMPLE_DISABLED = `This is sample data, so it sends nothing. Toil UI on your own machine sends through toil feedback, or use the form at ${FEEDBACK_FORM}.`;
+export const FEEDBACK_SAMPLE_DISABLED = `This is sample data, so it sends nothing. Toil UI on your own machine sends it for you, or use the form at ${FEEDBACK_FORM}.`;
 
 /** What the person typed. Nothing else goes in a report: toil adds only its version and commit. */
 export interface FeedbackFields {

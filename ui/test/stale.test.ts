@@ -145,7 +145,7 @@ function toilProjectExecute(toilProject: () => unknown): Execute {
 }
 
 describe("a chat's session", () => {
-  const ctx = (signal = new AbortController().signal): RequestContext => ({ viewer: { id: 'local', name: 'you', via: 'launch-token' }, signal });
+  const ctx = (signal = new AbortController().signal): RequestContext => ({ viewer: { id: 'local', name: 'you', via: 'loopback' }, signal });
   const folder = mkdtempSync(join(tmpdir(), 'toil-ui-stale-'));
   let cache: Cache;
   let data: AgentData;

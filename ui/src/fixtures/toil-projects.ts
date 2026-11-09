@@ -140,7 +140,22 @@ export function listData() {
   return {
     folder: null,
     places: { user: USER_DIR, listed: [], repo: null },
-    toilProjects: TOIL_PROJECTS.map((d) => ({ name: d.name, description: d.description, source: 'user', file: fileOf(d.name), shadowedBy: null, problems: 0 })),
+    archivedHidden: SAMPLE_ARCHIVED.length,
+    toilProjects: TOIL_PROJECTS.map((d) => ({ name: d.name, description: d.description, archived: false, source: 'user', file: fileOf(d.name), shadowedBy: null, problems: 0 })),
+    broken: [],
+  };
+}
+
+/** The sample's one archived Toil project: it has no data, which is what archived means here. */
+export const SAMPLE_ARCHIVED = [{ name: 'pilot-rollout', description: 'The pilot, wrapped up in March' }];
+
+/** `toil projects list --archived`'s data. */
+export function archivedListData() {
+  return {
+    folder: null,
+    places: { user: USER_DIR, listed: [], repo: null },
+    archivedHidden: 0,
+    toilProjects: SAMPLE_ARCHIVED.map((d) => ({ name: d.name, description: d.description, archived: true, source: 'user', file: fileOf(d.name), shadowedBy: null, problems: 0 })),
     broken: [],
   };
 }

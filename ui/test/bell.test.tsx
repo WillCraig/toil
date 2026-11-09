@@ -90,7 +90,7 @@ describe('the bell', () => {
     render(<Bell />);
     await userEvent.click(screen.getByRole('button', { name: 'Notifications' }));
     const list = await screen.findByRole('dialog', { name: /^Notifications/ });
-    expect(within(list).getByRole('link', { name: 'Choose what notifies' }).getAttribute('href')).toBe('#/settings/toil');
+    expect(within(list).getByRole('link', { name: 'Choose what notifies' }).getAttribute('href')).toBe('#/settings/general');
   });
 
   it("keeps each notice's changes, quiet hours included, without a toast it didn't make", async () => {

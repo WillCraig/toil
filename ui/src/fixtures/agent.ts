@@ -10,6 +10,7 @@
 
 import type { AdapterList, Agent, Answer, AnswerPart, AskStyle, Starter } from '../agent.ts';
 import { ANALYZE, SCRIPTED_LABEL, citationsOf } from '../agent.ts';
+import { GUIDE_REFUSAL, looksLikeSecret, type GuideRequest } from '../guide.ts';
 import type { ChatTurn } from '../model-usage.ts';
 import type { Proposal } from '../proposal.ts';
 import { plainify } from '../plainify.ts';
@@ -478,6 +479,24 @@ export function scriptedJob(prompt: string): Answer | null {
   return { prompt: jobLabel(id, target), parts, citations: citationsOf(parts), by: 'scripted', adapter: 'scripted', model: null, proposals, ...(id === 'ship' ? { warnings: [`Round 1 of 3. After round 3 it stops and the pull request is for a person.`] } : {}) };
 }
 
+/** What the preview's guide says: canned, plain and short, and about the step it was asked on. It reads no docs and calls no model; it says so. */
+function scriptedGuide(request: GuideRequest): Answer {
+  const asked = request.message.toLowerCase();
+  const text = /scope/.test(asked)
+    ? 'For read-only use, a token that can read your repositories and issues is enough. toil lists exactly what each tool needs on the Settings page, and the tool\'s own page for making a token can pre-fill it.'
+    : /site name|address/.test(asked)
+      ? 'It is the first part of the web address you see when you open the tool in a browser, for example the part before .atlassian.net for Jira Cloud. Paste the whole address, with https://, into the Address box.'
+      : /cloud|data center/.test(asked)
+        ? 'Cloud means the vendor hosts it and you reach it at their domain. Data Center means your organization runs it, at an address of its own. If the address ends in a vendor domain, it is Cloud.'
+        : /toil project/.test(asked)
+          ? 'A Toil project is one body of work, such as a product or a team\'s backlog: the tools it reads from and the repositories it covers. It is a small file in your home folder, and it holds no login.'
+          : 'This is a scripted preview of the guide, so it can only answer the starter questions. With an AI agent set up, it reads toil\'s own documentation to answer yours.';
+  const proposals: Proposal[] = /toil project/.test(asked)
+    ? [{ id: 'guide:projects init:0', from: 'agent', item: 'setup', title: 'Make a Toil project called payments', reason: 'You have no Toil project yet, and this one is empty until you link your tools to it.', command: 'projects init', input: { name: 'payments' }, note: null }]
+    : [];
+  return { prompt: request.message, parts: [{ text }], citations: [], by: 'scripted', adapter: 'scripted', model: null, proposals };
+}
+
 export function scriptedAgent({ delay = 0 }: ScriptedOptions = {}): Agent {
   const answer = (toilProject: string, prompt: string, style?: AskStyle, chat?: ChatTurn): Answer => {
     const job = scriptedJob(prompt);
@@ -502,6 +521,18 @@ export function scriptedAgent({ delay = 0 }: ScriptedOptions = {}): Agent {
     adapters: async () => SAMPLE_ADAPTERS,
     starters: (toilProject: string): Starter[] => Object.entries(SCRIPTS[toilProject] ?? {}).map(([id, s]) => ({ id, label: s.label })),
     ask: async (toilProject, prompt, style, chat) => answer(toilProject, prompt, style, chat),
+    async *guide(request, _history, signal) {
+      if (looksLikeSecret(request.message)) throw new Error(GUIDE_REFUSAL);
+      const whole = scriptedGuide(request);
+      let text = '';
+      for (const w of words(whole.parts[0]!.text)) {
+        if (signal?.aborted) return;
+        text += w;
+        yield { ...whole, parts: [{ text }], proposals: [], activity: { phase: 'writing' } };
+        await wait(delay, signal);
+      }
+      yield whole;
+    },
     async *stream(toilProject, prompt, signal, style, chat) {
       const { usage, ...whole } = answer(toilProject, prompt, style, chat);
       const parts: AnswerPart[] = [];

@@ -5,7 +5,6 @@ import { App, parseRoute } from '../src/App.tsx';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { CONFIG_CANNED, FIXTURE_CONNECTIONS, fixtureConfig } from '../src/fixtures/config.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
-import { standardWords } from './words.ts';
 
 /**
  * The workflow jobs where they apply (#532): Review and Ship in a pull
@@ -27,7 +26,6 @@ async function open(hash: string, canned = CONFIG_CANNED) {
 
 beforeEach(() => {
   localStorage.clear();
-  standardWords();
 });
 afterEach(cleanup);
 
@@ -45,11 +43,11 @@ describe('Pull Requests', () => {
     await open('#/project/card-payments/prs');
     const triggers = await screen.findAllByRole('button', { name: /^Actions for / });
     expect(triggers.length).toBeGreaterThan(0);
-    expect(screen.queryByRole('button', { name: /^Review/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Check this code change/ })).toBeNull();
     await userEvent.click(triggers[0]!);
     const menu = await screen.findByRole('menu');
     const items = within(menu).getAllByRole('menuitem').map((i) => i.textContent);
-    expect(items[0]).toBe('Review');
+    expect(items[0]).toBe('Check this code change');
     expect(items.length).toBeLessThanOrEqual(2);
   });
 
@@ -57,7 +55,7 @@ describe('Pull Requests', () => {
     await open('#/project/card-payments/prs', onlyJira);
     const triggers = await screen.findAllByRole('button', { name: /^Actions for / });
     await userEvent.click(triggers[0]!);
-    const review = await screen.findByRole('menuitem', { name: /Review/ });
+    const review = await screen.findByRole('menuitem', { name: /Check this code change/ });
     expect(review.className).toContain('jobs-item--off');
     expect(review.textContent).toContain('Needs a');
     expect(review.textContent).toContain('connection. Add one in Settings, Connections.');
@@ -70,7 +68,7 @@ describe('Pull Requests', () => {
     let found = false;
     for (const t of triggers) {
       await userEvent.click(t);
-      const review = await screen.findByRole('menuitem', { name: /Review/ });
+      const review = await screen.findByRole('menuitem', { name: /Check this code change/ });
       await userEvent.click(review);
       const dialog = await screen.findByRole('dialog', { name: /Ask about card-payments/ }, { timeout: 3000 });
       await waitFor(() => expect(dialog.textContent).toMatch(/Review .+#\d+/));

@@ -27,16 +27,14 @@ import { voiceOn } from '../theme-context.ts';
 import type { WorklogApi, WorklogExport, WorklogStandup } from '../worklog.ts';
 import { Loader } from '../moments/Moments.tsx';
 
-type Loaded<T> = { ok: true; value: T } | { ok: false; message: string } | null;
+export type Loaded<T> = { ok: true; value: T } | { ok: false; message: string } | null;
 const failedWith = (e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) });
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-export function Standup({ api, from, to, ignored }: { api: WorklogApi | null; from: string | null; to: string | null; ignored?: string }) {
-  const { toilProject, now } = useData();
-  const today = dayOf(now)!;
-  const range = from && to ? { from, to } : defaultRange(today);
+/** Loads the stand-up for a range through the worklog API: null while it loads, `ok: false` with the message when it fails. The page and the Summary's card share it. */
+export function useStandupReport(api: WorklogApi | null, range: { from: string; to: string }): [Loaded<WorklogStandup>, (v: Loaded<WorklogStandup>) => void] {
+  const { toilProject } = useData();
   const [loaded, setLoaded] = useState<Loaded<WorklogStandup>>(null);
-
   useEffect(() => {
     if (!api) return;
     let live = true;
@@ -49,6 +47,14 @@ export function Standup({ api, from, to, ignored }: { api: WorklogApi | null; fr
       live = false;
     };
   }, [api, toilProject.name, range.from, range.to]);
+  return [loaded, setLoaded];
+}
+
+export function Standup({ api, from, to, ignored }: { api: WorklogApi | null; from: string | null; to: string | null; ignored?: string }) {
+  const { toilProject, now } = useData();
+  const today = dayOf(now)!;
+  const range = from && to ? { from, to } : defaultRange(today);
+  const [loaded, setLoaded] = useStandupReport(api, range);
 
   const head = (
     <div className="view-head">
@@ -156,7 +162,7 @@ function Subject({ line }: { line: StandupLine }) {
   );
 }
 
-function Line({ report, line, highlight }: { report: StandupReport; line: StandupLine; highlight: boolean }) {
+export function Line({ report, line, highlight }: { report: StandupReport; line: StandupLine; highlight: boolean }) {
   const { byId, prById } = useData();
   const title = byId.has(line.subject) || prById?.has(line.subject) ? null : line.title;
   return (
@@ -176,6 +182,21 @@ function Line({ report, line, highlight }: { report: StandupReport; line: Standu
   );
 }
 
+/** No good sync behind the report: an empty list is unknown, not zero (principle 12), so it says so beside the way to read. */
+export function NotRead() {
+  const { sync } = useData();
+  return (
+    <p className="note" data-not-read="">
+      <span aria-hidden="true">–</span> Not read yet: nothing has been read for these days.{' '}
+      {sync && (
+        <Button className="btn btn--small" onPress={sync} data-sync-now="">
+          Sync now
+        </Button>
+      )}
+    </p>
+  );
+}
+
 function Lines({ report, lines, none, cited }: { report: StandupReport; lines: StandupLine[]; none: string; cited: Set<string> }) {
   return lines.length ? (
     <ul className="rows worklog-lines">
@@ -183,6 +204,8 @@ function Lines({ report, lines, none, cited }: { report: StandupReport; lines: S
         <Line key={l.fact} report={report} line={l} highlight={cited.has(l.fact)} />
       ))}
     </ul>
+  ) : report.asOf === null ? (
+    <NotRead />
   ) : (
     <p className="note">{none}</p>
   );
@@ -195,7 +218,7 @@ function Person({ report, group, cited }: { report: StandupReport; group: Standu
     <Panel id={id} title={groupTitle(group)} calls={[]}>
       {!group.mapped && group.key !== 'none' && <p className="note">Not in the Toil project's people: an account the People view can map to someone.</p>}
       {count === 0 ? (
-        <p className="note">Nothing recorded for these days.</p>
+        report.asOf === null ? <NotRead /> : <p className="note">Nothing recorded for these days.</p>
       ) : (
         <div className="standup-buckets">
           {BUCKETS.map((b) => (
@@ -250,7 +273,7 @@ function Report({ api, data, onRebuilt }: { api: WorklogApi; data: WorklogStandu
         )}
       </section>
       <Panel id="standup-team" title="Team" calls={[]}>
-        <Lines report={report} lines={report.team} none="No sprint, scope changes, or builds and deployments that broke or recovered." cited={cited} />
+        <Lines report={report} lines={report.team} none="No scope changes, or builds and deployments that broke or recovered." cited={cited} />
       </Panel>
       {report.people.length ? (
         report.people.map((g) => <Person key={g.key} report={report} group={g} cited={cited} />)

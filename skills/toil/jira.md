@@ -33,11 +33,11 @@ shape**, unchanged; `meta.context.connection.deployment` says which one ran. Wha
 | Rich text | strings (wiki markup) | Atlassian Document Format (ADF), plain text in, `…Text` beside it out |
 | `issue search` | `{ issues, total, startAt, maxResults }`, `--start-at` | `{ issues, maxResults, isLast }`, no total, no `--start-at` |
 | `issue log-work --started` | optional, defaults to now | required |
-| Only here | `api` | `project list`, `project get`, `user search` |
+| Only here | `api` | `project list`, `project get`, `user search`, `sprint get`, `sprint create`, `sprint update`, `sprint start`, `sprint complete` |
 
 A call the connection's deployment can't serve fails **before any request** with
 `UNSUPPORTED`, saying which deployment and what to do: `jira api` or `--start-at` on a
-Cloud connection, `jira project list` or `user search` on a Data Center one. The error
+Cloud connection, `jira project list`, `user search` or `sprint create` on a Data Center one. The error
 names the connections you have that can run it. `--assignee` is one flag whose value is a
 username on Data Center and an accountId on Cloud.
 
@@ -143,12 +143,18 @@ listed when writes are on, and `allowWrite: true` stands in for the flag.
 | `issue attachments` | `<key>` | Attachments (id, filename, size, mimeType, content) |
 | `issue download` | `<key> <attachment-id> --dir` | `{ saved, filename, size }`; saves to `.toil/` by default |
 | `issue fields` | `--discover --custom-only --project --issue-type` | Registered fields, or Jira's field list with `suggestedType` and `allowedValues` |
+| `field discover` | `--project <key>` (`--per-type 1-3`, `--limit`) or `--issue <key>` (repeatable) | `{ issueTypes, fields, commands }`: per issue type, the custom fields that hold a value on the sample, each with an example, an alias and the OWI field it likely is; see **Finding custom fields** |
 | `issue set-sprint` ✎ | `<key> --sprint <id>` | `{ updated, sprint }` |
 | `project list` (Cloud) | `--query --limit --cursor` | Every visible project, or a page of them |
 | `project get` (Cloud) | `<project>` | The project |
 | `user search` (Cloud) | `--query --limit --cursor` | One page of matching users, with `accountId` |
 | `board list` | `--project --limit --cursor` | Boards (id, name, scrum or kanban) |
 | `sprint list` | `--board` or `--project`, `--state active,future,closed`, `--limit --cursor` (with `--board`) | Sprints with dates and goal |
+| `sprint get` (Cloud) | `<sprint>` | The sprint as Jira returns it (state, dates, goal, board) |
+| `sprint create` ✎ (Cloud) | `<name> --board <id> --start --end --goal` | The new sprint, state `future` |
+| `sprint update` ✎ (Cloud) | `<sprint> --name --start --end --goal` | The sprint; only what you pass changes |
+| `sprint start` ✎ (Cloud) | `<sprint> --start --end` | The now active sprint; start defaults to now, end to its planned end |
+| `sprint complete` ✎ (Cloud) | `<sprint> --move-open-to <sprint\|backlog>` | `{ sprint, moved, movedTo }`; issues not done move first, then the sprint closes |
 | `api` (Data Center) | `<method> <path> --query key=value (repeatable) --body-file --content-type` | The response body; see **Any endpoint** below. ✎ for `POST`, `PUT`, `PATCH`, `DELETE` |
 | `check-toil-project` | `--toil-project <name\|file>` (or the folder's toil project) | `{ toil project, connection, env, ok, checked, checks, unchecked }`: each project and field id the toil project names, found or not; exit 1 when one is missing |
 
@@ -173,6 +179,7 @@ toil jira issue link ABC-123 --target ABC-456 --type Blocks --allow-write
 toil jira sprint list --project ABC --state active,future
 toil jira issue set-sprint ABC-123 --sprint 42 --allow-write
 toil jira issue download ABC-123 10001 --dir downloads
+toil jira field discover --project ABC --per-type 1
 ```
 
 On a Cloud connection, name it (or make it the default) and mind the differences above:
@@ -182,6 +189,9 @@ toil jira user search --query smith --connection imagile-cloud
 toil jira issue create --connection imagile-cloud --project PROJ --type Bug --summary "Login broken" --description "Open the login page in Safari; the button does nothing." --assignee 5b10ac8d82e05b22cc7d4ef5 --allow-write
 toil jira issue log-work PROJ-123 --connection imagile-cloud --time-spent "2h 30m" --started 2026-01-15T09:00:00.000+0000 --allow-write
 toil jira project get PROJ --connection imagile-cloud
+toil jira sprint create "Sprint 7" --board 1 --start 2026-11-02 --end 2026-11-16 --connection imagile-cloud --allow-write
+toil jira sprint start 7 --connection imagile-cloud --allow-write
+toil jira sprint complete 7 --move-open-to backlog --connection imagile-cloud --allow-write
 toil jira sprint list --project PROJ --state active --connection imagile-cloud
 ```
 
@@ -379,7 +389,24 @@ the raw string; a value in `--fields-file` or `--input-file` is sent untouched, 
 multi-line text field there needs ADF on Cloud. `toil jira issue fields --discover` lists
 Jira's fields with a `suggestedType`; add `--project ABC` to see each select field's
 `allowedValues`. A select field that only accepts option ids needs `"type": "option-id"`.
-**Sprint is not a custom field**: use `issue set-sprint` after the issue exists.
+**Sprint is not a custom field**: use `issue set-sprint` after the issue exists; on Cloud the sprints themselves are made and run with `sprint create`, `start` and `complete`.
+
+**Finding custom fields.** `toil jira field discover --project ABC` reads the most recently
+updated issue of each issue type (at most 12 types, one search each, `--limit` fewer;
+`--per-type` up to 3 issues of each) and reports, per issue type, the custom fields that
+hold a value on it: id, name, schema, an example of at most 80 characters (a person shows
+as `(a person)`, rich text as `(rich text)`), a suggested camelCase `alias`, and `owi`, the
+Open Work Item field it likely is (`iteration` for Jira Software's Sprint, `estimate` for
+Story Points or Story point estimate, `team`, `dueDate`) with `confidence` `high` or
+`medium` and why. `--issue ABC-123 --issue ABC-456` reads those issues instead. An issue
+type with no issue to read has `status: "no-sample"` and `fields: null`: that is unknown,
+not "no custom fields" (`[]`). More types than `--limit` allows give a
+`JIRA_DISCOVER_TRUNCATED` warning naming the ones left out. `commands` holds the
+`toil projects field` lines for the high-confidence fields: the alias, then the OWI key
+(`estimate`, `iteration`) pointed at the same id with `--replace`. It reads only and never
+runs them: copy the ones you want, or tick them in Toil UI's **Find the fields**. Naming a
+field in a toil project does not make `issue search` return it; that still takes the field
+in the connection's `customFields`, or `--fields`.
 
 A **toil project** can name fields too (`"jira": { "fields": { "storyPoints": "customfield_10016" } }`,
 or `toil projects field <toil project> jira storyPoints customfield_10016`). Then
@@ -457,6 +484,13 @@ from the toil project and the connection. Both are writes, made only on the pers
   asks for the bytes with `GET /rest/api/3/attachment/content/<id>?redirect=false`, so the
   request never leaves your site; `issue attach` uploads as multipart with
   `X-Atlassian-Token: no-check`.
+- `sprint start` refuses a sprint that isn't `future` and one with no end date (Jira
+  needs both dates); `sprint complete` refuses one that isn't `active`. `complete` with
+  `--move-open-to` lists the issues whose status category isn't Done, moves them (50 a
+  call) to the sprint or backlog, then closes the sprint, so a failed close leaves them
+  already moved. Without it the open issues stay attached to the closed sprint: Jira moves nothing when the API completes one (checked on Cloud). Jira may refuse a second
+  active sprint on one board, and that message is the command's error. None of these
+  deletes anything, so they are all on MCP.
 - `sprint list --project` on Cloud reads scrum and team-managed (`simple`) boards and skips
   kanban ones. A team-managed board whose project hasn't turned sprints on answers 400;
   it's skipped with a `JIRA_CLOUD_NO_SPRINTS` warning naming it. Any other failure is

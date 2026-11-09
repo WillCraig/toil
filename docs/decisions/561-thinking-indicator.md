@@ -1,0 +1,9 @@
+# An active thinking indicator for the Ask bar (#561)
+
+- **The phrases are a `thinking` list in each game theme's `theme.json`, not `lexicon` keys.** The lexicon holds one text per key with placeholders; a rotating list is a different shape, and putting it beside `moments.loader.flavour`'s idea (a list of flavour lines) without a new moment keeps `src/wording.ts` unchanged. Plain has none and reads the standard phrases in `src/thinking.ts`. Applies to `ui/themes/*/theme.json`, `ui/src/theme-pack.ts`.
+- **They follow Themed wording, like every other theme line.** With wording off, every theme reads Plain's phrases. Applies to `useThinkingPhrases` in `ui/src/components/thinking.tsx`.
+- **A phrase is chosen by elapsed time, not at random:** one per 6 seconds, in the listed order. Tests are stable, and the live region announces a change at most every 6 seconds. The elapsed seconds sit in an `aria-hidden` span so the ticking clock is never announced.
+- **The phrase gives way to a plain statement once the agent names a tool or writes** (principle 4). Flavour is shown only while all that is known is the wait; the seconds elapsed are always beside it.
+- **The icon is a CSS-animated SVG, stopped by `prefers-reduced-motion` and by Settings' "Reduce motion and effects"**, which `app.css` already does for every animation, and left as a still arc. It is not a theme asset, so no theme needs to ship one.
+- **The in-bubble loader keeps `loading.answer`** ("Checking the almanac…"): it is the Loader's own message, not the status line, and changing it would touch the Loader's contract.
+- **The scripted sample agent is unchanged, so `toil-ui --sample` still answers at once and never shows the indicator.** Making it think first would slow the site's showcase and the smoke scripts that wait on its answers. It was checked in a browser by temporarily making the scripted stream wait before its first word; that change was not kept.

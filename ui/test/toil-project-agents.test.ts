@@ -1,6 +1,7 @@
 // @vitest-environment node
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
+import { cookieHeader, letInto } from './let-in.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -10,7 +11,7 @@ import type { AdapterList, AdapterOption, Answer } from '../src/agent.ts';
 import { ToilProjectAgents, toilProjectAgentsFile } from '../server/agents/toil-project-agents.ts';
 import type { Agent } from '../server/agent.ts';
 import { Cache } from '../server/cache.ts';
-import { CSRF_HEADER, SESSION_HEADER, createUiServer } from '../server/server.ts';
+import { createUiServer } from '../server/server.ts';
 import { fixtureStore } from '../server/store.ts';
 import { SyncService } from '../server/sync.ts';
 import { stubToil } from './toil-stub.ts';
@@ -153,7 +154,7 @@ describe("the file that remembers an agent per Toil project", () => {
     const toil = stubToil();
     const store = new ToilProjectAgents(dir);
     const sync = new SyncService({ cache, execute: toil.execute, mapOwi, onForget: (d) => store.forget(d) });
-    const ctx = { viewer: { id: 'local', name: 'you', via: 'launch-token' as const }, signal: new AbortController().signal };
+    const ctx = { viewer: { id: 'local', name: 'you', via: 'loopback' as const }, signal: new AbortController().signal };
     await sync.run(ctx);
     store.set('checkout-web', 'codex');
     store.set('settlement', 'claude');
@@ -166,14 +167,13 @@ describe("the file that remembers an agent per Toil project", () => {
 });
 
 describe('the server', () => {
-  const TOKEN = 'launch-token-for-tests';
   const app = folder();
 
-  function send(origin: string, path: string, sid: string, body?: unknown, csrf?: string): Promise<{ status: number; body: string }> {
+  function send(origin: string, path: string, body?: unknown): Promise<{ status: number; body: string }> {
     const url = new URL(path, origin);
     return new Promise((resolve, reject) => {
-      const headers: Record<string, string> = { host: url.host, [SESSION_HEADER]: sid };
-      if (body !== undefined) Object.assign(headers, { origin, 'content-type': 'application/json', [CSRF_HEADER]: csrf! });
+      const headers: Record<string, string> = { host: url.host, ...cookieHeader(origin) };
+      if (body !== undefined) Object.assign(headers, { origin, 'content-type': 'application/json' });
       const req = request({ host: url.hostname, port: url.port, path: `${url.pathname}${url.search}`, method: body === undefined ? 'GET' : 'POST', headers }, (res) => {
         let text = '';
         res.setEncoding('utf8');
@@ -204,55 +204,46 @@ describe('the server', () => {
       },
       adapterOptions: () => list(),
     };
-    const ui = createUiServer({ settings: { host: '127.0.0.1', port: 0, basePath: '/', dataDir: app, retentionDays: 30, sample: true }, store: fixtureStore(), agent, appDir: app, version: '0.0.0-test', toil: { version: '0.1.0', contractVersion: 1 }, token: TOKEN, toilProjectAgents: store });
+    mkdirSync(app, { recursive: true });
+    writeFileSync(join(app, 'index.html'), '<!doctype html>');
+    const ui = createUiServer({ settings: { host: '127.0.0.1', port: 0, basePath: '/', dataDir: app, retentionDays: 30, sample: true }, store: fixtureStore(), agent, appDir: app, version: '0.0.0-test', toil: { version: '0.1.0', contractVersion: 1 }, toilProjectAgents: store });
     const address = await ui.listen();
+    await letInto(address.origin);
     closers.push(() => ui.close());
-    const res = await new Promise<{ body: string }>((resolve, reject) => {
-      const url = new URL('/api/session', address.origin);
-      const req = request({ host: url.hostname, port: url.port, path: url.pathname, method: 'POST', headers: { host: url.host, origin: address.origin, 'content-type': 'application/json' } }, (r) => {
-        let text = '';
-        r.setEncoding('utf8');
-        r.on('data', (c: string) => (text += c));
-        r.on('end', () => resolve({ body: text }));
-      });
-      req.on('error', reject);
-      req.end(JSON.stringify({ token: TOKEN }));
-    });
-    const session = JSON.parse(res.body) as { session: string; csrf: string };
-    return { origin: address.origin, sid: session.session, csrf: session.csrf, asked };
+    return { origin: address.origin, asked };
   }
 
   const whole: Answer = { prompt: 'Analyze', parts: [{ text: 'Fine.' }], citations: [], by: 'Codex', proposals: [] };
 
   it("says the Toil project's remembered agent with the list, and learns it from a whole Analyze that named one", async () => {
     const store = new ToilProjectAgents(folder());
-    const { origin, sid, csrf, asked } = await boot(store, () => whole);
-    const read = async (toilProject: string) => JSON.parse((await send(origin, `/api/agent/adapters?toilProject=${toilProject}`, sid)).body) as AdapterList;
+    const { origin, asked } = await boot(store, () => whole);
+    const read = async (toilProject: string) => JSON.parse((await send(origin, `/api/agent/adapters?toilProject=${toilProject}`)).body) as AdapterList;
     expect((await read('card-payments')).remembered).toBeUndefined();
-    expect((await send(origin, '/api/agent/ask', sid, { toilProject: 'card-payments', prompt: 'analyze', adapter: 'codex' }, csrf)).status).toBe(200);
+    expect((await send(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'analyze', adapter: 'codex' })).status).toBe(200);
     expect(asked).toEqual(['codex']);
     expect((await read('card-payments')).remembered).toBe('codex');
     expect((await read('settlement')).remembered).toBeUndefined();
-    expect(JSON.parse((await send(origin, '/api/agent/adapters', sid)).body).remembered).toBeUndefined();
+    expect(JSON.parse((await send(origin, '/api/agent/adapters')).body).remembered).toBeUndefined();
     // Another agent picked: the memory follows.
-    await send(origin, '/api/agent/ask', sid, { toilProject: 'card-payments', prompt: 'analyze', adapter: 'claude' }, csrf);
+    await send(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'analyze', adapter: 'claude' });
     expect(new ToilProjectAgents(dirOf(store)).get('card-payments')).toBe('claude');
   });
 
   it('remembers an ordinary question that names an agent', async () => {
     const store = new ToilProjectAgents(folder());
-    const { origin, sid, csrf } = await boot(store, () => whole);
-    await send(origin, '/api/agent/ask', sid, { toilProject: 'card-payments', prompt: 'What is blocked?', adapter: 'codex' }, csrf);
+    const { origin } = await boot(store, () => whole);
+    await send(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'What is blocked?', adapter: 'codex' });
     expect(store.get('card-payments')).toBe('codex');
     // Streamed, as the page asks: the same.
-    await send(origin, '/api/agent/ask', sid, { toilProject: 'settlement', prompt: 'What is blocked?', adapter: 'claude', stream: true }, csrf);
+    await send(origin, '/api/agent/ask', { toilProject: 'settlement', prompt: 'What is blocked?', adapter: 'claude', stream: true });
     expect(store.get('settlement')).toBe('claude');
   });
 
   it('refuses a fallback that names no adapter', async () => {
     const store = new ToilProjectAgents(folder());
-    const { origin, sid, csrf } = await boot(store, () => whole);
-    const res = await send(origin, '/api/agent/ask', sid, { toilProject: 'card-payments', prompt: 'What is blocked?', fallback: true }, csrf);
+    const { origin } = await boot(store, () => whole);
+    const res = await send(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'What is blocked?', fallback: true });
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body).error.message).toContain('fallback names no adapter');
   });
@@ -260,14 +251,14 @@ describe('the server', () => {
   it('remembers nothing from a question that names no agent, names only a fallback, or fails or comes back empty', async () => {
     const store = new ToilProjectAgents(folder());
     let next: Answer | Error = whole;
-    const { origin, sid, csrf } = await boot(store, () => next);
-    await send(origin, '/api/agent/ask', sid, { toilProject: 'card-payments', prompt: 'What is blocked?' }, csrf);
-    await send(origin, '/api/agent/ask', sid, { toilProject: 'card-payments', prompt: 'analyze' }, csrf);
-    await send(origin, '/api/agent/ask', sid, { toilProject: 'card-payments', prompt: 'What is blocked?', adapter: 'codex', fallback: true }, csrf);
+    const { origin } = await boot(store, () => next);
+    await send(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'What is blocked?' });
+    await send(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'analyze' });
+    await send(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'What is blocked?', adapter: 'codex', fallback: true });
     next = new Error('The agent is not signed in.');
-    expect((await send(origin, '/api/agent/ask', sid, { toilProject: 'card-payments', prompt: 'analyze', adapter: 'codex' }, csrf)).status).toBe(502);
+    expect((await send(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'analyze', adapter: 'codex' })).status).toBe(502);
     next = { ...whole, parts: [] };
-    await send(origin, '/api/agent/ask', sid, { toilProject: 'card-payments', prompt: 'analyze', adapter: 'codex' }, csrf);
+    await send(origin, '/api/agent/ask', { toilProject: 'card-payments', prompt: 'analyze', adapter: 'codex' });
     expect(store.get('card-payments')).toBeNull();
   });
 

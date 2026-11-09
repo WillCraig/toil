@@ -1,6 +1,6 @@
 /**
- * Every toil project page's frame (#394): a top row with the toil project's name, its
- * switcher, the sprint's day, and the Ask bar; then one tab per
+ * Every toil project page's frame (#394): a top row with the toil project's name,
+ * the sprint's day, and the Ask bar; then one tab per
  * view of the toil project; then the view itself, with the Agents panel behind one
  * button: beside the view from 1200px wide once opened, a drawer below that. The tabs are links, one route each,
  * so a view keeps its own address and the old ones (`/prs`, `/people`,
@@ -18,7 +18,7 @@
  */
 
 import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { Button, Dialog, Menu, MenuItem, MenuTrigger, Modal, ModalOverlay, Popover } from 'react-aria-components';
+import { Button, Dialog, Modal, ModalOverlay } from 'react-aria-components';
 import { AskBar } from '../components/ask.tsx';
 import { ItemDrawer } from '../components/briefing.tsx';
 import { Editable, SourceBadges } from '../components/toil-project-head.tsx';
@@ -30,7 +30,7 @@ import { AgentsSidebar, useAgentsSummary } from '../assign/sidebar.tsx';
 import { AssignModal } from '../assign/views.tsx';
 import { useUiCommand } from '../commands.ts';
 import { useData, useDerived } from '../data.ts';
-import { analysesHref, boardHref, commandCenterHref, dependenciesHref, toilProjectHref, peopleHref, prsHref, worklogHref } from '../format.ts';
+import { analysesHref, boardHref, commandCenterHref, dependenciesHref, toilProjectEditHref, toilProjectHref, peopleHref, prsHref, worklogHref } from '../format.ts';
 import { needingAttention } from '../model/insights.ts';
 import { useTerm, useTheme } from '../skins.tsx';
 import { usePlain } from '../plain-words.ts';
@@ -57,12 +57,12 @@ export const SIDEBAR_WIDE = '(min-width: 1200px)';
 export const PHONE_BAR = '(max-width: 599px)';
 
 /**
- * The toil project's top row and tabs, the view, and the Agents sidebar. `heading`
+ * The toil project's top row and tabs, the view, and the Agents sidebar (the project picker is in the app's header). `heading`
  * makes the toil project's name the page's h1, for the tabs that have no heading of
  * their own (Overview, Board, Dependencies, Analyses); the others keep theirs.
  * `boardView` says which of the Board tab's two views is showing.
  */
-export function ToilProjectShell({ tab, heading, toilProjects, boardView, peek = null, children }: { tab: ToilProjectTab | null; heading: boolean; toilProjects: string[] | null; boardView?: 'board' | 'readiness'; peek?: string | null; children: ReactNode }) {
+export function ToilProjectShell({ tab, heading, boardView, peek = null, children }: { tab: ToilProjectTab | null; heading: boolean; boardView?: 'board' | 'readiness'; peek?: string | null; children: ReactNode }) {
   const { toilProject, config, described } = useData();
   const { health: h, insights } = useDerived();
   const term = useTerm();
@@ -78,7 +78,7 @@ export function ToilProjectShell({ tab, heading, toilProjects, boardView, peek =
   useEnter(view, moments.tabs, `${tab ?? ''}:${boardView ?? ''}`, { onMount: false, ms: 260 });
   const attention = useMemo(() => needingAttention(h?.items ?? toilProject.items, insights).length, [h, toilProject, insights]);
   const name = (
-    <Editable field="name" toilProject={toilProject.name} value={toilProject.name} config={config ?? null} onSaved={described ?? (() => undefined)}>
+    <Editable bare field="name" toilProject={toilProject.name} value={toilProject.name} config={config ?? null} onSaved={described ?? (() => undefined)}>
       {toilProject.name}
     </Editable>
   );
@@ -103,7 +103,6 @@ export function ToilProjectShell({ tab, heading, toilProjects, boardView, peek =
             ) : (
               <p className="toil-project-bar__name">{name}</p>
             )}
-            <Switcher current={toilProject.name} toilProjects={toilProjects} />
             {phone && (
               <Button className="btn btn--small" aria-expanded={aboutOpen} aria-controls="toil-project-about" onPress={() => setAboutOpen(!aboutOpen)} data-about-toggle="">
                 Details<span className="sr-only"> of {toilProject.name}: description and sources</span>
@@ -114,7 +113,7 @@ export function ToilProjectShell({ tab, heading, toilProjects, boardView, peek =
           {(!phone || aboutOpen) && (
           <div className="toil-project-bar__about" id="toil-project-about">
             <p className="toil-project-bar__desc">
-              <Editable field="description" toilProject={toilProject.name} value={toilProject.description} config={config ?? null} onSaved={described ?? (() => undefined)}>
+              <Editable bare field="description" toilProject={toilProject.name} value={toilProject.description} config={config ?? null} onSaved={described ?? (() => undefined)}>
                 {toilProject.description ? (
                   <span className="toil-project-bar__desc-text" title={toilProject.description} data-truncate="">
                     {toilProject.description}
@@ -124,8 +123,12 @@ export function ToilProjectShell({ tab, heading, toilProjects, boardView, peek =
                 )}
               </Editable>
             </p>
-            <SourceBadges sources={toilProject.sources} toilProject={toilProject.name} />
+            <SourceBadges sources={toilProject.sources} toilProject={toilProject.name} bare />
             {tab === 'overview' && <DiagramLink />}
+            {/* One way to change the project (its sources, fields, people and the rest), where three pencils each opened a different corner of it. A quiet link at the end of the row, not a button beside the name. */}
+            <a className="toil-project-bar__edit" href={toilProjectEditHref(toilProject.name, 'sources')} aria-label={`Edit ${toilProject.name}`} data-edit-project="">
+              Edit
+            </a>
           </div>
           )}
         </div>
@@ -143,7 +146,7 @@ export function ToilProjectShell({ tab, heading, toilProjects, boardView, peek =
                   <a href={t.href} aria-current={t.id === tab ? 'page' : undefined} data-tab={t.id} title={t.title}>
                     {t.label}
                     {t.count && t.count.n > 0 && (
-                      <span className="tab-count">
+                      <span className="tab-count" title={`${t.count.n} ${t.count.label}`}>
                         <span aria-hidden="true">{t.count.n}</span>
                         <span className="sr-only">
                           , {t.count.n} {t.count.label}
@@ -198,32 +201,8 @@ function PaletteAssign() {
   return <AssignModal item={item} isOpen onOpenChange={(open) => !open && setId(null)} />;
 }
 
-/** The toil project switcher: every toil project this browser has read, and the Toil projects overview, whose cards say most about each. */
-function Switcher({ current, toilProjects }: { current: string; toilProjects: string[] | null }) {
-  const others = (toilProjects ?? []).filter((d) => d !== current);
-  return (
-    <MenuTrigger>
-      <Button className="btn btn--small toil-project-switch" aria-label={`${'Switch Toil project'}, on ${current}`} data-toil-project-switch="">
-        Switch <span aria-hidden="true">▾</span>
-      </Button>
-      <Popover className="popover" placement="bottom start">
-        <Menu className="menu" aria-label={'Toil projects'}>
-          <MenuItem id="#/" href="#/" className="menu-item">
-            All Toil projects
-          </MenuItem>
-          {others.map((d) => (
-            <MenuItem key={d} id={d} href={toilProjectHref(d)} className="menu-item">
-              {d}
-            </MenuItem>
-          ))}
-        </Menu>
-      </Popover>
-    </MenuTrigger>
-  );
-}
-
 /**
- * The one way into the Agents panel from the frame (#552), labelled "AI helpers" in plain words and carrying how many
+ * The one way into the Agents panel from the frame (#552), labelled "AI agents" in plain words and carrying how many
  * things wait on a person. From 1200px wide it opens and closes the panel beside the view, and remembers which; below that
  * it opens the drawer. The command palette (Open the Agents panel) reaches the same panel without it; there is no keyboard shortcut.
  */
@@ -242,8 +221,8 @@ function AgentsButton({ wide }: { wide: boolean }) {
     <>
       <Hint precise="Agents">
         <Button className="btn agents-open" onPress={() => (wide ? setSide(!side) : setOpen(true))} aria-expanded={wide ? side : undefined} data-agents-open="">
-          {/* On a phone the label shrinks to "AI" and the rest stays for a screen reader, so the name is still "AI helpers". */}
-          <span className="agents-open__label">{plain.pw('Agents', 'AI helpers')}</span>
+          {/* On a phone the label shrinks to "AI" and the rest stays for a screen reader, so the name is still "AI agents". */}
+          <span className="agents-open__label">{plain.pw('Agents', 'AI agents')}</span>
           {plain.on && (
             <span className="agents-open__short" aria-hidden="true">
               AI

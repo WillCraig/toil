@@ -76,10 +76,27 @@ export const SIZES: readonly SizeBucket[] = ['XS', 'S', 'M', 'L', 'XL'];
 export const SIZE_LINES: Record<SizeBucket, number> = { XS: 9, S: 49, M: 249, L: 999, XL: Infinity };
 
 /** XS to XL by changed lines, or null with the reason when the host counts files only. */
-export function sizeOf(c: Change): { bucket: SizeBucket | null; lines: number | null; files: number | null } {
-  const lines = c.size && c.size.additions !== null && c.size.deletions !== null ? c.size.additions + c.size.deletions : null;
-  return { bucket: lines === null ? null : SIZES.find((b) => lines <= SIZE_LINES[b])!, lines, files: c.size?.files ?? null };
+export function sizeOf(c: Change): { bucket: SizeBucket | null; lines: number | null; files: number | null; additions: number | null; deletions: number | null } {
+  const known = c.size && c.size.additions !== null && c.size.deletions !== null;
+  const lines = known ? c.size!.additions! + c.size!.deletions! : null;
+  return { bucket: lines === null ? null : SIZES.find((b) => lines <= SIZE_LINES[b])!, lines, files: c.size?.files ?? null, additions: known ? c.size!.additions : null, deletions: known ? c.size!.deletions : null };
 }
+
+/** Five squares, GitHub's diff stat: how many are additions, deletions and neither (a change with no lines, or a share too small to draw). */
+export function diffSquares(additions: number, deletions: number): { add: number; del: number; none: number } {
+  const total = additions + deletions;
+  if (total === 0) return { add: 0, del: 0, none: 5 };
+  let add = additions > 0 ? Math.max(1, Math.round((5 * additions) / total)) : 0;
+  let del = deletions > 0 ? Math.max(1, Math.round((5 * deletions) / total)) : 0;
+  while (add + del > 5) {
+    if (add > del) add--;
+    else del--;
+  }
+  return { add, del, none: 5 - add - del };
+}
+
+/** A wait as a compact figure, `32.6 d`, for a cell; `daysText` is the full words. */
+export const daysShort = (n: number) => `${round1(n)} d`;
 
 // Flags --------------------------------------------------------------------------------
 
@@ -89,6 +106,16 @@ export const PICKUP_DAYS = lensDef('waiting').threshold!;
 export const FAILING_HOURS = lensDef('failing').threshold!;
 
 export type PrFlag = 'slow-pickup' | 'failing-checks' | 'conflict' | 'no-work-item' | 'item-done' | 'merged-item-open';
+
+/** The same flags in a table cell: a few words, the full label one step in (title) and in the Flags panel. */
+export const PR_FLAG_SHORT: Record<PrFlag, string> = {
+  'slow-pickup': 'No review yet',
+  'failing-checks': 'Checks failing',
+  conflict: 'Conflict',
+  'no-work-item': 'No work item',
+  'item-done': 'Item done',
+  'merged-item-open': 'Item open',
+};
 
 export const PR_FLAG_LABEL: Record<PrFlag, string> = {
   'slow-pickup': `No first review in ${PICKUP_DAYS} working days`,
@@ -101,6 +128,8 @@ export const PR_FLAG_LABEL: Record<PrFlag, string> = {
 
 export interface FlagHit {
   flag: PrFlag;
+  /** Working days a `slow-pickup` has waited. */
+  days?: number;
   /** What it rests on, citing items as [[id]]. */
   text: string;
 }
@@ -113,7 +142,7 @@ export function flagsOf(c: Change, byId: Map<string, WorkItem>, now: string): Fl
   const items = linked(c, byId).map((id) => byId.get(id)!);
   if (c.state === 'OPEN') {
     const waited = c.created ? workingDays(c.created, c.firstReviewAt ?? now) : null;
-    if (!c.firstReviewAt && waited !== null && waited > PICKUP_DAYS) out.push({ flag: 'slow-pickup', text: `Open ${daysText(waited)} with no review yet.` });
+    if (!c.firstReviewAt && waited !== null && waited > PICKUP_DAYS) out.push({ flag: 'slow-pickup', days: waited, text: `Open ${daysText(waited)} with no review yet.` });
   }
   if (isOpen(c)) {
     if (c.checks === 'FAILING' && c.checksAt && Date.parse(now) - Date.parse(c.checksAt) > FAILING_HOURS * 3_600_000) {

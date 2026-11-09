@@ -84,6 +84,8 @@ export interface ToilProject {
   people: ToilProjectPerson[];
   /** How many items one person may have in progress at once, as the team agreed; absent when it set none. */
   wipLimit?: number;
+  /** Set by `toil projects archive`: the person is done looking at it for now. Hidden from lists, never from resolution; absent when not archived. */
+  archived?: true;
   /** How Analyze briefs it (#494): its reader, its lenses, and its focus; absent for the standard. */
   analyze?: ToilProjectAnalyze;
 }
@@ -118,7 +120,7 @@ export interface ToilProjectArea {
 
 /** Keys of a section that core reads itself; every other key is a context input or reference data. */
 const CORE_SECTION_KEYS = new Set(['connection', 'host', 'fields', 'transitions']);
-const TOP_LEVEL = new Set(['$schema', 'name', 'description', 'env', 'repos', 'environments', 'people', 'wipLimit', 'analyze']);
+const TOP_LEVEL = new Set(['$schema', 'name', 'description', 'env', 'repos', 'environments', 'people', 'wipLimit', 'archived', 'analyze']);
 const ALIAS = /^[a-z][a-zA-Z0-9]*$/;
 const HOST = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:\d{1,5})?$/i;
 
@@ -396,6 +398,8 @@ export function validateToilProject(input: unknown, areas: readonly ToilProjectA
   const people = readPeople(raw.people, byName, error, warn);
   if (raw.wipLimit !== undefined && !(typeof raw.wipLimit === 'number' && Number.isInteger(raw.wipLimit) && raw.wipLimit > 0)) error('wipLimit', '"wipLimit" must be a whole number above 0: how many items one person may have in progress at once.');
 
+  if (raw.archived !== undefined && typeof raw.archived !== 'boolean') error('archived', '"archived" must be true or false.');
+
   const analyze = readAnalyze(raw.analyze, error, warn);
 
   if (problems.some((p) => p.level === 'error')) return { problems };
@@ -410,6 +414,7 @@ export function validateToilProject(input: unknown, areas: readonly ToilProjectA
       environments,
       people,
       ...(typeof raw.wipLimit === 'number' ? { wipLimit: raw.wipLimit } : {}),
+      ...(raw.archived === true ? { archived: true as const } : {}),
       ...(analyze ? { analyze } : {}),
     },
     problems,
@@ -608,6 +613,7 @@ export function toilProjectContent(toilProject: ToilProject): Record<string, unk
     ...(Object.keys(toilProject.environments).length > 0 ? { environments: toilProject.environments } : {}),
     ...(toilProject.people.length > 0 ? { people: toilProject.people } : {}),
     ...(toilProject.wipLimit !== undefined ? { wipLimit: toilProject.wipLimit } : {}),
+    ...(toilProject.archived ? { archived: true } : {}),
     ...(toilProject.analyze !== undefined ? { analyze: toilProject.analyze } : {}),
   };
 }

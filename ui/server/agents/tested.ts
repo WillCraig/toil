@@ -15,6 +15,16 @@ export const TESTED: Record<AdapterName, readonly string[]> = {
   codex: ['@openai/codex-sdk@0.160.0'],
 };
 
+/**
+ * The vendor's own CLI, where it ships on npm as a loader script Node can run
+ * (the Copilot CLI, tested at 1.0.100), installed in the same press as its SDK
+ * so Install leaves one working helper, not half of one. Exact, like TESTED.
+ * Extends the exception above at the maintainer's request (2026-11-05).
+ */
+export const CLI_PACKAGES: Partial<Record<AdapterName, string>> = {
+  copilot: '@github/copilot@1.0.100',
+};
+
 /** How old every release an install resolves must be (CLAUDE.md, Secrets: the 14-day rule). */
 export const MIN_AGE_DAYS = 14;
 

@@ -71,7 +71,7 @@ describe('which changes notify', () => {
 describe("the server's event stream, as the page reads it", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('reads NDJSON split across chunks, with the session header, to a last line with no newline', async () => {
+  it('reads NDJSON split across chunks, with no header, to a last line with no newline', async () => {
     const { httpAssignments } = await import('../src/assign/client.ts');
     const a = JSON.stringify(event({ seq: 1, id: 'a1' }));
     const b = JSON.stringify(event({ seq: 2, id: 'a2', state: 'done' }));
@@ -83,12 +83,12 @@ ${b.slice(0, 7)}`, b.slice(7)];
       const enc = new TextEncoder();
       return new Response(new ReadableStream({ start(c) { for (const x of chunks) c.enqueue(enc.encode(x)); c.close(); } }), { status: 200, headers: { 'content-type': 'application/x-ndjson' } });
     });
-    const api = httpAssignments({ session: 'sid-1', csrf: 'c', assignments: true } as never, '/');
+    const api = httpAssignments({ assignments: true } as never, '/');
     const got: AssignmentEvent[] = [];
     await api.events!('latest', (e) => got.push(e), new AbortController().signal);
     expect(got.map((e) => [e.seq, e.id, e.state])).toEqual([[1, 'a1', 'needs-you'], [2, 'a2', 'done']]);
     expect(seen[0]!.url).toBe('/api/assignments/events?since=latest');
-    expect(seen[0]!.headers['X-Toil-UI-Session']).toBe('sid-1');
+    expect(seen[0]!.headers).toBeUndefined();
   });
 });
 
@@ -164,7 +164,7 @@ describe('in the page', () => {
   it('asks the browser for permission only once a person turns browser notifications on', async () => {
     const requestPermission = vi.fn(async () => 'granted' as NotificationPermission);
     vi.stubGlobal('Notification', Object.assign(vi.fn(), { permission: 'default', requestPermission }));
-    await open('#/settings/toil');
+    await open('#/settings/general');
     const panel = screen.getByRole('region', { name: 'Notifications' });
     expect(within(panel).getByRole('checkbox', { name: 'Needs you' })).toHaveProperty('checked', true);
     expect(within(panel).getByRole('checkbox', { name: 'Done' })).toHaveProperty('checked', false);
@@ -175,7 +175,7 @@ describe('in the page', () => {
   }, 20_000);
 
   it('keeps quiet hours as they were while a time is typed that is not one, saying so', async () => {
-    await open('#/settings/toil');
+    await open('#/settings/general');
     const panel = screen.getByRole('region', { name: 'Notifications' });
     const user = userEvent.setup();
     await user.click(within(panel).getByRole('checkbox', { name: 'Quiet hours' }));
@@ -191,7 +191,7 @@ describe('in the page', () => {
 
   it("says plainly when the browser refuses, and leaves it off", async () => {
     vi.stubGlobal('Notification', Object.assign(vi.fn(), { permission: 'default', requestPermission: async () => 'denied' as NotificationPermission }));
-    await open('#/settings/toil');
+    await open('#/settings/general');
     const panel = screen.getByRole('region', { name: 'Notifications' });
     await userEvent.setup().click(within(panel).getByRole('checkbox', { name: /Browser notifications/ }));
     await within(panel).findByText(/didn't allow notifications for this page/);

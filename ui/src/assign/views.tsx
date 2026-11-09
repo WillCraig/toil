@@ -127,7 +127,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const choice = list.adapters.find((a) => a.name === adapter);
-  const implementOff = mode === 'implement' ? (choice?.implement ?? (list.repos.length ? null : `${toilProject.name} lists no repository with a local path, so implement mode has nothing to clone. Add one with toil projects add-repo ${toilProject.name} <folder>.`)) : null;
+  const implementOff = mode === 'implement' ? (choice?.implement ?? (list.repos.length ? null : `${toilProject.name} lists no repository with a local path, so implement mode has nothing to clone. Add one under Settings, Toil projects.`)) : null;
   const canSend = api && !api.disabled && adapter !== null && !choice?.problem && !implementOff && !busy && (mode !== 'implement' || repo !== null);
 
   const submit = async (e: FormEvent) => {
@@ -149,7 +149,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
   return (
     <form className="assign-form" onSubmit={submit} noValidate>
       <Heading slot="title" level={2} id="assign-title">
-        {start ? plain.pw('Start the assignment', 'Start the AI helper') : plain.pw('Assign to an agent', 'Ask an AI helper')}
+        {start ? plain.pw('Start the assignment', 'Start the AI agent') : plain.pw('Assign to an agent', 'Ask an AI agent')}
       </Heading>
       <p className="note">
         <ItemLink id={item.id} /> {item.title}
@@ -209,7 +209,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
       )}
       <div className="assign-actions">
         <Button type="submit" className="btn btn--accent" isDisabled={!canSend}>
-          {busy ? plain.pw('Assigning…', 'Asking…') : start ? 'Start' : plain.pw('Assign', 'Ask the AI helper')}
+          {busy ? plain.pw('Assigning…', 'Asking…') : start ? 'Start' : plain.pw('Assign', 'Ask the AI agent')}
         </Button>
         <Button className="btn" onPress={close}>
           Cancel
@@ -255,7 +255,7 @@ function AssignBody({ item, start, close, onDone }: { item: Pick<WorkItem, 'id' 
   return (
     <div className="assign-form">
       <Heading slot="title" level={2} id="assign-title">
-        {plain.pw('Assign to an agent', 'Ask an AI helper')}
+        {plain.pw('Assign to an agent', 'Ask an AI agent')}
       </Heading>
       <p className={problem ? 'failure' : 'note'}>{problem ?? 'Reading the adapters on this machine…'}</p>
       <div className="assign-actions">
@@ -334,7 +334,7 @@ export function Limits({ list, onSaved }: { list: AssignmentList; onSaved: () =>
           Save the limits
         </Button>
         <p id={id} className="note" role="status">
-          {said ?? 'Usage caps are under Settings, Agent usage: an assignment is one chat there.'}
+          {said ?? 'Usage caps are under Settings, Usage: an assignment is one chat there.'}
         </p>
         {!said && <EditLink href={CAPS_HREF} label="Edit the usage caps" />}
       </form>
@@ -490,8 +490,8 @@ export function AgentAssignments({ people }: { people: readonly PersonEntry[] })
   const adapters = [...new Set(list.assignments.flatMap((a) => (a.adapter ? [a.adapter] : [])))].sort();
   return (
     <section className="people-section" aria-labelledby="agent-assignments">
-      <h2 id="agent-assignments">{plain.pw("Agents' assignments", "AI helpers' work")}</h2>
-      <p className="note">{plain.pw("What each agent was assigned from Toil UI, as a teammate's plate: its own runs, not the pull requests above.", "What each AI helper was asked to do from Toil UI, as a teammate's plate: its own runs, not the code reviews above.")}</p>
+      <h2 id="agent-assignments">{plain.pw("Agents' assignments", "AI agents' work")}</h2>
+      <p className="note">{plain.pw("What each agent was assigned from Toil UI, as a teammate's plate: its own runs, not the pull requests above.", "What each AI agent was asked to do from Toil UI, as a teammate's plate: its own runs, not the code reviews above.")}</p>
       {adapters.length ? (
         <CardGrid min="md" className="people-cards">
           {adapters.map((adapter) => {

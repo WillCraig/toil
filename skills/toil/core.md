@@ -460,9 +460,9 @@ toil audit list --command "jira issue get" --outcome failed --limit 20
 A Node program can call toil in-process instead of running `toil` and parsing stdout.
 `@imagile-dev/toil/api` is a supported entry point of the same package, with its own
 types, and it adds no dependency: it is the same bundle as the CLI. Loading it runs nothing, even
-when your own build bundles it in: only toil's bin starts the CLI. On a Node toil
-refuses (see `install.md`), every `execute()` returns the CLI's
-`UNSUPPORTED_NODE` envelope and runs nothing.
+when your own build bundles it in: only toil's bin starts the CLI. On a Node with a known
+remote code execution (see `install.md`), every `execute()` still runs and puts an
+`UNSUPPORTED_NODE` warning first in `meta.warnings`.
 
 ```js
 import { contractVersion, execute, registry, version } from '@imagile-dev/toil/api';

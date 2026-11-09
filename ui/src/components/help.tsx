@@ -94,7 +94,7 @@ export function Glossary({ entries }: { entries: readonly GlossaryEntry[] }) {
  * Context Overflow's four modules by task. After an upgrade it carries a dot,
  * and so does What's new, until the list has been opened.
  */
-export function HeaderHelp({ href, fresh = false, onWhatsNew }: { href: string; fresh?: boolean; onWhatsNew?: () => void }) {
+export function HeaderHelp({ href, fresh = false, onWhatsNew, onShortcuts }: { href: string; fresh?: boolean; onWhatsNew?: () => void; onShortcuts?: () => void }) {
   const [on] = useLearningLinks();
   return (
     <MenuTrigger>
@@ -103,7 +103,7 @@ export function HeaderHelp({ href, fresh = false, onWhatsNew }: { href: string; 
         <span aria-hidden="true"> ▾</span>
       </Button>
       <Popover className="popover menu-popover" placement="bottom end" offset={6}>
-        <Menu className="menu help-menu" aria-label="Help" onAction={(key) => key === 'whats-new' && onWhatsNew?.()}>
+        <Menu className="menu help-menu" aria-label="Help" onAction={(key) => (key === 'whats-new' ? onWhatsNew?.() : key === 'shortcuts' ? onShortcuts?.() : undefined)}>
           <MenuItem className="menu-item" href={href} target="_blank" rel="noopener noreferrer" textValue="Help for this view">
             Help for this view<span className="sr-only"> (opens in a new tab)</span>
           </MenuItem>
@@ -111,6 +111,11 @@ export function HeaderHelp({ href, fresh = false, onWhatsNew }: { href: string; 
             <MenuItem id="whats-new" className="menu-item" textValue="What's new" data-whats-new-open="">
               What's new
               {fresh && <NewDot />}
+            </MenuItem>
+          )}
+          {onShortcuts && (
+            <MenuItem id="shortcuts" className="menu-item" textValue="Keyboard shortcuts" data-shortcuts-open="">
+              Keyboard shortcuts
             </MenuItem>
           )}
           {on && (

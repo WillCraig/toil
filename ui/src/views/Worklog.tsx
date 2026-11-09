@@ -240,7 +240,12 @@ function Line({ e }: { e: WorklogEvent }) {
   );
 }
 
-function Section({ title, events, none }: { title: string; events: WorklogEvent[]; none: string }) {
+/**
+ * One section of a day. An empty one says "nothing happened" only when a sync read that day; with no read behind it the
+ * absence is unknown, not zero (principle 12), so it is a dash, "not read yet", and the way to read.
+ */
+function Section({ title, events, none, read }: { title: string; events: WorklogEvent[]; none: string; read: boolean }) {
+  const { sync } = useData();
   return (
     <section className="worklog-section">
       <h3>{title}</h3>
@@ -250,8 +255,17 @@ function Section({ title, events, none }: { title: string; events: WorklogEvent[
             <Line key={e.key} e={e} />
           ))}
         </ul>
-      ) : (
+      ) : read ? (
         <p className="note">{none}</p>
+      ) : (
+        <p className="note" data-not-read="">
+          <span aria-hidden="true">–</span> Not read yet: nothing has been read for this day.{' '}
+          {sync && (
+            <Button className="btn btn--small" onPress={sync} data-sync-now="">
+              Sync now
+            </Button>
+          )}
+        </p>
       )}
     </section>
   );
@@ -304,6 +318,8 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
   const { page } = data;
   const [rebuilt, setRebuilt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Today's empty section is a real zero only after a sync has read today. An earlier day is folded from the sources' own history, and its Coverage note says what it can't vouch for.
+  const read = page.day !== today || page.sources.some((s) => s.syncs > 0);
   const rebuild = async () => {
     setBusy(true);
     try {
@@ -332,9 +348,9 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
           </ul>
         </section>
       )}
-      <Section title="Work items" events={page.work} none="No status changes, sprint changes or new blockers recorded." />
-      <Section title="Pull requests" events={page.prs} none="No pull requests opened, reviewed, merged or declined." />
-      <Section title="Builds and deployments" events={page.delivery} none="No builds or deployments failed or recovered." />
+      <Section title="Work items" events={page.work} read={read} none="No status changes, sprint changes or new blockers recorded." />
+      <Section title="Pull requests" events={page.prs} read={read} none="No pull requests opened, reviewed, merged or declined." />
+      <Section title="Builds and deployments" events={page.delivery} read={read} none="No builds or deployments failed or recovered." />
       <section className="worklog-section">
         <h3>Agent runs</h3>
         {page.agents.length ? (
@@ -366,7 +382,7 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
         <Button className="btn" data-worklog-rebuild="" isDisabled={busy} onPress={() => void rebuild()}>
           Rebuild this day
         </Button>
-        <a className="btn" href={standupHref(page.toilProject, { from: page.day, to: page.day })}>
+        <a className="btn btn--accent" href={standupHref(page.toilProject, { from: page.day, to: page.day })} data-standup-day="">
           Stand-up for this day
         </a>
         {rebuilt && (

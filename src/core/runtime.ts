@@ -1,6 +1,3 @@
-import { failure, type Envelope } from './envelope.js';
-import { ToilError } from './errors.js';
-
 /**
  * The oldest patched release on each Node line toil runs on, kept in step with
  * "engines" in package.json (`^24.22.1 || >=26.12.1`).
@@ -11,11 +8,11 @@ import { ToilError } from './errors.js';
  * CVE-2026-111497, the Brotli decoder's out-of-bounds write (#479): Node's
  * fetch() Brotli-decodes any response marked `Content-Encoding: br`, so every
  * host toil talks to could reach it. 24.22.1 and 26.12.1 fix it; Node 25 gets
- * no fix, so it's refused outright, and a line newer than the last one listed
+ * no fix, so it's flagged outright, and a line newer than the last one listed
  * here is allowed.
  *
- * npm only warns about "engines", so the CLI checks for itself before doing
- * anything, the way a form checks the applicant is eligible before reading the rest.
+ * npm only warns about "engines", so the CLI checks for itself and warns on every run,
+ * the way a form notes the applicant is ineligible and processes it regardless.
  */
 export const PATCHED_NODE = ['24.22.1', '26.12.1'] as const;
 
@@ -36,7 +33,7 @@ function older(a: number[], b: number[]): boolean {
 }
 
 /**
- * True when toil refuses `version` (`24.22.0`, with or without a `v`): older
+ * True when `version` gets the warning (`24.22.0`, with or without a `v`): older
  * than its line's patched release, on a line between the listed ones with no
  * patched release (25), or older than the lowest line.
  */
@@ -49,18 +46,25 @@ export function nodeRefused(version: string, patched: readonly string[] = PATCHE
   return (have[0] ?? 0) < (newest[0] ?? 0);
 }
 
-/** The one envelope toil prints on a Node it refuses, or undefined when the Node is supported. */
-export function unsupportedNode(version: string, toilVersion: string): Envelope | undefined {
+/**
+ * The warning toil prints, in capitals, on a Node it would not choose to run on, or
+ * undefined when the Node is patched. It used to refuse outright; the maintainer
+ * loosened that (2026-11-09): toil runs, and says on every call, loudly, why it
+ * shouldn't. The reason stays on screen (principle 4); the decision is the user's.
+ */
+export function nodeWarning(version: string): string | undefined {
   if (!nodeRefused(version)) return undefined;
   const [line24, line26] = PATCHED_NODE;
-  return failure(
-    new ToilError(
-      'UNSUPPORTED_NODE',
-      `toil needs Node ${line24} or later on 24.x, or ${line26} or later, the releases that fix ${NODE_CVE} (a remote code execution in Node's Brotli decoder); this is ${version.replace(/^v/, '')}.`,
-      {
-        fix: `Install Node ${line24} or later on 24.x, or ${line26} or later (nodejs.org, or your organization's approved channel), then run toil again. Node 25 gets no fix.`,
-      },
-    ),
-    { command: 'toil', durationMs: 0, version: toilVersion },
-  );
+  return `WARNING: THIS NODE (${version.replace(/^v/, '')}) HAS A KNOWN REMOTE CODE EXECUTION, ${NODE_CVE}, IN ITS BROTLI DECODER, REACHABLE FROM EVERY HOST TOIL TALKS TO. toil is running anyway. Install Node ${line24} or later on 24.x, or ${line26} or later (nodejs.org, or your organization's approved channel). Node 25 gets no fix.`;
+}
+
+/** The same warning as a banner for stderr, which keeps stdout to the one JSON envelope. */
+export function nodeBanner(version: string): string | undefined {
+  const text = nodeWarning(version);
+  if (!text) return undefined;
+  const bar = '!'.repeat(78);
+  return `${bar}
+${text}
+${bar}
+`;
 }

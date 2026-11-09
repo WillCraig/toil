@@ -45,7 +45,7 @@
 /* Scroller: the one place content may be wider than its box. A shadow
    marks each edge with more beyond it, and the box takes focus to scroll. */
 .l-scroll { position: relative; min-width: 0; max-width: 100%; }
-.l-scroll__body { overflow-x: auto; max-width: 100%; overscroll-behavior-x: contain; }
+.l-scroll__body { position: relative; overflow-x: auto; max-width: 100%; overscroll-behavior-x: contain; }
 .l-scroll__body:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .l-scroll::before, .l-scroll::after {
   content: "";
@@ -67,6 +67,9 @@
 .l-table table { width: 100%; overflow-wrap: break-word; }
 .l-table[data-wide] table { min-width: 50rem; }
 .l-table__label { display: none; }
+/* An actions column is as wide as its icon button, and its heading is for screen readers. */
+.l-table th.l-table__actions, .l-table td.l-table__actions { width: 1%; white-space: nowrap; padding-right: 0; text-align: right; }
+.l-table__actions .l-table__label { display: none; }
 @container l-table (max-width: 28rem) {
   .l-table table, .l-table tbody, .l-table tr, .l-table th, .l-table td { display: block; width: 100%; }
   .l-table[data-wide] table { min-width: 0; }
@@ -75,6 +78,11 @@
   .l-table tr > * { border: 0; padding: 0.2rem 0; display: grid; grid-template-columns: minmax(0, 7.5rem) minmax(0, 1fr); gap: 0.75rem; }
   .l-table tr > th[role="rowheader"] { grid-template-columns: minmax(0, 1fr); font-weight: 600; }
   .l-table tr > th[role="rowheader"] .l-table__label { display: none; }
+  /* Stacked, the actions button moves to the row's top corner and the title leaves room for it. */
+  .l-table tr { position: relative; }
+  .l-table tr > td.l-table__actions { display: block; position: absolute; top: 0.35rem; right: 0; width: auto; padding: 0; }
+  .l-table tr:has(> .l-table__actions) > th[role="rowheader"] { padding-right: 2.5rem; }
+  .l-table tr > .l-table__actions .l-table__label { display: none; }
   .l-table__label { display: block; color: var(--muted); font-size: 0.8125rem; font-weight: 400; }
 }
 
@@ -84,3 +92,7 @@
 .l-path__head { min-width: 1.5ch; overflow: hidden; text-overflow: ellipsis; }
 .l-path__tail { flex: none; }
 .l-copy { flex: none; }
+
+/* Stacked cards on a page: one section gap between neighbours, in every view and theme. Cards inside a grid, list or
+   stack already get their gap from it, so this only covers cards that sit directly in the page, which had none. */
+main > .l-card + .l-card, main > * + .l-card { margin-top: var(--section-gap, 1.5rem); }

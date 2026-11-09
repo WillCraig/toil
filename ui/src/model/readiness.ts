@@ -391,7 +391,7 @@ const issueRepo = (item: WorkItem) => (item.source.area === 'github' ? (/^[^/]+\
 function scope(item: WorkItem, settings: ReadinessSettings): Row {
   if (!settings.sources.includes(item.source.area)) return row('scope', 'fail', `It came from ${item.source.area}, which isn't one of this Toil project's sources (${settings.sources.join(', ') || 'none'}).`, 'toilProject');
   const repos = settings.repos;
-  if (!repos.length) return row('scope', 'thin', 'The Toil project names no repository, so an agent could plan it but has nowhere to implement it. Add one with toil projects add-repo.', 'Toil project repos');
+  if (!repos.length) return row('scope', 'thin', 'The Toil project names no repository, so an agent could plan it but has nowhere to implement it. Add one under Settings, Toil projects.', 'Toil project repos');
   const own = issueRepo(item);
   if (own && repos.includes(own)) return row('scope', 'pass', `${item.source.area} is one of the Toil project's sources, and its repository, ${own}, is in the Toil project.`, 'Toil project repos');
   if (repos.length === 1) return row('scope', 'pass', `${item.source.area} is one of the Toil project's sources, and an agent works in ${repos[0]}.`, 'Toil project repos');

@@ -1,9 +1,7 @@
 import { render } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { InsightChips } from '../src/components/bits.tsx';
 import type { Insight } from '../src/model/insights.ts';
-import { setPlain } from '../src/plain-words.ts';
-import { standardWords } from './words.ts';
 
 /**
  * A card draws one chip per insight code, with a count (#541). Two flags that
@@ -14,10 +12,8 @@ const blocking = (id: string): Insight => ({ code: 'blocking', weight: 2, text: 
 const stale: Insight = { code: 'stale', weight: 2, text: 'No update for 6 days', evidence: 'updated' };
 
 describe('insight chips', () => {
-  beforeEach(standardWords);
 
-  it('words the two shorthand chips in everyday words with plain words on, and keeps the rest', () => {
-    setPlain(true);
+  it('words the two shorthand chips in everyday words always, and keeps the rest', () => {
     const others: Insight[] = (['pr-no-build', 'aging', 'stale'] as const).map((code) => ({ code, weight: 1, text: code, evidence: code }));
     const { container } = render(<InsightChips insights={others} />);
     expect([...container.querySelectorAll('li')].map((c) => c.textContent)).toEqual(['Code review with no build', 'Open a long time', 'Stale']);
@@ -35,7 +31,7 @@ describe('insight chips', () => {
   it('counts "+N more" in chips, not insights', () => {
     const others: Insight[] = (['aging', 'carried', 'unestimated'] as const).map((code) => ({ code, weight: 1, text: code, evidence: code }));
     const { container } = render(<InsightChips insights={[blocking('c:A'), blocking('c:B'), blocking('c:C'), stale, ...others]} compact />);
-    expect([...container.querySelectorAll('li')].map((c) => c.textContent)).toEqual(['Blocking 3', 'Stale', 'Aging', '+2 more']);
+    expect([...container.querySelectorAll('li')].map((c) => c.textContent)).toEqual(['Blocking 3', 'Stale', 'Open a long time', '+2 more']);
   });
 
   it('keeps the count of a hidden chip in the "+N more" tooltip', () => {

@@ -167,3 +167,41 @@ describe('connections test, per area', () => {
     }
   }
 });
+
+describe('connections test, deeper than the first read (github)', () => {
+  const fixture = fixtures.find((f) => f.area === 'github')!;
+  const base = fixture.config.github!;
+  const run = async (settings: Record<string, unknown>, routes: Array<{ method: string; url: RegExp; respond: unknown }>) => {
+    const { context, http } = testContext({ config: { github: { ...base, ...settings } }, routes: routes as never });
+    const result = await runCli(['connections', 'test', 'github'], { commands, context });
+    return { result, gets: http.calls.filter((c) => c.method === 'GET').map((c) => new URL(c.url).pathname) };
+  };
+
+  it('also reads the repository the connection names, reports the expiry GitHub sends and the scopes of a classic token', async () => {
+    const soon = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+    const { result, gets } = await run({ owner: 'imagile', repo: 'toil-probe' }, [
+      { method: 'GET', url: /\/user$/, respond: { json: { login: 'you' }, headers: { 'github-authentication-token-expiration': `${soon} 00:00:00 UTC`, 'x-oauth-scopes': 'repo, read:org' } } },
+      { method: 'GET', url: /\/repos\/imagile\/toil-probe$/, respond: { json: { full_name: 'imagile/toil-probe' } } },
+    ]);
+    expect(result.envelope?.ok).toBe(true);
+    expect(result.envelope?.data).toMatchObject({ expires: soon, scopes: ['repo', 'read:org'], checked: ['GET /user', '/repos/imagile/toil-probe'].map((s) => (s.startsWith('GET') ? s : `GET ${s}`)) });
+    expect(gets.map((g) => g.replace(/^\/api\/v3/, ''))).toEqual(['/user', '/repos/imagile/toil-probe']);
+    expect(result.envelope?.meta.warnings?.map((w) => w.code)).toContain('CREDENTIAL_EXPIRES_SOON');
+  });
+
+  it('fails, saying which read, when the token answers as its user but is refused the repository', async () => {
+    const { result } = await run({ owner: 'imagile', repo: 'toil-probe' }, [
+      { method: 'GET', url: /\/user$/, respond: { json: { login: 'you' } } },
+      { method: 'GET', url: /\/repos\/imagile\/toil-probe$/, respond: { status: 403, json: { message: 'Resource not accessible by personal access token' } } },
+    ]);
+    expect(result.envelope?.ok).toBe(false);
+    expect(result.envelope?.error?.message).toContain('accepted the credential on GET /user');
+    expect(result.envelope?.error?.message).toContain('reading the repository imagile/toil-probe it names');
+  });
+
+  it('with no repository named, reads /user alone and says nothing about an expiry GitHub did not send', async () => {
+    const { result, gets } = await run({ owner: undefined, repo: undefined }, [{ method: 'GET', url: /\/user$/, respond: { json: { login: 'you' } } }]);
+    expect(result.envelope?.data).toMatchObject({ expires: null, scopes: null });
+    expect(gets).toHaveLength(1);
+  });
+});

@@ -22,11 +22,12 @@ interface Over {
   failed?: boolean;
   plain?: boolean;
   title?: string;
+  done?: boolean;
 }
 
 function ctx(o: Over = {}): Ctx {
   const total = o.total ?? 21;
-  const item = { id: 'jira:PAY-1', title: o.title ?? 'A story', source: { area: 'jira', key: 'PAY-1' }, assignee: null, status: 'In progress', statusCategory: 'IN_PROGRESS' };
+  const item = { id: 'jira:PAY-1', title: o.title ?? 'A story', source: { area: 'jira', key: 'PAY-1' }, assignee: null, status: 'In progress', statusCategory: o.done ? 'DONE' : 'IN_PROGRESS' };
   const reasons = o.title ? [{ lens: 'failing', label: 'Failing checks', line: 'x', severity: 'danger', items: [{ id: item.id, why: 'Fails.' }] }] : [];
   const health = { days: { gone: o.gone ?? 7, total: 10 }, items: Array.from({ length: o.stories ?? 3 }, () => ({})), unestimated: [] };
   return {
@@ -77,6 +78,26 @@ describe('the answer at its edges', () => {
   });
 });
 
+describe('the first risk card', () => {
+  it('says "right now" when no sprint is running, and "to the sprint" when one is', () => {
+    expect(cardsOf(ctx({ title: 'Fix it', noSprint: true }))[0]!.kicker).toBe('Biggest risk right now');
+    expect(cardsOf(ctx({ title: 'Fix it' }))[0]!.kicker).toBe('Biggest risk to the sprint');
+  });
+
+  it('never picks an item that is already finished', () => {
+    const cards = cardsOf(ctx({ title: 'Already shipped', done: true }));
+    expect(cards.map((c) => c.id)).not.toContain('risk');
+    expect(cards.map((c) => c.title)).not.toContain('Already shipped');
+  });
+
+  it('makes the no-sprint headline the sentence alone, with no "No sprint:" in front', () => {
+    const a = answerOf(ctx({ noSprint: true }));
+    expect(a.bare).toBe(true);
+    expect(a.sentence).toBe('No sprint is running right now.');
+    expect(answerOf(ctx()).bare).toBeUndefined();
+  });
+});
+
 describe('titles are facts', () => {
   it('keeps an item title that says "agent", in plain words and in standard', () => {
     for (const plain of [true, false]) {
@@ -103,7 +124,7 @@ describe('a read that failed', () => {
   });
 });
 
-describe('what waits on you, for the AI helpers button', () => {
+describe('what waits on you, for the AI agents button', () => {
   const a = (over: Partial<Assignment>) => ({ state: 'working', waiting: null, proposals: [], questions: [], ...over }) as unknown as Assignment;
 
   it('counts the inbox, pending and failed proposals, questions, and a failed assignment', () => {

@@ -236,13 +236,50 @@ toil projects wip-limit card-payments 3
 toil projects describe card-payments --name payments-v2 --description "Card payments v2"
 ```
 
-`toil projects person` adds a person, or more identities to one already there.
+`toil projects person` adds a person, or more identities to one already there. Besides
+`--id area=identity`, `--github <login>`, `--jira <identity>`, `--ado <identity>` and
+`--bitbucket <identity>` each fill in their own area, so `toil projects person card-payments
+"Pat Example" --github pat-ex --jira pat --ado you@example.com` maps one person across
+every work-tracking system.
 Removing a person or an identity (`--remove`) and clearing the limit
 (`toil projects wip-limit <toil project> --clear`) are deletes, so they run on the CLI only.
 `toil projects describe <toil project> [--name <new name>] [--description <text>]`
 renames one of your own toil projects, moving its file with everything in it, or replaces
 its one-line description. A name you already use is refused, and so is a checked-in
 or listed toil project: import it first, then describe your copy.
+`toil projects archive <toil project>` puts one of your own away: it sets `archived: true`
+in the file, and `toil projects unarchive <toil project>` brings it back. Nothing is
+deleted, so it is not a delete and is served over MCP. `toil projects list` leaves
+archived ones out and says how many (`archivedHidden`); `--all` lists everything and
+`--archived` only the archived ones. Archiving only hides: a folder in one of its repos
+still resolves to it, so calls keep their context, and `show` reports `archived`.
+
+### Map accounts to people, and share the mapping
+
+An account no person is mapped to (a GitHub login, a Jira account id, an Azure DevOps
+identity, a Bitbucket user) shows up in Toil UI's People view with a **Map** button, and
+in the CLI through two commands, each reading one source (the caller composes):
+
+```sh
+toil github pr list --repo imagile/payments | toil util owi map | toil projects people suggest card-payments
+toil projects people save card-payments --repo .
+```
+
+- `toil projects people suggest <toil-project>` reads OWI records (the same input
+  `projects brief` takes, a file, `--text` or stdin) and sets the accounts they name
+  (assignee, reporter, who moved an item, pull request author and reviewers) against the
+  toil project's people. It returns `suggestions` (each with the `person` it fits, or null
+  for a new one, a `reason` of `email`, `name` or `login`, `because`, and the
+  `projects person` `command` that applies it), `unmapped` (accounts nothing fit, to map by
+  hand), `ambiguous` (why an account that fit more than one person suggests nothing) and
+  `read` (how many accounts it looked at). It maps nothing and asks no service.
+- `toil projects people save <toil-project> [--repo <dir>] [--replace]` writes the people
+  into `<repo>/.toil/projects/<name>.json`, so teammates who clone the repository share the
+  mapping, whether it is hosted on GitHub, Azure DevOps or Bitbucket: it is only a file.
+  If the file is there, only its people change (a person it lists differently is refused
+  unless `--replace`, and people only it lists are kept); if not, the whole toil project is
+  written as a shared one, as `projects export` does. It never stages or commits, and a
+  toil project holds no secret, so none is written.
 
 Each command returns the change it made, refuses a value that's already there unless
 `--replace`, and needs no `--allow-write`, since it only writes your own toil project.

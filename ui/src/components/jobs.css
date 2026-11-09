@@ -1,8 +1,19 @@
 /* The workflow jobs (#532): a pull request's Actions menu, and a job's own page. */
-.jobs-trigger {
-  white-space: nowrap;
-  margin-left: 0.5rem;
+/* A quiet icon button, the same 2rem square as the (i) and the pencil: themes frame buttons, and a framed box on every row is a lot of boxes. */
+[data-theme] .btn.jobs-trigger, .btn.jobs-trigger {
+  min-width: 2rem;
+  min-height: 2rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
 }
+[data-theme] .btn.jobs-trigger:hover, [data-theme] .btn.jobs-trigger[data-hovered], [data-theme] .btn.jobs-trigger[data-pressed] { border-color: var(--line); color: var(--ink); }
+.jobs-trigger[data-focus-visible] { outline: 3px solid var(--focus); outline-offset: 2px; }
 .jobs-item {
   display: flex;
   flex-direction: column;

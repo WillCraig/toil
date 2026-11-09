@@ -4,7 +4,7 @@
  * listed, not hidden (principle 4). Full disclosure, without the twelve-page form.
  */
 
-import { Avatar, Outcome, StatusChip } from '../components/bits.tsx';
+import { Avatar, Outcome, PLAIN_INSIGHT_LABEL, StatusChip } from '../components/bits.tsx';
 import { Cited, ItemLink, typeText } from '../components/items.tsx';
 import { ReadinessPanel } from '../components/readiness.tsx';
 import { Card, DataTable } from '../components/layout.tsx';
@@ -79,7 +79,7 @@ export function ItemView({ id }: { id: string }) {
           <ul className="rows">
             {found.map((i) => (
               <li key={i.code} className={`insight-row insight-row--w${i.weight}`}>
-                <span className={`insight insight--w${i.weight}`}>{INSIGHT_LABEL[i.code]}</span> <Cited text={i.text} />.{' '}
+                <span className={`insight insight--w${i.weight}`}>{PLAIN_INSIGHT_LABEL[i.code] ?? INSIGHT_LABEL[i.code]}</span> <Cited text={i.text} />.{' '}
                 <span className="field">
                   Source: <code>{i.evidence}</code>
                 </span>
@@ -118,7 +118,7 @@ export function ItemView({ id }: { id: string }) {
           <p>None in {toilProject.name}: no item shares enough words with this one.</p>
         )}
         <p className="note">
-          By shared words in titles and bodies, title trigrams, labels, parent and links, as <code>toil util owi similar</code> scores them: not by meaning, so a duplicate written in other words isn't found.
+          By shared words in titles and bodies, title trigrams, labels, parent and links: not by meaning, so a duplicate written in other words isn't found.
         </p>
       </Card>
       <ItemAssignments item={item} />
@@ -131,7 +131,7 @@ export function ItemView({ id }: { id: string }) {
           <dl className="fields">
             <dt>Source</dt>
             <dd>
-              {source}, connection <code>{item.source.connection}</code> <EditLink href={connectionEditHref(item.source.connection)} label={`Edit the ${item.source.connection} connection`} />, read with <code>toil {item.source.command}</code>
+              {source}, connection {item.source.connection} <EditLink href={connectionEditHref(item.source.connection)} label={`Edit the ${item.source.connection} connection`} />
             </dd>
             <dt>Type</dt>
             <dd>{typeText(item, theme)}</dd>
@@ -212,10 +212,7 @@ export function ItemView({ id }: { id: string }) {
             <ul className="rows">
               {mine.map((c) => (
                 <li key={c.id}>
-                  {c.url ? <a href={c.url}>{c.title}</a> : c.title} <Outcome of={c} />{' '}
-                  <span className="field">
-                    (<code>toil {c.command}</code>)
-                  </span>
+                  {c.url ? <a href={c.url}>{c.title}</a> : c.title} <Outcome of={c} />
                 </li>
               ))}
             </ul>
@@ -227,10 +224,7 @@ export function ItemView({ id }: { id: string }) {
             <ul className="rows">
               {deployedTo.map((d) => (
                 <li key={d.id}>
-                  {d.environment}: {d.name}, commit <code>{d.commit}</code>{' '}
-                  <span className="field">
-                    (<code>toil {d.command}</code>)
-                  </span>
+                  {d.environment}: {d.name}, commit <code>{d.commit}</code>
                 </li>
               ))}
             </ul>

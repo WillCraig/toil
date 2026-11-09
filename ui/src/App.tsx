@@ -15,7 +15,8 @@ import type { Agent } from './agent.ts';
 import { Ambient } from './ambient/Ambient.tsx';
 import { DataContext, type Data, type StartReady } from './data.ts';
 import { dateTime, toilProjectHref } from './format.ts';
-import { loadToilProject, loadToilProjects, type ToilProjectData, type ToilProjectSummary } from './load.ts';
+import { loadToilProject, loadToilProjects, type ArchivedToilProject, type ToilProjectData, type ToilProjectSummary } from './load.ts';
+import { canArchive, type ArchiveNotice } from './components/archive.tsx';
 import { SkinProvider, ThemeProvider, skinsFor } from './skins.tsx';
 import { THEMES, themeNamed, tokenCss } from './themes.ts';
 import { useResolvedScheme, useThemeChoice } from './theme-choice.ts';
@@ -49,6 +50,7 @@ import type { WorklogApi } from './worklog.ts';
 import { isDay } from './model/worklog.ts';
 import type { ConfigApi } from './config.ts';
 import type { AgentSettingsPanelProps } from './agent-settings.tsx';
+import type { CacheControl } from './views/settings/General.tsx';
 import type { ModelUsageApi } from './server-client.ts';
 import type { FeedbackApi } from './feedback.ts';
 import { FeedbackButton, FeedbackModal } from './feedback-dialog.tsx';
@@ -56,8 +58,11 @@ import { useMediaQuery } from './components/layout.tsx';
 import { Choice } from './components/choice.tsx';
 import { ThemeChoiceProvider, wordingOn } from './theme-context.ts';
 import type { WordKey } from './wording.ts';
+import { useFontApplied } from './fonts.ts';
 import { usePlain, wordsFor } from './plain-words.ts';
 import { viewHelpHref } from './help.ts';
+import { Setup, type SetupProps } from './views/Setup.tsx';
+import { NewProject, type NewProjectProps } from './views/NewProject.tsx';
 import { Loader, MomentsProvider, Splash, useMomentPlayer } from './moments/Moments.tsx';
 import { momentsFor } from './moments/events.ts';
 import { progressText, syncText, trackCalls, type CallProgress } from './moments/progress.ts';
@@ -65,18 +70,23 @@ import { useThemeMotion } from './motion.ts';
 import type { WorklogEvent } from './model/worklog.ts';
 import type { SyncJob } from './server-client.ts';
 import { CommandPalette, ShortcutsSheet } from './components/palette.tsx';
-import { matches, typingIn } from './shortcuts.ts';
+import { ariaKeys, keysText, matches, SHORTCUTS, typingIn } from './shortcuts.ts';
 import { HeaderHelp } from './components/help.tsx';
 import { Bell } from './components/bell.tsx';
+import { ProjectLinks, ProjectSwitcher } from './components/project-switcher.tsx';
 import { NewDot, WhatsNewModal, useWhatsNew } from './components/whats-new.tsx';
 import type { Release, Versions } from './whats-new.ts';
 
 const PowershellMan = lazy(() => import('./game/PowershellMan.tsx').then((module) => ({ default: module.PowershellMan })));
 const POWERSHELL_MAN_HASH = '#/powershell-man';
 
-export type SettingsPage = 'connections' | 'projects' | 'toil' | 'usage' | 'agent-usage' | 'agent';
+export type SettingsPage = 'general' | 'connections' | 'projects' | 'appearance' | 'usage' | 'agent';
 type RouteOf =
   | { view: 'toilProjects' }
+  /** The setup wizard (#561): `#/setup`. */
+  | { view: 'setup' }
+  /** The short wizard that creates one Toil project: `#/new-project`. */
+  | { view: 'newProject' }
   /** `at`: where an edit link lands on the page (#346): a connection's name, a toil project and its section, or `caps`. */
   | { view: 'settings'; page: SettingsPage; at?: string[] }
   /**
@@ -110,7 +120,10 @@ export function upgradeHash(hash: string): string {
   return hash
     .replace(/^#\/dossier(?=\/|\?|$)/, '#/project')
     .replace(/^#\/settings\/dossiers(?=\/|\?|$)/, '#/settings/projects')
-    .replace(/^#\/dossiers(?=\/|\?|$)/, '#/');
+    .replace(/^#\/dossiers(?=\/|\?|$)/, '#/')
+    // Creating a Toil project has its own short wizard; the two addresses that used to open the first-run wizard's project step go there.
+    .replace(/^#\/setup\/project(?=\/|\?|$)/, '#/new-project')
+    .replace(/^#\/settings\/projects\/\+new(?=\/|\?|$)/, '#/new-project');
 }
 
 export function parseRoute(rawHash: string): Route {
@@ -125,8 +138,11 @@ export function parseRoute(rawHash: string): Route {
 
 function parsePath(hash: string): RouteOf {
   const parts = hash.replace(/^#\/?/, '').split('/');
+  if (parts[0] === 'setup') return { view: 'setup' };
+  if (parts[0] === 'new-project') return { view: 'newProject' };
   if (parts[0] === 'settings') {
-    const page: SettingsPage = parts[1] === 'projects' || parts[1] === 'toil' || parts[1] === 'usage' || parts[1] === 'agent-usage' || parts[1] === 'agent' ? parts[1] : 'connections';
+    // General opens first: `#/settings`, `#/settings/general` and the old `#/settings/toil` all land there. Agent token usage moved to Usage.
+    let page: SettingsPage = parts[1] === 'agent-usage' ? 'usage' : parts[1] === 'connections' || parts[1] === 'projects' || parts[1] === 'appearance' || parts[1] === 'usage' || parts[1] === 'agent' ? parts[1] : 'general';
     // A malformed escape is kept as typed, so the page says it found nothing by that name rather than failing to render.
     const at = parts.slice(2).filter(Boolean).map((p) => {
       try {
@@ -135,6 +151,8 @@ function parsePath(hash: string): RouteOf {
         return p;
       }
     });
+    // The caps moved from AI agent to Usage with the rest of the agent's usage; the address they had before still lands on them.
+    if (page === 'agent' && at[0] === 'caps') page = 'usage';
     return at.length ? { view: 'settings', page, at } : { view: 'settings', page };
   }
   if (parts[0] === 'project' && parts[1]) {
@@ -260,14 +278,20 @@ export interface AppProps {
   preview: boolean;
   /** The local app's agent settings (#251), shown under Settings; the preview has none. */
   agentSettings?: AgentSettingsPanelProps;
+  /** Where the setup wizard is, held by the page above (src/local.tsx), which outlives this App's remounts. Absent: the wizard keeps its own. */
+  setupKeep?: SetupProps['keep'];
+  /** The same for the New Toil project wizard. */
+  newProjectKeep?: NewProjectProps['keep'];
   /** `toil feedback`, behind the header's Feedback button (#265): the server's, or the preview's, which sends nothing. */
   feedback?: FeedbackApi;
   /** The Command Center's start action (#307), which assign-to-agent (#293) provides; without it the start button is disabled. */
   startReady?: StartReady;
   /** The worklog (#308): the server's pages, or the sample's, which keep nothing. */
   worklog?: WorklogApi;
-  /** The agent's model usage and caps (#295), for Settings, Agent usage: the server's, or the preview's sample. */
+  /** The agent's model usage and caps (#295), for Settings, Usage: the server's, or the preview's sample. */
   modelUsage?: ModelUsageApi;
+  /** Wiping the cache, under Settings, General, Advanced: the page above (src/local.tsx) owns it. Absent where nothing is cached (the preview). */
+  cache?: CacheControl;
   /** Assigning items to an agent (#293): the server's, or the preview's sample queue. */
   assignments?: AssignmentsApi;
   /** The history of analyses (#395): the server's, or the preview's sample. Without one, the App keeps this page's in memory. */
@@ -293,7 +317,7 @@ export interface AppProps {
 type Loaded<T> = { ok: true; value: T } | { ok: false; message: string };
 const failed = (e: unknown): Loaded<never> => ({ ok: false, message: e instanceof Error ? e.message : String(e) });
 
-export function App({ execute, agent, config, themeSetting, now, preview, agentSettings, feedback, modelUsage, worklog, startReady, assignments: given, analyses: givenAnalyses, synced, afterDescribe, serverStatus, onSync, syncing, syncedAt, news, versions }: AppProps) {
+export function App({ execute, agent, config, themeSetting, now, preview, agentSettings, setupKeep, newProjectKeep, feedback, modelUsage, cache, worklog, startReady, assignments: given, analyses: givenAnalyses, synced, afterDescribe, serverStatus, onSync, syncing, syncedAt, news, versions }: AppProps) {
   const [ownAnalyses] = useState(() => memoryAnalyses());
   const analyses = givenAnalyses ?? ownAnalyses;
   const route = useRoute();
@@ -323,7 +347,9 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   // Every assignment this browser starts is remembered as its own, for "only for agents I started" (#306).
   const { mine, mark } = useMine();
   const assignments = useMemo(() => (given ? remembering(given, mark) : undefined), [given, mark]);
-  const [list, setList] = useState<Loaded<{ toilProjects: ToilProjectSummary[]; calls: Call[] }> | null>(null);
+  const [list, setList] = useState<Loaded<{ toilProjects: ToilProjectSummary[]; archived: ArchivedToilProject[] | null; calls: Call[] }> | null>(null);
+  // What the last archive or unarchive did, shown above the list with its undo (#561).
+  const [archiveNotice, setArchiveNotice] = useState<ArchiveNotice | null>(null);
   const [toilProjects, setToilProjects] = useState<Record<string, Loaded<ToilProjectData>>>({});
   // What the toil project on screen is waiting on, for its loading screen (#419): the real calls, as they go.
   const [progress, setProgress] = useState<Record<string, CallProgress>>({});
@@ -337,7 +363,7 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
     element?.querySelector<HTMLElement>('button')?.focus();
   }, []);
   const first = useRef(true);
-  const wanted = route.view === 'toilProjects' || route.view === 'settings' ? null : route.toilProject;
+  const wanted = route.view === 'toilProjects' || route.view === 'settings' || route.view === 'setup' || route.view === 'newProject' ? null : route.toilProject;
   // The command palette and the shortcuts sheet (#416), hidden until called up; `focused` is the item the focus was on when the palette opened.
   const [palette, setPalette] = useState<{ open: boolean; focused: string | null }>({ open: false, focused: null });
   const [sheet, setSheet] = useState(false);
@@ -376,12 +402,12 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
 
   // Settings can add or remove toil projects, so the list is read again after a visit there (the first-run checklist, #416, ticks off from it).
   useEffect(() => {
-    if (route.view === 'settings') setList(null);
+    if (route.view === 'settings' || route.view === 'setup' || route.view === 'newProject') setList(null);
   }, [route.view]);
 
   useEffect(() => {
     // The list feeds the Toil projects view, on a toil project's pages its switcher (#394), and the palette (#416).
-    if ((route.view === 'settings' && !palette.open) || list) return;
+    if (((route.view === 'settings' || route.view === 'setup' || route.view === 'newProject') && !palette.open) || list) return;
     let live = true;
     loadToilProjects(execute).then(
       (value) => live && setList({ ok: true, value }),
@@ -452,6 +478,30 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
     }
   };
 
+  /**
+   * Archives or unarchives a Toil project through toil's own command (#561), from a
+   * card's menu, the palette or the undo line. The list is read again afterwards, so
+   * the switcher, the cards and the sync figures all drop or regain it together.
+   */
+  const archive = async (name: string, putAway: boolean) => {
+    if (!config || !canArchive(config)) return;
+    try {
+      const env = await config.run(putAway ? 'projects archive' : 'projects unarchive', { toilProject: name });
+      if (!env.ok) {
+        setArchiveNotice({ kind: 'failed', name, message: `${env.error.message}${env.error.fix ? ` ${env.error.fix}` : ''}` });
+        return;
+      }
+      setArchiveNotice({ kind: putAway ? 'archived' : 'unarchived', name });
+      setList(null);
+    } catch (e) {
+      setArchiveNotice({ kind: 'failed', name, message: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  // The line belongs to the page it was made on.
+  useEffect(() => {
+    setArchiveNotice(null);
+  }, [route.view]);
+
   useEffect(() => {
     if (!wanted || toilProjects[wanted]) return;
     let live = true;
@@ -485,7 +535,7 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
     const h1 = pending.current ? (main.current?.querySelector<HTMLElement>('#board-filter') ?? main.current?.querySelector<HTMLElement>('h1')) : null;
     if (h1) {
       pending.current = false;
-      h1.focus();
+      h1.focus({ preventScroll: h1.id === 'board-filter' });
     }
   });
 
@@ -497,14 +547,16 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   const skins = skinsFor(theme.name);
   // Mirrors Theme motion on the root (#419), so the moments' CSS plays at the level chosen.
   useThemeMotion();
-  const splashReady = route.view === 'settings' || (route.view === 'toilProjects' ? list !== null : Boolean(wanted && toilProjects[wanted]));
-  const splashDetail = route.view === 'toilProjects' || !wanted ? 'Reading the Toil projects with toil projects list.' : progressText(progress[wanted]);
+  // The pairing picked in Settings, Font (src/fonts.ts), over the theme's own fonts.
+  useFontApplied(theme);
+  const splashReady = route.view === 'settings' || route.view === 'setup' || route.view === 'newProject' || (route.view === 'toilProjects' ? list !== null : Boolean(wanted && toilProjects[wanted]));
+  const splashDetail = route.view === 'toilProjects' || !wanted ? 'Reading the Toil projects.' : progressText(progress[wanted]);
   // The App provides the theme context, so it can't read it through useWords(); this is the same lookup.
   const plain = usePlain();
-  const words = (key: WordKey, vars?: Record<string, string>) => wordsFor(theme.lexicon, wordingOn(theme, choice), plain.on, key, vars);
+  const words = (key: WordKey, vars?: Record<string, string>) => wordsFor(theme.lexicon, wordingOn(theme, choice), key, vars);
   // A toil project's own views are its tabs (#394), so the header carries only what sits above every toil project.
+  // The overview is not a link here: the project switcher after the brand lists "All Toil projects", and the brand goes home.
   const links: NavLink[] = [
-    { href: '#/', label: 'Toil projects', current: route.view === 'toilProjects' },
     { href: '#/settings', label: 'Settings', current: route.view === 'settings' },
   ];
   const top = useRef<HTMLDivElement>(null);
@@ -513,7 +565,8 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   const phoneBanner = useMediaQuery('(max-width: 599px)');
   const crowded = useCrowded(top, !narrow, links.map((l) => l.label).join('|'));
   const compact = narrow || crowded;
-  const controls = (
+  // On a Toil project's pages the header carries no theme picker: Settings, Appearance has it, and the palette reaches it too.
+  const controls = wanted ? null : (
     <>
       <Choice label="Theme" value={theme.name} onChange={choice.setTheme} options={THEMES.map((t) => ({ id: t.name, label: t.label }))} />
     </>
@@ -522,6 +575,7 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   // In the compact header Help sits inside the Menu, which closes first so What's new opens over the page, not over it.
   const helpWith = (closeFirst?: () => void) => (
     <HeaderHelp
+      {...(closeFirst ? {} : { onShortcuts: () => setSheet(true) })}
       href={viewHelpHref(route.view, route.view === 'settings' ? route.page : undefined)}
       fresh={whatsNew.fresh.length > 0}
       onWhatsNew={() => {
@@ -540,22 +594,26 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
   );
 
   let body;
-  if (route.view === 'settings') {
-    body = <Settings page={route.page} {...(route.at ? { at: route.at } : {})} config={config ?? null} modelUsage={modelUsage ?? null} {...(agentSettings ? { agent: agentSettings } : {})} />;
+  if (route.view === 'setup') {
+    body = <Setup config={config ?? null} agent={agentSettings} keep={setupKeep} guide={agent.guide ? (request, history, signal, style) => agent.guide!(request, history, signal, style) : undefined} onSync={onSync} />;
+  } else if (route.view === 'newProject') {
+    body = <NewProject config={config ?? null} keep={newProjectKeep} />;
+  } else if (route.view === 'settings') {
+    body = <Settings page={route.page} {...(route.at ? { at: route.at } : {})} config={config ?? null} modelUsage={modelUsage ?? null} {...(cache ? { cache } : {})} {...(agentSettings ? { agent: agentSettings } : {})} />;
   } else if (route.view === 'toilProjects') {
-    body = !list ? <Loader message={words('loading.toilProjects')} detail="Reading them with toil projects list." /> : list.ok ? <ToilProjects toilProjects={list.value.toilProjects} calls={list.value.calls} loaded={toilProjects} now={now} synced={synced ?? (preview ? null : {})} config={config ?? null} onDescribed={described} onSync={onSync} /> : failure(list.message);
+    body = !list ? <Loader message={words('loading.toilProjects')} detail="Reading them." /> : list.ok ? <ToilProjects toilProjects={list.value.toilProjects} calls={list.value.calls} loaded={toilProjects} now={now} synced={synced ?? (preview ? null : {})} config={config ?? null} onDescribed={described} onSync={onSync} archived={list.value.archived} notice={archiveNotice} onDismissNotice={() => setArchiveNotice(null)} {...(config && canArchive(config) ? { onArchive: archive } : {})} /> : failure(list.message);
   } else if (!current) {
     body = <Loader message={words('loading.toilProject', { name: route.toilProject })} detail={progressText(progress[route.toilProject])} />;
   } else if (!current.ok) {
     body = failure(current.message);
   } else {
-    const data: Data = { ...(onSync ? { sync: onSync } : {}), toilProject: current.value, byId: new Map(current.value.items.map((i) => [i.id, i])), prById: new Map((current.value.pullRequests ?? []).map((c) => [c.id, c])), agent, now, ...(preview ? { viewedAt: new Date(Date.parse(now) + 2 * 3_600_000).toISOString() } : {}), execute, analyses, ...(config ? { config } : {}), ...(assignments ? { assignments } : {}), ...(startReady ? { startReady } : assignments && !assignments.disabled ? { startReady: startReadyWith(assignments, route.toilProject) } : {}), refresh: () => setToilProjects(({ [route.toilProject]: _, ...rest }) => rest), described };
+    const data: Data = { ...(onSync ? { sync: onSync } : {}), ...(worklog ? { worklog } : {}), toilProject: current.value, byId: new Map(current.value.items.map((i) => [i.id, i])), prById: new Map((current.value.pullRequests ?? []).map((c) => [c.id, c])), agent, now, ...(preview ? { viewedAt: new Date(Date.parse(now) + 2 * 3_600_000).toISOString() } : {}), execute, analyses, ...(config ? { config } : {}), ...(assignments ? { assignments } : {}), ...(startReady ? { startReady } : assignments && !assignments.disabled ? { startReady: startReadyWith(assignments, route.toilProject) } : {}), refresh: () => setToilProjects(({ [route.toilProject]: _, ...rest }) => rest), described };
     body = (
       <DataContext value={data}>
         {/* The Ask bar (#343), on every toil project page; its chat is keyed by toil project, so a conversation lasts across that toil project's views. */}
         <ChatScope key={route.toilProject}>
           <AnalyzeAfterSync syncedAt={syncedAt ?? null} />
-          <ToilProjectShell tab={tabOf(route)} peek={route.peek ?? null} heading={route.view === 'dashboard'} toilProjects={list?.ok ? list.value.toilProjects.map((d) => d.name) : null} {...(route.view === 'command-center' ? { boardView: 'readiness' as const } : route.view === 'dashboard' && route.tab === 'board' ? { boardView: 'board' as const } : {})}>
+          <ToilProjectShell tab={tabOf(route)} peek={route.peek ?? null} heading={route.view === 'dashboard'} {...(route.view === 'command-center' ? { boardView: 'readiness' as const } : route.view === 'dashboard' && route.tab === 'board' ? { boardView: 'board' as const } : {})}>
             {route.view === 'item' ? <ItemView id={route.id} /> : route.view === 'assignment' ? <AssignmentView id={route.id} /> : route.view === 'job' ? <JobPage id={route.job} target={route.target} /> : route.view === 'prs' ? <PullRequests /> : route.view === 'people' ? <People /> : route.view === 'worklog' ? <Worklog api={worklog ?? null} day={route.day} /> : route.view === 'standup' ? <Standup api={worklog ?? null} from={route.from} to={route.to} {...(route.ignored ? { ignored: route.ignored } : {})} /> : route.view === 'command-center' ? <CommandCenter /> : <Dashboard {...(route.tab ? { tab: route.tab } : {})} {...(route.person ? { person: route.person } : {})} {...(route.analysis ? { analysis: route.analysis } : {})} />}
           </ToilProjectShell>
         </ChatScope>
@@ -601,10 +659,11 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
                   </span>
                 </span>
               </a>
+              {!compact && <ProjectSwitcher current={wanted} toilProjects={names} tab={tabOf(route)} loaded={list?.ok === true} />}
               {compact ? (
                 <>
                   <Bell />
-                  <HeaderMenu suspended={game.open} links={links} feedback={feedback} controls={controls} help={helpWith} fresh={whatsNew.fresh.length > 0} onPalette={openPalette} onShortcuts={() => setSheet(true)} />
+                  <HeaderMenu suspended={game.open} projects={(onFollow) => <ProjectLinks current={wanted} toilProjects={names} tab={tabOf(route)} onFollow={onFollow} loaded={list?.ok === true} />} links={links} feedback={feedback} controls={controls} help={helpWith} fresh={whatsNew.fresh.length > 0} onPalette={openPalette} onShortcuts={() => setSheet(true)} />
                 </>
               ) : (
                 <>
@@ -612,6 +671,10 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
                     <NavLinks links={links} />
                   </nav>
                   <div className="settings">
+                    {/* The palette is the quickest way around, and nothing on screen said it was there. */}
+                    <Button className="btn search-open" onPress={openPalette} aria-keyshortcuts={ariaKeys('palette')} data-palette-open="">
+                      Search <kbd className="search-open__keys">{keysText(SHORTCUTS.palette.keys)}</kbd>
+                    </Button>
                     <Bell />
                     {helpWith()}
                     {feedback && !game.open && <FeedbackButton api={feedback} />}
@@ -630,8 +693,6 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
           )}
         </header>
         <main id="main" ref={main} data-view={route.view} inert={game.open} aria-hidden={game.open || undefined}>
-          {/* A running sync (#419): the theme's loader with its progress; the Sync panel's own line is the one announced. */}
-          {syncing?.running && <Loader size="panel" message={syncText(syncing)!} live={false} />}
           {choice.saveError && (
             <p className="notice" role="alert">
               {choice.saveError}
@@ -639,6 +700,12 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
           )}
           {body}
         </main>
+        {/* A running sync (#419): the theme's loader with its progress, as a small card over the page's corner. It is out of the page's flow, so starting and finishing a sync never moves what is being read; the Sync panel's own line is the one announced. */}
+        {syncing?.running && (
+          <div className="sync-card" data-sync-card="" aria-live="off" inert={game.open} aria-hidden={game.open || undefined}>
+            <Loader size="panel" message={syncText(syncing)!} live={false} />
+          </div>
+        )}
         <CommandPalette
           isOpen={palette.open && !game.open}
           onOpenChange={(open) => setPalette((p) => ({ ...p, open }))}
@@ -655,10 +722,13 @@ export function App({ execute, agent, config, themeSetting, now, preview, agentS
           scheme={choice.scheme}
           setScheme={choice.setScheme}
           onSync={onSync}
+          archivedNames={list?.ok && list.value.archived ? list.value.archived.map((d) => d.name) : []}
+          onArchive={config && canArchive(config) ? archive : undefined}
           focused={palette.focused}
           canAssign={Boolean(assignments && !assignments.disabled)}
           agentSettings={Boolean(agentSettings)}
           openShortcuts={() => setSheet(true)}
+          hasWorklog={Boolean(worklog)}
         />
         <ShortcutsSheet isOpen={sheet && !game.open} onOpenChange={setSheet} />
         <WhatsNewModal shown={newsOpen?.shown ?? []} fresh={newsOpen?.fresh ?? false} isOpen={newsOpen !== null && !game.open} onOpenChange={(open) => !open && setNewsOpen(null)} />
@@ -724,7 +794,7 @@ function useCrowded(row: RefObject<HTMLElement | null>, measuring: boolean, link
       const el = row.current;
       if (!measuring || !el) return;
       // Only the header's own parts: a theme's corners and flourishes sit beside them, positioned on their own.
-      const parts = [...el.querySelectorAll<HTMLElement>('.brand, nav, .settings')];
+      const parts = [...el.querySelectorAll<HTMLElement>('.brand, .project-switch, nav, .settings')];
       const items = [...el.querySelectorAll<HTMLElement>('nav li')];
       // A second row is an element lying wholly below another one of the row.
       const wraps = (xs: HTMLElement[]) => {
@@ -762,7 +832,7 @@ function NavLinks({ links, onFollow }: { links: NavLink[]; onFollow?: () => void
  * inside while it's open, Escape or a click outside closes it, and focus goes
  * back to the button. Feedback closes the menu first, then opens its dialog.
  */
-function HeaderMenu({ suspended, links, feedback, controls, help, fresh, onPalette, onShortcuts }: { suspended: boolean; links: NavLink[]; feedback: FeedbackApi | undefined; controls: ReactNode; help: (closeFirst: () => void) => ReactNode; fresh: boolean; onPalette: () => void; onShortcuts: () => void }) {
+function HeaderMenu({ suspended, projects, links, feedback, controls, help, fresh, onPalette, onShortcuts }: { suspended: boolean; projects: (closeFirst: () => void) => ReactNode; links: NavLink[]; feedback: FeedbackApi | undefined; controls: ReactNode; help: (closeFirst: () => void) => ReactNode; fresh: boolean; onPalette: () => void; onShortcuts: () => void }) {
   const [open, setOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const current = links.find((l) => l.current)?.label;
@@ -779,6 +849,8 @@ function HeaderMenu({ suspended, links, feedback, controls, help, fresh, onPalet
         </Button>
         <Popover className="popover nav-menu" placement="bottom end" offset={6}>
           <Dialog className="nav-menu__dialog" aria-label={current ? `Menu, on ${current}` : 'Menu'}>
+            {/* Where the project picker would sit in the header row, there is no room for a long name on a phone. */}
+            {projects(() => setOpen(false))}
             <nav aria-label="Views">
               <NavLinks links={links} onFollow={() => setOpen(false)} />
             </nav>

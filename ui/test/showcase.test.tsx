@@ -72,7 +72,7 @@ describe('the controls the showcase\'s tour presses', () => {
     expect(pane.getAttribute('role')).toBe('dialog');
     const starters = within(pane).getByRole('group', { name: 'Starter questions' });
     expect(within(starters).getAllByRole('button').some((b) => b.textContent?.startsWith('Are we going to finish the sprint?'))).toBe(true);
-    expect([...pane.querySelectorAll('button')].some((b) => /change the (agent|AI helper)/.test(b.textContent ?? ''))).toBe(true);
+    expect([...pane.querySelectorAll('button')].some((b) => /change the (agent|AI agent)/.test(b.textContent ?? ''))).toBe(true);
     expect(pane.querySelector('form.ask-form input')).not.toBeNull();
   });
 });

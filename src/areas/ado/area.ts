@@ -86,6 +86,23 @@ export const adoArea = defineArea({
   connection,
   secrets: ['pat'],
   defaults: { deployment: 'server' },
+  choices: {
+    deployment: {
+      question: 'Which one is it?',
+      required: true,
+      options: [
+        { label: 'Services (cloud)', value: 'cloud', hosts: ['dev.azure.com', '*.visualstudio.com'] },
+        { label: 'Server', value: 'server' },
+      ],
+    },
+    baseUrl: {
+      options: [
+        { label: 'Your Azure DevOps organization', value: null, when: { deployment: 'cloud' }, compose: { prefix: 'https://dev.azure.com/', label: 'Organization', placeholder: 'example-org' } },
+        { label: 'Your Azure DevOps Server', value: null, when: { deployment: 'server' }, placeholder: 'https://ado.imagile.dev' },
+      ],
+    },
+  },
+  appliesTo: { collection: ['server'], discoveredFields: ['server'], discoveredTypes: ['server'] },
   variants: {
     by: 'deployment',
     of: {

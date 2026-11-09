@@ -10,7 +10,9 @@
 
 import type { ContextUse, PremiumQuota, UsageRecord } from '../../src/model-usage.ts';
 import { AgentError, findCli } from './cli.ts';
-import { packageUrl } from './package-path.ts';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { findPackage, packageUrl } from './package-path.ts';
 import type { ToolSpec } from './tools.ts';
 
 export type AdapterName = 'claude' | 'copilot' | 'codex';
@@ -101,6 +103,8 @@ export interface Runtime {
   workspace?: boolean;
   /** Its SDK starts a `.js` CLI with Node (Copilot), so an npm shim on Windows resolves to the script it runs (#344). */
   scripts?: boolean;
+  /** The npm package that holds the CLI and the script in it Node runs (Copilot): Install puts it beside Toil UI, and it is used when PATH has no usable CLI. */
+  cliPackage?: { name: string; script: string };
   /** Sends one question; resolves with the final answer's text. */
   run(sdk: unknown, request: RunRequest): Promise<string>;
 }
@@ -126,8 +130,19 @@ export async function loadSdk(runtime: Pick<Runtime, 'label' | 'package'>, impor
 }
 
 /** The CLI for a runtime: the configured path, else PATH. */
-export function cliFor(runtime: Pick<Runtime, 'cliLabel' | 'command' | 'scripts'>, configured: string | null, env: Record<string, string | undefined>, platform: NodeJS.Platform, isFile?: (p: string) => boolean, cwd?: string, readText?: (p: string) => string | null): string {
-  return findCli({ label: runtime.cliLabel, command: runtime.command, configured: configured ?? undefined, env, platform, ...(isFile ? { isFile } : {}), ...(cwd ? { cwd } : {}), ...(runtime.scripts ? { scripts: true } : {}), ...(readText ? { readText } : {}) });
+export function cliFor(runtime: Pick<Runtime, 'cliLabel' | 'command' | 'scripts' | 'cliPackage'>, configured: string | null, env: Record<string, string | undefined>, platform: NodeJS.Platform, isFile?: (p: string) => boolean, cwd?: string, readText?: (p: string) => string | null): string {
+  try {
+    return findCli({ label: runtime.cliLabel, command: runtime.command, configured: configured ?? undefined, env, platform, ...(isFile ? { isFile } : {}), ...(cwd ? { cwd } : {}), ...(runtime.scripts ? { scripts: true } : {}), ...(readText ? { readText } : {}) });
+  } catch (e) {
+    // Nothing usable on PATH, or only a launcher script: the CLI Install put beside Toil UI. A path set in Settings is never overridden.
+    const pkg = runtime.cliPackage;
+    const found = !configured && !isFile && pkg ? findPackage(pkg.name) : null;
+    if (found && pkg) {
+      const script = join(found.dir, pkg.script);
+      if (existsSync(script)) return script;
+    }
+    throw e;
+  }
 }
 
 /** The real importer. The specifier is a variable, so the bundler leaves the import for Node to resolve at run time. */

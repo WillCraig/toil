@@ -7,7 +7,8 @@
 
 import { Button, Label, ListBox, ListBoxItem, Popover, Select, SelectValue } from 'react-aria-components';
 
-export function Choice({ label, value, options, onChange }: { label: string; value: string; options: Array<{ id: string; label: string }>; onChange: (id: string) => void }) {
+/** `faces` sets the font-family of an option's line, so a list of typefaces shows each in its own (Settings, Font). */
+export function Choice({ label, value, options, onChange, faces }: { label: string; value: string; options: Array<{ id: string; label: string }>; onChange: (id: string) => void; faces?: Record<string, string> }) {
   return (
     <Select className="choice" selectedKey={value} onSelectionChange={(k) => k !== null && onChange(String(k))}>
       <Label>{label}</Label>
@@ -21,7 +22,7 @@ export function Choice({ label, value, options, onChange }: { label: string; val
       <Popover className="popover">
         <ListBox className="menu">
           {options.map((o) => (
-            <ListBoxItem key={o.id} id={o.id} className="menu-item">
+            <ListBoxItem key={o.id} id={o.id} className="menu-item" {...(faces?.[o.id] ? { style: { fontFamily: faces[o.id] } } : {})}>
               {o.label}
             </ListBoxItem>
           ))}

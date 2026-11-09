@@ -2,6 +2,7 @@
 import { Validator } from '@cfworker/json-schema';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
+import { cookieHeader, letInto } from './let-in.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,7 +15,7 @@ import { connectionEnvName } from '../../src/core/config.ts';
 import { CONFIG_CANNED, FIXTURE_AREAS, FIXTURE_CONNECTIONS, PROBES } from '../src/fixtures/config.ts';
 import { noAgent } from '../server/agent.ts';
 import { areasFrom, personFrom, settingsFrom } from '../server/config.ts';
-import { CSRF_HEADER, SESSION_HEADER, createUiServer, type UiServerOptions } from '../server/server.ts';
+import { createUiServer, type UiServerOptions } from '../server/server.ts';
 import { toilStore } from '../server/store.ts';
 
 // toil's API builds its own credential store: here it is an in-memory one, so no test reaches the OS keychain.
@@ -28,7 +29,7 @@ const { execute, registry } = await import('../../src/api.ts');
 
 /**
  * The settings pages' path end to end (#253, item 4): the page's request to
- * `/api/config`, the server's allowlist and its CSRF and Origin checks, and
+ * `/api/config`, the server's allowlist and its Host, Origin and JSON checks, and
  * toil's own config commands run in-process from source (src/api.ts) against
  * a temp home, so the config file, the toil projects and the audit log are this
  * test's, never the user's. The credential store is the in-memory fake.
@@ -38,7 +39,6 @@ const { execute, registry } = await import('../../src/api.ts');
 
 const SECRET = 'fake-pat-abc12345-typed-once';
 const SECOND = 'fake-pat-abc12345-typed-twice';
-const TOKEN = 'launch-token-for-config-tests';
 
 const app = mkdtempSync(join(tmpdir(), 'toil-ui-config-app-'));
 writeFileSync(join(app, 'index.html'), '<!doctype html><div id="root"></div>');
@@ -91,7 +91,7 @@ interface Reply {
 function send(origin: string, path: string, options: { method?: string; headers?: Record<string, string>; body?: string } = {}): Promise<Reply> {
   const url = new URL(path, origin);
   return new Promise((resolve, reject) => {
-    const req = request({ host: url.hostname, port: url.port, path: url.pathname, method: options.method ?? 'GET', headers: { host: url.host, ...options.headers } }, (res) => {
+    const req = request({ host: url.hostname, port: url.port, path: url.pathname, method: options.method ?? 'GET', headers: { host: url.host, ...cookieHeader(origin), ...options.headers } }, (res) => {
       let body = '';
       res.setEncoding('utf8');
       res.on('data', (c: string) => (body += c));
@@ -115,18 +115,17 @@ async function serve(extra: Partial<UiServerOptions> = {}) {
     appDir: app,
     version: '0.0.0-test',
     toil: { version: '0.0.0-test', contractVersion: 1 },
-    token: TOKEN,
     config: { areas: areasFrom(registry), settings: settingsFrom(process.env) },
   });
   const { origin } = await ui.listen();
+  await letInto(origin);
   closeServer = () => ui.close();
-  const signed = JSON.parse((await send(origin, '/api/session', { method: 'POST', body: JSON.stringify({ token: TOKEN }), headers: { origin, 'content-type': 'application/json' } })).body) as { session: string; csrf: string };
-  const headers = { [SESSION_HEADER]: signed.session, [CSRF_HEADER]: signed.csrf, origin, 'content-type': 'application/json' };
+  const headers = { origin, 'content-type': 'application/json' };
   const config = async (command: string, input: Record<string, unknown> = {}, extra: { answers?: Record<string, string>; secrets?: Record<string, string> } = {}, over: Record<string, string> = {}) => {
     const res = await send(origin, '/api/config', { method: 'POST', body: JSON.stringify({ command, input, ...extra }), headers: { ...headers, ...over } });
     return { status: res.status, envelope: JSON.parse(res.body) };
   };
-  const get = async (path: string) => JSON.parse((await send(origin, path, { headers: { [SESSION_HEADER]: signed.session } })).body);
+  const get = async (path: string) => JSON.parse((await send(origin, path)).body);
   return { origin, config, get, headers };
 }
 
@@ -155,7 +154,7 @@ describe('the allowlist', () => {
   it('is exactly the config commands the pages need, each one toil has, the changes local writes only', () => {
     const served = new Map([...registry.commands, ...registry.personCommands].map((c) => [c.name, c]));
     expect([...CONFIG_COMMANDS].sort()).toEqual(
-      ['audit list', 'audit stats', 'connections add', 'connections default', 'connections list', 'connections login', 'connections remove', 'connections test', 'connections writes', 'projects add-repo', 'projects analyze set', 'projects check', 'projects field', 'projects init', 'projects link', 'projects list', 'projects onboard', 'projects person', 'projects show', 'projects wip-limit', 'projects describe', 'theme list', 'theme set'].sort(),
+      ['audit list', 'audit stats', 'connections add', 'connections default', 'connections list', 'connections login', 'connections remove', 'connections test', 'connections writes', 'jira field discover', 'projects add-repo', 'projects analyze set', 'projects archive', 'projects check', 'projects describe', 'projects field', 'projects init', 'projects link', 'projects list', 'projects onboard', 'projects people save', 'projects person', 'projects show', 'projects unarchive', 'projects wip-limit', 'theme list', 'theme set'],
     );
     for (const name of CONFIG_READS) expect(served.get(name), name).toMatchObject({ writes: false, writesLocal: false, writesDependOnInput: false });
     // A change writes only toil's own config on this machine, never a service.
@@ -184,14 +183,14 @@ describe('the allowlist', () => {
     expect(audit()).toEqual([]);
   });
 
-  it('refuses a config call from another Origin, or without the CSRF token, before anything is saved', async () => {
+  it('refuses a config call from another Origin, from a form post, or under another Host, before anything is saved', async () => {
     const { config } = await serve();
     const body = { name: 'corp-jira', area: 'jira' };
     const extra = { answers: jiraAnswers(), secrets: { apiToken: SECRET } };
     expect((await config('connections add', body, extra, { origin: 'http://evil.imagile.dev' })).status).toBe(403);
     expect((await config('connections add', body, extra, { origin: 'null' })).status).toBe(403);
-    expect((await config('connections add', body, extra, { [CSRF_HEADER]: 'not-the-token' })).status).toBe(403);
-    expect((await config('connections add', body, extra, { [SESSION_HEADER]: 'not-a-session' })).status).toBe(401);
+    expect((await config('connections add', body, extra, { 'content-type': 'text/plain' })).status).toBe(415);
+    expect((await config('connections add', body, extra, { host: 'rebind.imagile.dev' })).status).toBe(403);
     expect(fileText()).toBe('');
     expect(secrets.entries.size).toBe(0);
     expect(audit()).toEqual([]);
@@ -327,6 +326,19 @@ describe('Toil projects, through toil', () => {
     expectEnvelope(await config('projects person', { toilProject: 'payments', name: 'Claude', remove: true })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', fix: 'Only a person can make this call, on the CLI with toil projects person.' } });
     expectEnvelope(await config('projects wip-limit', { toilProject: 'payments', clear: true })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
     expect(JSON.parse(readFileSync(join(home, '.toil', 'projects', 'payments.json'), 'utf8'))).toMatchObject({ people: [{ name: 'Pat Example' }, { name: 'Claude' }], wipLimit: 3 });
+    sweep();
+  });
+
+  it("maps one person across sources and saves the people into a repository's .toil/projects, never a secret (#561)", async () => {
+    const { config } = await serve();
+    await config('projects init', { name: 'payments' });
+    expectEnvelope(await config('projects person', { toilProject: 'payments', name: 'Pat Example', github: 'pat-ex', jira: 'pat', ado: 'you@example.com', bitbucket: 'pexample' })).toMatchObject({ ok: true, data: { person: { ids: { github: 'pat-ex', jira: 'pat', ado: 'you@example.com', bitbucket: 'pexample' } } } });
+    const repo = join(home, 'repo');
+    mkdirSync(join(repo, '.git'), { recursive: true });
+    writeFileSync(join(repo, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+    const saved = await config('projects people save', { toilProject: 'payments', repo });
+    expectEnvelope(saved).toMatchObject({ ok: true, data: { created: true, added: ['Pat Example'] } });
+    expect(JSON.parse(readFileSync(join(repo, '.toil', 'projects', 'payments.json'), 'utf8'))).toMatchObject({ name: 'payments', people: [{ name: 'Pat Example', ids: { github: 'pat-ex' } }] });
     sweep();
   });
 

@@ -43,10 +43,12 @@ export interface NetworkApis {
 
 // Read through the namespace, not imported by name: a named import of an API an
 // older Node lacks fails the whole bundle at load, before even `toil version`.
+// On a Node that lacks one (toil runs on those with a warning, src/core/runtime.ts), calling it says which API and which release, not "(void 0) is not a function".
+const missing = (name: string, since: string) => new ToilError('UNSUPPORTED_NODE', `This Node (${process.versions.node}) has no ${name}, which arrived in Node ${since}.`, { fix: `Install Node 24.22.1 or later on 24.x, or 26.12.1 or later (also the releases that fix CVE-2026-111497).` });
 const node: NetworkApis = {
-  getCACertificates: (type) => tls.getCACertificates(type),
-  setDefaultCACertificates: (certs) => tls.setDefaultCACertificates(certs),
-  setGlobalProxyFromEnv: (env) => http.setGlobalProxyFromEnv(env),
+  getCACertificates: (type) => (typeof tls.getCACertificates === 'function' ? tls.getCACertificates(type) : (() => { throw missing('tls.getCACertificates', '24.5'); })()),
+  setDefaultCACertificates: (certs) => (typeof tls.setDefaultCACertificates === 'function' ? tls.setDefaultCACertificates(certs) : (() => { throw missing('tls.setDefaultCACertificates', '24.5'); })()),
+  setGlobalProxyFromEnv: (env) => (typeof http.setGlobalProxyFromEnv === 'function' ? http.setGlobalProxyFromEnv(env) : (() => { throw missing('http.setGlobalProxyFromEnv', '24.14'); })()),
 };
 
 /**
@@ -63,6 +65,7 @@ export function configureNetwork(env: NodeJS.ProcessEnv, debug: (message: string
     try {
       apis.setGlobalProxyFromEnv(proxy);
     } catch (err) {
+      if (err instanceof ToilError) throw err;
       const names = Object.keys(proxy).filter((name) => !/no_proxy/i.test(name)).join(' / ');
       throw new ToilError('CONFIG_INVALID', `The proxy in ${names} isn't one toil can use: ${(err as Error).message}`, {
         fix: `Set ${names} to a proxy URL such as http://proxy.imagile.dev:8080, or unset it to connect directly.`,
@@ -81,7 +84,13 @@ export function configureNetwork(env: NodeJS.ProcessEnv, debug: (message: string
  */
 export function trustOsStoreByDefault(debug: (message: string) => void, apis: NetworkApis = node): void {
   const trusted = trustedCertificates(debug, apis);
-  if (trusted.certificates && trusted.system > 0) apis.setDefaultCACertificates(trusted.certificates);
+  if (trusted.certificates && trusted.system > 0) {
+    try {
+      apis.setDefaultCACertificates(trusted.certificates);
+    } catch (err) {
+      debug(`couldn't trust the OS certificate store: ${(err as Error).message}`);
+    }
+  }
 }
 
 /**

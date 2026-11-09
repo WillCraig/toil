@@ -1,6 +1,8 @@
 /* The briefing (#494): one reading column, reasons folded, and the item drawer beside the view. */
 
-.briefing { display: grid; gap: 1.25rem; max-width: 46rem; }
+/* The page uses the width (the cards sit side by side); only the reading text stays a column. */
+.briefing { display: grid; gap: 1.25rem; max-width: 72rem; }
+.briefing__full, .briefing__meta, .briefing__warning { max-width: 46rem; }
 .briefing__meta { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; align-items: center; color: var(--muted); font-size: 0.9rem; }
 .customize { position: relative; margin-left: auto; }
 .customize > summary { list-style: none; cursor: pointer; }

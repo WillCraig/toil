@@ -1,21 +1,19 @@
 /**
  * The sync panel (#250): what the local app's cache holds and how fresh it
- * is, for every toil project and each of its sources, with Sync now and Wipe the
- * cache. It sits beside the App rather than inside it (src/local.tsx), so the
+ * is, for every toil project and each of its sources, with Sync now. Wiping the cache
+ * is under Settings, General, Advanced. It sits beside the App rather than inside it (src/local.tsx), so the
  * views stay functions of their data and the preview never shows it.
  *
  * While a sync runs the panel polls `api/sync` once a second and says what
  * toil is doing (requests, pages, retries) in a polite live region. A source
  * whose latest sync failed shows toil's message and fix, and says its data is
- * the last good copy. The wipe asks first, in the page, with Cancel focused.
- * A progress bar that knows what it's measuring, which is rarer than it sounds.
+ * the last good copy. * A progress bar that knows what it's measuring, which is rarer than it sounds.
  */
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { dateTime, toilProjectHref, sourceLabel } from './format.ts';
 import { history, type HistoryEntry } from './history.ts';
 import type { ToilProjectState, SyncClient, SyncStatus } from './server-client.ts';
-import { matches } from './shortcuts.ts';
 import './sync-panel.css';
 
 /** How often a running sync is polled. */
@@ -70,11 +68,11 @@ function ToilProjectRow({ toilProject }: { toilProject: ToilProjectState }) {
             <li key={s.area} className={s.status === 'failed' ? 'sync-bad' : undefined}>
               {s.status === 'ok' ? (
                 <>
-                  {sourceLabel(s.area)} <span className="sync-area">({s.area})</span>: up to date
+                  {sourceLabel(s.area)}: up to date
                 </>
               ) : (
                 <>
-                  {sourceLabel(s.area)} <span className="sync-area">({s.area})</span>: failed {dateTime(s.lastAttemptAt)}. {s.error} {s.fix}{' '}
+                  {sourceLabel(s.area)}: failed {dateTime(s.lastAttemptAt)}. {s.error} {s.fix}{' '}
                   <strong>{s.stale && s.lastSuccessAt ? `Showing the last good copy, from ${dateTime(s.lastSuccessAt)}.` : 'Nothing synced from it yet.'}</strong>
                 </>
               )}
@@ -89,11 +87,8 @@ function ToilProjectRow({ toilProject }: { toilProject: ToilProjectState }) {
 export function SyncPanel({ client, onChange, onStatus, pollMs = POLL_MS, request = 0 }: SyncPanelProps) {
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
   const [announce, setAnnounce] = useState('');
   const wasRunning = useRef(false);
-  const cancel = useRef<HTMLButtonElement>(null);
-  const wipeButton = useRef<HTMLButtonElement>(null);
 
   const take = useCallback(
     (next: SyncStatus) => {
@@ -123,30 +118,10 @@ export function SyncPanel({ client, onChange, onStatus, pollMs = POLL_MS, reques
     return () => clearInterval(timer);
   }, [running, client, take, pollMs]);
 
-  useEffect(() => {
-    if (confirming) cancel.current?.focus();
-  }, [confirming]);
-
   const start = () => {
     setAnnounce('Sync started.');
     wasRunning.current = true;
     client.start().then(take, fail);
-  };
-  const closeConfirm = () => {
-    setConfirming(false);
-    wipeButton.current?.focus();
-  };
-  const wipe = () => {
-    client.wipe().then((next) => {
-      setConfirming(false);
-      take(next);
-      setAnnounce('The cache is wiped. Nothing synced is left on this machine.');
-      onChange(next);
-      wipeButton.current?.focus();
-    }, fail);
-  };
-  const onKey = (e: KeyboardEvent) => {
-    if (matches('wipeCancel', e)) closeConfirm();
   };
   // Sync asked for from the page (#416), by the command palette or the first-run checklist: each new number is one
   // press. One made while a sync runs is that sync; one made before the panel has read the cache waits for it.
@@ -165,14 +140,11 @@ export function SyncPanel({ client, onChange, onStatus, pollMs = POLL_MS, reques
         <div className="sync-head">
           <h2 id="sync-heading">Sync</h2>
           <p className="sync-when">
-            {!status ? 'Reading the cache…' : last ? `Last synced ${dateTime(last)}. Kept ${status.retentionDays} days.` : 'Nothing synced yet: press Sync now to read your Toil projects through toil.'}
+            {!status ? 'Reading the cache…' : last ? `Last synced ${dateTime(last)}. Kept ${status.retentionDays} days.` : 'Nothing synced yet: press Sync now to read your Toil projects.'}
           </p>
           <div className="sync-actions">
             <button type="button" onClick={start} disabled={!status || running}>
               {running ? 'Syncing…' : 'Sync now'}
-            </button>
-            <button type="button" ref={wipeButton} onClick={() => setConfirming(true)} disabled={!status || running} aria-expanded={confirming} aria-controls="sync-confirm">
-              Wipe the cache…
             </button>
           </div>
         </div>
@@ -189,22 +161,6 @@ export function SyncPanel({ client, onChange, onStatus, pollMs = POLL_MS, reques
           </p>
         )}
         {job && !running && job.error && <p className="sync-bad">The last sync stopped: {job.error}</p>}
-
-        {confirming && (
-          <div className="sync-confirm" id="sync-confirm" role="group" aria-labelledby="sync-confirm-text" onKeyDown={onKey}>
-            <p id="sync-confirm-text">
-              Delete everything Toil UI synced to this machine? The dashboards will be empty until the next sync, which fetches everything again. Your trackers are not touched.
-            </p>
-            <div className="sync-actions">
-              <button type="button" className="sync-danger" onClick={wipe}>
-                Wipe it
-              </button>
-              <button type="button" ref={cancel} onClick={closeConfirm}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
 
         {status && status.toilProjects.length > 0 && (
           <ul className="sync-toil-projects" aria-label="Toil projects in the cache">

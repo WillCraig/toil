@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_NOW } from '../src/fixtures/execute.ts';
 import {
-  allFlags, daysText, flagsOf, openQueue, ownersOf, parseCodeowners, pathsOf, prMetrics, sizeOf, suggestReviewers, waitOf, workingDays,
+  allFlags, daysText, flagsOf, openQueue, ownersOf, parseCodeowners, pathsOf, prMetrics, sizeOf, diffSquares, daysShort, suggestReviewers, waitOf, workingDays,
 } from '../src/model/prs.ts';
 import type { Change } from '../src/toil.ts';
 import { loaded } from './harness.ts';
@@ -52,10 +52,10 @@ describe('the open queue', () => {
   it('sizes by changed lines, and says when a host counts files only', async () => {
     const { d } = await data('checkout-web');
     const by = (n: number) => d.pullRequests.find((p) => p.id.endsWith(`#${n}`))!;
-    expect(sizeOf(by(50))).toEqual({ bucket: 'S', lines: 13, files: 1 });
-    expect(sizeOf(by(52))).toEqual({ bucket: 'L', lines: 325, files: 3 });
+    expect(sizeOf(by(50))).toMatchObject({ bucket: 'S', lines: 13, files: 1 });
+    expect(sizeOf(by(52))).toMatchObject({ bucket: 'L', lines: 325, files: 3 });
     const { d: card } = await data('card-payments');
-    expect(sizeOf(card.pullRequests[0]!)).toEqual({ bucket: null, lines: null, files: 6 });
+    expect(sizeOf(card.pullRequests[0]!)).toEqual({ bucket: null, lines: null, files: 6, additions: null, deletions: null });
   });
 });
 
@@ -130,5 +130,19 @@ describe('suggested reviewers', () => {
     // Without CODEOWNERS, a change to the card form is suggested to whoever reviewed earlier card-form changes.
     const form = d.pullRequests.find((p) => p.id.endsWith('#53'))!;
     expect(suggestReviewers({ ...form, author: { id: 'ada-dev', name: null, email: null } }, d.pullRequests, null).map((s) => s.id)).toEqual(['bo-web']);
+  });
+});
+
+describe('the size bar and compact figures (#561)', () => {
+  it('draws five squares by the share of additions and deletions, never more, never a present side lost', () => {
+    expect(diffSquares(100, 0)).toEqual({ add: 5, del: 0, none: 0 });
+    expect(diffSquares(0, 100)).toEqual({ add: 0, del: 5, none: 0 });
+    expect(diffSquares(50, 50)).toEqual({ add: 3, del: 2, none: 0 });
+    expect(diffSquares(1000, 1)).toEqual({ add: 4, del: 1, none: 0 });
+    expect(diffSquares(0, 0)).toEqual({ add: 0, del: 0, none: 5 });
+  });
+  it('says a wait as a short figure', () => {
+    expect(daysShort(32.64)).toBe('32.6 d');
+    expect(daysShort(2)).toBe('2 d');
   });
 });

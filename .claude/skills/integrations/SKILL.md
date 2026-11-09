@@ -341,6 +341,29 @@ that isn't in `OWI_SOURCES` fails CI, and so does a marked area without a fixtur
 whose mapped examples don't validate against the schema. An area that is on its way
 sits in that test's `PENDING` list, by its issue, and switches on once it registers.
 
+### Scopes and connection form choices (#561)
+
+*Principles 2 and 11.* An area whose credential has **named scopes or permissions** (GitHub's
+classic and fine-grained tokens) declares them in `defineArea({ scopes })`, kept in its own
+`src/areas/<area>/scopes.ts`: per kind of credential, each scope with the commands that need
+it and `required: 'read' | 'write'` (a fine-grained permission is two entries, one per
+level). `toil connections scopes --area <area>` and Toil UI's "Scopes toil needs" read it.
+**Update it with every command you add or change**: `test/scopes.test.ts` fails when a
+command of a scoped area is in no entry, naming the file and what to add, and when an entry
+names a command that doesn't exist. Derive each entry from the requests the command sends;
+never guess a scope, and say in the PR what you could not confirm. An area with no named scopes
+declares none; `toil connections scopes` then says it doesn't say, not that nothing is needed.
+
+The connection form (Settings and the setup wizard) is built from the area's own description
+(`src/core/connection-form.ts`): `choices` turn a setting into radio buttons (GitHub.com or
+Enterprise Server; Cloud or Data Center, which is a **required** radio with nothing preselected,
+and which builds the address from a word the person types), `appliesTo` and the keys each
+`variants` entry `requires` or `uses` decide what is asked, required, optional or hidden for
+the choice, and `hosts` on a choice let the form say "that looks like a Cloud address". A new
+variants area declares its `choices` for the variant setting and its address;
+`ui/test/connection-form.test.ts` checks the form's requirements against the CLI's own schema, so
+the two cannot drift.
+
 ### Deployment Variants
 
 *Principle 10.* **A product that ships Data Center/Server and Cloud is one area, one

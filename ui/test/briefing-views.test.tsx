@@ -49,16 +49,16 @@ describe('Customize', () => {
 });
 
 describe("the Toil project's Analyze settings", () => {
-  it('shows the prompt Analyze will send as you type, and the command Save runs', async () => {
+  it('shows the prompt Analyze will send as you type, and shows no command', async () => {
     window.location.hash = '#/settings/projects/card-payments/analyze';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
-    const form = (await screen.findByRole('heading', { name: 'How Analyze briefs card-payments' })).closest('form')!;
+    const form = (await screen.findByRole('heading', { name: 'How briefings are made for card-payments' })).closest('form')!;
     const goal = within(form).getByRole('textbox', { name: 'Goal of this work' });
     await userEvent.type(goal, 'Ship card payments v2.');
     const preview = form.querySelector('.analyze-preview__text')!;
     await waitFor(() => expect(preview.textContent).toContain('The goal of this work: Ship card payments v2.'));
     expect(preview.textContent).toContain('Answer with one fenced block, ```briefing');
-    expect(form.textContent).toContain('toil projects analyze set card-payments --goal');
+    expect(form.textContent).not.toContain('toil projects analyze set');
   });
 });
 

@@ -101,7 +101,7 @@ describe('the cache answers the dashboard whatever window the browser names', ()
       sources: [{ area: 'jira', ok: true, error: null, fix: null, watermark: at, calls: 1 }],
     });
     const store = sqliteStore(() => cache, (async () => envelope('x', null)) as unknown as Execute, { version: 'x', contractVersion: 1 });
-    const ctx = { viewer: { id: 'local', name: 'you', via: 'launch-token' }, signal: new AbortController().signal } as never;
+    const ctx = { viewer: { id: 'local', name: 'you', via: 'loopback' }, signal: new AbortController().signal } as never;
     const ask = (q: string) => store.execute(ctx, 'jira issue search', { toilProject: 'd', jql: q }, 'read');
 
     const same = await ask(JQL('PAY', 30));

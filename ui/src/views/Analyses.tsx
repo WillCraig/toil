@@ -25,7 +25,7 @@ import { analysesHref, analysisHref, dateTime, toilProjectHref } from '../format
 import { Empty, EmptyButton, EmptyLink } from '../components/empty.tsx';
 import { unchanged, type AnalysisSummary, type AnalysisView } from '../model/analysis.ts';
 import { Loader } from '../moments/Moments.tsx';
-import { useTerm } from '../skins.tsx';
+import { useTerm, useWords } from '../skins.tsx';
 import { usePlain } from '../plain-words.ts';
 
 export function Analyses({ open }: { open?: string } = {}) {
@@ -38,6 +38,7 @@ function AnalysisList() {
   const history = chat?.history;
   const list = history?.list ?? null;
   const term = useTerm();
+  const words = useWords();
   const plain = usePlain();
   const { toilProject } = useData();
   return (
@@ -59,7 +60,7 @@ function AnalysisList() {
       )}
       {history?.error && <p className="failure">{history.error}</p>}
       {list === null ? (
-        !history?.error && <Loader size="panel" message="Reading the briefings…" />
+        !history?.error && <Loader size="panel" message={words('loading.briefings')} />
       ) : list.length ? (
         <ol className="analyses__list" aria-label="Analyses, newest first">
           {list.map((a) => (
@@ -68,7 +69,7 @@ function AnalysisList() {
         </ol>
       ) : running ? null : (
         <Empty
-          message={plain.pw('No analysis kept for this Toil project yet.', 'No briefing kept for this Toil project yet.')}
+          message={words('empty.briefings')}
           action={
             chat ? (
               <EmptyButton onPress={() => void chat.ask(ANALYZE, plain.pw('Analyze', 'Get a briefing'))} disabled={chat.busy}>
@@ -112,6 +113,7 @@ function AnalysisEntry({ a }: { a: AnalysisSummary }) {
 
 function OpenAnalysis({ id }: { id: string }) {
   const { analyses, toilProject } = useData();
+  const words = useWords();
   const [view, setView] = useState<AnalysisView | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -141,7 +143,7 @@ function OpenAnalysis({ id }: { id: string }) {
       </Card>
     );
   }
-  if (!view) return <p className="note">Reading the analysis…</p>;
+  if (!view) return <p className="note">{words('loading.analysis')}</p>;
   const { record: r, changes } = view;
   return (
     <Card as="section" className="panel analyses analysis-open" aria-labelledby="analysis-title">

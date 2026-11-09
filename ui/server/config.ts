@@ -57,8 +57,8 @@ export function personFrom(body: Record<string, unknown>): ExecutePerson {
 }
 
 /** The registry's areas, as the add-connection form needs them. An older toil's areas have no `connection`. */
-export function areasFrom(registry: { areas: ReadonlyArray<{ name: string; description: string; connection?: readonly ConnectionField[] }> }): AreaInfo[] {
-  return registry.areas.map((a) => ({ name: a.name, description: a.description, connection: [...(a.connection ?? [])] }));
+export function areasFrom(registry: { areas: ReadonlyArray<{ name: string; description: string; connection?: readonly ConnectionField[]; scopes?: AreaInfo["scopes"]; variantBy?: string }> }): AreaInfo[] {
+  return registry.areas.map((a) => ({ name: a.name, description: a.description, connection: [...(a.connection ?? [])], ...(a.scopes ? { scopes: a.scopes } : {}), ...(a.variantBy ? { variantBy: a.variantBy } : {}) }));
 }
 
 /** The time limit toil applies in this process: TOIL_TIMEOUT_MS when it's a positive number, else the default. */

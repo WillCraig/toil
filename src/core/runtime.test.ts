@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONTRACT_VERSION } from './envelope.js';
-import { nodeRefused, unsupportedNode } from './runtime.js';
+import { nodeBanner, nodeRefused, nodeWarning } from './runtime.js';
 
 describe('the Node floor (CVE-2026-111497, #479)', () => {
   it('refuses every 24.x before 24.22.1 and accepts it and later, with or without a v', () => {
@@ -30,20 +29,16 @@ describe('the Node floor (CVE-2026-111497, #479)', () => {
     expect(nodeRefused('28.1.0')).toBe(false);
   });
 
-  it('a refused Node is one plain envelope error naming the CVE and the releases to install; a patched one gets nothing', () => {
-    expect(unsupportedNode('v24.22.0', '0.0.0-test')).toEqual({
-      ok: false,
-      data: null,
-      error: {
-        code: 'UNSUPPORTED_NODE',
-        message:
-          "toil needs Node 24.22.1 or later on 24.x, or 26.12.1 or later, the releases that fix CVE-2026-111497 (a remote code execution in Node's Brotli decoder); this is 24.22.0.",
-        fix: "Install Node 24.22.1 or later on 24.x, or 26.12.1 or later (nodejs.org, or your organization's approved channel), then run toil again. Node 25 gets no fix.",
-      },
-      meta: { command: 'toil', durationMs: 0, version: '0.0.0-test', contractVersion: CONTRACT_VERSION },
-    });
-    expect(unsupportedNode('25.1.0', '0.0.0-test')?.error?.message).toContain('this is 25.1.0.');
-    expect(unsupportedNode('24.22.1', '0.0.0-test')).toBeUndefined();
-    expect(unsupportedNode('26.12.1', '0.0.0-test')).toBeUndefined();
+  it('an unpatched Node gets a loud warning naming the CVE and the releases to install, and a patched one gets nothing', () => {
+    const warning = nodeWarning('v24.22.0');
+    expect(warning).toContain('WARNING');
+    expect(warning).toContain('CVE-2026-111497');
+    expect(warning).toContain('24.22.0');
+    expect(warning).toContain('Install Node 24.22.1 or later on 24.x, or 26.12.1 or later');
+    expect(nodeWarning('25.1.0')).toContain('25.1.0');
+    expect(nodeWarning('24.22.1')).toBeUndefined();
+    expect(nodeWarning('26.12.1')).toBeUndefined();
+    expect(nodeBanner('24.22.0')).toMatch(/^!{78}\nWARNING/);
+    expect(nodeBanner('26.12.1')).toBeUndefined();
   });
 });

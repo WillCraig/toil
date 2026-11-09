@@ -91,6 +91,13 @@ export const projectItem = (more = false) => ({
   },
 });
 
+/** What project status reads before it writes: the item, its project, the Status field's options and the option it holds. Invented from the GraphQL reference, not captured live. */
+export const statusItem = (current: string | null = 'In Progress') => ({
+  id: 'PVTI_abc12345',
+  project: { id: 'PVT_kwDOabc123453', number: 3, title: 'Roadmap', owner: { __typename: 'Organization', login: 'imagile' }, field: { id: 'PVTSSF_abc12345', name: 'Status', options: projectField().options } },
+  fieldValueByName: current === null ? null : { name: current, optionId: projectField().options.find((o) => o.name === current)!.id },
+});
+
 const lastPage = { hasNextPage: false, endCursor: 'Y3Vyc29yOjE=' };
 
 /**
@@ -138,6 +145,9 @@ function graphql(body: string | undefined) {
   if (query.includes('convertPullRequestToDraft')) return { data: { convertPullRequestToDraft: { pullRequest: { number: 7, isDraft: true } } } };
   if (query.includes('markPullRequestReadyForReview')) return { data: { markPullRequestReadyForReview: { pullRequest: { number: 7, isDraft: false } } } };
   if (query.includes('resolveReviewThread')) return { data: { resolveReviewThread: { thread: { ...thread(), isResolved: true } } } };
+  if (query.includes('updateProjectV2ItemFieldValue')) return { data: { updateProjectV2ItemFieldValue: { projectV2Item: { id: 'PVTI_abc12345' } } } };
+  if (query.includes('issueOrPullRequest')) return { data: { repository: { issueOrPullRequest: { __typename: 'Issue', projectItems: { nodes: [statusItem()] } } } } };
+  if (query.includes('node(id')) return { data: { node: { __typename: 'ProjectV2Item', ...statusItem() } } };
   if (query.includes('projectsV2(')) return { data: { repositoryOwner: { projectsV2: { pageInfo: lastPage, nodes: [project()] } } } };
   if (query.includes('fields(first')) return { data: { repositoryOwner: { projectV2: { fields: { pageInfo: lastPage, nodes: [{ __typename: 'ProjectV2Field', id: 'PVTF_abc12345', name: 'Estimate', dataType: 'NUMBER' }, projectField(), iterationField()] } } } } };
   if (query.includes('items(first')) return { data: { repositoryOwner: { projectV2: { items: { pageInfo: lastPage, nodes: [projectItem()] } } } } };

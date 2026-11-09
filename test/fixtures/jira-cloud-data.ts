@@ -67,6 +67,9 @@ export const sprints = [
   { id: 42, self: `${SITE}${AGILE}/sprint/42`, state: 'active', name: 'Sprint 42', startDate: '2026-01-15T00:00:00.000Z', endDate: '2026-01-28T00:00:00.000Z', originBoardId: 3, goal: 'Ship login fix' },
 ];
 
+/** A planned sprint, not in the board listing, so the start example has a future one to start. */
+const futureSprint = { id: 43, self: `${SITE}${AGILE}/sprint/43`, state: 'future', name: 'Sprint 43', endDate: '2026-02-11T00:00:00.000Z', originBoardId: 3 };
+
 export const projects = [
   { self: `${SITE}${API}/project/10000`, id: '10000', key: 'PROJ', name: 'Project', projectTypeKey: 'software', simplified: false, style: 'classic' },
   { self: `${SITE}${API}/project/10001`, id: '10001', key: 'IMG', name: 'Imagile web', projectTypeKey: 'software', simplified: true, style: 'next-gen' },
@@ -98,7 +101,7 @@ const histories = [
 
 export const routes: Route[] = [
   // check-toil-project's project lookup. Invented from the docs: GET /rest/api/3/project/{key}.
-  { method: 'GET', path: `${API}/project/PROJ`, respond: json({ id: '10000', key: 'PROJ', name: 'Project' }) },
+  { method: 'GET', path: `${API}/project/PROJ`, respond: json({ id: '10000', key: 'PROJ', name: 'Project', issueTypes: [{ id: '10001', name: 'Bug' }] }) },
   // The attachment-only read first: same path as issue get, with a query.
   { method: 'GET', path: `${API}/issue/PROJ-123`, query: { fields: 'attachment' }, respond: json({ id: '10123', key: 'PROJ-123', fields: { attachment: [attachment] } }) },
   { method: 'GET', path: `${API}/attachment/content/10001`, query: { redirect: 'false' }, respond: { text: 'PNG!', headers: { 'content-type': 'image/png' } } },
@@ -290,6 +293,18 @@ export const routes: Route[] = [
   // Invented from the docs: a team-managed board with sprints turned off.
   { method: 'GET', path: `${AGILE}/board/5/sprint`, respond: json({ errorMessages: ['The board does not support sprints'], errors: {} }, 400) },
   { method: 'POST', path: `${AGILE}/sprint/42/issue`, respond: empty },
+  { method: 'POST', path: `${AGILE}/sprint/43/issue`, respond: empty },
+  { method: 'POST', path: `${AGILE}/backlog/issue`, respond: empty },
+
+  // Sprint ceremony. Invented from the docs: the Agile API's sprint object,
+  // an active sprint (42) to complete and a future one (43) to start. The
+  // fixture holds no state, so a start answers with what it was asked for.
+  { method: 'GET', path: `${AGILE}/sprint/42`, respond: json(sprints[1]) },
+  { method: 'GET', path: `${AGILE}/sprint/43`, respond: json(futureSprint) },
+  { method: 'GET', path: `${AGILE}/sprint/42/issue`, respond: json({ maxResults: 50, startAt: 0, total: 1, isLast: true, issues: [{ id: '10123', key: 'PROJ-9', fields: { summary: 'Still open' } }] }) },
+  { method: 'POST', path: `${AGILE}/sprint`, respond: json({ ...futureSprint, id: 44, self: `${SITE}${AGILE}/sprint/44`, name: 'Sprint 44' }, 201) },
+  { method: 'POST', path: `${AGILE}/sprint/42`, respond: (req: RecordedRequest) => json({ ...sprints[1], ...(JSON.parse(req.body ?? '{}') as object) }) },
+  { method: 'POST', path: `${AGILE}/sprint/43`, respond: (req: RecordedRequest) => json({ ...futureSprint, ...(JSON.parse(req.body ?? '{}') as object) }) },
 ];
 
 /** Local files the examples read. */

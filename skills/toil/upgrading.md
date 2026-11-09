@@ -24,7 +24,7 @@ and CI; you propose, they approve.
     gone, so `projects_list` is the one to call), or `INVALID_INPUT` with `Unrecognized key:
     "dossier"` and a fix saying the field is now `toilProject`
   - `UNSUPPORTED`, when a flag or command belongs to the other deployment
-  - `UNSUPPORTED_NODE`, when the Node on this machine is no longer supported
+  - `UNSUPPORTED_NODE`, now a `meta.warnings` entry and a stderr banner (it was an error before 2026-11-09) when the Node on this machine is no longer supported
 - A script, CI file or agent config of the user's names a path, tool, flag or variable
   from the table below, or one that uses the `dossiers` command group, passes `--dossier`, or sets
   `TOIL_DOSSIER` or `TOIL_DOSSIER_PATHS`.

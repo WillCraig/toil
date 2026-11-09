@@ -6,6 +6,7 @@ import { API, checkRun, DIFF, file, fixture, GHE, label, prCommit, prStatusNode,
 import type { AnyCommand } from '../../core/command.js';
 import type { Context } from '../../core/context.js';
 import { execute } from '../../core/run.js';
+import { checkSecret } from '../../core/secret-input.js';
 import { graphqlUrl } from './client.js';
 import { commands } from './index.js';
 import { addAssigneesCommand, addLabelsCommand, createIssueCommand, createRepoCommand, removeLabelCommand } from './issues.js';
@@ -53,6 +54,20 @@ describe('requests', () => {
     const { envelope, calls } = await run(getPrCommand, { ...BASE, number: '7' });
     expect(calls).toEqual([{ method: 'GET', url: `${API}/repos/imagile/toil-probe/pulls/7`, headers: HEADERS, body: undefined }]);
     expect(envelope.data).toEqual(pullRequest(7));
+  });
+
+  // Both kinds of personal access token are sent the same way, and nothing in toil refuses either shape (#561).
+  it.each([
+    ['a classic token', 'ghp_0000000000000000000000000000000000AB'],
+    ['a fine-grained token', 'github_pat_00000000000000000000_0000000000000000000000000000000000000000000000000000000000000AB'],
+  ])('accepts %s and sends it as a Bearer token', async (_kind, token) => {
+    const { envelope, calls } = await run(getPrCommand, { ...BASE, number: '7' }, fixture.routes!, { token });
+    expect(envelope.ok).toBe(true);
+    expect(calls[0]!.headers).toEqual({ ...HEADERS, authorization: `Bearer ${token}` });
+    // The paste checks take either as it is, and look through a pasted wrapper to the same value.
+    expect(checkSecret(token, { empty: 'required' })).toMatchObject({ status: 'ok', value: token, wrapper: null });
+    expect(checkSecret(`Bearer ${token}`, { empty: 'required' })).toMatchObject({ status: 'ok', wrapper: { without: token } });
+    expect(checkSecret(`GITHUB_TOKEN=${token}`, { empty: 'required' })).toMatchObject({ status: 'ok', wrapper: { without: token } });
   });
 
   it('a 401 is AUTH, naming where to make a token and the GITHUB_TOKEN fallback', async () => {

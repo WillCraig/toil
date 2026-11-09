@@ -13,6 +13,7 @@ import type { Briefing } from '../../src/core/brief/answer.ts';
 import type { AnswerUsage, ChatTurn } from './model-usage.ts';
 import type { Proposal } from './proposal.ts';
 import type { ChatSession } from './fingerprint.ts';
+import type { GuideRequest } from './guide.ts';
 
 /** One paragraph of an answer, and the work items it rests on. */
 export interface AnswerPart {
@@ -123,12 +124,12 @@ export interface Starter {
 /** Who answers in the preview and with --sample: the scripted agent, named so nobody mistakes it for a model. */
 export const SCRIPTED_LABEL = 'a scripted preview, not a model';
 
-/** What the pane says when no adapter is chosen (#251, #552): in everyday words, for whoever is asking and not whoever installs. The page adds a link to Settings, Agent, where an engineer sets one up. */
+/** What the pane says when no adapter is chosen (#251, #552): in everyday words, for whoever is asking and not whoever installs. The page adds a link to Settings, AI agent, where an engineer sets one up. */
 export const NO_AGENT_NOTICE = 'No agent is set up yet, so nothing can answer questions.';
 /** The step further in, behind a fold: what an engineer needs, with the three adapters and their packages. */
 export const NO_AGENT_DETAILS =
   'Toil UI reasons with the subscription you already have, through one of three adapters: Claude (the Claude Agent SDK, @anthropic-ai/claude-agent-sdk), GitHub Copilot (@github/copilot-sdk) or Codex (@openai/codex-sdk).';
-export const NO_AGENT_FIX = 'Press Install for the one your organization approves under Settings, Agent, with its CLI on PATH, and choose it there, or pick an installed one for this chat from Answered by, above. The dashboards work without one, and toil-ui --sample shows the scripted agent.';
+export const NO_AGENT_FIX = "Install the one your organization approves under Settings, AI agent, and choose it there, or pick an installed one for this chat from Answered by, above. The dashboards work without one.";
 
 /**
  * How the answer should sound (#283): the theme on screen and whether
@@ -163,6 +164,11 @@ export interface Agent {
   session?(chat: string): Promise<ChatSession | null>;
   /** Starts the chat afresh on today's instructions (#305), keeping its log; refused while it answers. */
   renew?(chat: string, toilProject: string): Promise<ChatSession>;
+  /**
+   * One question to the setup guide (#561), as it grows: about the wizard's step, with no Toil project and no sync needed. Its request carries
+   * only non-secret state (src/guide.ts), and a message that looks like a secret is refused before it is sent. Absent: no guide.
+   */
+  guide?(request: GuideRequest, history?: HistoryTurn[], signal?: AbortSignal, style?: AskStyle): AsyncIterable<Answer>;
 }
 
 /** The fixed question Analyze asks (#343): a pulse check of the toil project. */

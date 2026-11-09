@@ -105,6 +105,8 @@ const QUOTES: ReadonlyArray<[string, string]> = [
   ['‘', '’'],
 ];
 const PREFIX = /^(bearer|token)[ \t]+/i;
+/** A paste from a shell or a .env file: `GITHUB_TOKEN=...` or `export GITHUB_TOKEN=...`. The name is boilerplate, never the secret. */
+const ENV_ASSIGNMENT = /^(?:export[ \t]+)?[A-Z][A-Z0-9_]{2,}=/;
 
 /** The value with quotes and a `Bearer ` / `token ` prefix taken off, and what was taken. */
 function unwrap(value: string): { inner: string; quoted: boolean; prefix: string | null } {
@@ -115,6 +117,15 @@ function unwrap(value: string): { inner: string; quoted: boolean; prefix: string
   if (pair) {
     inner = inner.slice(pair[0].length, inner.length - pair[1].length);
     quoted = true;
+  }
+  // An env-var paste comes off first, and what follows may itself be quoted.
+  const env = ENV_ASSIGNMENT.exec(inner);
+  if (env && env[0].length < inner.length) {
+    const name = env[0].replace(/^export[ \t]+/, '');
+    inner = inner.slice(env[0].length);
+    const again = QUOTES.find(([open, close]) => inner.length > open.length + close.length && inner.startsWith(open) && inner.endsWith(close));
+    if (again) inner = inner.slice(again[0].length, inner.length - again[1].length);
+    return { inner, quoted: quoted || Boolean(again), prefix: name };
   }
   const match = PREFIX.exec(inner);
   // "Bearer" alone, or "token" alone, is a word, not a prefix: there must be something after it.

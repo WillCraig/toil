@@ -1,16 +1,16 @@
 /**
- * Settings, Agent usage (#295): what the agent's models used over the last
- * 30 days, by day, adapter, model and toil project, and the chats that used the
+ * Settings, Usage, the AI agent half (#295): what the helper's models used over the last
+ * 30 days, by day, AI agent, model and toil project, and the chats that used the
  * most, all added up in the page by the meter's one function from the
  * records the server keeps in its local cache. Below that, the caps, each
  * off until it's turned on, and the rates Codex's dollar figure is computed
  * from. A CSV of the records downloads from here; nothing is sent anywhere.
  * The figures are the SDKs' own reports, and the page says the vendor's bill
- * is the authority. Beside the Usage page (#309), which counts toil's own
- * commands from its audit log. A budget office, staffed by the budget.
+ * is the authority. It sits under the audit summary on the Usage page (#309),
+ * and the tables and the audit detail share one "More detail". A budget office, staffed by the budget.
  */
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { TokensPerDay } from '../../components/charts.tsx';
 import { Card, DataTable } from '../../components/layout.tsx';
 import { Help, useLandOn } from '../../components/help.tsx';
@@ -61,7 +61,17 @@ function tokenDays(records: readonly UsageRecord[], since: string, today: string
   return out;
 }
 
-export function ModelUsage({ api, landOn = null }: { api: ModelUsageApi | null; landOn?: string | null }) {
+/** The one place the page's detail lives: closed until asked for (principle 11). `detail` is what the audit log adds. */
+function MoreDetail({ children }: { children?: ReactNode }) {
+  return (
+    <details className="usage-more" data-usage-more="">
+      <summary>More detail</summary>
+      {children}
+    </details>
+  );
+}
+
+export function ModelUsage({ api, landOn = null, detail = null }: { api: ModelUsageApi | null; landOn?: string | null; detail?: ReactNode }) {
   const [view, setView] = useState<UsageView | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
@@ -78,18 +88,27 @@ export function ModelUsage({ api, landOn = null }: { api: ModelUsageApi | null; 
   // An edit link to the caps (#346) lands on their heading once the figures have loaded.
   useLandOn(landOn, view !== null || problem !== null);
 
-  if (!api) return <p className="failure">This app wasn't given the agent's usage, so there is nothing to show.</p>;
+  if (!api) return <><p className="failure">This app can't read what the AI agent used, so there is nothing to show.</p>{detail && <MoreDetail>{detail}</MoreDetail>}</>;
   if (problem)
     return (
-      <p role="alert" className="failure">
-        Reading the model usage failed: {problem}
-      </p>
+      <>
+        <p role="alert" className="failure">
+          What the AI agent used couldn't be read: {problem}
+        </p>
+        {detail && <MoreDetail>{detail}</MoreDetail>}
+      </>
     );
-  if (!view) return <Loader size="panel" message={"Reading what the agent's models used…"} />;
-  return <Loaded view={view} api={api} onSaved={setView} />;
+  if (!view)
+    return (
+      <>
+        <Loader size="panel" message="Reading what the AI agent used…" />
+        {detail && <MoreDetail>{detail}</MoreDetail>}
+      </>
+    );
+  return <Loaded view={view} api={api} onSaved={setView} detail={detail} />;
 }
 
-function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; onSaved: (v: UsageView) => void }) {
+function Loaded({ view, api, onSaved, detail }: { view: UsageView; api: ModelUsageApi; onSaved: (v: UsageView) => void; detail: ReactNode }) {
   const records = view.records;
   const all = useMemo(() => addUp(records), [records]);
   const byAdapter = useMemo(() => totalsBy(records, (r) => r.adapter), [records]);
@@ -118,9 +137,9 @@ function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; o
   return (
     <>
       <Card as="section" className="panel usage" aria-labelledby="model-usage-totals">
-        <h2 id="model-usage-totals">Usage of the agent's models</h2>
+        <h2 id="model-usage-totals">What your AI agent used</h2>
         <p className="lede">
-          What the Claude, Codex and Copilot SDKs reported each chat used, since {day(view.since)}, UTC. <Help topic="model-usage" />
+          What your AI agents reported each chat used, since {day(view.since)}, UTC. <Help topic="model-usage" />
         </p>
         {view.sample && <p className="note">These are sample figures, made up for the preview. No model reported them.</p>}
         {view.retentionDays !== null && view.retentionDays < 30 && <p className="note">The cache keeps a record {view.retentionDays} days, so this window holds only the last {view.retentionDays}.</p>}
@@ -150,15 +169,18 @@ function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; o
         </div>
       </Card>
 
+      <CapsForm view={view} api={api} onSaved={onSaved} />
+
+      <MoreDetail>
       <Card as="section" className="panel" aria-labelledby="model-usage-adapters">
-        <h2 id="model-usage-adapters">By adapter</h2>
+        <h3 id="model-usage-adapters">By AI agent</h3>
         <DataTable
-          label="Usage by adapter"
-          caption="Usage by adapter"
+          label="Usage by AI agent"
+          caption="Usage by AI agent"
           rows={byAdapter}
           rowKey={(g) => g.key}
           columns={[
-            { header: 'Adapter', label: 'Adapter', rowHeader: true, cell: (g) => ADAPTER_LABEL[g.sample.adapter] },
+            { header: 'AI agent', label: 'AI agent', rowHeader: true, cell: (g) => ADAPTER_LABEL[g.sample.adapter] },
             { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
             { header: 'In / out', label: 'In / out', cell: (g) => `${figure(g.totals.inputTokens)} / ${figure(g.totals.outputTokens)}` },
             { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, g.sample.adapter) },
@@ -167,15 +189,15 @@ function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; o
       </Card>
 
       <Card as="section" className="panel" aria-labelledby="model-usage-models">
-        <h2 id="model-usage-models">By model</h2>
+        <h3 id="model-usage-models">By model</h3>
         <DataTable
           label="Usage by model"
-          caption="Usage by model and the adapter it ran on"
+          caption="Usage by model and the AI agent it ran on"
           rows={byModel}
           rowKey={(g) => g.key}
           columns={[
             { header: 'Model', label: 'Model', rowHeader: true, cell: (g) => <code>{modelLabel(g.sample)}</code> },
-            { header: 'Adapter', label: 'Adapter', cell: (g) => ADAPTER_LABEL[g.sample.adapter] },
+            { header: 'AI agent', label: 'AI agent', cell: (g) => ADAPTER_LABEL[g.sample.adapter] },
             { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
             { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, g.sample.adapter) },
           ]}
@@ -183,7 +205,7 @@ function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; o
       </Card>
 
       <Card as="section" className="panel" aria-labelledby="model-usage-toil-projects">
-        <h2 id="model-usage-toil-projects">By Toil project</h2>
+        <h3 id="model-usage-toil-projects">By Toil project</h3>
         <DataTable
           label="Usage by Toil project"
           caption="Usage by Toil project"
@@ -198,7 +220,7 @@ function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; o
       </Card>
 
       <Card as="section" className="panel" aria-labelledby="model-usage-chats">
-        <h2 id="model-usage-chats">Chats that used the most</h2>
+        <h3 id="model-usage-chats">Chats that used the most</h3>
         {byChat.length === 0 ? (
           <p>No chat in this window.</p>
         ) : (
@@ -218,8 +240,8 @@ function Loaded({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; o
           />
         )}
       </Card>
-
-      <CapsForm view={view} api={api} onSaved={onSaved} />
+      {detail}
+      </MoreDetail>
     </>
   );
 }
@@ -297,7 +319,7 @@ function CapsForm({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi;
               <div key={c.key} className="cap-row" data-cap={c.key}>
                 <label className="cap-on">
                   <input type="checkbox" checked={row.on} onChange={(e) => set({ on: e.target.checked })} />
-                  {ADAPTER_LABEL[c.adapter]}, {c.scope === 'chat' ? 'per chat' : 'per day (UTC)'}
+                  {ADAPTER_LABEL[c.adapter]}, {c.scope === 'chat' ? 'per chat' : 'per day'}
                 </label>
                 <label htmlFor={`${id}-limit`} className="sr-only">
                   {ADAPTER_LABEL[c.adapter]} {c.scope === 'chat' ? 'per-chat' : 'per-day'} limit
@@ -313,7 +335,6 @@ function CapsForm({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi;
                     </option>
                   ))}
                 </select>
-                <code className="cap-key">{c.key}</code>
               </div>
             );
           })}

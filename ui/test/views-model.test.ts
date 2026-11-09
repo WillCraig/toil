@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_NOW } from '../src/fixtures/execute.ts';
-import { columns, proposeMove, statusFor } from '../src/model/board.ts';
+import { canMove, columns, proposeMove, statusFor } from '../src/model/board.ts';
 import { burnup } from '../src/model/burnup.ts';
 import { age, aging, cycleTime, cycleTimes, doneAt, percentile, throughput, weekStart } from '../src/model/flow.ts';
 import { dependencyGraph } from '../src/model/graph.ts';
@@ -195,12 +195,42 @@ describe('the board', () => {
     expect(commandLine(proposeMove(settle.byId.get('corp-ado:2303')!, 'IN_PROGRESS', settle.data.items, 'settlement')!, 'posix').line).toBe("toil ado work-item transition '2303' --toil-project 'settlement' --state 'Active' --allow-write");
   });
 
-  it("says where toil has no command, rather than inventing one", async () => {
+  it("proposes a GitHub board item's move with github project status, naming the item and the project's own status word", async () => {
     const { data, byId } = await healthOf('checkout-web');
-    const p = proposeMove(byId.get('github:imagile/payments-web#43')!, 'DONE', data.items, 'checkout-web')!;
-    expect(p.command).toBeNull();
-    expect(commandLine(p, 'posix')).toEqual({ line: null, reason: 'toil has no command for this change.' });
-    expect(p.note).toMatch(/no command that sets a GitHub Projects status/);
+    const item = byId.get('github:imagile/payments-web#43')!;
+    const p = proposeMove(item, 'DONE', data.items, 'checkout-web')!;
+    const board = item.native['github project items'] as { id: string };
+    expect(p).toMatchObject({ command: 'github project status', input: { toilProject: 'checkout-web', item: board.id, to: 'Done' } });
+    expect(commandLine(p, 'posix').line).toBe(`toil github project status --toil-project 'checkout-web' --item '${board.id}' --to 'Done' --allow-write`);
+    expect(p.hint).toMatchObject({ command: 'github project fields', input: { toilProject: 'checkout-web', project: 7 } });
+    expect(readLine(p.hint!, 'posix').line).toBe("toil github project fields '7' --toil-project 'checkout-web' --owner 'imagile'");
+  });
+
+  it("says plainly when a GitHub issue is on no board, or no board item shows the status to use", async () => {
+    const { data, byId } = await healthOf('checkout-web');
+    const off = { ...byId.get('github:imagile/payments-web#43')!, native: {} };
+    const none = proposeMove(off, 'DONE', data.items, 'checkout-web')!;
+    expect(none.command).toBeNull();
+    expect(none.note).toMatch(/isn't on a GitHub project board this Toil project reads/);
+    // The card and its proposal use one rule: a card that can't move proposes nothing, and one that can proposes a command.
+    const refused = canMove(off);
+    expect(refused.ok).toBe(false);
+    expect(none.note).toContain(refused.ok ? '' : refused.reason);
+    expect(canMove(byId.get('github:imagile/payments-web#43')!)).toEqual({ ok: true });
+    expect(proposeMove(byId.get('github:imagile/payments-web#43')!, 'DONE', data.items, 'checkout-web')!.command).toBe('github project status');
+    expect(canMove(item({ id: 'c:L-1' }))).toEqual({ ok: true });
+    const lone = { ...byId.get('github:imagile/payments-web#43')!, id: 'github:imagile/payments-web#99' };
+    const unknown = proposeMove(lone, 'DONE', [lone], 'checkout-web')!;
+    expect(unknown.command).toBeNull();
+    expect(unknown.note).toMatch(/No Done item on this Toil project's board shows which Status to use/);
+    // An issue's own state (closed) is not a Status option, so it never stands in for one; a board item's Status value does, even on a closed issue.
+    const closed = { ...lone, id: 'github:imagile/payments-web#98', native: {}, status: 'closed', statusCategory: 'DONE' as const };
+    expect(statusFor(lone, 'DONE', [lone, closed])).toBeNull();
+    const done = { ...closed, id: 'github:imagile/payments-web#97', native: { 'github project items': { id: 'PVTI_x', fieldValues: [{ name: 'Shipped', field: { name: 'Status' } }] } } };
+    expect(statusFor(lone, 'DONE', [lone, closed, done])).toBe('Shipped');
+  });
+
+  it("says where toil has no command, rather than inventing one", () => {
     const lone = item({ id: 'c:L-1' });
     expect(statusFor(lone, 'DONE', [lone])).toBeNull();
     const p2 = proposeMove(lone, 'DONE', [lone], 'd')!;

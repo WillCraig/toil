@@ -63,6 +63,23 @@ export const jiraArea = defineArea({
   }),
   secrets: ['apiToken'],
   defaults: { deployment: 'server' },
+  // The deployment decides what the form asks for and how the address is made: a Cloud site is a name, Data Center is a URL.
+  choices: {
+    deployment: {
+      question: 'Which one is it?',
+      required: true,
+      options: [
+        { label: 'Cloud', value: 'cloud', hosts: ['*.atlassian.net'] },
+        { label: 'Data Center', value: 'server' },
+      ],
+    },
+    baseUrl: {
+      options: [
+        { label: 'Your Atlassian site', value: null, when: { deployment: 'cloud' }, compose: { prefix: 'https://', suffix: '.atlassian.net', label: 'Site name', placeholder: 'example-site' } },
+        { label: 'Your Jira server', value: null, when: { deployment: 'server' }, placeholder: 'https://jira.imagile.dev' },
+      ],
+    },
+  },
   variants: {
     by: 'deployment',
     of: {

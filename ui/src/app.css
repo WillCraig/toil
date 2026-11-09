@@ -174,6 +174,8 @@ h1:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
 /* Help (#346): a link to the docs, drawn like the header's buttons beside it. */
 .help-link { min-height: 44px; padding: 0 0.75rem; border: 1px solid var(--muted); border-radius: var(--radius); background: var(--raised); color: var(--ink); text-decoration: none; }
 .help-link:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.search-open { min-height: 44px; padding: 0 0.75rem; border: 1px solid var(--muted); border-radius: var(--radius); background: var(--raised); color: var(--ink); display: inline-flex; align-items: center; gap: 0.5rem; }
+.search-open__keys { font: inherit; font-size: 0.8rem; color: var(--muted); border: 1px solid var(--line); border-radius: 0.3rem; padding: 0 0.3rem; }
 
 /* The compact header (below 1024px, COMPACT_HEADER in App.tsx): the name on
    the left, Menu on the right, and everything else in the menu's popover. */
@@ -184,6 +186,36 @@ h1:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
 .nav-menu__dialog { display: grid; gap: 0.75rem; padding: 0.5rem; outline: none; }
 .nav-menu nav ul { display: grid; gap: 0.25rem; list-style: none; padding: 0; }
 .nav-menu nav a { display: flex; width: 100%; overflow-wrap: anywhere; }
+.project-links { padding-bottom: 0.75rem; border-bottom: 1px solid var(--line); }
+/* The project picker beside the brand: its name is cut to fit, never wrapped onto a second row. */
+.project-switch { gap: 0.35rem; max-width: 16rem; }
+/* A column of its own on every item, so the names line up whether or not one carries the mark. */
+.project-switch__check { display: inline-block; width: 1.25em; }
+.project-switch__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A running sync: a small card over the page's lower corner, out of the flow, so the page never moves for it.
+   It is only as big as the card, so nothing else is covered; on a phone it is full width and short, along the bottom edge. */
+.sync-card {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 25;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 0.18);
+}
+/* Until the loader's 300 ms are up it is an empty box; the card waits with it. */
+.sync-card:has(.loader--pending) { display: none; }
+.sync-card .loader--panel { padding: 0; gap: 0.25rem; font-size: 0.875rem; }
+.sync-card .loader__art { max-width: 3.5rem; }
+.sync-card .loader__stage { gap: 0.25rem; }
+@media (max-width: 599px) {
+  .sync-card { left: 0; right: 0; bottom: 0; width: auto; border-width: 1px 0 0; border-radius: 0; padding: 0.35rem 16px; }
+  .sync-card .loader__art { display: none; }
+}
 .nav-menu__settings { display: grid; gap: 0.5rem; padding-top: 0.75rem; border-top: 1px solid var(--line); }
 .nav-menu__settings > .btn { justify-content: center; }
 .nav-menu__settings .choice { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); }
@@ -306,3 +338,6 @@ tbody th { font-weight: 400; }
 }
 /* "Reduce motion and effects" in Settings (#271, src/motion.ts) stops the same things. */
 :root[data-motion="reduced"] *, :root[data-motion="reduced"] *::before, :root[data-motion="reduced"] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+
+/* A link alone in a note, or an item named in an evidence line, has a hit area of at least 24px (WCAG 2.5.8) without changing how it reads. */
+.back-link, .evidence .item-link { display: inline-block; min-height: 24px; padding-block: 2px; box-sizing: border-box; }

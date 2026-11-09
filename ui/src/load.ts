@@ -24,6 +24,7 @@
 import { ADO_FEED_FIELDS, feedStart, splitRevisionFeed } from './ado-revisions.ts';
 import { adoBuilds, adoDeployments, byEnvironment, changeRef, githubBuild, jenkinsBuilds, openshiftDeployments } from './model/delivery.ts';
 import { splitChangelogs } from './jira-changelog.ts';
+import { GITHUB_BOARD_KEY, GITHUB_ITEMS } from './model/board.ts';
 import { LOOKBACK_DAYS } from './model/flow.ts';
 import { readPeople, type PersonEntry } from './model/people.ts';
 import { readReadiness, type ReadinessSettings } from './model/readiness.ts';
@@ -341,6 +342,7 @@ export async function loadToilProject(execute: Execute, name: string, options: L
 
   // Work items, mapped to OWI ---------------------------------------------------------
   // Each area is mapped on its own, with its own section's OWI fields.
+  const boardOf = new Map<string, { project: number; owner?: string }>();
   const work: Record<(typeof JIRA_AREAS)[number] | (typeof ADO_AREAS)[number] | 'github', unknown[]> = { jira: [], ado: [], github: [] };
   const tasks: Array<Promise<void>> = [];
   /** Each place a read went to (a GitHub repository, a Bitbucket repo, an Azure DevOps project) and whether its work items and pull requests came back, for the Pull requests view to say. */
@@ -450,11 +452,14 @@ export async function loadToilProject(execute: Execute, name: string, options: L
       const sectionOwner = section('github').owner;
       const owner = typeof sectionOwner === 'string' && sectionOwner ? sectionOwner : targets[0]?.owner;
       const board: Rec[] = [];
+      // Which board each item id came from, so a move on the Board can name the project (GITHUB_BOARD_KEY).
+      boardOf.clear();
       for (const project of projects) {
         const answer = await run('work', 'github project items', { ...base, ...(owner ? { owner } : {}), project: Number(project) });
         if (!answer) continue;
         work.github.push(answer);
         board.push(...recs(answer.data));
+        for (const b of recs(answer.data)) if (typeof b.id === 'string') boardOf.set(b.id, { project: Number(project), ...(owner ? { owner } : {}) });
       }
       for (const r of targets) {
         const slug = (r ? r.slug : `${areas.github!.inputs.owner}/${areas.github!.inputs.repo}`).toLowerCase();
@@ -475,6 +480,13 @@ export async function loadToilProject(execute: Execute, name: string, options: L
   await Promise.all(tasks);
   const mapper = options.mapOwi ?? mapOwi;
   const items = Object.entries(work).flatMap(([area, docs]) => (docs.length ? (mapper(docs, { fields: owiFields(section(area).fields) }).items as WorkItem[]) : []));
+
+  // An issue on a board remembers which one, so a move on the Board can say which project's Status to set.
+  for (const item of items) {
+    const entry = item.native[GITHUB_ITEMS] as { id?: unknown } | undefined;
+    const on = typeof entry?.id === 'string' ? boardOf.get(entry.id) : undefined;
+    if (on) item.native[GITHUB_BOARD_KEY] = on;
+  }
 
   // Pull requests, as OWI changes, then their builds and deployments ------------------
   const changes: ChangeRef[] = [];
@@ -620,8 +632,14 @@ export async function loadToilProject(execute: Execute, name: string, options: L
   return { ...summary, items, pullRequests, codeowners, prNotes: [...new Set(prNotes)], readTargets: [...readState.values()], changes, deployments: deployments.sort(byEnvironment), people: team.people, wipLimit: team.wipLimit, analyze, origin, peopleNotes: team.notes, readiness: readReadiness(toilProject), calls };
 }
 
+/** A Toil project put away with `toil projects archive` (#561): all the list needs of it. */
+export interface ArchivedToilProject {
+  name: string;
+  description: string | null;
+}
+
 /** `projects list`, and `projects show` for each, so the list can say what each one covers. */
-export async function loadToilProjects(execute: Execute): Promise<{ toilProjects: ToilProjectSummary[]; calls: Call[] }> {
+export async function loadToilProjects(execute: Execute): Promise<{ toilProjects: ToilProjectSummary[]; /** The archived ones; null when they could not be read, which is not none. */ archived: ArchivedToilProject[] | null; calls: Call[] }> {
   const calls: Call[] = [];
   const call = async (command: string, input: Rec) => {
     const env = await execute(command, input, CALL_OPTIONS);
@@ -636,5 +654,15 @@ export async function loadToilProjects(execute: Execute): Promise<{ toilProjects
   for (const name of names) {
     toilProjects.push(readShow(await call('projects show', { toilProject: name })).summary);
   }
-  return { toilProjects, calls };
+  // An older toil has no --archived and refuses the field. Then the archived are unknown, and the page offers nothing it can't back.
+  let archived: ArchivedToilProject[] | null = null;
+  try {
+    const gone = await call('projects list', { archived: true });
+    archived = recs(gone.toilProjects).filter((d) => d.shadowedBy === null || d.shadowedBy === undefined).map((d) => ({ name: String(d.name), description: typeof d.description === 'string' ? d.description : null }));
+  } catch (e) {
+    if (!(e instanceof CallFailed)) throw e;
+    // Left out of Sources: the refusal is a toil too old for the flag, not something the person's page is about.
+    calls.pop();
+  }
+  return { toilProjects, archived, calls };
 }

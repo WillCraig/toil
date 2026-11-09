@@ -27,3 +27,12 @@
 
 /* The dashboard's board, filtered to one person from here. */
 .board-filter { margin-bottom: 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); background: var(--surface); }
+
+/* Mapping an account to a person (#561): the form opens in place under the card, and its explanations stay behind a disclosure. */
+.map-identity { display: grid; gap: 0.5rem; }
+.map-form { padding: 0.75rem; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); background: var(--surface); min-width: 0; }
+.map-ids { display: grid; gap: 0.5rem; border: 0; padding: 0; margin: 0; min-width: 0; }
+.map-ids legend { font-weight: 600; padding: 0; margin-bottom: 0.25rem; }
+.save-to-repo details { max-width: 60ch; }
+.save-to-repo summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.map-replace { display: flex; gap: 0.5rem; align-items: center; min-height: 44px; }

@@ -67,7 +67,9 @@ export interface BriefingInput {
   analyses: readonly AnalysisSummary[];
 }
 
-const severityOf = (lens: string): Severity => (lens === 'failing' || lens === 'blocked' ? 'danger' : 'warn');
+/** The code's lens labels, said the way a manager would: WIP is a developer's abbreviation. */
+const plainLabel = (label: string) => label.replace(/\bWIP\b/g, 'work-in-progress');
+const severityOf =(lens: string): Severity => (lens === 'failing' || lens === 'blocked' ? 'danger' : 'warn');
 const knownLens = (lens: string): lens is LensId => ['failing', 'blocked', 'waiting', 'sprint', 'stale', 'load', 'drift', 'ready'].includes(lens);
 
 /** Whether an analysis is current enough to lead the page: made since the data was read, or the same UTC day. */
@@ -79,7 +81,7 @@ export function briefingOf(input: BriefingInput): BriefingView {
   const latest = input.analyses[0] ?? null;
   const usable = latest?.briefing && isCurrent(latest, input.now) ? latest : null;
   const onTrackByCode = `${code.onTrack.open} open and ${code.onTrack.done} done are on track.`;
-  const unchecked = code.lenses.filter((l) => l.on && l.note).map((l) => ({ label: l.label, note: l.note! }));
+  const unchecked = code.lenses.filter((l) => l.on && l.note).map((l) => ({ label: plainLabel(l.label), note: l.note! }));
   if (!usable) {
     const stale = !latest ? null : !isCurrent(latest, input.now) ? 'The latest Analyze is older than the data.' : 'The latest Analyze has no briefing block, so it is shown as it came on its own page.';
     return {
@@ -87,7 +89,7 @@ export function briefingOf(input: BriefingInput): BriefingView {
       analysis: latest,
       stale,
       recommendation: code.recommendation?.text ?? null,
-      reasons: code.reasons.map((r) => ({ lens: r.lens, label: r.label, severity: r.severity, line: r.line, text: r.text, items: r.items.map((i) => ({ id: i.id, why: i.why, next: null })) })),
+      reasons: code.reasons.map((r) => ({ lens: r.lens, label: plainLabel(r.label), severity: r.severity, line: r.line, text: r.text, items: r.items.map((i) => ({ id: i.id, why: i.why, next: null })) })),
       onTrack: onTrackByCode,
       changed: [],
       leftOut: [],
@@ -107,7 +109,7 @@ export function briefingOf(input: BriefingInput): BriefingView {
     analysis: usable,
     stale: null,
     recommendation: b.recommendation,
-    reasons: b.reasons.map((r) => ({ lens: r.lens, label: r.label || (knownLens(r.lens) ? lensDef(r.lens).label : r.lens), severity: severityOf(r.lens), line: r.line, text: r.text, items: r.items })),
+    reasons: b.reasons.map((r) => ({ lens: r.lens, label: plainLabel(r.label || (knownLens(r.lens) ? lensDef(r.lens).label : r.lens)), severity: severityOf(r.lens), line: r.line, text: r.text, items: r.items })),
     onTrack: b.onTrack ?? onTrackByCode,
     changed: b.changed,
     leftOut: b.leftOut,

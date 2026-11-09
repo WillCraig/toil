@@ -2,7 +2,6 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
-import { standardWords } from './words.ts';
 import type { AnalysesApi } from '../src/analyses.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureAnalyses, sampleAnalysisRecords } from '../src/fixtures/analyses.ts';
@@ -27,7 +26,6 @@ async function open(hash: string, analyses: AnalysesApi | undefined = fixtureAna
 
 beforeEach(() => {
   localStorage.clear();
-  standardWords();
 });
 afterEach(cleanup);
 
@@ -63,7 +61,7 @@ describe('the Analyses tab', () => {
 
   it('says so when a Toil project has none yet', async () => {
     await open('#/project/settlement/analyses');
-    expect(await screen.findByText(/No analysis kept for this Toil project yet/)).toBeTruthy();
+    expect(await screen.findByText(/No briefing (kept|in the filing cabinet) for this Toil project yet/)).toBeTruthy();
   });
 
   it('opens one again, top-down, with its evidence folded and what changed', async () => {
@@ -92,8 +90,8 @@ describe("the Toil project's briefing (#494)", () => {
     await open('#/project/card-payments');
     const b = await screen.findByRole('region', { name: 'Briefing' });
     await waitFor(() => expect(b.dataset.recSource).toBe('analysis'));
-    expect(b.textContent).toContain('Analyze, the scripted preview, not a model, 13 Oct 2026, 07:30 UTC');
-    expect(within(b).getByRole('link', { name: 'Open the analysis' }).getAttribute('href')).toBe('#/project/card-payments/analyses/sample-analysis-2');
+    expect(b.textContent).toContain('Written by an AI agent, the scripted preview, not a model, 13 Oct 2026, 07:30 UTC');
+    expect(within(b).getByRole('link', { name: 'Open that briefing' }).getAttribute('href')).toBe('#/project/card-payments/analyses/sample-analysis-2');
     expect(b.querySelector('.briefing__head')!.textContent).toContain('Fix');
     // The first reason is open, the rest folded.
     const reasons = [...b.querySelectorAll<HTMLDetailsElement>('details[data-reason]')];
@@ -122,15 +120,15 @@ describe("the Toil project's briefing (#494)", () => {
     const b = await screen.findByRole('region', { name: 'Briefing' });
     await waitFor(() => expect(b.textContent).toContain('The latest Analyze is older than the data.'));
     expect(b.dataset.recSource).toBe('code');
-    expect(b.textContent).toContain('By code, no agent');
-    expect(within(b).getByRole('link', { name: 'Open the analysis' }).getAttribute('href')).toBe('#/project/card-payments/analyses/sample-analysis-2');
+    expect(b.textContent).toContain("Worked out by the app's own rules, no AI");
+    expect(within(b).getByRole('link', { name: 'Open that briefing' }).getAttribute('href')).toBe('#/project/card-payments/analyses/sample-analysis-2');
   });
 
   it("is the code's, and says so, where there is no analysis", async () => {
     await open('#/project/settlement');
     const b = await screen.findByRole('region', { name: 'Briefing' });
     expect(b.dataset.recSource).toBe('code');
-    expect(b.textContent).toContain('By code, no agent');
+    expect(b.textContent).toContain("Worked out by the app's own rules, no AI");
     expect(b.querySelectorAll('details[data-reason]').length).toBeGreaterThan(0);
   });
 
@@ -200,13 +198,13 @@ describe('a citation chip', () => {
 describe('the sidebar', () => {
   it("lists the Toil project's three newest analyses, each linking to it", async () => {
     await open('#/project/card-payments');
-    await userEvent.click(screen.getByRole('button', { name: /^Agents/ }));
-    const side = await screen.findByRole('region', { name: 'Agents' });
-    const recent = within(side).getByRole('region', { name: 'Recent analyses' });
+    await userEvent.click(screen.getByRole('button', { name: /^AI agents/ }));
+    const side = await screen.findByRole('region', { name: 'AI agents' });
+    const recent = within(side).getByRole('region', { name: 'Recent briefings' });
     await waitFor(() => expect(within(recent).getAllByRole('listitem')).toHaveLength(2));
     const links = within(recent).getAllByRole('link');
     expect(links[0]!.getAttribute('href')).toBe('#/project/card-payments/analyses/sample-analysis-2');
     expect(links[0]!.textContent).toContain('Fix PAY-101');
-    expect(links.at(-1)!.textContent).toBe('All analyses');
+    expect(links.at(-1)!.textContent).toBe('All past briefings');
   });
 });

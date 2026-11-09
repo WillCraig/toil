@@ -61,13 +61,22 @@ export function AnswerHero({ answer }: { answer: Answer }) {
   return (
     <div className="sum-hero" data-status={answer.status}>
       <h2 className="sum-answer" data-answer="">
-        <span className="sum-status">
-          <Shape tone={answer.status} />
-          <span>{answer.word}</span>
-        </span>
-        <span aria-hidden="true">: </span>
-        <span className="sr-only">. </span>
-        {answer.sentence}
+        {answer.bare ? (
+          <span className="sum-status">
+            <Shape tone={answer.status} />
+            <span>{answer.sentence}</span>
+          </span>
+        ) : (
+          <>
+            <span className="sum-status">
+              <Shape tone={answer.status} />
+              <span>{answer.word}</span>
+            </span>
+            <span aria-hidden="true">: </span>
+            <span className="sr-only">. </span>
+            {answer.sentence}
+          </>
+        )}
       </h2>
       {answer.basis && <p className="sum-basis">{answer.basis}.</p>}
       <p className="sum-why" data-why="">

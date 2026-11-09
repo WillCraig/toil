@@ -106,5 +106,15 @@
       "--user <name>",
       "--save"
     ]
+  },
+  {
+    "name": "scopes",
+    "tool": "connections_scopes",
+    "description": "Show the scopes or permissions a credential needs for read-only use and for everything toil can do",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "--area <area>"
+    ]
   }
 ]

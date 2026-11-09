@@ -55,7 +55,7 @@ export interface Face {
 export const FACE: Record<JobId, Face> = {
   review: { label: 'Review', plain: 'Check this code change', on: 'pull request', segment: 'review', gist: "Reads the pull request and its checks, then drafts findings as comments you can post." },
   ship: { label: 'Ship', plain: 'Answer the review', on: 'pull request', segment: 'ship', gist: "Reads the review and the build on your own pull request, then drafts the replies. Editing and pushing stay in your terminal." },
-  'map-codebase': { label: 'Diagram', plain: 'Draw the architecture', on: 'repository', segment: 'diagram', gist: "Models the repository's containers and draws them as a C4 diagram, saying how each part is known." },
+  'map-codebase': { label: 'Diagram', plain: 'Draw the architecture', on: 'repository', segment: 'diagram', gist: "Models the repository's containers and draws them as a system diagram, saying how each part is known." },
 };
 
 export const isJobId = (id: string): id is JobId => id in FACE;

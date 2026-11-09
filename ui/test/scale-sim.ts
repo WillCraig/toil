@@ -25,7 +25,7 @@ import { stubToil } from './toil-stub.ts';
 type Rec = Record<string, unknown>;
 const DAY = 86_400_000;
 const NOW = Date.parse(FIXTURE_NOW);
-const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'launch-token' }, signal: new AbortController().signal };
+const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'loopback' }, signal: new AbortController().signal };
 const JIRA_PAGE_SIZE = 100;
 const ADO_BATCH_SIZE = 200;
 /**

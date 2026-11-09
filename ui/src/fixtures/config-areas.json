@@ -9,7 +9,31 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": true
+        "required": true,
+        "choices": {
+          "options": [
+            {
+              "label": "Your Azure DevOps organization",
+              "value": null,
+              "when": {
+                "deployment": "cloud"
+              },
+              "compose": {
+                "prefix": "https://dev.azure.com/",
+                "label": "Organization",
+                "placeholder": "example-org"
+              }
+            },
+            {
+              "label": "Your Azure DevOps Server",
+              "value": null,
+              "when": {
+                "deployment": "server"
+              },
+              "placeholder": "https://ado.imagile.dev"
+            }
+          ]
+        }
       },
       {
         "name": "deployment",
@@ -17,7 +41,25 @@
         "secret": false,
         "password": false,
         "default": "server",
-        "required": false
+        "required": false,
+        "choices": {
+          "question": "Which one is it?",
+          "required": true,
+          "options": [
+            {
+              "label": "Services (cloud)",
+              "value": "cloud",
+              "hosts": [
+                "dev.azure.com",
+                "*.visualstudio.com"
+              ]
+            },
+            {
+              "label": "Server",
+              "value": "server"
+            }
+          ]
+        }
       },
       {
         "name": "collection",
@@ -25,7 +67,10 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "server"
+        ]
       },
       {
         "name": "project",
@@ -49,7 +94,10 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "cloud"
+        ]
       },
       {
         "name": "fieldAliases",
@@ -65,7 +113,10 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "server"
+        ]
       },
       {
         "name": "discoveredTypes",
@@ -73,7 +124,10 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "server"
+        ]
       },
       {
         "name": "pat",
@@ -83,7 +137,8 @@
         "default": null,
         "required": true
       }
-    ]
+    ],
+    "variantBy": "deployment"
   },
   {
     "name": "bitbucket",
@@ -95,7 +150,26 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": true
+        "required": true,
+        "choices": {
+          "options": [
+            {
+              "label": "Bitbucket Cloud (https://api.bitbucket.org/2.0)",
+              "value": "https://api.bitbucket.org/2.0",
+              "when": {
+                "deployment": "cloud"
+              }
+            },
+            {
+              "label": "Your Bitbucket server",
+              "value": null,
+              "when": {
+                "deployment": "server"
+              },
+              "placeholder": "https://bitbucket.imagile.dev"
+            }
+          ]
+        }
       },
       {
         "name": "deployment",
@@ -103,7 +177,25 @@
         "secret": false,
         "password": false,
         "default": "server",
-        "required": false
+        "required": false,
+        "choices": {
+          "question": "Which one is it?",
+          "required": true,
+          "options": [
+            {
+              "label": "Cloud",
+              "value": "cloud",
+              "hosts": [
+                "bitbucket.org",
+                "api.bitbucket.org"
+              ]
+            },
+            {
+              "label": "Data Center",
+              "value": "server"
+            }
+          ]
+        }
       },
       {
         "name": "email",
@@ -111,7 +203,10 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "cloud"
+        ]
       },
       {
         "name": "project",
@@ -119,7 +214,10 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "server"
+        ]
       },
       {
         "name": "workspace",
@@ -127,7 +225,10 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "cloud"
+        ]
       },
       {
         "name": "repo",
@@ -143,7 +244,10 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "server"
+        ]
       },
       {
         "name": "pat",
@@ -151,7 +255,13 @@
         "secret": true,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "server"
+        ],
+        "requiredFor": [
+          "server"
+        ]
       },
       {
         "name": "apiToken",
@@ -159,7 +269,10 @@
         "secret": true,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "cloud"
+        ]
       },
       {
         "name": "accessToken",
@@ -167,9 +280,13 @@
         "secret": true,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "cloud"
+        ]
       }
-    ]
+    ],
+    "variantBy": "deployment"
   },
   {
     "name": "github",
@@ -181,7 +298,25 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": true
+        "required": true,
+        "choices": {
+          "question": "Which GitHub is it?",
+          "options": [
+            {
+              "label": "GitHub.com (https://api.github.com)",
+              "value": "https://api.github.com",
+              "hosts": [
+                "api.github.com"
+              ]
+            },
+            {
+              "label": "GitHub Enterprise Server",
+              "value": null,
+              "placeholder": "https://ghe.imagile.dev/api/v3",
+              "expectPath": "/api/v3"
+            }
+          ]
+        }
       },
       {
         "name": "owner",
@@ -209,13 +344,295 @@
       },
       {
         "name": "token",
-        "description": "Fine-grained personal access token",
+        "description": "Personal access token, classic (ghp_...) or fine-grained (github_pat_...)",
         "secret": true,
         "password": false,
         "default": null,
         "required": true
       }
-    ]
+    ],
+    "scopes": {
+      "secret": "token",
+      "otherPrefixes": {
+        "gho_": "an OAuth token",
+        "ghu_": "an app user token",
+        "ghs_": "an app installation token",
+        "ghr_": "an app refresh token"
+      },
+      "kinds": [
+        {
+          "id": "classic",
+          "label": "Classic token",
+          "tokenPrefix": "ghp_",
+          "summary": "The common kind: one token, scopes ticked on one page, works on every repository you can reach.",
+          "createUrl": "https://github.com/settings/tokens/new",
+          "readOnly": {
+            "needs": [
+              "repo",
+              "read:project"
+            ],
+            "createUrl": "https://github.com/settings/tokens/new?scopes=repo,read:project&description=toil"
+          },
+          "everything": {
+            "needs": [
+              "repo",
+              "read:project",
+              "project"
+            ],
+            "createUrl": "https://github.com/settings/tokens/new?scopes=repo,read:project,project&description=toil"
+          },
+          "entries": [
+            {
+              "name": "repo",
+              "required": "read",
+              "commands": [
+                "github pr list",
+                "github pr get",
+                "github pr diff",
+                "github pr files",
+                "github pr comments",
+                "github pr review-comments",
+                "github pr reviews",
+                "github pr reviewers",
+                "github pr threads",
+                "github pr status",
+                "github pr create",
+                "github pr update",
+                "github pr close",
+                "github pr reopen",
+                "github pr draft",
+                "github pr ready",
+                "github pr merge",
+                "github pr comment",
+                "github pr comment-inline",
+                "github pr reply",
+                "github pr delete-comment",
+                "github pr delete-review-comment",
+                "github pr approve",
+                "github pr request-changes",
+                "github pr add-reviewers",
+                "github pr remove-reviewers",
+                "github pr resolve",
+                "github pr enable-auto-merge",
+                "github pr disable-auto-merge",
+                "github pr enqueue",
+                "github issue list",
+                "github issue search",
+                "github issue get",
+                "github issue history",
+                "github issue create",
+                "github issue label",
+                "github issue unlabel",
+                "github issue assign",
+                "github issue unassign",
+                "github repo file",
+                "github repo create",
+                "github commit status",
+                "github commit checks",
+                "github check-toil-project"
+              ],
+              "note": "GitHub has no read-only form of repo. toil's own write gate keeps it read-only until you turn writes on. Public repositories alone need only public_repo."
+            },
+            {
+              "name": "read:project",
+              "required": "read",
+              "commands": [
+                "github project list",
+                "github project fields",
+                "github project items"
+              ],
+              "note": "Reading Projects (v2)."
+            },
+            {
+              "name": "project",
+              "required": "write",
+              "commands": [
+                "github project status"
+              ],
+              "note": "Changing a project item's Status. It includes read:project."
+            }
+          ]
+        },
+        {
+          "id": "fine-grained",
+          "label": "Fine-grained token",
+          "tokenPrefix": "github_pat_",
+          "summary": "Limited to the repositories you pick, with each permission set to Read or Read and write. Cannot read your own account-level Projects.",
+          "createUrl": "https://github.com/settings/personal-access-tokens/new",
+          "readOnly": {
+            "needs": [
+              "Metadata: Read",
+              "Pull requests: Read",
+              "Contents: Read",
+              "Issues: Read",
+              "Checks: Read",
+              "Commit statuses: Read",
+              "Projects (organization permission): Read"
+            ],
+            "createUrl": "https://github.com/settings/personal-access-tokens/new"
+          },
+          "everything": {
+            "needs": [
+              "Metadata: Read",
+              "Pull requests: Read and write",
+              "Contents: Read and write",
+              "Issues: Read and write",
+              "Checks: Read",
+              "Commit statuses: Read",
+              "Projects (organization permission): Read and write",
+              "Administration: Read and write"
+            ],
+            "createUrl": "https://github.com/settings/personal-access-tokens/new"
+          },
+          "entries": [
+            {
+              "name": "Metadata",
+              "access": "read",
+              "required": "read",
+              "commands": [
+                "github check-toil-project"
+              ],
+              "note": "GitHub grants it to every fine-grained token."
+            },
+            {
+              "name": "Pull requests",
+              "access": "read",
+              "required": "read",
+              "commands": [
+                "github pr list",
+                "github pr get",
+                "github pr diff",
+                "github pr files",
+                "github pr comments",
+                "github pr review-comments",
+                "github pr reviews",
+                "github pr reviewers",
+                "github pr threads",
+                "github pr status"
+              ]
+            },
+            {
+              "name": "Pull requests",
+              "access": "write",
+              "required": "write",
+              "commands": [
+                "github pr create",
+                "github pr update",
+                "github pr close",
+                "github pr reopen",
+                "github pr draft",
+                "github pr ready",
+                "github pr merge",
+                "github pr comment",
+                "github pr comment-inline",
+                "github pr reply",
+                "github pr delete-comment",
+                "github pr delete-review-comment",
+                "github pr approve",
+                "github pr request-changes",
+                "github pr add-reviewers",
+                "github pr remove-reviewers",
+                "github pr resolve",
+                "github pr enable-auto-merge",
+                "github pr disable-auto-merge",
+                "github pr enqueue"
+              ]
+            },
+            {
+              "name": "Contents",
+              "access": "read",
+              "required": "read",
+              "commands": [
+                "github repo file"
+              ]
+            },
+            {
+              "name": "Contents",
+              "access": "write",
+              "required": "write",
+              "commands": [
+                "github pr merge",
+                "github pr enable-auto-merge",
+                "github pr enqueue"
+              ],
+              "note": "Merging a pull request needs Contents as well as Pull requests."
+            },
+            {
+              "name": "Issues",
+              "access": "read",
+              "required": "read",
+              "commands": [
+                "github issue list",
+                "github issue search",
+                "github issue get",
+                "github issue history"
+              ]
+            },
+            {
+              "name": "Issues",
+              "access": "write",
+              "required": "write",
+              "commands": [
+                "github issue create",
+                "github issue label",
+                "github issue unlabel",
+                "github issue assign",
+                "github issue unassign"
+              ]
+            },
+            {
+              "name": "Checks",
+              "access": "read",
+              "required": "read",
+              "commands": [
+                "github commit checks",
+                "github pr get",
+                "github pr status"
+              ],
+              "note": "pr get needs it only with --include checks."
+            },
+            {
+              "name": "Commit statuses",
+              "access": "read",
+              "required": "read",
+              "commands": [
+                "github commit status",
+                "github pr status"
+              ]
+            },
+            {
+              "name": "Projects (organization permission)",
+              "access": "write",
+              "required": "write",
+              "commands": [
+                "github project status"
+              ],
+              "note": "Changing a project item's Status. Only an organization's projects."
+            },
+            {
+              "name": "Projects (organization permission)",
+              "access": "read",
+              "required": "read",
+              "commands": [
+                "github project list",
+                "github project fields",
+                "github project items"
+              ],
+              "note": "Only an organization's projects. A fine-grained token can't read a user's own; use a classic token for those."
+            },
+            {
+              "name": "Administration",
+              "access": "write",
+              "required": "write",
+              "commands": [
+                "github repo create"
+              ],
+              "note": "For a repository under an organization. GitHub may refuse a fine-grained token for one under your own account; use a classic token for that."
+            }
+          ]
+        }
+      ]
+    }
   },
   {
     "name": "jenkins",
@@ -265,7 +682,32 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": true
+        "required": true,
+        "choices": {
+          "options": [
+            {
+              "label": "Your Atlassian site",
+              "value": null,
+              "when": {
+                "deployment": "cloud"
+              },
+              "compose": {
+                "prefix": "https://",
+                "suffix": ".atlassian.net",
+                "label": "Site name",
+                "placeholder": "example-site"
+              }
+            },
+            {
+              "label": "Your Jira server",
+              "value": null,
+              "when": {
+                "deployment": "server"
+              },
+              "placeholder": "https://jira.imagile.dev"
+            }
+          ]
+        }
       },
       {
         "name": "deployment",
@@ -273,7 +715,24 @@
         "secret": false,
         "password": false,
         "default": "server",
-        "required": false
+        "required": false,
+        "choices": {
+          "question": "Which one is it?",
+          "required": true,
+          "options": [
+            {
+              "label": "Cloud",
+              "value": "cloud",
+              "hosts": [
+                "*.atlassian.net"
+              ]
+            },
+            {
+              "label": "Data Center",
+              "value": "server"
+            }
+          ]
+        }
       },
       {
         "name": "email",
@@ -281,7 +740,13 @@
         "secret": false,
         "password": false,
         "default": null,
-        "required": false
+        "required": false,
+        "appliesTo": [
+          "cloud"
+        ],
+        "requiredFor": [
+          "cloud"
+        ]
       },
       {
         "name": "customFields",
@@ -323,7 +788,8 @@
         "default": null,
         "required": true
       }
-    ]
+    ],
+    "variantBy": "deployment"
   },
   {
     "name": "openshift",

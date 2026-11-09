@@ -9,7 +9,8 @@
 
 import { Background, Handle, MarkerType, Panel, Position, ReactFlow, useReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/base.css';
-import { Component, type ReactNode } from 'react';
+import { Component, useState, type ReactNode } from 'react';
+import { Button } from 'react-aria-components';
 import { StatusChip } from '../components/bits.tsx';
 import { ItemLink } from '../components/items.tsx';
 import { useData } from '../data.ts';
@@ -85,6 +86,9 @@ export function Graph() {
   const { toilProject, byId, sync } = useData();
   const words = useWords();
   const g = dependencyGraph(toilProject.items);
+  // With nothing open held up, the picture is only finished work's links: said plainly, and drawn on request.
+  const [finished, setFinished] = useState(false);
+  const idle = g.nodes.length > 0 && !g.nodes.some((n) => n.blocked);
   if (!g.nodes.length) return <Empty message={words('empty.links')} action={<TrackerAction toilProject={toilProject.name} sync={sync} />} />;
 
   const nodes: ItemNode[] = g.nodes.map((n) => ({ id: n.id, type: 'item', position: { x: n.rank * 260, y: n.row * 130 }, data: { node: n } }));
@@ -105,8 +109,26 @@ export function Graph() {
     return item ? <ItemLink id={id} withTitle /> : <code className="missing">{id}</code>;
   };
 
+  if (idle && !finished) {
+    return (
+      <>
+        <p data-nothing-blocked="">Nothing that is still open is blocked by another story.</p>
+        <Button className="btn btn--small" onPress={() => setFinished(true)} aria-expanded="false" data-show-finished="">
+          Show finished links
+        </Button>
+      </>
+    );
+  }
+
   return (
     <>
+      {idle && (
+        <p>
+          <Button className="btn btn--small" onPress={() => setFinished(false)} aria-expanded="true" data-show-finished="">
+            Hide finished links
+          </Button>
+        </p>
+      )}
       <p className="note">{words('graph.note')}</p>
       {g.cycle && <p className="failure">These blocks links form a loop, so the columns are approximate.</p>}
       <Drawing>

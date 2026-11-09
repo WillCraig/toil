@@ -14,14 +14,11 @@ import { Button } from 'react-aria-components';
 import type { ConfigApi, ConnectionsData } from '../config.ts';
 import type { HelpTopicId } from '../help.ts';
 import { ADD_CONNECTION_HREF, CREATE_TOIL_PROJECT_HREF } from '../views/Settings.tsx';
+import { SETUP_HREF } from '../views/Setup.tsx';
 import { OWI_SOURCES } from '../../../src/core/owi/types.ts';
 import { usePlain } from '../plain-words.ts';
 import { Help } from './help.tsx';
-import { Copy } from './layout.tsx';
 import './first-run.css';
-
-/** The command that starts Toil UI on the sample data. */
-export const SAMPLE_COMMAND = 'npx @imagile-dev/toil-ui --sample';
 
 /** The areas a toil project reads work items from: a connection to one of these is a tracker. */
 export const TRACKER_AREAS: ReadonlySet<string> = new Set(Object.entries(OWI_SOURCES).flatMap(([area, s]) => (s.items.length ? [area] : [])));
@@ -52,7 +49,7 @@ export function FirstRun({ toilProjects, synced, config, onSync, lede }: FirstRu
     config.run('connections list', {}).then(
       (e) => {
         if (!live) return;
-        if (!e.ok) return setTrackers({ ok: false, message: e.error?.message ?? 'toil connections list failed.' });
+        if (!e.ok) return setTrackers({ ok: false, message: e.error?.message ?? "Your connections didn't load." });
         const rows = (e.data as ConnectionsData).connections ?? [];
         setTrackers({ ok: true, names: rows.filter((c) => TRACKER_AREAS.has(c.area)).map((c) => c.name) });
       },
@@ -72,9 +69,14 @@ export function FirstRun({ toilProjects, synced, config, onSync, lede }: FirstRu
         <Help topic="first-run" />
       </div>
       {lede && <p className="note">{lede}</p>}
+      <p className="first-run__guided">
+        <a className="btn btn--accent" href={SETUP_HREF} data-first-run-step="wizard">
+          Set it up step by step
+        </a>
+      </p>
       <div className="first-run__body">
         <ol className="first-run__steps">
-          <Step n={1} title="Connect a tracker" topic="connections" done={connected} detail={connected ? trackers.names.join(', ') : trackers?.ok === false ? `toil connections list failed: ${trackers.message}` : null}>
+          <Step n={1} title="Connect a tracker" topic="connections" done={connected} detail={connected ? trackers.names.join(', ') : trackers?.ok === false ? `Your connections didn't load: ${trackers.message}` : null}>
             <a className="btn" href={ADD_CONNECTION_HREF} data-first-run-step="connect">
               Add a connection
             </a>
@@ -92,15 +94,6 @@ export function FirstRun({ toilProjects, synced, config, onSync, lede }: FirstRu
             )}
           </Step>
         </ol>
-        <section className="first-run__sample" aria-labelledby="first-run-sample">
-          <div className="first-run__head">
-            <h3 id="first-run-sample">Try the sample data</h3>
-            <Help topic="sample-data" />
-          </div>
-          <p className="first-run__command">
-            <code>{SAMPLE_COMMAND}</code> <Copy value={SAMPLE_COMMAND} what="sample data command" />
-          </p>
-        </section>
       </div>
     </section>
   );

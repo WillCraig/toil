@@ -1,7 +1,10 @@
 import { existsSync, rmSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
+import { inputFields, openInput, textOption } from '../areas/util/kit/input.js';
 import type { AnyArea, ContextInput } from '../core/area.js';
+import { readBriefRecords } from '../core/brief/read.js';
+import { accountsIn, suggestPeople } from '../core/people-match.js';
 import { defineConfigCommand, type AnyCommand } from '../core/command.js';
 import { toilProjectConnection } from '../core/call-context.js';
 import { CONNECTION_NAME, connectionWrites, defaultConnectionName, type ResolvedConfig } from '../core/config.js';
@@ -14,6 +17,16 @@ import { isLensId, LENSES, type LensId } from '../core/brief/brief.js';
 import { ToilError, toToilError } from '../core/errors.js';
 import { forwardSlashes } from '../core/files.js';
 import { refuseRenamedArea } from '../core/renamed-areas.js';
+
+/** A pull request by a GitHub login that reads as Pat Example, and a Jira issue held by an account with Pat's email, for the examples. */
+export const EXAMPLE_PEOPLE_RECORDS = JSON.stringify({
+  items: [
+    { id: 'corp-jira:PAY-101', source: { area: 'jira', connection: 'corp-jira', key: 'PAY-101', command: 'jira issue search' }, title: 'Tokenise card numbers at the edge', status: 'In Progress', statusCategory: 'IN_PROGRESS', assignee: { id: 'acct-0001', name: 'P. Example', email: 'you@example.com' }, links: [] },
+  ],
+  changes: [
+    { id: 'corp-github:imagile/payments#7', source: { area: 'github', connection: 'corp-github', key: 'imagile/payments#7', command: 'github pr list' }, repo: 'imagile/payments', title: 'Tokenise PANs', state: 'OPEN', author: { id: 'pat-example', name: null, email: null }, reviewers: [], workItems: [] },
+  ],
+});
 
 /**
  * `toil projects init | add-repo | link | env | field | person | wip-limit |
@@ -259,6 +272,10 @@ export function toilProjectBuildCommands(areas: readonly AnyArea[]): AnyCommand[
       toilProject: toilProjectField,
       name: z.string().min(1).describe('The person\'s name as the team writes it, e.g. Pat Example'),
       id: z.array(z.string().min(1)).optional().describe('Identities to add, each area=identity: the user name, login or email that area shows (github=pat-ex, jira=pat, ado=you@example.com)'),
+      github: z.string().min(1).optional().describe('Their GitHub login. The same as id github=<login>'),
+      jira: z.string().min(1).optional().describe('Their Jira identity: the account id, user name or email Jira shows. The same as id jira=<identity>'),
+      ado: z.string().min(1).optional().describe('Their Azure DevOps identity or email. The same as id ado=<identity>'),
+      bitbucket: z.string().min(1).optional().describe('Their Bitbucket user name or account id. The same as id bitbucket=<identity>'),
       kind: z.enum(PERSON_KINDS).optional().describe('human (the default) or agent'),
       email: z.string().min(1).optional().describe('Their email, compared only to suggest which unmapped identities are theirs'),
       remove: z.boolean().optional().describe('Remove the person, or with id only those identities. A delete: CLI only.'),
@@ -270,6 +287,10 @@ export function toilProjectBuildCommands(areas: readonly AnyArea[]): AnyCommand[
     args: [toilProjectArg, { name: 'name', field: 'name', description: "The person's name, e.g. Pat Example" }],
     options: [
       { flags: '--id <area=identity>', field: 'id', description: 'An identity to add, e.g. github=pat-ex; repeatable' },
+      { flags: '--github <login>', field: 'github', description: 'Their GitHub login, as --id github=<login>' },
+      { flags: '--jira <identity>', field: 'jira', description: 'Their Jira account id, user name or email, as --id jira=<identity>' },
+      { flags: '--ado <identity>', field: 'ado', description: 'Their Azure DevOps identity or email, as --id ado=<identity>' },
+      { flags: '--bitbucket <identity>', field: 'bitbucket', description: 'Their Bitbucket user name or account id, as --id bitbucket=<identity>' },
       { flags: '--kind <kind>', field: 'kind', description: 'human (the default) or agent' },
       { flags: '--email <address>', field: 'email', description: 'Their email, used only to suggest matches' },
       { flags: '--remove', field: 'remove', description: 'Remove the person, or with --id only those identities (CLI only)' },
@@ -277,6 +298,7 @@ export function toilProjectBuildCommands(areas: readonly AnyArea[]): AnyCommand[
     ],
     examples: [
       { toilProject: 'payments', name: 'Pat Example', id: ['jira=pat', 'github=pat-ex'], email: 'you@example.com' },
+      { toilProject: 'payments', name: 'Sam Example', github: 'sam-ex', jira: 'sam', ado: 'sam@example.com', bitbucket: 'sam.example' },
       { toilProject: 'payments', name: 'Claude', kind: 'agent', id: ['github=claude'], replace: true },
       // A removal is off MCP, so the example that sets the field keeps it false, as parity runs every example through both doors.
       { toilProject: 'payments', name: 'Pat Example', id: ['github=pat-ex'], remove: false },
@@ -289,7 +311,9 @@ export function toilProjectBuildCommands(areas: readonly AnyArea[]): AnyCommand[
       const refuse = (message: string, fix: string) => new ToilError('INVALID_INPUT', `${message} (toil project ${toilProject.name}).`, { fix });
       // Neither a name nor an email may be shaped like a credential either: the toil project is meant to be safe to check in.
       if (identityProblem(name)) throw refuse(`The name can't be used: ${identityProblem(name)}`, 'Give the name the team writes, never a token.');
-      const ids = (input.id ?? []).map((pair) => {
+      // --github, --jira, --ado and --bitbucket are --id with the area filled in: one idea, one way through the checks below.
+      const pairs = [...(input.id ?? []), ...(['github', 'jira', 'ado', 'bitbucket'] as const).flatMap((a) => (input[a] !== undefined ? [`${a}=${input[a]}`] : []))];
+      const ids = pairs.map((pair) => {
         const [area, value] = keyValue(pair, '--id', { example: 'github=pat-ex', quiet: true });
         // A token with `==` padding splits at its first `=`, leaving most of it as the "area": refused without repeating it.
         if (identityProblem(area)) throw refuse("An --id's area can't be used: it's shaped like a credential", 'Give area=identity, e.g. --id github=pat-ex, never a token.');
@@ -439,6 +463,39 @@ export function toilProjectBuildCommands(areas: readonly AnyArea[]): AnyCommand[
       return { name: to, file: written, source: 'user', changed: true, renamed: { from, to, previousFile: forwardSlashes(file.file) }, description: toilProject.description ?? null, ...(removed.length ? { credentialsRemoved: removed } : {}) };
     },
   });
+
+  // Archive and unarchive are one command written twice; the pair differs by one boolean and a verb.
+  const archiveCommand = (archive: boolean) =>
+    defineConfigCommand({
+      path: ['projects', archive ? 'archive' : 'unarchive'],
+      description: archive ? 'Archive one of your own toil projects: hidden from lists, kept on disk, reversible' : 'Bring an archived toil project back',
+      toolDescription: archive
+        ? 'Archives one of your own toil projects (~/.toil/projects) by setting archived: true in its file. Nothing is deleted and nothing else changes: projects_list leaves it out unless all or archived is set, Toil UI moves it under Archived, and a folder in one of its repos still resolves to it, so calls keep their context. Undo with projects_unarchive. A checked-in or listed toil project is refused: copy it into your own folder with projects_import first. A local write: no allowWrite.'
+        : 'Brings an archived toil project of yours back by removing archived from its file. Asking for one that is not archived changes nothing and says so. A local write: no allowWrite.',
+      input: z.object({ toilProject: toilProjectField }),
+      writes: false,
+      writesLocal: true,
+      args: [toilProjectArg],
+      examples: [{ toilProject: 'payments' }],
+      run: async (input, ctx) => {
+        const { catalog } = access(ctx);
+        const file = catalog.find(input.toilProject);
+        // A teammate's file in a repository isn't yours to shelve; your own copy is.
+        if (file.source !== 'user') {
+          const verb = archive ? 'archive' : 'unarchive';
+          throw new ToilError('INVALID_INPUT', `Toil project ${file.toilProject.name} is ${file.source === 'repo' ? 'checked into a repository' : file.source === 'listed' ? 'in a listed folder' : 'a file outside your own folder'} (${forwardSlashes(file.file)}), so it isn't yours to ${verb}.`, {
+            fix: `Copy it into your own folder with toil projects import ${forwardSlashes(file.file)}, then ${verb} your copy.`,
+          });
+        }
+        const toilProject = structuredClone(file.toilProject);
+        const was = toilProject.archived === true;
+        if (archive) toilProject.archived = true;
+        else delete toilProject.archived;
+        return saved(ctx, catalog, file, toilProject, was !== archive, { archived: archive });
+      },
+    });
+  const archive = archiveCommand(true);
+  const unarchive = archiveCommand(false);
 
   const exportCommand = defineConfigCommand({
     path: ['projects', 'export'],
@@ -669,7 +726,91 @@ export function toilProjectBuildCommands(areas: readonly AnyArea[]): AnyCommand[
     },
   });
 
-  return [init, addRepo, link, env, field, person, wipLimit, analyzeSet, describe, exportCommand, importCommand, unlink, remove];
+  const peopleSuggest = defineConfigCommand({
+    path: ['projects', 'people', 'suggest'],
+    description: "Suggest which accounts in work items and pull requests are the toil project's people, from OWI records you pass (local only)",
+    toolDescription:
+      "Reads the accounts named in Open Work Item records you pass (what util owi map printed for one tracker's or code host's work items and pull requests: assignee, reporter, who moved an item, pull request author and reviewers) and sets those the toil project's people don't map against its people. Asks no service: read one source with its own command, map it, pass it here. Returns { toilProject, read, suggestions [{ person (null for a new person), name, reason (email, name or login), because, accounts [{ area, id, name, email }], command, input }], unmapped [{ area, id, name, email }], ambiguous }. An account that fits more than one person suggests nothing. Nothing is mapped: apply a suggestion by running its command (projects_person) when the person agrees. Reads local files only.",
+    input: z.object({
+      toilProject: toilProjectField,
+      ...inputFields,
+    }),
+    writes: false,
+    writesLocal: false,
+    args: [toilProjectArg],
+    options: [{ flags: '--file <path>', field: 'file', description: 'The OWI records: a file inside the workspace, or - for stdin (the default when no --text is given)' }, textOption],
+    examples: [
+      { toilProject: 'payments', text: EXAMPLE_PEOPLE_RECORDS },
+      { toilProject: 'payments', file: 'owi/people.owi.json' },
+    ],
+    run: async (input, ctx) => {
+      const { catalog } = access(ctx);
+      const file = catalog.find(input.toilProject);
+      const read = await openInput(ctx, input);
+      const records = readBriefRecords(await read.text());
+      if (!records.items.length && !records.changes.length) {
+        throw new ToilError('INVALID_INPUT', `The input holds no work items or pull requests${records.skipped.length ? ` (${records.skipped.length} records skipped: ${records.skipped[0]!.at}, ${records.skipped[0]!.reason})` : ''}.`, {
+          fix: 'Read one source and map it: toil github pr list … | toil util owi map, then pipe it into toil projects people suggest.',
+        });
+      }
+      if (records.skipped.length) ctx.warn({ code: 'PEOPLE_SKIPPED', message: `${records.skipped.length} record${records.skipped.length > 1 ? 's were' : ' was'} skipped: ${records.skipped[0]!.at}, ${records.skipped[0]!.reason}.` });
+      const result = suggestPeople(file.toilProject.name, file.toilProject.people, accountsIn(records.items, records.changes));
+      return { toilProject: file.toilProject.name, ...result };
+    },
+  });
+
+  const peopleSave = defineConfigCommand({
+    path: ['projects', 'people', 'save'],
+    description: "Save a toil project's people into a repository's .toil/projects, so the mapping is checked in with the code",
+    toolDescription:
+      "Writes the toil project's people (names, kinds, emails and the identity each area knows them by, never a credential) into <repo>/.toil/projects/<name>.json, where repo is a working tree's root (default: the working folder), so teammates who clone the repository share the mapping. It is only a file: the repository may be hosted on GitHub, Azure DevOps or Bitbucket. If the file is there, only its people change: each person is added, or changed when replace is set (a person already there who differs is refused otherwise), and people only the file lists are kept. If it isn't, the whole toil project is written as a shared one, as projects_export does. It never stages or commits: the change is for a person to review and commit. Over MCP, creating the file from a toil project whose bindings select a connection with writes on is refused. A local write: no allowWrite.",
+    input: z.object({
+      toilProject: toilProjectField,
+      repo: z.string().min(1).optional().describe("The root of a working tree to write .toil/projects/<name>.json into (default: the working folder, which must be a repository's root)"),
+      replace: replaceField,
+    }),
+    writes: false,
+    writesLocal: true,
+    args: [toilProjectArg],
+    options: [{ flags: '--repo <dir>', field: 'repo', description: "A working tree's root (default: this folder)" }, replaceOption],
+    examples: [{ toilProject: 'payments', repo: '.' }, { toilProject: 'payments', replace: true }],
+    run: async (input, ctx) => {
+      const { catalog, config, via } = access(ctx);
+      const source = catalog.find(input.toilProject);
+      if (!source.toilProject.people.length) throw new ToilError('INVALID_INPUT', `Toil project ${source.toilProject.name} has no people to save.`, { fix: `Add some first: toil projects person ${source.toilProject.name} "Pat Example" --github pat-ex.` });
+      const target = join(catalog.repoFolder(input.repo ?? '.'), `${source.toilProject.name}.json`);
+      const names = (list: readonly ToilProjectPerson[]) => list.map((p) => p.name);
+      if (!existsSync(target)) {
+        if (via !== 'cli') refuseWritesBindings(catalog, config, areas, source.toilProject, 'export');
+        const { toilProject } = forSharing(source.toilProject, config, areas);
+        const written = catalog.save(target, toilProject, 'create');
+        return { name: toilProject.name, file: written, created: true, added: names(toilProject.people), updated: [], kept: [] };
+      }
+      const there = catalog.find(target);
+      const next = structuredClone(there.toilProject);
+      const added: string[] = [];
+      const updated: string[] = [];
+      for (const p of source.toilProject.people) {
+        const at = next.people.findIndex((q) => q.name.toLowerCase() === p.name.toLowerCase());
+        if (at < 0) {
+          next.people.push(structuredClone(p));
+          added.push(p.name);
+        } else if (JSON.stringify(next.people[at]) !== JSON.stringify(p)) {
+          if (!input.replace) throw new ToilError('INVALID_INPUT', `${p.name} is already in ${forwardSlashes(target)} with other details (toil project ${source.toilProject.name}).`, { fix: 'Pass --replace to take yours, or change the file by hand.' });
+          next.people[at] = structuredClone(p);
+          updated.push(p.name);
+        }
+      }
+      const kept = names(next.people).filter((n) => !source.toilProject.people.some((p) => p.name.toLowerCase() === n.toLowerCase()));
+      const changed = added.length + updated.length > 0;
+      const written = changed ? catalog.save(target, next, 'edit') : forwardSlashes(target);
+      return { name: next.name, file: written, created: false, changed, added, updated, kept };
+    },
+  });
+
+  const peopleCommands = () => [peopleSuggest, peopleSave];
+
+  return [init, addRepo, link, env, field, person, ...peopleCommands(), wipLimit, analyzeSet, describe, exportCommand, importCommand, unlink, remove, archive, unarchive];
 
   /** link and env: one section's binding, context inputs and reference data. */
   async function changeSection(
@@ -912,6 +1053,8 @@ function hostWarnings(catalog: ToilProjectCatalog, toilProject: ToilProject, are
  */
 export function forSharing(source: ToilProject, config: ResolvedConfig, areas: readonly AnyArea[] = []): { toilProject: ToilProject; hosts: Array<{ area: string; env: string | null; connection: string; host: string }>; droppedPaths: number } {
   const toilProject = structuredClone(source);
+  // Archiving is your own tidying; a teammate importing the file starts with it open.
+  delete toilProject.archived;
   const hosts: Array<{ area: string; env: string | null; connection: string; host: string }> = [];
   const share = (area: string, env: string | undefined, section: Section) => {
     if (typeof section.connection !== 'string') return;

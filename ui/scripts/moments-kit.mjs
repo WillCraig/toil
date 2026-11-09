@@ -68,7 +68,7 @@ export function build() {
 
 /**
  * Starts the built `toil-ui --sample` in a throwaway home with no `TOIL_*` variable from the shell,
- * so the run reads only the sample. Resolves with its launch URL and `stop()`.
+ * so the run reads only the sample. Resolves with its URL and `stop()`.
  */
 export async function startSample() {
   const bin = join(ui, 'dist', 'server', 'toil-ui.js');
@@ -83,7 +83,7 @@ export async function startSample() {
     const timer = setTimeout(() => reject(new Error(`toil-ui --sample printed no URL in 20s. Is Toil UI built (npm run build -w ui)? stderr: ${stderr}`)), 20_000);
     child.stdout.on('data', (c) => {
       stdout += c;
-      const m = /http:\/\/127\.0\.0\.1:\d+\/\?token=[A-Za-z0-9_-]+/.exec(stdout);
+      const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(stdout);
       if (m) {
         clearTimeout(timer);
         resolve(m[0]);

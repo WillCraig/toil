@@ -137,7 +137,7 @@ export function FeedbackForm({ api, close }: { api: FeedbackApi; close: () => vo
         Send feedback to Imagile
       </Heading>
       <p className="note">
-        A bug report or a feature request, sent through <code>toil feedback</code>. Only what you type below is sent, with toil's version and commit.
+        A bug report or a feature request, sent to Imagile. Only what you type below is sent, with the version of Toil and Toil UI.
       </p>
       <RadioGroup className="shells" orientation="horizontal" value={fields.kind} onChange={(v) => change({ kind: v as FeedbackKind })}>
         <Label className="feedback-label">Kind</Label>

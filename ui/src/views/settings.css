@@ -2,9 +2,8 @@
    and the change forms. Colours come from the theme's tokens, so Plain and
    Crate both style them; every control is at least 44px tall. */
 
-/* The tabs share the row evenly, and on a phone fall into even rows of two rather than leave one on its own. */
-.subnav ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), max-content)); gap: 0.25rem; list-style: none; padding: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
-@media (max-width: 600px) { .subnav ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* The tabs size to their words with an even gap, and wrap onto a second row on a phone. */
+.subnav ul { display: flex; flex-wrap: wrap; gap: 0 1.25rem; list-style: none; padding: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
 .subnav a { display: flex; align-items: center; min-height: 44px; padding: 0 0.75rem; color: var(--ink); text-decoration: none; border-bottom: 3px solid transparent; }
 .subnav a:hover { border-bottom-color: var(--line); }
 .subnav a[aria-current="page"] { border-bottom-color: var(--accent); font-weight: 600; }
@@ -64,6 +63,7 @@ button.btn:disabled { cursor: not-allowed; opacity: 0.75; }
 /* The Agent page: the adapter, then the person's instructions (#283). */
 .instructions { margin-top: 1.5rem; }
 .theme-setting .choice { justify-self: start; }
+.font-sample strong { font-family: var(--font-display); font-weight: 600; }
 /* A checkbox and the (i) that explains it (#346), on one line where they fit. */
 .theme-setting__row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
 
@@ -103,3 +103,11 @@ button.btn:disabled { cursor: not-allowed; opacity: 0.75; }
 .analyze-preview__text { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.5; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.75rem; max-height: 24rem; overflow: auto; margin: 0.5rem 0; }
 .analyze-lenses > summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; }
 .analyze-lenses[open] { display: grid; gap: 0.5rem; }
+
+/* A connection card: its name and status, then the host and login as two plain facts, and where each setting comes from one step in. */
+.conn-sources { font-size: 0.875rem; color: var(--muted); }
+.conn-sources > summary { cursor: pointer; min-height: 2rem; display: flex; align-items: center; }
+.conn-sources__list { display: grid; gap: 0.25rem; margin: 0.25rem 0 0; }
+.conn-sources__list > div { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 0.5rem; }
+.conn-sources__list dt { font-weight: 600; }
+.conn-sources__list dd { margin: 0; overflow-wrap: anywhere; }

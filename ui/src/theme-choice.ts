@@ -1,12 +1,14 @@
 /**
  * Which theme and colour scheme are showing, and how deep the theme goes
  * (#283): "Themed wording" (the theme's lexicon) and "Themed agent voice" (its
- * voice in the agent's prompt), both off until someone switches them on
- * (#552: a theme's colours, fonts and art are for everyone, its jokes are for
- * those who ask). A `?theme=`, `?scheme=`, `?wording=` or `?voice=` (`on` or
+ * voice in the agent's prompt), themed wording on and the agent voice off until someone changes
+ * them (#552 kept both off; the maintainer turned wording on, 2026-11-05, #561:
+ * with functional words always plain, a theme only words explanations and
+ * loading text, so it costs nobody anything; the voice changes how the agent
+ * answers, so it stays for those who ask). A `?theme=`, `?scheme=`, `?wording=` or `?voice=` (`on` or
  * `off`) in the address wins (it makes a view linkable as it looked), then
  * what this browser picked last, a saved choice kept exactly as it was, then
- * Crate, the default (#277), with both off. The choice is a convenience, so
+ * Crate, the default (#277), with wording on and the voice off. The choice is a convenience, so
  * storage that refuses (a private window, blocked site data) just means it
  * isn't remembered. Preferences are honoured without a request form.
  *
@@ -47,11 +49,11 @@ function remembered(): Partial<Record<keyof ThemeChoice | 'synced', unknown>> {
   }
 }
 
-/** `?wording=off` and `?voice=off` switch one off, `on` switches it on; anything else leaves it to what was saved, else off. */
-function flag(param: string | null, saved: unknown): boolean {
+/** `?wording=off` and `?voice=off` switch one off, `on` switches it on; anything else leaves it to what was saved, else `fallback`. */
+function flag(param: string | null, saved: unknown, fallback: boolean): boolean {
   if (param === 'off') return false;
   if (param === 'on') return true;
-  return typeof saved === 'boolean' ? saved : false;
+  return typeof saved === 'boolean' ? saved : fallback;
 }
 
 export function initialChoice(search: string): ThemeChoice {
@@ -59,7 +61,7 @@ export function initialChoice(search: string): ThemeChoice {
   const saved = remembered();
   const theme = [params.get('theme'), saved.theme].find((t): t is string => THEMES.some((m) => m.name === t)) ?? DEFAULT_THEME;
   const scheme = [params.get('scheme'), saved.scheme].find((s): s is SchemeChoice => SCHEMES.includes(s as SchemeChoice)) ?? 'system';
-  return { theme, scheme, wording: flag(params.get('wording'), saved.wording), voice: flag(params.get('voice'), saved.voice) };
+  return { theme, scheme, wording: flag(params.get('wording'), saved.wording, true), voice: flag(params.get('voice'), saved.voice, false) };
 }
 
 /** What `toil theme list` says: the theme in effect, and where it came from. */

@@ -242,20 +242,21 @@ describe('the ambient layer', () => {
   });
 });
 
-describe('Reduce motion and effects, in Settings', () => {
-  it('is on the General page, remembered by this browser, and stops the particles', async () => {
+describe('Motion, in Settings', () => {
+  it('is on the Appearance page, remembered by this browser, and stops the particles', async () => {
     osMotion(false);
     fakeCanvas();
     localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'crate', scheme: 'system' }));
-    window.location.hash = '#/settings/toil';
+    window.location.hash = '#/settings/appearance';
     const { container } = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByRole('link', { name: 'General' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'Appearance' }).getAttribute('aria-current')).toBe('page');
     expect(container.ownerDocument.querySelector('.ambient canvas')).not.toBeNull();
-    const box = screen.getByRole('checkbox', { name: 'Reduce motion and effects' });
-    expect((box as HTMLInputElement).checked).toBe(false);
-    await userEvent.click(box);
-    expect((box as HTMLInputElement).checked).toBe(true);
+    const select = screen.getByRole('button', { name: /Motion/ });
+    expect(select.textContent).toContain('Full');
+    await userEvent.click(select);
+    await userEvent.click(await screen.findByRole('option', { name: 'Off' }));
+    expect(screen.getByRole('button', { name: /Motion/ }).textContent).toContain('Off');
     expect(localStorage.getItem('toil-ui.motion')).toBe('reduced');
     expect(document.documentElement.dataset.motion).toBe('reduced');
     expect(container.ownerDocument.querySelector('.ambient canvas')).toBeNull();
@@ -326,30 +327,29 @@ describe('Particles and ambient effects, per theme (#348)', () => {
     osMotion(false);
     fakeCanvas();
     localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'plain', scheme: 'light' }));
-    window.location.hash = '#/settings/toil';
+    window.location.hash = '#/settings/appearance';
     const plain = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 });
     expect(screen.queryByRole('checkbox', { name: 'Particles and ambient effects' })).toBeNull();
-    expect(screen.getByText('Particles: none.')).toBeTruthy();
     plain.unmount();
 
     localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'starship', scheme: 'system' }));
     const { container } = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 });
     expect(container.ownerDocument.querySelector('.ambient canvas')).not.toBeNull();
-    const box = screen.getByRole('checkbox', { name: 'Particles and ambient effects' });
-    expect((box as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText('Particles: stars, on.')).toBeTruthy();
-    await userEvent.click(box);
-    expect((box as HTMLInputElement).checked).toBe(false);
+    // No checkbox of their own any more: Motion, Subtle takes this theme's particles away, Full brings them back.
+    expect(screen.queryByRole('checkbox', { name: 'Particles and ambient effects' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Motion/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Subtle' }));
     expect(container.ownerDocument.querySelector('.ambient')).toBeNull();
-    expect(screen.getByText('Particles: stars, off.')).toBeTruthy();
     expect(JSON.parse(localStorage.getItem('toil-ui.particles')!)).toEqual({ starship: false });
-    // The motion switch still wins, and the note under the particle switch says so.
-    await userEvent.click(box);
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Reduce motion and effects' }));
+    await userEvent.click(screen.getByRole('button', { name: /Motion/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Full' }));
+    expect(container.ownerDocument.querySelector('.ambient canvas')).not.toBeNull();
+    // Off stops everything, particles included.
+    await userEvent.click(screen.getByRole('button', { name: /Motion/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Off' }));
     expect(container.ownerDocument.querySelector('.ambient')).toBeNull();
-    expect(screen.getByText(/Reduce motion and effects is ticked below, so no particles show/)).toBeTruthy();
   });
 });
 

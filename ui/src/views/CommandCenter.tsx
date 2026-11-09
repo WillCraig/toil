@@ -163,7 +163,7 @@ export function CommandCenter() {
             Start {count(slated.length, 'ready item')}
           </Button>
           <p id="slate-note" className="note">
-            {startReady ? plain.pw('Assigns each item above to an agent in implement mode, as listed: proposals wait for you, and nothing leaves this machine until you apply one.', 'Asks an AI helper to try a fix for each item above, as listed: its suggestions wait for you, and nothing leaves this computer until you approve one.') : plain.text('This view has no agent assignments, so it shows the plan it would start.')}
+            {startReady ? plain.pw('Assigns each item above to an agent in implement mode, as listed: proposals wait for you, and nothing leaves this machine until you apply one.', 'Asks an AI agent to try a fix for each item above, as listed: its suggestions wait for you, and nothing leaves this computer until you approve one.') : plain.text('This view has no agent assignments, so it shows the plan it would start.')}
           </p>
         </Cluster>
         <p className={started && !started.ok ? 'failure' : 'note'} role="status">

@@ -1,5 +1,5 @@
 {
-  "//": "test/registry.test.ts and test/config.test.ts load toil's registry from source (src/api.ts), which is Node code: it is checked here, with the CLI's own module settings and ambient declarations, and left out of tsconfig.json.",
+  "//": "test/registry.test.ts, test/config.test.ts and test/connection-form.test.ts load toil's registry from source (src/api.ts), which is Node code: it is checked here, with the CLI's own module settings and ambient declarations, and left out of tsconfig.json.",
   "compilerOptions": {
     "target": "ES2023",
     "module": "NodeNext",
@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["../src/**/*.d.ts", "test/registry.test.ts", "test/config.test.ts"]
+  "include": ["../src/**/*.d.ts", "test/registry.test.ts", "test/config.test.ts", "test/connection-form.test.ts"]
 }

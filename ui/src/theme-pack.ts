@@ -17,8 +17,10 @@ export type Token = (typeof TOKENS)[number];
 export type Scheme = 'light' | 'dark';
 
 /**
- * The words a theme may rename. Each is shown with the real word beside it
- * ("Campaign (Epic)"), never instead of it (#206). A theme renames as few as
+ * The words a theme names in its moments (the build events it rolls, a natural
+ * 20 or a critical fail), where nothing depends on the words. They are never
+ * drawn on a tab, a heading or a control: those read the real word in every
+ * theme (src/wording.ts, Words in ui/docs/themes.md). A theme names as few as
  * it likes. The second row (#415) is where a view names people, analyses, a
  * priority, builds and how a build ended, and the sprint's points done and
  * left; Realm reads them as a party, a quest log, initiative, saving throws,
@@ -30,6 +32,20 @@ export const TERMS = [
 ] as const;
 export type TermKey = (typeof TERMS)[number];
 
+/**
+ * One type pairing a theme offers in Settings, Font (src/fonts.ts). Each of
+ * `display`, `body` and `mono` is a CSS font-family list whose first family is
+ * one bundled with Toil UI (test/fonts.test.ts holds that); `mono` is optional,
+ * and left out it stays the theme's own.
+ */
+export interface FontPair {
+  id: string;
+  label: string;
+  display: string;
+  body: string;
+  mono?: string;
+}
+
 export interface ThemeManifest {
   name: string;
   label: string;
@@ -37,6 +53,15 @@ export interface ThemeManifest {
   /** Both schemes, light and dark (#507); the first listed is the theme's default. */
   schemes: Record<Scheme, Record<Token, string>>;
   fonts: { body: string; display: string; mono: string };
+  /**
+   * The pairings this theme offers beside its own `fonts` ("The theme's own",
+   * always first and the default unless `defaultFontPair` says another). Left out,
+   * it offers the curated set in src/fonts.ts. A pair's body font must be a bundled
+   * text face, never a pixel or display face, unless it is this theme's own body.
+   */
+  fontPairs?: FontPair[];
+  /** The id in `fontPairs` shown until someone picks one; absent means the theme's own fonts. */
+  defaultFontPair?: string;
   radius: string;
   motion: 'none' | 'subtle';
   /**
@@ -49,8 +74,15 @@ export interface ThemeManifest {
   sounds: Record<string, string>;
   assets: Record<string, string>;
   terms?: Partial<Record<TermKey, string>>;
-  /** Themed wording (#283): the theme's own microcopy, by key, over the standard text in src/wording.ts. */
+  /** Themed wording (#283): the theme's own words for the flavour keys of src/wording.ts, over the plain text. A functional key is refused (test/themes.test.ts). */
   lexicon?: Partial<Record<WordKey, string>>;
+  /**
+   * The phrases the Ask bar rotates while a helper is thinking (#561), shown
+   * only while themed wording is on. Flavour only: the elapsed time and any
+   * tool the agent names are said plainly beside them (src/thinking.ts). Plain
+   * has none and reads the standard phrases.
+   */
+  thinking?: string[];
   /** Themed agent voice (#283): the register the agent answers in, added to its prompt as style. Plain has none. */
   voice?: string;
   /**

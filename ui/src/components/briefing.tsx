@@ -43,7 +43,7 @@ export function useBriefing(): BriefingView {
 
 /** Who wrote the briefing, in words: "Analyze, Codex (gpt-5.5), 13 Oct 2026, 07:30 UTC" or "By code". */
 export function briefingSource(view: BriefingView, plain = false): string {
-  if (view.by === 'analyze' && view.analysis) return plain ? `Written by an AI helper, ${whoText(view.analysis)}, ${dateTime(view.analysis.at)}` : `Analyze, ${whoText(view.analysis)}, ${dateTime(view.analysis.at)}`;
+  if (view.by === 'analyze' && view.analysis) return plain ? `Written by an AI agent, ${whoText(view.analysis)}, ${dateTime(view.analysis.at)}` : `Analyze, ${whoText(view.analysis)}, ${dateTime(view.analysis.at)}`;
   return plain ? "Worked out by the app's own rules, no AI" : 'By code, no agent';
 }
 
@@ -260,7 +260,7 @@ export function Customize({ lenses }: { lenses: Array<{ lens: string; label: str
           <label className="customize__check">
             <input type="checkbox" checked={prefs.afterSync} onChange={(e) => setPrefs({ afterSync: e.target.checked })} /> {pw('Run Analyze after each sync', 'Write a briefing after each sync')}
           </label>
-          <p className="source">Uses your {pw('agent', 'AI helper')}'s usage. Off, the briefing says when it is older than the data.</p>
+          <p className="source">Uses your {pw('agent', 'AI agent')}'s usage. Off, the briefing says when it is older than the data.</p>
         </fieldset>
       </div>
     </details>

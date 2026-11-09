@@ -41,7 +41,6 @@ behaved differently, it says so.
 | Apply | the comment proposal, with the connection's writes off | refused by toil's write gate, naming the connection; `#9` still has no comments | No; nothing was written to the sandbox |
 | Notifications | the page open while assignments ran | "Claude stopped at a usage cap … #21 Refund reason codes: stopped at its usage cap"; "Claude needs you … asked 9 questions, 2 proposals to review" | No |
 | Readiness gate | the "Which items are ready for an agent?" starter, and the Command Center | 0 ready, 15 thin, 3 blocked in both; "Start 0 ready items": "No open item is ready, so nothing would be slated" | No |
-| Not ticketed yet | "Add exponential backoff to the payout webhook retries" in the Ask bar, then Ticket this | banner matched `#5` at 63% alike; sub-task and new-ticket proposals with `toil github issue create` lines | No (the banner uses no model) |
 | `verify:ui --ask` | `npm run verify:ui -- --ask --adapter claude --model haiku` | PASS twice, the second on this branch's final code: 16 cited, 0 unverified, usage `claude-haiku-5-5` at $0.0083 (SDK estimate, API-equivalent), Analyze carried the first turn | No |
 
 ## Excerpts

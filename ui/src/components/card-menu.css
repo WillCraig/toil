@@ -1,0 +1,4 @@
+/* A card's hamburger (src/components/card-menu.tsx): top right of the card, always there, never over its title. */
+.card-menu__trigger { position: absolute; top: 0.6rem; inset-inline-end: 0.6rem; min-width: 2.25rem; padding: 0; line-height: 1; justify-content: center; }
+.conn-card:has(> .card-menu__trigger) .conn-head { padding-inline-end: 2.75rem; }
+.card-menu__rule { margin: 0.25rem 0; border: 0; border-top: 1px solid var(--line); height: 0; }

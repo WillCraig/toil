@@ -10,7 +10,7 @@ import { createContext, useContext } from 'react';
 import { THEMES, type TermKey, type ThemeManifest } from './themes.ts';
 import type { SchemeChoice, ThemeChoiceState } from './theme-choice.ts';
 import type { WordKey } from './wording.ts';
-import { usePlain, wordsFor } from './plain-words.ts';
+import { wordsFor } from './plain-words.ts';
 
 const ThemeContext = createContext<ThemeManifest>(THEMES[0]!);
 export const ThemeProvider = ThemeContext.Provider;
@@ -38,14 +38,15 @@ export const wordingOn = (theme: ThemeManifest, choice: Pick<ThemeChoiceState, '
 export const voiceOn = (theme: ThemeManifest, choice: Pick<ThemeChoiceState, 'voice'>) => choice.voice && theme.voice !== undefined;
 
 /**
- * A theme's own word for something, always with the real one beside it
- * (#206, principle 4): Realm's epic reads "Campaign (Epic)", and Plain, which
- * renames nothing, reads "Epic". With themed wording off, every theme reads
- * the real word alone.
+ * A name a person reads to act (a tab, a heading, a flag, a figure's label) is
+ * the real word in every theme (the maintainer's call, 2026-11-05; src/wording.ts).
+ * A theme's `terms` still name things in its moments (the build events it
+ * rolls), where nothing depends on the words, but never on a control or a
+ * heading. Kept as a function so each place that names one still says which
+ * name it is.
  */
-export function themed(theme: ThemeManifest, key: TermKey, real: string, wording = true): string {
-  const word = wording ? theme.terms?.[key] : undefined;
-  return word && word.toLowerCase() !== real.toLowerCase() ? `${word} (${real})` : real;
+export function themed(_theme: ThemeManifest, _key: TermKey, real: string, _wording = true): string {
+  return real;
 }
 
 export function useTerm(): (key: TermKey, real: string) => string {
@@ -55,14 +56,13 @@ export function useTerm(): (key: TermKey, real: string) => string {
 }
 
 /**
- * The microcopy for a key (src/wording.ts), in the theme's words when themed wording is on.
- * With plain words on (src/plain-words.ts), a key plain words has its own text for reads that, and any
- * other key reads the theme's or the standard text with its jargon swapped.
+ * The microcopy for a key (src/wording.ts). A functional key (a label a person acts on) reads the one plain text
+ * in every theme; a flavour key (a lede, a loading line, an empty-state sentence) reads the theme's own words when
+ * themed wording is on, else the plain text.
  */
 export function useWords(): (key: WordKey, vars?: Record<string, string>) => string {
   const theme = useTheme();
   const choice = useThemeChoiceContext();
   const on = wordingOn(theme, choice);
-  const plain = usePlain().on;
-  return (key, vars) => wordsFor(theme.lexicon, on, plain, key, vars);
+  return (key, vars) => wordsFor(theme.lexicon, on, key, vars);
 }

@@ -137,7 +137,7 @@ export function AgentsSidebar() {
     <section className="agents-sidebar" aria-labelledby="agents">
       <div className="edit-head">
         <h2 id="agents" title={plain.title('Agents')}>
-          {plain.pw('Agents', 'AI helpers')}
+          {plain.pw('Agents', 'AI agents')}
         </h2>
         <Help topic="assignments" {...(list ? { note: `${plain.on ? (list.settings.concurrent === 1 ? 'One works at a time' : `${list.settings.concurrent} work at once`) : list.settings.concurrent === 1 ? 'One runs at a time' : `${list.settings.concurrent} run at a time`}, for up to ${list.settings.timeLimitMinutes} minutes each.` } : {})} />
       </div>

@@ -17,9 +17,11 @@
  * door with a different sign on it, which is the only kind the facilities
  * committee ever approves.
  */
+import { nodeWarning } from './core/runtime.js';
 import { homedir } from 'node:os';
 import type { z } from 'zod';
-import type { AnyArea } from './core/area.js';
+import type { AnyArea, ChoiceSet } from './core/area.js';
+import { describeScopes, type DescribedScopes } from './core/scopes.js';
 import { CALLER_LABEL } from './core/audit.js';
 import { commandName, servedOverMcp, toolName, type AnyCommand, type CommandKind } from './core/command.js';
 import type { AreaInfo } from './core/config.js';
@@ -29,7 +31,6 @@ import { createSecretStore, type SecretStore } from './core/keychain.js';
 import type { ProgressEvent } from './core/progress.js';
 import type { Prompter } from './core/prompt.js';
 import { runCommand } from './core/run.js';
-import { unsupportedNode } from './core/runtime.js';
 import { checkSecret as checkSecretInput, type SecretCheck, type SecretRules } from './core/secret-input.js';
 import { inputSchemaFor } from './mcp/server.js';
 import { createNodeContext } from './node-context.js';
@@ -88,6 +89,27 @@ export interface AreaSummary {
    * connection.
    */
   connection: readonly ConnectionField[];
+  /** What its credential must be allowed to do, per kind of credential. Left out for an area that declares none (`toil connections scopes`). */
+  scopes?: DescribedScopes;
+  /** The setting whose value picks the deployment (`deployment`), for an area with variants. */
+  variantBy?: string;
+}
+
+/** Presets for a setting, as a form shows them: radio buttons, one of which may build the value from a word the person types. */
+export interface ConnectionChoices {
+  question?: string;
+  /** No option starts selected; the person must pick one. */
+  required?: boolean;
+  options: readonly {
+    label: string;
+    /** What choosing it sets, or null when the person types it. */
+    value: string | null;
+    when?: Readonly<Record<string, string>>;
+    placeholder?: string;
+    compose?: { prefix: string; suffix?: string; label: string; placeholder: string };
+    hosts?: readonly string[];
+    expectPath?: string;
+  }[];
 }
 
 /** One value a connection holds, as `toil connections add` asks for it. */
@@ -103,6 +125,12 @@ export interface ConnectionField {
   default: string | null;
   /** The connection isn't valid without it. */
   required: boolean;
+  /** Presets a form offers as radio buttons; `value` is null for the one the person types. Left out when there are none. */
+  choices?: ConnectionChoices;
+  /** The values of the area's variant setting (`deployment`) this applies to; left out when it applies to all. */
+  appliesTo?: readonly string[];
+  /** The variants whose connections can't do without it, though it isn't required of every one. */
+  requiredFor?: readonly string[];
 }
 
 /**
@@ -237,9 +265,15 @@ const info = (def: AnyCommand): CommandInfo => ({
 function connectionFields(area: AnyArea): ConnectionField[] {
   const shape = area.connection.shape as Record<string, z.ZodType>;
   const secretKeys: string[] = area.secrets ?? [];
+  const choices = area.choices as Record<string, ChoiceSet | undefined> | undefined;
+  const variants = area.variants?.of ?? {};
+  const mentions = (name: string) => Object.entries(variants).filter(([, v]) => [...(v.requires ?? []), ...(v.uses ?? [])].includes(name)).map(([k]) => k);
   const settings = Object.keys(shape)
     .filter((k) => !secretKeys.includes(k))
     .sort((a, b) => Number(b === 'baseUrl') - Number(a === 'baseUrl'));
+  const explicit = area.appliesTo as Record<string, string[] | undefined> | undefined;
+  const appliesTo = (name: string) => [...new Set([...mentions(name), ...(explicit?.[name] ?? [])])];
+  const requiredFor = (name: string) => Object.entries(variants).filter(([, v]) => (v.requires ?? []).includes(name)).map(([k]) => k);
   const field = (name: string, secret: boolean): ConnectionField => {
     const fallback = (area.defaults as Record<string, unknown> | undefined)?.[name];
     return {
@@ -249,6 +283,9 @@ function connectionFields(area: AnyArea): ConnectionField[] {
       password: secret && area.secretKinds[name] === 'password',
       default: fallback === undefined ? null : String(fallback),
       required: fallback === undefined && shape[name]?.safeParse(undefined).success === false,
+      ...(choices?.[name] ? { choices: choices[name] as ConnectionChoices } : {}),
+      ...(appliesTo(name).length > 0 ? { appliesTo: appliesTo(name) } : {}),
+      ...(requiredFor(name).length > 0 ? { requiredFor: requiredFor(name) } : {}),
     };
   };
   return [...settings.map((k) => field(k, false)), ...secretKeys.filter((k) => k in shape).map((k) => field(k, true))];
@@ -260,7 +297,7 @@ let summaries: AreaSummary[] | undefined;
 /** Built on first read: a JSON Schema for every command takes a moment, and most hosts look once. */
 export const registry: Registry = {
   get areas() {
-    summaries ??= areas.map((a) => ({ name: a.name, description: a.description, connection: connectionFields(a) }));
+    summaries ??= areas.map((a) => ({ name: a.name, description: a.description, connection: connectionFields(a), ...(a.scopes ? { scopes: describeScopes(a.scopes) } : {}), ...(a.variants ? { variantBy: a.variants.by } : {}) }));
     return summaries;
   },
   get commands() {
@@ -299,13 +336,14 @@ let secrets: SecretStore | undefined;
  * throws: an unknown command, a bad option or a failure inside is an envelope
  * with `ok: false`, like every other. `input` is the command's MCP fields
  * (`{ jql: "project = PAY", limit: 50 }`), checked strictly. On a Node toil
- * refuses (`src/core/runtime.ts`, CVE-2026-111497) every call is the CLI's
- * `UNSUPPORTED_NODE` envelope, before anything runs or fetches.
+ * flags (`src/core/runtime.ts`, CVE-2026-111497) every envelope carries the
+ * warning in `meta.warnings`, from core like the other front doors; the call still runs.
  */
 export async function execute(command: string, input: Record<string, unknown> = {}, options: ExecuteOptions = {}): Promise<Envelope> {
-  const refused = unsupportedNode(process.versions.node, VERSION);
-  if (refused) return refused;
-  const refuse = (message: string, fix: string): Envelope => failure(new ToilError('INVALID_INPUT', message, { fix }), { command, durationMs: 0, version: VERSION });
+  // The API's own refusals never reach core, so they carry the unpatched-Node warning here.
+  const unpatched = nodeWarning(process.versions.node);
+  const refuse = (message: string, fix: string): Envelope =>
+    failure(new ToilError('INVALID_INPUT', message, { fix }), { command, durationMs: 0, version: VERSION, ...(unpatched ? { warnings: [{ code: 'UNSUPPORTED_NODE', message: unpatched }] } : {}) });
   const def = byName.get(command) ?? (options.person ? personByName.get(command) : undefined);
   if (!def) {
     const known = commands.find((d) => commandName(d) === command);

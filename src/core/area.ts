@@ -7,6 +7,7 @@ import { foldDeployments, type DeploymentOptions } from './deployments.js';
 import type { GitRemote } from './call-context.js';
 import type { CommandContext } from './context.js';
 import type { RequestHook } from './api.js';
+import { assertScopes, type AreaScopes } from './scopes.js';
 import type { QueryParam } from './rest.js';
 
 /**
@@ -66,6 +67,29 @@ export interface AreaSpec<S extends z.ZodObject = z.ZodObject, K extends string 
    * selector and a suggestion: toil never connects to it on its own.
    */
   siteApis?: Record<string, string>;
+  /**
+   * Presets for a setting, which a form shows as radio buttons instead of a
+   * blank box: GitHub.com's fixed API address, or "my own server" with a box
+   * for the URL. The first choice is the one selected. Only a presentation:
+   * the setting is still the connection's one key, validated by its schema,
+   * and `toil connections add` still takes any value.
+   */
+  choices?: Partial<Record<SettingKey<S>, ChoiceSet>>;
+  /**
+   * The variants (`variants.by`'s values) a setting applies to, for a form
+   * that shows only what the chosen one uses: Data Center's `project`, Cloud's
+   * `workspace`. A setting that a variant lists in `requires` or `uses` already
+   * applies to only those variants; one named by neither, and not here,
+   * applies to all.
+   */
+  appliesTo?: Partial<Record<SettingKey<S>, string[]>>;
+  /**
+   * The scopes or permissions the area's credentials need, per kind of
+   * credential, with the commands that need each (`toil connections scopes`).
+   * Only an area whose credential has named scopes declares one.
+   * `test/scopes.test.ts` fails on a command no entry lists.
+   */
+  scopes?: AreaScopes;
   /**
    * Paths in this area that run a core command for this area alone, the core
    * command fixing its `area` input: `{ 'instance list': 'connections list' }`
@@ -158,6 +182,49 @@ export interface Probe {
    * `authenticated: false`. Defaults to true.
    */
   authenticated?: boolean;
+  /**
+   * What the first answer's headers say about the credential itself, such as
+   * when it expires (GitHub sends `github-authentication-token-expiration`).
+   * Shown by the test; never a reason to fail it, because a credential past
+   * its expiry is refused by the read before the headers matter.
+   */
+  inspect?(headers: Headers): { expires?: string | null; scopes?: string[] | null } | undefined;
+  /**
+   * Further reads, run after the first one succeeds, that a real command would
+   * make and the first doesn't prove: a fine-grained GitHub token answers as its
+   * user on `/user` and is still refused on a repository it wasn't given. One
+   * failing fails the test, and says which.
+   */
+  deeper?: Array<{ path: string; what: string }>;
+}
+
+/** One preset of a setting; see {@link AreaSpec.choices}. */
+export interface SettingChoice {
+  label: string;
+  /** The value this choice sets, or null when the person types it (a box under the radio). */
+  value: string | null;
+  /** Only offered when these other settings have these values (`{ deployment: 'cloud' }`). */
+  when?: Record<string, string>;
+  /** For a value the person types: the box's placeholder, a whole address. */
+  placeholder?: string;
+  /** For a value built from one word the person types: `https://` + site + `.atlassian.net`. */
+  compose?: { prefix: string; suffix?: string; label: string; placeholder: string };
+  /**
+   * Hosts (`*.atlassian.net`, `api.github.com`) that a base URL of this choice
+   * is on, so a form can say "that looks like Cloud" when it's typed under another.
+   */
+  hosts?: string[];
+  /** For a typed address: the path it should end with (`/api/v3`), which a form checks and keeps, where it would otherwise drop API paths. */
+  expectPath?: string;
+}
+
+/** The choices for one setting, shown as radio buttons; see {@link AreaSpec.choices}. */
+export interface ChoiceSet {
+  /** The radio group's question ("Which one is it?"). */
+  question?: string;
+  /** No option starts selected: the person must pick one before the form can be saved. */
+  required?: boolean;
+  options: SettingChoice[];
 }
 
 /** See {@link AreaSpec.shares}. */
@@ -336,6 +403,19 @@ export function defineArea<S extends z.ZodObject, K extends string = never>(spec
   for (const key of secrets) {
     if (!(key in spec.connection.shape)) throw new Error(`Area ${spec.name}: secret "${key}" isn't a connection key.`);
   }
+  for (const [key, set] of Object.entries(spec.choices ?? {}) as Array<[string, ChoiceSet]>) {
+    const field = (spec.connection.shape as Record<string, z.ZodType>)[key];
+    if (!field) throw new Error(`Area ${spec.name}: choices for "${key}", which isn't a connection key.`);
+    if (set.options.length < 2) throw new Error(`Area ${spec.name}: choices for "${key}" are two or more.`);
+    for (const c of set.options) {
+      if (c.value !== null && !field.safeParse(c.value).success) throw new Error(`Area ${spec.name}: the choice "${c.label}" for "${key}" isn't a value its schema accepts.`);
+      for (const other of Object.keys(c.when ?? {})) if (!(other in spec.connection.shape)) throw new Error(`Area ${spec.name}: the choice "${c.label}" waits on "${other}", which isn't a connection key.`);
+    }
+  }
+  for (const key of Object.keys(spec.appliesTo ?? {})) {
+    if (!(key in spec.connection.shape)) throw new Error(`Area ${spec.name}: appliesTo names "${key}", which isn't a connection key.`);
+  }
+  if (spec.scopes) assertScopes(spec.name, spec.scopes, secrets as string[]);
   for (const key of Object.keys(spec.examples ?? {})) {
     if (!(key in spec.connection.shape)) throw new Error(`Area ${spec.name}: example "${key}" isn't a connection key.`);
   }

@@ -20,14 +20,14 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Button, Input, Label, Radio, RadioGroup, TextArea, TextField } from 'react-aria-components';
-import type { AgentSettings, AgentSettingsClient, AgentStatus } from './server-client.ts';
+import type { AdapterStatus, AgentSettings, AgentSettingsClient, AgentStatus } from './server-client.ts';
 import { Card } from './components/layout.tsx';
 import type { AskStyle } from './agent.ts';
 import { MAX_INSTRUCTIONS, systemPrompt } from '../server/agents/prompts.ts';
 import { promptStyle } from '../server/agents/voices.ts';
 import { useTheme, useThemeChoiceContext, voiceOn } from './theme-context.ts';
 import { FIXTURE_NOW } from './fixtures/execute.ts';
-import { AdaptersCard, helperState, STATE_WORD } from './agent-install.tsx';
+import { AdaptersCard, InstallDialog, helperState, needsInstall, statusLines, STATE_WORD } from './agent-install.tsx';
 import { usePlain } from './plain-words.ts';
 import { SAMPLE_ADAPTER_STATUS } from './fixtures/agent-status.ts';
 
@@ -47,6 +47,7 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
+  const [installing, setInstalling] = useState<AdapterStatus | null>(null);
   const plain = usePlain();
 
   useEffect(() => {
@@ -70,11 +71,11 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
     setBusy(true);
     setSaved('');
     try {
-      const next = await client.save({ ...form, endpoint: form.adapter === 'claude' ? form.endpoint : null });
+      const next = await client.save({ ...form, endpoint: form.adapter === 'claude' ? form.endpoint : null, instructions: (form.instructions ?? '').trim() || null, voice: (form.voice ?? '').trim() || null });
       setStatus(next);
       setForm(next.settings);
       setProblem(null);
-      setSaved(next.settings.adapter === 'none' ? 'Saved: no AI helper answers.' : `Saved: ${next.adapters.find((a) => a.name === next.settings.adapter)?.label ?? next.settings.adapter} answers from the next question.`);
+      setSaved(next.settings.adapter === 'none' ? 'Saved: no AI agent answers.' : `Saved: ${next.adapters.find((a) => a.name === next.settings.adapter)?.label ?? next.settings.adapter} answers from the next question, with your instructions.`);
       onChange?.(next);
     } catch (err) {
       setProblem(err instanceof Error ? err.message : String(err));
@@ -106,66 +107,70 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
     else delete models[name];
     setForm({ ...f, models, ...(f.adapter === name ? { model: value } : {}) });
   };
-  const saveWords = async (words: Pick<AgentSettings, 'instructions' | 'voice'>) => {
-    if (!status) throw new Error('The agent settings have not loaded yet.');
-    // The saved adapter, model and path go back as they are, so an unsaved edit above is neither lost nor sent.
-    const next = await client.save({ ...status.settings, ...words });
-    setStatus(next);
-    setForm((f) => (f ? { ...f, instructions: next.settings.instructions, voice: next.settings.voice } : next.settings));
-    return next.settings;
-  };
-  const ready = status?.adapters.some((a) => helperState(a) === 'ready');
   return (
     <>
+    <form className="agent-form" onSubmit={submit}>
     <Card as="section" className="panel" aria-labelledby="agent-settings">
-      <h2 id="agent-settings">{plain.pw('Agent', 'AI helper')}</h2>
-      <p className="note">{plain.text('The agent works with the subscription you already have, through its own program on this machine. Toil UI never downloads one, stores no keys, and the agent can only read: anything it suggests changing comes back as a proposal for you to apply.')}</p>
+      <h2 id="agent-settings">{plain.pw('Agent', 'Your AI agents')}</h2>
+      <p className="note">{plain.text('Each runs on the subscription you already have, through its own program on this machine. Toil UI stores no keys, and the agent can only read: a change it suggests comes back as a proposal for you to apply.')}</p>
       {status?.problem && <p className="failure">{status.problem}</p>}
       {problem && (
         <p role="alert" className="failure">
           {problem}
         </p>
       )}
-      {!status ? (
-        !problem && <p className="note">Reading the AI helper settings…</p>
+      {!status || !form ? (
+        !problem && <p className="note">Reading the AI agent settings…</p>
       ) : (
-        !ready && (
-          <div className="agent-hint" data-setup-steps="">
-            <p>{plain.text("No agent is set up yet. That's fine: everything else works without one. To set one up:")}</p>
-            <ol className="agent-steps">
-              <li>Press Install on the AI helper your organization approves.</li>
-              <li>Choose it under Which one answers, and press Save.</li>
-            </ol>
-          </div>
-        )
-      )}
-    </Card>
-    {status && <AdaptersCard adapters={status.adapters} client={client} onInstalled={() => void installed()} />}
-    {status && form && (
-      <Card as="section" className="panel" aria-labelledby="agent-choice">
-        <h2 id="agent-choice">Which one answers</h2>
-        <form className="agent-form" onSubmit={submit}>
+        <>
           <RadioGroup
-            className="agent-adapters"
+            className="agent-adapters helper-list"
             value={form.adapter}
-            aria-labelledby="agent-choice"
+            aria-label="Which AI agent answers"
             onChange={(v) => {
               const adapter = v as AgentSettings['adapter'];
               // Each adapter's own model and CLI path come with it (#344).
               setForm({ ...form, adapter, model: adapter === 'none' ? null : (form.models[adapter] ?? null), cliPath: adapter === 'none' ? null : (form.cliPaths[adapter] ?? null) });
             }}
           >
-            <Radio value="none" className="agent-choice">
-              <strong>None</strong>
-              <span className="note">{plain.text('The dashboards only; a chat answers only once it is switched to an agent.')}</span>
-            </Radio>
-            {status.adapters.map((a) => (
-              <Radio key={a.name} value={a.name} className="agent-choice">
-                <strong>{a.label}</strong>
-                <span className="note">{STATE_WORD[helperState(a)]}</span>
+            <div className="helper-row">
+              <Radio value="none" className="agent-choice">
+                <strong>None</strong>
+                <span className="note">{plain.text('The dashboards only; a chat answers only once it is switched to an agent.')}</span>
               </Radio>
-            ))}
+            </div>
+            {status.adapters.map((a) => {
+              const state = helperState(a);
+              return (
+                <div key={a.name} className="helper-row" data-adapter={a.name} data-state={state}>
+                  <Radio value={a.name} className="agent-choice">
+                    <strong>{a.label}</strong>
+                    <span className={state === 'ready' ? 'agent-pick__ready' : 'note'}>{STATE_WORD[state]}</span>
+                  </Radio>
+                  {needsInstall(a) && (
+                    <Button className="btn btn--accent" onPress={() => setInstalling(a)} data-install={a.name}>
+                      Install {a.label}
+                    </Button>
+                  )}
+                  {state === 'fix' && (
+                    <p className="agent-notice helper-row__wide" data-needs-fix="">
+                      {a.cli.problem ?? 'Its command-line program was not found.'}
+                      {a.cli.fix ? ` ${a.cli.fix}` : ''}
+                    </p>
+                  )}
+                  <details className="agent-details helper-row__wide">
+                    <summary>Details for whoever sets it up</summary>
+                    {statusLines(a).map((line, i) => (
+                      <p key={i} className="note">
+                        {line}
+                      </p>
+                    ))}
+                  </details>
+                </div>
+              );
+            })}
           </RadioGroup>
+          <p className="note">Install runs one npm command, shown to you first, at the version Toil UI was tested with. Nothing runs until you press Install in that window.</p>
           <details className="agent-advanced" data-advanced="">
             <summary>Advanced: models, program path and endpoint</summary>
             <fieldset className="agent-models">
@@ -180,7 +185,7 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
             </fieldset>
             {form.adapter !== 'none' && (
               <TextField className="field-text" value={form.cliPath ?? ''} onChange={(v) => setForm({ ...form, cliPath: v || null, cliPaths: { ...form.cliPaths, [form.adapter as Named]: v || undefined } })}>
-                <Label>{status.adapters.find((a) => a.name === form.adapter)?.label ?? form.adapter}'s CLI path (empty to use the one on PATH)</Label>
+                <Label>{status.adapters.find((a) => a.name === form.adapter)?.label ?? form.adapter}'s program location (empty to find it automatically)</Label>
                 <Input spellCheck={false} autoComplete="off" />
               </TextField>
             )}
@@ -201,18 +206,33 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
               <p className="note">Claude Code reads that cloud's own region and credentials from its environment, as it does on its own; Toil UI sets only the switch.</p>
             )}
           </details>
-          <div className="proposal-actions">
-            <Button type="submit" className="btn btn--accent" isDisabled={busy}>
-              Save
-            </Button>
-            <span className="note" role="status">
-              {saved}
-            </span>
-          </div>
-        </form>
-      </Card>
+        </>
+      )}
+    </Card>
+    {status && form && (
+      <>
+        <InstructionsCard
+          value={{ instructions: form.instructions, voice: form.voice }}
+          onChange={(w) => {
+            setForm({ ...form, ...w });
+            setSaved('');
+          }}
+          saved={status.settings}
+          toilProject={toilProject ?? null}
+          prompt={(style) => client.prompt(toilProject, style)}
+        />
+        <div className="proposal-actions">
+          <Button type="submit" className="btn btn--accent" isDisabled={busy}>
+            Save
+          </Button>
+          <span className="note" role="status">
+            {saved}
+          </span>
+        </div>
+      </>
     )}
-    {status && <InstructionsCard saved={status.settings} save={saveWords} toilProject={toilProject ?? null} prompt={(style) => client.prompt(toilProject, style)} />}
+    </form>
+    {installing && <InstallDialog adapter={installing} plan={installing.install} client={client} onClose={() => setInstalling(null)} onInstalled={() => void installed()} />}
     </>
   );
 }
@@ -223,47 +243,55 @@ export function AgentSettingsPreview() {
   return (
     <>
     <Card as="section" className="panel" aria-labelledby="agent-settings">
-      <h2 id="agent-settings">{plain.pw('Agent', 'AI helper')}</h2>
+      <h2 id="agent-settings">{plain.pw('Agent', 'AI agent')}</h2>
       <p className="note">
         {plain.text('The preview answers with a scripted agent. The local app answers with the one your organization approved: Claude, GitHub Copilot or Codex, each through its own program on your machine. You choose which one, its model and the program path here; no key is ever stored.')}
       </p>
     </Card>
     <AdaptersCard adapters={SAMPLE_ADAPTER_STATUS} client={null} />
-    <InstructionsCard
-      saved={{ instructions: null, voice: null }}
-      toilProject="card-payments"
-      disabled="This is the preview, so nothing is saved. Toil UI on your own machine keeps these in its data folder, in agent.json."
-      prompt={async (style, draft) => systemPrompt('card-payments', FIXTURE_NOW, promptStyle(style, draft))}
-    />
+    <PreviewInstructions />
     </>
   );
 }
 
 type Words = Pick<AgentSettings, 'instructions' | 'voice'>;
 
+/** The preview's copy of the card: it composes the prompt from what is typed, and saves nothing. */
+function PreviewInstructions() {
+  const [words, setWords] = useState<Words>({ instructions: null, voice: null });
+  return (
+    <InstructionsCard
+      value={words}
+      onChange={setWords}
+      toilProject="card-payments"
+      disabled="This is the preview, so nothing is saved."
+      prompt={async (style, draft) => systemPrompt('card-payments', FIXTURE_NOW, promptStyle(style, draft))}
+    />
+  );
+}
+
 /**
- * General instructions and a custom voice (#283), with a counter each, a
- * Save, and "Show the full prompt". `prompt` returns what the agent is sent
- * in the page's theme; the local app asks the server, which uses what was
- * saved, and the preview composes it from what is typed.
+ * General instructions and a custom voice (#283), with a counter each and
+ * "Show the full prompt". They have no Save of their own: they are part of the
+ * AI agent form and go with its one Save. `prompt` returns what the agent is
+ * sent in the page's theme; the local app asks the server, which uses what was
+ * saved (`saved`), and the preview composes it from what is typed.
  */
-export function InstructionsCard({ saved, save, prompt, disabled, toilProject }: { saved: Words; save?: (words: Words) => Promise<Words>; prompt: (style: AskStyle, draft: Words) => Promise<string>; disabled?: string; toilProject: string | null }) {
+export function InstructionsCard({ value, onChange, saved, prompt, disabled, toilProject }: { value: Words; onChange: (words: Words) => void; saved?: Words; prompt: (style: AskStyle, draft: Words) => Promise<string>; disabled?: string; toilProject: string | null }) {
   const theme = useTheme();
   const choice = useThemeChoiceContext();
   const style: AskStyle = { theme: theme.name, voice: voiceOn(theme, choice) };
-  const [instructions, setInstructions] = useState(saved.instructions ?? '');
-  const [voice, setVoice] = useState(saved.voice ?? '');
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState('');
+  const instructions = value.instructions ?? '';
+  const voice = value.voice ?? '';
   const [problem, setProblem] = useState<string | null>(null);
   const [shown, setShown] = useState<string | null>(null);
   const promptId = useId();
   const draft: Words = { instructions: instructions.trim() || null, voice: voice.trim() || null };
-  const dirty = (saved.instructions ?? '') !== instructions.trim() || (saved.voice ?? '') !== voice.trim();
+  const dirty = saved !== undefined && ((saved.instructions ?? '') !== instructions.trim() || (saved.voice ?? '') !== voice.trim());
   // An open prompt follows what it shows: the theme on screen and, where nothing is saved (the preview), what is typed.
   const open = useRef(false);
   open.current = shown !== null;
-  const live = save ? '' : `${draft.instructions ?? ''}\u0000${draft.voice ?? ''}`;
+  const live = saved ? '' : `${draft.instructions ?? ''}\u0000${draft.voice ?? ''}`;
   useEffect(() => {
     if (!open.current) return;
     let current = true;
@@ -276,29 +304,6 @@ export function InstructionsCard({ saved, save, prompt, disabled, toilProject }:
     };
     // prompt and draft are new each render; what the prompt depends on is the theme, the switch and the typed text.
   }, [style.theme, style.voice, live]);
-  const edit = (set: (v: string) => void) => (v: string) => {
-    set(v);
-    setNote('');
-  };
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!save) return;
-    setBusy(true);
-    setNote('');
-    try {
-      const next = await save(draft);
-      setInstructions(next.instructions ?? '');
-      setVoice(next.voice ?? '');
-      setProblem(null);
-      setNote('Saved: the next question uses them.');
-      if (shown !== null) setShown(await prompt(style, next));
-    } catch (err) {
-      setProblem(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const toggle = async () => {
     if (shown !== null) return setShown(null);
@@ -313,14 +318,14 @@ export function InstructionsCard({ saved, save, prompt, disabled, toilProject }:
   const voiceState = style.voice
     ? `Themed agent voice is on in ${theme.label}, so a custom voice here replaces ${theme.label}'s.`
     : theme.voice
-      ? 'Themed agent voice is off, so a custom voice is not used until you switch it on under Settings, General.'
+      ? 'Themed agent voice is off, so a custom voice is not used until you switch it on under Settings, Appearance.'
       : `${theme.label} has no voice, so a custom voice is not used in it. Pick a game theme to use one.`;
 
   return (
     <Card as="section" className="panel instructions" aria-labelledby="agent-instructions">
       <h2 id="agent-instructions">Instructions</h2>
       <p className="note">
-        Your own words for every answer. They come after toil's rules in the prompt, and the rules win where the two disagree: answers still cite their items, give figures as the data has them, and suggest changes only as proposals. Instructions can't widen what the agent can do, since its tools only read.
+        Your own words for every answer. They come after Toil's own rules, and the rules win where the two disagree: answers still cite their items, give figures as the data has them, and suggest changes only as proposals. Instructions can't widen what the AI agent can do, since it can only read.
       </p>
       {disabled && <p className="config-off">{disabled}</p>}
       {problem && (
@@ -328,29 +333,19 @@ export function InstructionsCard({ saved, save, prompt, disabled, toilProject }:
           {problem}
         </p>
       )}
-      <form className="agent-form" onSubmit={submit}>
-        <Counted label="General instructions" hint="For example: answer in British English, or lead with risks." value={instructions} onChange={edit(setInstructions)} />
-        <Counted label="Custom voice" hint={`Replaces the theme's voice while Themed agent voice is on. ${voiceState}`} value={voice} onChange={edit(setVoice)} />
-        <div className="proposal-actions">
-          {save && (
-            <Button type="submit" className="btn btn--accent" isDisabled={busy || !dirty}>
-              Save
-            </Button>
-          )}
-          <Button className="btn" onPress={() => void toggle()} aria-expanded={shown !== null} aria-controls={shown !== null ? promptId : undefined} data-full-prompt="">
-            {shown !== null ? 'Hide the full prompt' : 'Show the full prompt'}
-          </Button>
-          <span className="note" role="status">
-            {note}
-          </span>
-        </div>
-      </form>
+      <Counted label="General instructions" hint="For example: answer in British English, or lead with risks." value={instructions} onChange={(v) => onChange({ ...value, instructions: v })} />
+      <Counted label="Custom voice" hint={`Replaces the theme's voice while Themed agent voice is on. ${voiceState}`} value={voice} onChange={(v) => onChange({ ...value, voice: v })} />
+      <div className="proposal-actions">
+        <Button className="btn" onPress={() => void toggle()} aria-expanded={shown !== null} aria-controls={shown !== null ? promptId : undefined} data-full-prompt="">
+          {shown !== null ? 'Hide the full prompt' : 'Show the full prompt'}
+        </Button>
+      </div>
       {shown !== null && (
         <div className="full-prompt">
           <p className="note">
-            {save
-              ? `What the agent is sent now, in this theme, for a question about ${toilProject ?? 'a Toil project'}${toilProject ? ', the first Toil project toil lists' : ''}.${dirty ? ' Your unsaved changes are not in it until you save.' : ''}`
-              : `What the agent would be sent in this theme, for the sample Toil project ${toilProject ?? 'card-payments'}.`}
+            {saved
+              ? `What the AI agent is sent now, in this theme, for a question about ${toilProject ?? 'a Toil project'}.${dirty ? ' Your unsaved changes are not in it until you save.' : ''}`
+              : `What the AI agent would be sent in this theme, for the sample Toil project ${toilProject ?? 'card-payments'}.`}
           </p>
           <pre id={promptId} className="full-prompt__text" tabIndex={0} role="region" aria-label="The full prompt" data-scroller="">
             {shown}

@@ -420,7 +420,7 @@ describe('motion stays on the compositor', () => {
 
 describe('in the app', () => {
   it("previews the theme's moments from one menu under Settings, General, the loading screen as it would be", async () => {
-    window.location.hash = '#/settings/toil';
+    window.location.hash = '#/settings/appearance';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     const menu = async () => {
       await userEvent.click(await screen.findByRole('button', { name: "Preview the theme's moments" }));
@@ -438,14 +438,22 @@ describe('in the app', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
-  it('sets Theme motion and toil tips under Settings, General, and says when reduced motion holds it off', async () => {
-    window.location.hash = '#/settings/toil';
+  it('sets Motion and toil tips under Settings, Appearance, and the one Motion setting turns everything off', async () => {
+    window.location.hash = '#/settings/appearance';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Toil tips on loading screens' }));
     expect(localStorage.getItem('toil-ui.tips')).toBe('off');
-    expect(document.querySelector('#theme-motion-note')).toBeNull();
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Reduce motion and effects' }));
-    expect(screen.getByText(/^Off for now: Reduce motion and effects is ticked/)).toBeTruthy();
+    // One select where there were three controls; its stored settings keep their old keys.
+    expect(screen.queryByRole('checkbox', { name: /Reduce motion/ })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: /Particles/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Motion/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Subtle' }));
+    expect(localStorage.getItem('toil-ui.theme-motion')).toBe('subtle');
+    expect(localStorage.getItem('toil-ui.motion')).toBe('full');
+    await userEvent.click(screen.getByRole('button', { name: /Motion/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Off' }));
+    expect(localStorage.getItem('toil-ui.motion')).toBe('reduced');
+    expect(screen.getByText(/^Nothing moves/)).toBeTruthy();
     expect(document.documentElement.dataset.themeMotion).toBe('off');
     await userEvent.click(screen.getByRole('button', { name: "Preview the theme's moments" }));
     expect(screen.getByRole('menuitem', { name: 'Moment: Done' }).getAttribute('aria-disabled')).toBe('true');

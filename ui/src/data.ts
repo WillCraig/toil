@@ -15,6 +15,7 @@ import type { ToilProjectData } from './load.ts';
 import { prepare, type Prepared } from './model/insights.ts';
 import { health, type Health } from './model/sprint.ts';
 import type { Change, Execute, WorkItem } from './toil.ts';
+import type { WorklogApi } from './worklog.ts';
 
 /**
  * What the Command Center hands #293's start action: the ready items in the
@@ -56,6 +57,8 @@ export interface Data {
   startReady?: StartReady;
   /** Starts a sync, where the local app keeps a cache: the action an empty panel that a sync fills offers (#417). Absent in the preview. */
   sync?: () => void;
+  /** The worklog (#308), which the Summary's stand-up card reads through; absent where nothing keeps one. */
+  worklog?: WorklogApi;
 }
 
 export const DataContext = createContext<Data | null>(null);

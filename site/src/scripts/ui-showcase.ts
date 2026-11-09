@@ -3,12 +3,12 @@
 // that theme, and the view buttons open a view in the frame. The frame is
 // the real app from the same origin, so for a few views this script also
 // presses what a visitor would (opens the chat, asks one of the plain
-// questions, opens the agent switcher, types a request no ticket covers), by the
+// questions, opens the agent switcher), by the
 // controls' visible names, which no theme renames. If the app ever moves a
 // control, the view still opens and the caption says what to press: the
 // tour degrades to a signpost, which is what most tours are anyway.
 
-type Act = '' | 'board' | 'ask' | 'switcher' | 'ticket';
+type Act = '' | 'board' | 'ask' | 'switcher';
 
 const root = document.querySelector<HTMLElement>('[data-uix]');
 const frame = document.querySelector<HTMLIFrameElement>('[data-frame]');
@@ -104,16 +104,7 @@ if (root && frame) {
       ((await find<HTMLButtonElement>(`${starters}[data-question="finish"]`, () => true, 3000)) ?? (await find<HTMLButtonElement>(starters)))?.click();
     } else if (kind === 'switcher') {
       if (!(await chat()) || !current()) return;
-      (await find<HTMLButtonElement>('[role="dialog"] button', (b) => /change the (agent|AI helper)/.test(b.textContent ?? '')))?.click();
-    } else if (kind === 'ticket') {
-      if (!(await chat()) || !current()) return;
-      const field = await find<HTMLInputElement>('[role="dialog"] form.ask-form input');
-      if (!field || !current()) return;
-      // React reads a typed value from the input event, so set it the way typing would.
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, 'Tokenise the card numbers at the edge of the gateway');
-      field.dispatchEvent(new Event('input', { bubbles: true }));
-      await wait(50);
-      if (current()) field.form?.requestSubmit();
+      (await find<HTMLButtonElement>('[role="dialog"] button', (b) => /change the (agent|AI agent)/.test(b.textContent ?? '')))?.click();
     }
   }
 

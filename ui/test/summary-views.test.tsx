@@ -5,7 +5,8 @@ import { App } from '../src/App.tsx';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureAnalyses } from '../src/fixtures/analyses.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
-import { resetPlain, setPlain } from '../src/plain-words.ts';
+import { fixtureWorklog } from '../src/fixtures/worklog.ts';
+import type { WorklogApi } from '../src/worklog.ts';
 import { setPrefs } from '../src/briefing-prefs.ts';
 
 /**
@@ -16,11 +17,9 @@ import { setPrefs } from '../src/briefing-prefs.ts';
 
 beforeEach(() => {
   localStorage.clear();
-  resetPlain();
 });
 afterEach(() => {
   cleanup();
-  resetPlain();
 });
 
 // A Jira key (PAY-101) or an Azure DevOps id (2303): what a headline must not carry.
@@ -75,7 +74,7 @@ describe('the answer first', () => {
     const meta = region.querySelector('.briefing__meta')!;
     expect(fold.contains(meta)).toBe(false);
     expect(meta.textContent).not.toContain('day 7 of 10');
-    expect(meta.textContent).toContain('Written by an AI helper');
+    expect(meta.textContent).toContain('Written by an AI agent');
     expect(fold.contains(region.querySelector('nav.briefing__links'))).toBe(false);
   });
 
@@ -127,19 +126,64 @@ describe('what needs attention', () => {
   });
 });
 
-describe('both word modes', () => {
-  it('says code review in plain words and pull request in standard, with the same facts', async () => {
-    setPlain(true);
-    const plainRegion = await open('card-payments');
-    const plainReview = plainRegion.querySelector('.sum-card[data-card="review"]')!.textContent!;
-    const plainAnswer = plainRegion.querySelector('[data-answer]')!.textContent;
-    expect(plainReview).toContain('The code review for');
-    cleanup();
-    setPlain(false);
-    const standardRegion = await open('card-payments');
-    const standardReview = standardRegion.querySelector('.sum-card[data-card="review"]')!.textContent!;
-    expect(standardReview).toContain('The pull request for');
-    expect(standardReview.replace('pull request', 'code review')).toBe(plainReview);
-    expect(standardRegion.querySelector('[data-answer]')!.textContent).toBe(plainAnswer);
+describe('plain words', () => {
+  it('says code review, with the same facts as the data', async () => {
+    const region = await open('card-payments');
+    expect(region.querySelector('.sum-card[data-card="review"]')!.textContent!).toContain('The code review for');
+  });
+});
+
+describe('the stand-up on the Summary', () => {
+  async function withLog(api: WorklogApi | undefined, sync?: () => void) {
+    window.location.hash = '#/project/card-payments';
+    render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview worklog={api} {...(sync ? { onSync: sync } : {})} />);
+    return screen.findByRole('region', { name: 'Briefing' });
+  }
+
+  it('shows the default range, five lines, and Show more expands in place', async () => {
+    const region = await withLog(fixtureWorklog());
+    const card = await waitFor(() => {
+      const c = region.querySelector('[data-standup-card]') as HTMLElement;
+      expect(c.querySelectorAll('li').length).toBeGreaterThan(0);
+      return c;
+    });
+    expect(within(card).getByRole('heading', { name: 'Stand-up' })).toBeTruthy();
+    expect(card.querySelector('[data-standup-range]')!.textContent).toBe('Yesterday');
+    expect(card.querySelectorAll('li').length).toBe(5);
+    expect(within(card).getByRole('link', { name: 'Open the full stand-up' }).getAttribute('href')).toBe('#/project/card-payments/worklog/standup');
+    // Right under the answer and the needs-attention cards, before the fold.
+    const order = [...region.children].map((c) => c.getAttribute('data-standup-card') !== null ? 'card' : c.matches('details[data-full-briefing]') ? 'full' : '');
+    expect(order.indexOf('card')).toBeGreaterThan(-1);
+    expect(order.indexOf('card')).toBeLessThan(order.indexOf('full'));
+    await userEvent.click(within(card).getByRole('button', { name: /^Show more/ }));
+    expect(card.querySelectorAll('li').length).toBeGreaterThan(5);
+    expect(within(card).getByRole('button', { name: 'Show less' })).toBeTruthy();
+    expect(within(region).getByRole('navigation', { name: /^More on/ }).textContent).toContain('Stand-up');
+    expect(within(region).getByRole('link', { name: 'Stand-up' }).getAttribute('href')).toBe('#/project/card-payments/worklog/standup');
+  });
+
+  it('says not read yet, with Sync now, when no sync has read the days, and never nothing happened', async () => {
+    const sample = fixtureWorklog();
+    const api: WorklogApi = { ...sample, standup: async (d, f, t) => {
+      const r = await sample.standup(d, f, t);
+      return { ...r, report: { ...r.report, asOf: null, team: [], people: [], facts: 0 } };
+    } };
+    const synced: string[] = [];
+    const region = await withLog(api, () => synced.push('sync'));
+    const card = await waitFor(() => {
+      const c = region.querySelector('[data-standup-card]') as HTMLElement;
+      expect(c.querySelector('[data-not-read]')).toBeTruthy();
+      return c;
+    });
+    expect(card.querySelector('[data-not-read]')!.textContent).toContain('–');
+    expect(card.textContent).not.toMatch(/nothing (happened|recorded)/i);
+    await userEvent.click(within(card).getByRole('button', { name: 'Sync now' }));
+    expect(synced).toEqual(['sync']);
+  });
+
+  it('is absent where no worklog is kept', async () => {
+    const region = await withLog(undefined);
+    await waitFor(() => expect(region.querySelector('[data-answer]')).toBeTruthy());
+    expect(region.querySelector('[data-standup-card]')).toBeNull();
   });
 });

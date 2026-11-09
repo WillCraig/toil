@@ -219,6 +219,22 @@
     ]
   },
   {
+    "name": "project status",
+    "tool": "github_project_status",
+    "description": "Set the Status of an issue or pull request on a project (move it between the board's columns)",
+    "writes": true,
+    "connection": true,
+    "flags": [
+      "[project]",
+      "[number]",
+      "--item <id>",
+      "--to <status>",
+      "--owner <owner>",
+      "--repo <repo>",
+      "--allow-write"
+    ]
+  },
+  {
     "name": "pr list",
     "tool": "github_pr_list",
     "description": "List pull requests",

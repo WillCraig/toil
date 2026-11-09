@@ -17,6 +17,7 @@ import type { RequestContext } from './context.ts';
 import type { StyleChoice } from './agents/voices.ts';
 import type { ChatTurn } from '../src/model-usage.ts';
 import type { ChatSession } from '../src/fingerprint.ts';
+import type { GuideRequest } from '../src/guide.ts';
 
 export type { Answer, Starter } from '../src/agent.ts';
 
@@ -35,6 +36,8 @@ export interface Agent {
   session?(chat: string): Promise<ChatSession | null>;
   /** Records what a chat starts on now (#305); refused while it answers. */
   renew?(chat: string, toilProject: string): Promise<ChatSession>;
+  /** One question to the setup guide (#561), streamed. Refuses a message that looks like a secret before anything runs. Absent: no guide. */
+  guide?(ctx: RequestContext, request: GuideRequest, style?: StyleChoice | null, history?: ReadonlyArray<{ prompt: string; answer: string; by?: string }>): AsyncIterable<Answer>;
 }
 
 /** The preview's scripted Agent: canned answers about the sample toil projects. */
@@ -45,6 +48,7 @@ export function fixtureAgent(): Agent {
     starters: async (_ctx, toilProject) => scripted.starters(toilProject),
     ask: (_ctx, toilProject, prompt, style, chat) => scripted.ask(toilProject, prompt, style ?? undefined, chat),
     adapterOptions: () => SAMPLE_ADAPTERS,
+    guide: (_ctx, request) => scripted.guide!(request),
   };
 }
 

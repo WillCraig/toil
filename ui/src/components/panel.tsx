@@ -11,59 +11,52 @@ import { Card } from './layout.tsx';
 import { useSkins } from '../skins.tsx';
 import type { Call } from '../toil.ts';
 import { sourceLabel } from '../format.ts';
-import { usePlain } from '../plain-words.ts';
 
-/** `toil jira issue history` ×8: each command once, with how many calls it took. */
-export function commandsOf(calls: Call[]): Array<{ command: string; count: number }> {
-  const out: Array<{ command: string; count: number }> = [];
+/** The tool a call read from, by name: `jira issue search` is Jira, `projects show` is the saved Toil project settings. */
+const toolOf = (command: string): string => {
+  const area = command.split(' ')[0]!;
+  return sourceLabel(area);
+};
+
+const isSettingsRead = (command: string) => ['projects', 'toilProjects'].includes(command.split(' ')[0]!);
+
+/** Each tool the calls read from, once, with how many reads it took and how many of them failed. */
+export function toolsOf(calls: Call[]): Array<{ tool: string; reads: number; failed: number }> {
+  const out: Array<{ tool: string; reads: number; failed: number }> = [];
   for (const c of calls) {
-    const seen = out.find((x) => x.command === c.command);
-    if (seen) seen.count++;
-    else out.push({ command: c.command, count: 1 });
+    // Reading the saved Toil project is how the page knows what to show, not where its numbers come from.
+    if (isSettingsRead(c.command)) continue;
+    const tool = toolOf(c.command);
+    const seen = out.find((x) => x.tool === tool);
+    const row = seen ?? { tool, reads: 0, failed: 0 };
+    row.reads++;
+    if (!c.ok) row.failed++;
+    if (!seen) out.push(row);
   }
   return out;
 }
 
-/** The tools a list of commands read from, by name: `jira issue search` is Jira, `projects show` is the saved Toil project settings. */
-export function toolsOf(commands: Array<{ command: string }>): string[] {
-  const names = commands.map((c) => {
-    const area = c.command.split(' ')[0]!;
-    return area === 'toilProjects' ? 'your saved Toil projects' : sourceLabel(area);
-  });
-  return [...new Set(names)];
-}
-
 const sentence = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 
+/** Where a panel's numbers came from, in plain words: the tools it read, behind one line; a failed read stays on screen (principle 4). */
 export function Sources({ calls, alerts = true }: { calls: Call[]; alerts?: boolean }) {
-  const plain = usePlain();
-  if (!calls.length) return null;
-  const commands = commandsOf(calls);
-  const commandList = commands.map((c, i) => (
-    <span key={c.command}>
-      {i > 0 && ', '}
-      <code>toil {c.command}</code>
-      {c.count > 1 && ` ×${c.count}`}
-    </span>
-  ));
-  const failed = alerts ? calls.filter((c) => !c.ok) : [];
+  const tools = toolsOf(calls);
+  if (!tools.length) return null;
+  const failed = alerts ? tools.filter((t) => t.failed > 0) : [];
   return (
     <>
-      {failed.map((c, i) => (
-        <p key={i} role="alert" className="failure">
-          <code>toil {c.command}</code> failed: {c.error}
+      {failed.map((t) => (
+        <p key={t.tool} role="alert" className="failure">
+          Reading {t.tool} failed{t.failed > 1 ? ` ${t.failed} times` : ''}: {calls.find((c) => !c.ok && toolOf(c.command) === t.tool)?.error}
         </p>
       ))}
       <details className="fed-by">
-        <summary>{plain.on ? `From ${sentence(toolsOf(commands))}` : <>Fed by {commandList}</>}</summary>
-        {plain.on && <p className="note">The exact toil commands that read it: {commandList}.</p>}
+        <summary>From {sentence(tools.map((t) => t.tool))}</summary>
         <ul className="plain calls">
-          {calls.map((c, i) => (
-            <li key={i}>
-              <code className="call">
-                execute({JSON.stringify(c.command)}, {JSON.stringify(c.input)})
-              </code>
-              {!c.ok && <span className="failure"> (failed)</span>}
+          {tools.map((t) => (
+            <li key={t.tool}>
+              {t.tool}: {t.reads} {t.reads === 1 ? 'read' : 'reads'}
+              {t.failed > 0 && <span className="failure"> ({t.failed} failed)</span>}
             </li>
           ))}
         </ul>

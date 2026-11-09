@@ -3,9 +3,9 @@ import { join, relative } from 'node:path';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.tsx';
-import { FirstRun, firstRunShows, SAMPLE_COMMAND, TRACKER_AREAS } from '../src/components/first-run.tsx';
+import { FirstRun, firstRunShows, TRACKER_AREAS } from '../src/components/first-run.tsx';
 import { ageText, paletteEntries, paletteResults, staleNote, STALE_AFTER_MS, type EntriesInput } from '../src/components/palette.tsx';
 import type { ConfigApi } from '../src/config.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
@@ -17,7 +17,6 @@ import { fuzzyRank, fuzzyScore } from '../src/fuzzy.ts';
 import { ariaKeys, keysText, matches, SHORTCUTS, typingIn } from '../src/shortcuts.ts';
 import type { Envelope } from '../src/toil.ts';
 import { loaded } from './harness.ts';
-import { standardWords } from './words.ts';
 
 /**
  * The first run, the command palette and the shortcuts sheet (#416): the
@@ -26,7 +25,6 @@ import { standardWords } from './words.ts';
  * three in the App against the fixture execute().
  */
 
-beforeEach(standardWords);
 
 const press = (key: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(window, { key, ...init });
 const openPalette = async () => {
@@ -145,14 +143,14 @@ describe('the palette entries', () => {
     expect(found[0]!.entries[0]!.id).toBe(hit.id);
     // Tabs: every toil project's seven, the one on screen's alone with nothing typed.
     expect(entries.filter((e) => e.group === 'tabs')).toHaveLength(14);
-    expect(paletteResults(entries, '', 'settlement').find((g) => g.group === 'tabs')!.entries.map((e) => e.label)).toEqual(['Overview', 'Board', 'Dependencies', 'Pull requests', 'People', 'Worklog', 'Analyses']);
+    expect(paletteResults(entries, '', 'settlement').find((g) => g.group === 'tabs')!.entries.map((e) => e.label)).toEqual(['Summary', 'Board', 'What blocks what', 'Code reviews', 'People', 'What happened', 'Past briefings']);
   });
 
   it('offers Ask, Analyze, Assign and the agents only on a Toil project page, and Sync only where there is a cache', async () => {
     const card = (await loaded('card-payments')).data;
     const item = card.items[0]!;
     const off = paletteEntries(base({ toilProjects: ['card-payments'], loaded: { 'card-payments': { ok: true, value: card } } })).filter((e) => e.group === 'commands').map((e) => e.id);
-    expect(off).toEqual(['cmd:plain-words', 'cmd:shortcuts']);
+    expect(off).toEqual(['cmd:setup', 'cmd:new-project', 'cmd:find-fields', 'cmd:shortcuts']);
     const on = paletteEntries(
       base({
         route: { view: 'dashboard', toilProject: 'card-payments', tab: 'board' },
@@ -165,9 +163,18 @@ describe('the palette entries', () => {
         adapters: { chosen: 'codex', options: [{ name: 'codex', label: 'Codex', model: null, ready: true, problem: null, fix: null, action: null }, { name: 'claude', label: 'Claude', model: 'haiku', ready: false, problem: 'Not installed', fix: null, action: 'install' }] },
       }),
     ).filter((e) => e.group === 'commands');
-    expect(on.map((e) => e.label)).toEqual(['Sync now', 'Ask about card-payments', 'Analyze card-payments', 'Open the Agents panel', 'Review a pull request', 'Ship: answer a review', 'Diagram card-payments', `Assign ${shortKey(item)} to an agent`, 'Answer with Codex', 'Choose the default agent', 'Use plain words', 'Keyboard shortcuts']);
+    expect(on.map((e) => e.label)).toEqual(['Sync now', 'Ask about card-payments', 'Get a briefing on card-payments', 'Open the AI agents panel', 'Check a code change', 'Answer the review of my code change', 'Draw the architecture of card-payments', `Give ${shortKey(item)} to an AI agent`, 'Answer with Codex', 'Choose the default AI agent', 'Set up toil, step by step', 'Create a Toil project', 'Find your Jira fields', 'Keyboard shortcuts']);
     expect(on.find((e) => e.id === 'cmd:job:diagram')!.go).toEqual({ href: '#/project/card-payments/job/diagram' });
     expect(on.find((e) => e.id === 'cmd:agent:codex')!.go).toEqual({ command: { kind: 'agent', name: 'codex', label: 'Codex' } });
+  });
+
+  it('opens the stand-up from a Toil project page that keeps a worklog, and offers nothing without one', async () => {
+    const card = (await loaded('card-payments')).data;
+    const x = { route: { view: 'dashboard' as const, toilProject: 'card-payments' }, toilProjects: ['card-payments'], loaded: { 'card-payments': { ok: true as const, value: card } } };
+    const withLog = paletteEntries(base({ ...x, hasWorklog: true })).find((e) => e.id === 'cmd:standup');
+    expect(withLog!.label).toBe('Open the stand-up');
+    expect(withLog!.go).toEqual({ href: '#/project/card-payments/worklog/standup' });
+    expect(paletteEntries(base(x)).some((e) => e.id === 'cmd:standup')).toBe(false);
   });
 });
 
@@ -205,7 +212,7 @@ describe('the palette in the App', () => {
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Command palette' })).toBeNull());
     dialog = await openPalette();
-    await userEvent.click(within(dialog).getByRole('menuitem', { name: /^Analyze card-payments/ }));
+    await userEvent.click(within(dialog).getByRole('menuitem', { name: /^Get a briefing on card-payments/ }));
     expect(await screen.findByRole('dialog', { name: /card-payments/ }, { timeout: 3000 })).toBeTruthy();
   }, 20_000);
 
@@ -268,11 +275,9 @@ describe('the first run', () => {
     expect(steps[0]!.textContent).toContain('ci-jira');
     expect(steps[0]!.textContent).not.toContain('builds');
     expect(steps[1]!.textContent).toContain('Not done yet');
-    expect(within(steps[1]!).getByRole('link', { name: 'Create a Toil project' }).getAttribute('href')).toBe('#/settings/projects/+new');
+    expect(within(steps[1]!).getByRole('link', { name: 'Create a Toil project' }).getAttribute('href')).toBe('#/new-project');
     expect(within(steps[2]!).getByRole('button', { name: 'Sync now' })).toHaveProperty('disabled', true);
-    expect(within(region).getByText(SAMPLE_COMMAND)).toBeTruthy();
-    expect(within(region).getByRole('button', { name: 'Copy sample data command' })).toBeTruthy();
-    expect(within(region).getByRole('button', { name: 'About the sample data' })).toBeTruthy();
+    expect(within(region).queryByText(/npx /)).toBeNull();
     expect(asked).toBe(0);
     const result = await axe.run(container, { rules: { 'color-contrast': { enabled: false } }, resultTypes: ['violations'] });
     expect(result.violations.map((v) => v.id)).toEqual([]);
@@ -294,7 +299,7 @@ describe('the first run', () => {
     expect(screen.queryByRole('region', { name: 'Get started' })).toBeNull();
   });
 
-  it('lands the add link on the add form, and the create link on Create a Toil project', async () => {
+  it("lands the add link on the add form, and the old create address in the New Toil project wizard", async () => {
     window.location.hash = '#/settings/connections/+add';
     const view = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     await waitFor(() => expect(document.activeElement?.id).toBe('conn-add'), { timeout: 3000 });
@@ -302,7 +307,8 @@ describe('the first run', () => {
     view.unmount();
     window.location.hash = '#/settings/projects/+new';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
-    await waitFor(() => expect(document.activeElement?.id).toBe('toil-project-change'), { timeout: 3000 });
+    await screen.findByRole('heading', { level: 1, name: 'Name it' }, { timeout: 3000 });
+    expect(window.location.hash).toBe('#/new-project');
     expect(screen.queryByText(/toil sees no Toil project named/)).toBeNull();
   });
 });

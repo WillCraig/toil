@@ -86,13 +86,15 @@ for (const old of Object.keys(REDIRECTS)) if (!fileFor(old)) problems.push(`${ol
 
 // The toil map (#432) reaches everything /connect/ lists: every page under
 // /connect/ is a node on /map/, so an area with a page and no node fails here.
+// A reference page that lives under /connect/ but isn't a service toil reaches has no node: the credential scopes page.
+const NOT_A_SERVICE = new Set(['/connect/connections/']);
 const mapFile = fileFor('/map/');
 if (!mapFile) problems.push('/map/: the build made no map page');
 else {
   const onMap = new Set([...readFileSync(mapFile, 'utf8').matchAll(/<a\b[^>]*?\shref="([^"#]*)/g)].map((m) => m[1]));
   for (const file of pages) {
     const path = pathOf(file);
-    if (path.startsWith('/connect/') && path !== '/connect/' && !isRedirect(path) && !onMap.has(`${BASE}${path}`)) problems.push(`/map/: no node links to ${path}`);
+    if (path.startsWith('/connect/') && path !== '/connect/' && !NOT_A_SERVICE.has(path) && !isRedirect(path) && !onMap.has(`${BASE}${path}`)) problems.push(`/map/: no node links to ${path}`);
   }
 }
 

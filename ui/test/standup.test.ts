@@ -277,3 +277,13 @@ describe('the sample', () => {
     }
   });
 });
+
+describe('sinceText', () => {
+  it('says yesterday, the weekday since, today, or the dates of a range that isn\x27t the default', async () => {
+    const { sinceText } = await import('../src/model/standup.ts');
+    expect(sinceText({ from: '2026-10-12', to: '2026-10-13' }, '2026-10-13')).toBe('Yesterday');
+    expect(sinceText({ from: '2026-10-09', to: '2026-10-12' }, '2026-10-12')).toBe('Since Friday (9 Oct 2026)');
+    expect(sinceText({ from: '2026-10-13', to: '2026-10-13' }, '2026-10-13')).toBe('Today');
+    expect(sinceText({ from: '2026-10-01', to: '2026-10-02' }, '2026-10-13')).toBe('1 Oct 2026 to 2 Oct 2026');
+  });
+});

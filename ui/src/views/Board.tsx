@@ -44,7 +44,7 @@ import { ProposalCard } from '../components/proposal.tsx';
 import { AssignModal } from '../assign/views.tsx';
 import { useData, useDerived } from '../data.ts';
 import { STATUS_CATEGORY_LABEL, estimateText, itemHref, peekHref, personText, shortKey, sourceLabel } from '../format.ts';
-import { columns, proposeMove } from '../model/board.ts';
+import { canMove, columns, proposeMove } from '../model/board.ts';
 import { flagsAttention, insights, type Prepared } from '../model/insights.ts';
 import type { Proposal } from '../proposal.ts';
 import { ariaKeys, matches } from '../shortcuts.ts';
@@ -67,6 +67,9 @@ class MouseSensor extends PointerSensor {
     },
   ];
 }
+
+/** How many cards a column shows before "Show N more": finished work piles up fastest, so it shows the fewest. */
+const COLUMN_LIMIT: Record<string, number> = { DONE: 10 };
 
 /** A hold this long picks a card up by touch; moving further than the tolerance first is a scroll. */
 const TOUCH_HOLD = { delay: 250, tolerance: 8 };
@@ -125,7 +128,7 @@ function CardFace({ item, ids }: { item: WorkItem; ids?: string }) {
             <span className="sr-only">Needs attention</span>
           </span>
         )}
-        <StatusChip category={item.statusCategory} status={item.status} />
+        <StatusChip category={item.statusCategory} status={item.status} inColumn />
       </div>
       <p id={ids && `${ids}-title`} className="card-title">
         {item.title}
@@ -213,7 +216,9 @@ export const columnSteps =
 function Card({ item, others, onMove, menuOpen, setMenuOpen }: { item: WorkItem; others: StatusCategory[]; onMove: (to: StatusCategory) => void; menuOpen: boolean; setMenuOpen: (open: boolean) => void }) {
   const { toilProject, assignments } = useData();
   const { insights: prepared } = useDerived();
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({ id: item.id, attributes: { role: 'group', roleDescription: 'draggable card' } });
+  // Decided up front, by the rule the proposal uses: a card that can't be moved isn't draggable, and says why.
+  const can = canMove(item);
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({ id: item.id, disabled: !can.ok, attributes: { role: 'group', ...(can.ok ? { roleDescription: 'draggable card' } : {}) } });
   const [assigning, setAssigning] = useState(false);
   const grip = useRef<HTMLDivElement | null>(null);
   const ids = useId();
@@ -267,21 +272,29 @@ function Card({ item, others, onMove, menuOpen, setMenuOpen }: { item: WorkItem;
         {...attributes}
         {...listeners}
         aria-labelledby={`${ids}-key ${ids}-title`}
+        aria-describedby={can.ok ? attributes['aria-describedby'] : `${ids}-why`}
+        aria-roledescription={can.ok ? attributes['aria-roledescription'] : undefined}
         aria-keyshortcuts={ariaKeys('cardMenu')}
+        data-immovable={can.ok ? undefined : ''}
         onKeyDown={onKeyDown}
         onContextMenu={onContextMenu}
         onClick={onClick}
       >
         <CardFace item={item} ids={ids} />
+        {!can.ok && (
+          <p id={`${ids}-why`} className="card-why" data-why-immovable>
+            {can.reason}
+          </p>
+        )}
       </div>
       {/* Outside the card's own element: a portal's events still bubble through React, and a press in the menu must not start a drag. */}
       <Popover triggerRef={grip} isOpen={menuOpen} onOpenChange={closeMenu} placement="bottom start" className="popover">
-        <Menu className="menu" aria-label={`${key} ${item.title}`} autoFocus="first" onAction={onAction}>
+        <Menu className="menu" aria-label={`${key} ${item.title}`} autoFocus="first" onAction={onAction} disabledKeys={can.ok ? [] : others}>
           <MenuItem id="open" className="menu-item">
             Open
           </MenuItem>
           <MenuSection>
-            <Header className="menu-header">Move to</Header>
+            <Header className="menu-header">{can.ok ? 'Move to' : can.reason}</Header>
             {others.map((c) => (
               <MenuItem key={c} id={c} className="menu-item">
                 {label(c)}
@@ -290,7 +303,7 @@ function Card({ item, others, onMove, menuOpen, setMenuOpen }: { item: WorkItem;
           </MenuSection>
           {assignments ? (
             <MenuItem id="assign" className="menu-item">
-              Assign to an agent…
+              Give to an AI agent…
             </MenuItem>
           ) : null}
         </Menu>
@@ -308,6 +321,11 @@ function Column({ category, items, all, onMove, menuFor, setMenuFor, ghosts, onU
   const dragged = active ? byId.get(String(active.id)) : undefined;
   // Under the pointer: a target, or refused (its own column), whose reason the copy under the pointer gives.
   const drop = isOver && dragged ? (dropVerdict(dragged, category).ok ? ' column--over' : ' column--refused') : '';
+  // A long column is a wall: the first cards show, the rest are one press away, and the count in the heading stays the whole.
+  const [more, setMore] = useState(false);
+  const limit = COLUMN_LIMIT[category] ?? 25;
+  const hiding = !more && items.length > limit ? items.length - limit : 0;
+  const visible = hiding ? items.slice(0, limit) : items;
   return (
     <section ref={setNodeRef} className={`column column--${category.toLowerCase()}${drop}`} aria-labelledby={id}>
       <h3 id={id}>
@@ -318,7 +336,7 @@ function Column({ category, items, all, onMove, menuFor, setMenuFor, ghosts, onU
           {ghosts.map((g) => (
             <Ghost key={g.move.proposal.id} item={g.item} move={g.move} onUndo={() => onUndo(g.move)} onShow={() => onShow(g.move)} />
           ))}
-          {items.map((item) => (
+          {visible.map((item) => (
             <Card
               key={item.id}
               item={item}
@@ -330,6 +348,11 @@ function Column({ category, items, all, onMove, menuFor, setMenuFor, ghosts, onU
           ))}
         </ul>
       ) : null}
+      {hiding > 0 && (
+        <Button className="btn btn--small column__more" onPress={() => setMore(true)} data-show-more={category}>
+          Show {hiding} more<span className="sr-only"> in {label(category)}</span>
+        </Button>
+      )}
       {items.length ? null : <p className="note">{words('empty.column')}</p>}
     </section>
   );

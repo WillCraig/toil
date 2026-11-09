@@ -59,6 +59,8 @@ export interface JiraCloudSprint {
   startDate?: string;
   endDate?: string;
   goal?: string;
+  originBoardId?: number;
+  [key: string]: unknown;
 }
 
 /** A key or id as one path segment, encoded, so `PROJ-1/comment` can't change which endpoint is called. */
@@ -397,6 +399,48 @@ export async function listSprintsForProject(ctx: JiraCloudContext, project: stri
 // POST /rest/agile/1.0/sprint/{sprintId}/issue
 export async function setSprint(ctx: JiraCloudContext, sprintId: number, issueKeys: string[]): Promise<void> {
   await jiraCloud<void>(ctx, `${AGILE_API}/sprint/${seg(sprintId)}/issue`, { method: 'POST', body: { issues: issueKeys } });
+}
+
+export interface SprintFields {
+  name?: string;
+  goal?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+// GET /rest/agile/1.0/sprint/{sprintId}
+export function getSprint(ctx: JiraCloudContext, sprintId: number): Promise<JiraCloudSprint> {
+  return jiraCloud<JiraCloudSprint>(ctx, `${AGILE_API}/sprint/${seg(sprintId)}`);
+}
+
+// POST /rest/agile/1.0/sprint: a new sprint is always future until it is started.
+export function createSprint(ctx: JiraCloudContext, boardId: number, fields: SprintFields & { name: string }): Promise<JiraCloudSprint> {
+  return jiraCloud<JiraCloudSprint>(ctx, `${AGILE_API}/sprint`, { method: 'POST', body: { originBoardId: boardId, ...fields } });
+}
+
+// POST /rest/agile/1.0/sprint/{sprintId}: the partial update, so only what is sent changes (PUT would blank the rest).
+export function updateSprint(ctx: JiraCloudContext, sprintId: number, fields: SprintFields & { state?: 'active' | 'closed' }): Promise<JiraCloudSprint> {
+  return jiraCloud<JiraCloudSprint>(ctx, `${AGILE_API}/sprint/${seg(sprintId)}`, { method: 'POST', body: fields });
+}
+
+// GET /rest/agile/1.0/sprint/{sprintId}/issue?jql=, every page: the keys of the issues still open.
+export async function listOpenSprintIssueKeys(ctx: JiraCloudContext, sprintId: number): Promise<string[]> {
+  const issues = await every<{ key: string }>(ctx, `Jira Cloud issues in sprint ${sprintId}`, 'issues', (paging) =>
+    jiraCloud(ctx, `${AGILE_API}/sprint/${seg(sprintId)}/issue`, { query: { ...paging, jql: 'statusCategory != Done', fields: 'summary' } }),
+  );
+  return issues.map((issue) => issue.key);
+}
+
+// POST /rest/agile/1.0/backlog/issue, which takes at most 50 issues a call.
+export async function moveToBacklog(ctx: JiraCloudContext, issueKeys: string[]): Promise<void> {
+  for (let i = 0; i < issueKeys.length; i += 50) {
+    await jiraCloud<void>(ctx, `${AGILE_API}/backlog/issue`, { method: 'POST', body: { issues: issueKeys.slice(i, i + 50) } });
+  }
+}
+
+/** setSprint in batches of 50, the most Jira takes in one call. */
+export async function setSprintBatched(ctx: JiraCloudContext, sprintId: number, issueKeys: string[]): Promise<void> {
+  for (let i = 0; i < issueKeys.length; i += 50) await setSprint(ctx, sprintId, issueKeys.slice(i, i + 50));
 }
 
 // POST /rest/api/3/issue/{issueIdOrKey}/worklog, with the comment as ADF.

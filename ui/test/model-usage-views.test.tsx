@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
-import { standardWords } from './words.ts';
 import type { Agent, Answer } from '../src/agent.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureConfig } from '../src/fixtures/config.ts';
@@ -15,7 +14,7 @@ import { addUp, compact, type ChatTurn, type ModelUsageApi, type UsageSettings, 
 /**
  * The agent's model usage on screen (#295): the footer under each answer and
  * the chat's running total, against a stubbed Agent whose answers carry
- * usage as each adapter would report it, and Settings, Agent usage on the
+ * usage as each adapter would report it, and Settings, Usage on the
  * preview's sample month. The figures shown are recomputed here from the
  * same records, so the page can't show a total the meter wouldn't.
  */
@@ -31,7 +30,6 @@ async function open(hash: string, { agent = scriptedAgent(), modelUsage = fixtur
 
 beforeEach(() => {
   localStorage.clear();
-  standardWords();
 });
 afterEach(cleanup);
 
@@ -51,7 +49,7 @@ function reportingAgent(asked: ChatTurn[]): Agent {
       }
       return {
         ...answer,
-        usage: { adapter: 'copilot', records: [{ id: `copilot:e${turn}`, chatId: chat!.id, turn, toilProject, adapter: 'copilot', model: 'gpt-5-mini', inputTokens: 3000, cachedInputTokens: 1000, outputTokens: 200, premiumRequests: 1, costSource: 'none', at }], context: { used: 7400, window: 128000 }, notices: ["This chat has used 41,000 tokens of Codex's per-chat cap (codex.chat) of 50,000 tokens (82%)."] },
+        usage: { adapter: 'copilot', records: [{ id: `copilot:e${turn}`, chatId: chat!.id, turn, toilProject, adapter: 'copilot', model: 'gpt-5-mini', inputTokens: 3000, cachedInputTokens: 1000, outputTokens: 200, premiumRequests: 1, costSource: 'none', at }], context: { used: 7400, window: 128000 }, notices: ["This chat has used 41,000 tokens of Codex's per-chat cap of 50,000 tokens (82%)."] },
       };
     },
   };
@@ -67,7 +65,7 @@ describe('the chat', () => {
     // The answer's one folded line carries the summary; the breakdown is the fold's contents.
     expect(first.closest('details')!.querySelector('summary')!.textContent).toMatch(/ · no dollar figure reported$/);
     expect(first.closest('details')!.open).toBe(false);
-    expect(first.textContent).toContain("Codex, the CLI's default model (not named by the SDK): 21k in · 380 out · 14k cached · cache write not reported · no dollar figure (add your rates under Settings, Agent usage)");
+    expect(first.textContent).toContain("Codex, the CLI's default model (not named by the SDK): 21k in · 380 out · 14k cached · cache write not reported · no dollar figure (add your rates under Settings, Usage)");
     // After the first question the starters are a Suggestions menu (#343).
     await userEvent.click(screen.getByRole('button', { name: 'Suggestions' }));
     await userEvent.click((await screen.findAllByRole('menuitem'))[1]!);
@@ -91,7 +89,7 @@ describe('the chat', () => {
 
   it('counts what a stopped run used, under its error and in the chat total, as the server does', async () => {
     const usage = { adapter: 'claude' as const, records: [{ id: 'claude:msg_1', chatId: 'c', turn: 1, toilProject: 'card-payments', adapter: 'claude' as const, model: 'claude-sonnet-4-6', inputTokens: 600, outputTokens: 50, cachedInputTokens: 1000, costSource: 'none' as const, at: FIXTURE_NOW }], notices: [] };
-    const agent: Agent = { ...scriptedAgent(), stream: undefined, ask: async () => Promise.reject(Object.assign(new Error("Claude's per-chat cap (claude.chat) stopped this question: this chat has used 1,650 tokens, and the cap is 1,000 tokens."), { usage })) };
+    const agent: Agent = { ...scriptedAgent(), stream: undefined, ask: async () => Promise.reject(Object.assign(new Error("Claude's per-chat cap stopped this question: this chat has used 1,650 tokens, and the cap is 1,000 tokens."), { usage })) };
     await open('#/project/card-payments', { agent });
     await openChat('card-payments');
     await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
@@ -114,18 +112,20 @@ describe('the chat', () => {
   });
 });
 
-describe('Settings, Agent usage', () => {
-  it('sits beside Usage, and totals the sample month by day, adapter, model and Toil project with the meter\'s figures', async () => {
-    const { container } = await open('#/settings/agent-usage');
+describe('Settings, Usage, the AI agent half', () => {
+  it('sits on the Usage page, under the audit summary, and totals the sample month by day, AI agent, model and Toil project with the meter\'s figures', async () => {
+    const { container } = await open('#/settings/usage');
     const nav = screen.getByRole('navigation', { name: 'Settings pages' });
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Connections', 'Toil projects', 'General', 'Usage', 'Agent usage', 'Agent']);
-    await screen.findByRole('heading', { name: "Usage of the agent's models" });
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['General', 'Connections', 'Toil projects', 'Appearance', 'Usage', 'AI agent']);
+    await screen.findByRole('heading', { name: 'What your AI agent used' });
+    // The AI agent's tables are behind the page's one More detail; the caps are not.
+    expect(container.querySelector('[data-usage-more]')!.querySelectorAll('summary')[0]!.textContent).toBe('More detail');
     const all = addUp(sampleUsageRecords());
     expect(screen.getByText('These are sample figures, made up for the preview. No model reported them.')).toBeTruthy();
     const totals = container.querySelector('.usage-totals')!;
     expect(totals.textContent).toContain(compact(all.tokens!));
-    for (const name of ['By adapter', 'By model', 'By Toil project', 'Chats that used the most', 'Caps']) expect(screen.getByRole('heading', { name })).toBeTruthy();
-    const adapters = screen.getByRole('table', { name: 'Usage by adapter' });
+    for (const name of ['By AI agent', 'By model', 'By Toil project', 'Chats that used the most', 'Caps']) expect(screen.getByRole('heading', { name })).toBeTruthy();
+    const adapters = screen.getByRole('table', { name: 'Usage by AI agent' });
     expect(within(adapters).getAllByRole('rowheader').map((c) => c.querySelector('.l-table__value')!.textContent).sort()).toEqual(['Claude', 'Codex', 'GitHub Copilot']);
     // Copilot's row is premium requests, never dollars.
     const copilot = within(adapters).getAllByRole('row').find((r) => r.textContent?.includes('GitHub Copilot'))!;
@@ -136,13 +136,16 @@ describe('Settings, Agent usage', () => {
   }, AXE);
 
   it('shows the sample caps with saving off in the preview', async () => {
-    await open('#/settings/agent-usage');
+    await open('#/settings/usage');
     await screen.findByRole('heading', { name: 'Caps' });
     expect(screen.getByText("This preview shows sample caps, so they can't be saved.")).toBeTruthy();
     const codexChat = document.querySelector('[data-cap="codex.chat"]')!;
     expect((within(codexChat as HTMLElement).getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
     expect((within(codexChat as HTMLElement).getByRole('textbox') as HTMLInputElement).value).toBe(String((SAMPLE_USAGE_SETTINGS.caps['codex.chat'] as { limit: number }).limit));
     expect((screen.getByRole('button', { name: 'Save caps and rates' }) as HTMLButtonElement).disabled).toBe(true);
+    // The rows say who and per what, in plain words, never the setting's own id.
+    expect(codexChat.textContent).toContain('Codex, per chat');
+    expect(codexChat.textContent).not.toContain('codex.chat');
   });
 
   it('sends a cap as typed, and shows the refusal naming the setting rather than saving 0 or off', async () => {
@@ -155,7 +158,7 @@ describe('Settings, Agent usage', () => {
         throw new Error('codex.chat: the limit "fifty" isn\'t a number above 0. Give a number above 0, or set codex.chat to "off" to turn the cap off.');
       },
     };
-    await open('#/settings/agent-usage', { modelUsage: api });
+    await open('#/settings/usage', { modelUsage: api });
     await screen.findByRole('heading', { name: 'Caps' });
     expect(screen.getByText(/No chat has used a model in this window yet/)).toBeTruthy();
     const row = document.querySelector('[data-cap="codex.chat"]') as HTMLElement;

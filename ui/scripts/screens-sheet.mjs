@@ -111,7 +111,7 @@ async function sheet(page, base, theme, width, level, dir) {
   };
   const catching = (on) => page.evaluate(`window.__catch = ${on}; window.__caught = []; window.__arrivals = undefined; 0`);
 
-  await page.goto(themed(base, theme.name, '#/settings/toil'));
+  await page.goto(themed(base, theme.name, '#/settings/appearance'));
   await poll(page, "Boolean(document.querySelector('[data-preview-menu]'))", 15_000);
   await wait(1200);
 

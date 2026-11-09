@@ -8,6 +8,8 @@
 
 import { useId, useState, type ClipboardEvent, type FormEvent, type ReactNode } from 'react';
 import { checkSecret, type SecretCheck, type SecretRules } from '../../../../src/core/secret-input.ts';
+import type { Need, Problem } from '../../../../src/core/connection-form.ts';
+import { RadioGroup, Radio } from 'react-aria-components';
 import type { Envelope } from '../../toil.ts';
 
 export type Outcome = { ok: true; message: string; warnings: string[] } | { ok: false; message: string; fix: string | null };
@@ -61,19 +63,25 @@ export function commandLine(command: string, args: string[] = []): string {
 export function ChangeForm({
   title,
   explain,
-  runs,
   submit,
   disabled,
   onSubmit,
   children,
   danger = false,
   titleId,
+  blockedBy = null,
+  onBlocked,
+  quietTitle = false,
 }: {
+  /** The heading only repeats the section it sits in: it stays for screen readers and for a link to land on, but isn't drawn. */
+  quietTitle?: boolean;
+  /** Why Save can't run yet, in one line ("Choose Cloud or Data Center first"). The button stays and says so; pressing it points at what's missing. */
+  blockedBy?: string | null;
+  onBlocked?: () => void;
   /** The heading's id, for a form an edit link lands on (#346); it then takes focus there. */
   titleId?: string;
   title: string;
   explain: ReactNode;
-  runs: string;
   submit: string;
   disabled: string | null;
   onSubmit: () => Promise<Outcome>;
@@ -87,6 +95,7 @@ export function ChangeForm({
   const handle = async (e: FormEvent) => {
     e.preventDefault();
     if (disabled || busy) return;
+    if (blockedBy) return onBlocked?.();
     setBusy(true);
     setOutcome(null);
     try {
@@ -99,18 +108,20 @@ export function ChangeForm({
   };
   return (
     <form className="change" aria-labelledby={titleId ?? `${id}-title`} onSubmit={handle} noValidate>
-      <h3 id={titleId ?? `${id}-title`} tabIndex={titleId ? -1 : undefined}>
+      <h3 id={titleId ?? `${id}-title`} tabIndex={titleId ? -1 : undefined} className={quietTitle ? 'sr-only' : undefined}>
         {title}
       </h3>
       <p className="explain">{explain}</p>
       {children}
-      <p className="runs">
-        Runs <code>{runs}</code>
-      </p>
       <div className="change-actions">
-        <button type="submit" className={`btn ${danger ? 'btn--danger' : 'btn--accent'}`} disabled={disabled !== null || busy} aria-describedby={disabled ? `${id}-off` : undefined}>
+        <button type="submit" className={`btn ${danger ? 'btn--danger' : 'btn--accent'}`} disabled={disabled !== null || busy} aria-disabled={blockedBy ? true : undefined} data-blocked={blockedBy ? '' : undefined} aria-describedby={disabled ? `${id}-off` : blockedBy ? `${id}-blocked` : undefined}>
           {busy ? 'Running…' : submit}
         </button>
+        {blockedBy && !disabled && (
+          <span id={`${id}-blocked`} className="note" aria-live="polite">
+            {blockedBy}
+          </span>
+        )}
         {disabled && (
           <span id={`${id}-off`} className="note">
             Turned off: {disabled}
@@ -122,21 +133,160 @@ export function ChangeForm({
   );
 }
 
-export function TextField({ label, value, onChange, hint, type = 'text', required = false, autoComplete = 'off', placeholder }: { label: string; value: string; onChange: (v: string) => void; hint?: ReactNode; type?: 'text' | 'password' | 'url'; required?: boolean; autoComplete?: string; placeholder?: string }) {
+export function NeedBadge({ need }: { need: Need }) {
+  if (need === 'hidden') return null;
+  return <span className={`need need--${need}`}> {need}</span>;
+}
+
+/** The long vendor sentence, one press away: the label stays short (principle 11). */
+export function Info({ label, text }: { label: string; text: string | null }) {
+  if (!text) return null;
+  return (
+    <details className="info">
+      <summary aria-label={`About ${label}`}>
+        <span aria-hidden="true">i</span>
+      </summary>
+      <p className="note info__text">{text}</p>
+    </details>
+  );
+}
+
+/** What a form says under a field: a note, a warning or an error, each with its fix, and a Switch when the fix is a choice. */
+export function Problems({ problems, onSwitch }: { problems: Problem[]; onSwitch?: ((p: Problem) => void) | undefined }) {
+  if (problems.length === 0) return null;
+  return (
+    <ul className="plain problems">
+      {problems.map((p, i) => (
+        <li key={i} className={`note problem problem--${p.level}${p.level === 'error' ? ' failure' : ''}`} role={p.level === 'error' ? 'alert' : undefined}>
+          {p.message}
+          {p.fix && <> {p.fix}</>}
+          {(p.switchTo || p.switchToken) && onSwitch && (
+            <>
+              {' '}
+              <button type="button" className="btn btn--small btn--quiet" onClick={() => onSwitch(p)}>
+                Switch
+              </button>
+            </>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function TextField({
+  label,
+  value,
+  onChange,
+  hint,
+  type = 'text',
+  required = false,
+  autoComplete = 'off',
+  placeholder,
+  need,
+  info,
+  problems,
+  onSwitch,
+  onBlur,
+  field,
+  affix,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  hint?: ReactNode;
+  type?: 'text' | 'password' | 'url';
+  required?: boolean;
+  autoComplete?: string;
+  placeholder?: string | undefined;
+  /** The live "required" / "optional" badge, which replaces the plain "(required)". */
+  need?: Need | undefined;
+  info?: string | null | undefined;
+  problems?: Problem[] | undefined;
+  onSwitch?: ((p: Problem) => void) | undefined;
+  onBlur?: (() => void) | undefined;
+  /** The setting this is, so a form can move focus to it. */
+  field?: string | undefined;
+  /** Fixed text around the box (`https://` and `.atlassian.net`). */
+  affix?: { before?: string; after?: string } | undefined;
+}) {
   const id = useId();
+  const hasHint = Boolean(hint) || (problems?.length ?? 0) > 0;
+  const input = (
+    <input
+      id={id}
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      aria-describedby={hasHint ? `${id}-hint` : undefined}
+      required={need === undefined ? required : need === 'required'}
+      autoComplete={autoComplete}
+      spellCheck={false}
+      placeholder={placeholder}
+      data-field={field}
+    />
+  );
   return (
     <div className="field-row">
-      <label htmlFor={id}>
-        {label}
-        {required && <span className="req"> (required)</span>}
-      </label>
-      <input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} aria-describedby={hint ? `${id}-hint` : undefined} required={required} autoComplete={autoComplete} spellCheck={false} placeholder={placeholder} />
-      {hint && (
-        <p id={`${id}-hint`} className="note">
-          {hint}
-        </p>
+      <div className="field-row__head">
+        <label htmlFor={id}>
+          {label}
+          {need ? <NeedBadge need={need} /> : required && <span className="req"> (required)</span>}
+        </label>
+        {info !== undefined && <Info label={label} text={info} />}
+      </div>
+      {affix ? (
+        <div className="affix">
+          {affix.before && <span aria-hidden="true">{affix.before}</span>}
+          {input}
+          {affix.after && <span aria-hidden="true">{affix.after}</span>}
+        </div>
+      ) : (
+        input
+      )}
+      {hasHint && (
+        <div id={`${id}-hint`}>
+          {hint && <p className="note">{hint}</p>}
+          {problems && <Problems problems={problems} onSwitch={onSwitch} />}
+        </div>
       )}
     </div>
+  );
+}
+
+/** Radio buttons for a choice the person makes: the options, one selected or none yet. */
+export function ChoiceRadios({
+  label,
+  options,
+  selected,
+  onChange,
+  need,
+  hint,
+  field,
+}: {
+  label: string;
+  options: Array<{ key: string; label: string; note?: string | undefined }>;
+  selected: string | null;
+  onChange: (key: string) => void;
+  need?: Need | undefined;
+  hint?: ReactNode;
+  field?: string | undefined;
+}) {
+  return (
+    <RadioGroup className="agent-adapters" value={selected} aria-label={label} onChange={onChange} isRequired={need === 'required'} data-field={field}>
+      <span className="agent-label">
+        {label}
+        {need && <NeedBadge need={need} />}
+      </span>
+      {options.map((o) => (
+        <Radio key={o.key} value={o.key} className="agent-choice">
+          <strong>{o.label}</strong>
+          {o.note && <span className="note">{o.note}</span>}
+        </Radio>
+      ))}
+      {hint && <p className="note">{hint}</p>}
+    </RadioGroup>
   );
 }
 
@@ -223,7 +373,7 @@ export function secretRefusal(name: string, check: SecretCheck, kept: boolean): 
  * rather than silently join two lines. `asking` shows the wrapper question with
  * Remove it and Keep it.
  */
-export function SecretField({ label, value, onChange, rules, asking, kept, onKeep, hint }: { label: string; value: string; onChange: (v: string) => void; rules: SecretRules; asking: boolean; kept: boolean; onKeep: () => void; hint?: ReactNode }) {
+export function SecretField({ label, value, onChange, rules, asking, kept, onKeep, hint, need, info, problems, onSwitch, onBlur, field }: { need?: Need | undefined; info?: string | null | undefined; problems?: Problem[] | undefined; onSwitch?: ((p: Problem) => void) | undefined; onBlur?: (() => void) | undefined; field?: string | undefined; label: string; value: string; onChange: (v: string) => void; rules: SecretRules; asking: boolean; kept: boolean; onKeep: () => void; hint?: ReactNode }) {
   const id = useId();
   const check = checkSecret(value, rules);
   const question = wrapperQuestion(check);
@@ -238,14 +388,18 @@ export function SecretField({ label, value, onChange, rules, asking, kept, onKee
   };
   return (
     <div className="field-row">
-      <label htmlFor={id}>
-        {label}
-        {rules.empty === 'required' && <span className="req"> (required)</span>}
-      </label>
-      <input id={id} type="password" value={value} onChange={(e) => onChange(e.target.value)} onPaste={paste} aria-describedby={`${id}-count${hint ? ` ${id}-hint` : ''}`} required={rules.empty === 'required'} autoComplete="new-password" spellCheck={false} />
+      <div className="field-row__head">
+        <label htmlFor={id}>
+          {label}
+          {need ? <NeedBadge need={need} /> : rules.empty === 'required' && <span className="req"> (required)</span>}
+        </label>
+        {info !== undefined && <Info label={label} text={info} />}
+      </div>
+      <input id={id} type="password" value={value} onChange={(e) => onChange(e.target.value)} onPaste={paste} onBlur={onBlur} data-field={field} aria-describedby={`${id}-count${hint ? ` ${id}-hint` : ''}`} required={rules.empty === 'required'} autoComplete="new-password" spellCheck={false} />
       <p id={`${id}-count`} className={`note${check.status === 'refused' ? ' failure' : ''}`} aria-live="polite">
         {secretNote(check)}
       </p>
+      {problems && <Problems problems={problems} onSwitch={onSwitch} />}
       {asking && question && !kept && (
         <div className="secret-ask" role="group" aria-label={`${label}: ${question}`}>
           <p>{question}</p>

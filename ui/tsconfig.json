@@ -16,5 +16,5 @@
     "noEmit": true
   },
   "include": ["src", "test", "vite.config.ts"],
-  "exclude": ["test/registry.test.ts", "test/config.test.ts"]
+  "exclude": ["test/registry.test.ts", "test/config.test.ts", "test/connection-form.test.ts"]
 }

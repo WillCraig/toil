@@ -37,9 +37,10 @@ without it.
 ## 2. If they want Toil UI
 
 Start it with `npx @imagile-dev/toil-ui`. If you can run a command in the background,
-do; otherwise ask the person to run it in their terminal. It prints one URL that
-carries a launch token. Give the person that URL and tell them to keep it to
-themselves; each start prints a new one. Point them at its first-run checklist on the
+do; otherwise ask the person to run it in their terminal. It prints one plain
+`http://127.0.0.1:<port>/` URL with no token in it. The person opens it and the
+browser is let in by a cookie, with no step for them; tell them that anything on the
+machine running as them can also reach Toil UI. Point them at its first-run checklist on the
 Toil projects page (Connect a tracker, Create a toil project, Sync). Secrets are entered there,
 in Settings, Connections. If they say no, stay on the CLI: secrets go in with `toil
 connections login <name>` in their own terminal.

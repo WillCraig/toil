@@ -9,7 +9,7 @@ connections, [#51](https://github.com/imagile-dev/toil/issues/51) (core in #59).
 - host selectors, environments and the write rule
 - `meta.context.toilProject`
 - `toil projects list | show | check | context`, which read
-- `toil projects init | add-repo | link | env | field | person | wip-limit | describe | export | import | unlink | remove`, which
+- `toil projects init | add-repo | link | env | field | person | people suggest | people save | wip-limit | describe | archive | unarchive | export | import | unlink | remove`, which
   build and share (`src/core/toil-project.ts`, `src/projects/`)
 - `toil projects migrate`, which moves your own `~/.toil/dossiers/*.json` to `~/.toil/projects/` (#555, `src/projects/migrate.ts`)
 - `toil projects onboard`, which sets a reader up for a repository's toil project (#333,
@@ -512,7 +512,19 @@ files directly:
     someone already there: the user name, login or email each area knows them by. A
     value shaped like a token is refused, as is an identity already another person's.
     `--remove` takes the person out, or with `--id` only those identities; it's a
-    delete, so it runs on the CLI only (refused over MCP and the API).
+    delete, so it runs on the CLI only (refused over MCP and the API). `--github`,
+    `--jira`, `--ado` and `--bitbucket` are `--id` with the area filled in (#561).
+  - `toil projects people suggest <toil-project>` (#561) reads OWI records from one source
+    (a file, `--text` or stdin, as `projects brief` does) and proposes which unmapped
+    accounts are which person, by email, then display name, then a login that reads as the
+    name (`src/core/people-match.ts`). It is read only and maps nothing: each suggestion
+    carries the `projects person` line that applies it.
+  - `toil projects people save <toil-project> [--repo <dir>] [--replace]` (#561) writes the
+    people into `<repo>/.toil/projects/<name>.json`, for any repository host. An existing
+    file keeps what it has and gains or (with `--replace`) takes the people; a missing one
+    is created as `projects export` would. A local write, never staged or committed, and
+    over MCP creating the file from a toil project that selects a connection with writes
+    on is refused, as for `export`.
   - `toil projects wip-limit <toil-project> <limit>` sets how many items one person may have
     in progress at once, which Toil UI's People view and `toil projects brief` count
     against. `--clear` removes it, on the CLI only.
@@ -526,6 +538,14 @@ files directly:
     first, then deletes the old file, so a refusal leaves it where it was. A name you
     already have is refused, and so is a toil project that isn't in your own folder, with the
     `toil projects import` fix. It needs no `--replace`: replacing is all it does.
+  - `toil projects archive <toil-project>` and `toil projects unarchive <toil-project>` set and
+    remove `archived: true` in one of your own toil projects (#561). Archiving hides, and only
+    hides: `list` leaves it out (with `archivedHidden` counting what it left out; `--all` or
+    `--archived` show it), and Toil UI moves it under Archived and drops it from the switcher
+    and the sync counts. Resolution is untouched: a folder in its repos still resolves to it,
+    so no call quietly loses its inputs. Asking twice changes nothing (`changed: false`).
+    Sharing drops the flag. A toil project that isn't in your own folder is refused, as
+    for `describe`. Local writes, not deletes, so they are served over MCP.
   - `toil projects unlink <toil-project> --area <area> [--env <env>]` removes a section, an
     area's own or one environment's, including one for an area toil doesn't have. An
     environment left with no areas goes too, and stops being the default. CLI only, like
@@ -541,7 +561,8 @@ files directly:
   (`add-repo <toil-project> <remote> --name <repo>`) adds nothing, needs no `--replace`, and
   is the way to clean one on its own.
 - **Reading and checking** (built; all served over MCP, all local reads):
-  - `toil projects list [--cwd <dir>]` lists every toil project toil can see, with its
+  - `toil projects list [--cwd <dir>] [--all | --archived]` lists every toil project toil can see
+    (archived ones only with a flag), with its `archived` flag, its
     `source`, the file that shadows it when two share a name, and broken files with
     what's wrong.
   - `toil projects show [<name|file>] [--cwd <dir>]` prints one (by default the one

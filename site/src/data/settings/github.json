@@ -12,7 +12,7 @@
   {
     "key": "token",
     "env": "TOIL_GITHUB_TOKEN",
-    "description": "Fine-grained personal access token",
+    "description": "Personal access token, classic (ghp_...) or fine-grained (github_pat_...)",
     "required": true,
     "secret": true,
     "fallbacks": [

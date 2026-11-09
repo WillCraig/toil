@@ -92,17 +92,18 @@ describe('contractVersion', () => {
 });
 
 describe('the Node floor through the API (CVE-2026-111497, #479)', () => {
-  it("refuses every call on an unpatched Node with the CLI's UNSUPPORTED_NODE envelope, before anything runs", async () => {
+  it('runs the call on an unpatched Node and puts the CVE warning first in meta.warnings', async () => {
     const real = Object.getOwnPropertyDescriptor(process.versions, 'node')!;
     Object.defineProperty(process.versions, 'node', { ...real, value: '24.22.0' });
     try {
-      const refused = await apiExecute('version');
-      expect(refused.ok).toBe(false);
-      expect(refused.error).toMatchObject({ code: 'UNSUPPORTED_NODE', message: expect.stringContaining('CVE-2026-111497') });
-      expect((await apiExecute('no such command')).error?.code).toBe('UNSUPPORTED_NODE');
+      // An unknown command is answered by the API itself (no config, no audit line), so it shows the warning without touching a home.
+      const result = await apiExecute('no such command');
+      expect(result.error?.code).toBe('INVALID_INPUT');
+      expect(result.meta.warnings?.[0]).toMatchObject({ code: 'UNSUPPORTED_NODE', message: expect.stringContaining('CVE-2026-111497') });
     } finally {
       Object.defineProperty(process.versions, 'node', real);
     }
+    expect((await apiExecute('no such command')).meta.warnings?.some((w) => w.code === 'UNSUPPORTED_NODE')).toBeFalsy();
   });
 });
 

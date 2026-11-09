@@ -26,7 +26,7 @@ export const SAMPLE_ADAPTER_STATUS: AdapterStatus[] = [
     cli: { path: '/home/you/.local/bin/claude', problem: null, fix: null },
     endpoints: ['anthropic', 'bedrock', 'foundry', 'vertex'],
     model: 'haiku',
-    install: { adapter: 'claude', kind: 'global', folder: prefix, command, argv: null, problem: null, fix: null },
+    install: { adapter: 'claude', kind: 'global', folder: prefix, cli: null, command, argv: null, problem: null, fix: null },
     notes: [],
   },
   {

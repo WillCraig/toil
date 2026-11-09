@@ -136,7 +136,7 @@ function send(origin, path, { method = 'GET', headers = {}, body, timeoutMs = 60
       let text = '';
       res.setEncoding('utf8');
       res.on('data', (c) => (text += c));
-      res.on('end', () => resolve({ status: res.statusCode, body: text, json: () => JSON.parse(text) }));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: text, json: () => JSON.parse(text) }));
     });
     req.setTimeout(timeoutMs, () => req.destroy(new Error(`${method} ${url.pathname} got no answer in ${timeoutMs / 1000}s`)));
     req.on('error', reject);
@@ -144,17 +144,17 @@ function send(origin, path, { method = 'GET', headers = {}, body, timeoutMs = 60
   });
 }
 
-/** Starts the built toil-ui and resolves with its launch URL and a signed-in API client. */
+/** Starts the built toil-ui and resolves with its URL and an API client. */
 async function launch(argv, env) {
   const child = spawn(process.execPath, [...toilUiNodeArgs, toilUi, '--port', '0', ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   children.push(child);
   let stdout = '';
   let stderr = '';
-  const launchUrl = await new Promise((resolve, reject) => {
+  const pageUrl = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`toil-ui printed no URL in 20s. stderr: ${stderr}`)), 20_000);
     child.stdout.on('data', (c) => {
       stdout += c;
-      const m = /http:\/\/127\.0\.0\.1:\d+\/\?token=[A-Za-z0-9_-]+/.exec(stdout);
+      const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(stdout);
       if (m) {
         clearTimeout(timer);
         resolve(m[0]);
@@ -163,38 +163,26 @@ async function launch(argv, env) {
     child.stderr.on('data', (c) => (stderr += c));
     child.on('exit', (code) => reject(new Error(`toil-ui exited ${code} before printing a URL. stderr: ${stderr}`)));
   });
-  const { origin, searchParams } = new URL(launchUrl);
-  // Every page the layout check opens signs in too, and the server keeps only its newest sessions,
-  // so a call refused for its session signs in again once rather than fail on the check's account.
-  let session;
-  const signIn = async () => {
-    const signedIn = await send(origin, '/api/session', { method: 'POST', body: JSON.stringify({ token: searchParams.get('token') }), headers: { origin, 'content-type': 'application/json' } });
-    if (signedIn.status !== 200) throw new Error(`signing in to toil-ui answered ${signedIn.status}: ${signedIn.body}`);
-    session = signedIn.json();
-  };
-  await signIn();
-  const again = async (call) => {
-    const res = await call();
-    if (res.status !== 401) return res;
-    await signIn();
-    return call();
-  };
+  const { origin } = new URL(pageUrl);
+  // What a browser does on opening the address: navigate to the page, and keep the cookie it earns (#561).
+  const entered = await send(origin, '/', { headers: { 'sec-fetch-dest': 'document', 'sec-fetch-mode': 'navigate', 'sec-fetch-site': 'none' } });
+  const cookie = String(entered.headers?.['set-cookie'] ?? '').split(';')[0];
+  if (!cookie.startsWith('toil-ui=')) throw new Error(`opening toil-ui's page answered ${entered.status} with no cookie`);
   const api = {
-    get: (path) => again(() => send(origin, `/api/${path}`, { headers: { 'x-toil-ui-session': session.session } })),
-    post: (path, body, timeoutMs) =>
-      again(() => send(origin, `/api/${path}`, { method: 'POST', body: JSON.stringify(body), headers: { 'x-toil-ui-session': session.session, origin, 'content-type': 'application/json', 'x-toil-ui-csrf': session.csrf }, timeoutMs })),
+    get: (path) => send(origin, `/api/${path}`, { headers: { cookie } }),
+    post: (path, body, timeoutMs) => send(origin, `/api/${path}`, { method: 'POST', body: JSON.stringify(body), headers: { cookie, origin, 'content-type': 'application/json' }, timeoutMs }),
   };
   const stop = async () => {
     if (child.exitCode !== null) return;
     child.kill();
     await new Promise((r) => child.once('exit', r));
   };
-  return { launchUrl, origin, api, stop, stderr: () => stderr };
+  return { pageUrl, origin, api, stop, stderr: () => stderr };
 }
 
 /** The layout check over some routes, strict themes shot to `shots`; its problems and findings go into the report. */
-async function layout(part, launchUrl, routes) {
-  const urlFor = (theme, scheme, route) => `${launchUrl}&theme=${theme}&scheme=${scheme}${route}`;
+async function layout(part, pageUrl, routes) {
+  const urlFor = (theme, scheme, route) => `${pageUrl}?theme=${theme}&scheme=${scheme}${route}`;
   const runs = themeRuns();
   const log = (line) => say(`  layout (${part}): ${line}`);
   // A real toil project's name and links may genuinely fill the header's row at 1440px, so only the sample's must fit (#387).
@@ -211,11 +199,11 @@ async function layout(part, launchUrl, routes) {
 }
 
 /** The toil project page's first work item, as a route, read from the page itself. */
-async function firstItemRoute(launchUrl, toilProject) {
+async function firstItemRoute(pageUrl, toilProject) {
   const { page, close } = await openBrowser(findChrome());
   try {
     await page.size(1440);
-    await page.goto(`${launchUrl}&theme=plain&scheme=light#/project/${encodeURIComponent(toilProject)}`);
+    await page.goto(`${pageUrl}?theme=plain&scheme=light#/project/${encodeURIComponent(toilProject)}`);
     return await page.evaluate(`new Promise((resolve) => {
       const started = Date.now();
       const tick = () => {
@@ -270,7 +258,7 @@ async function streamedAsk(api, body) {
  * plus the model it named, and for Codex its home's MCP servers. Copilot and
  * Claude are held to the same checks as Codex, the reference (#317, #318).
  */
-async function askAgent(api, toilProject, home, dataDir, env, launchUrl) {
+async function askAgent(api, toilProject, home, dataDir, env, pageUrl) {
   if (!sdkInstalled(adapter)) {
     const install = sdkInstall(adapter);
     problems.push(`Ask: ${ADAPTERS[adapter].package} isn't installed in this clone. Install it with ${install} and run again.`);
@@ -356,7 +344,7 @@ async function askAgent(api, toilProject, home, dataDir, env, launchUrl) {
   const pulseOk = pulse.status === 200 && !pulse.error && p && (p.parts.length || p.briefing) && p.citations.length && !(p.unverified ?? []).length && p.carried === 1;
   if (!pulseOk) fail(`Analyze: ${pulse.error?.message ?? `${p?.parts.length ?? 0} paragraph(s), ${p?.citations.length ?? 0} cited, ${(p?.unverified ?? []).length} unverified, carried ${p?.carried ?? 0}`}`);
   step('Ask: Analyze, as a follow-up', pulseOk ? 'pass' : 'fail', p ? `${p.briefing ? `a briefing (${p.briefing.reasons.length} reason(s)), ` : ''}${p.parts.length} paragraph(s) in ${pulseSeconds}s, ${p.citations.length} cited, ${(p.unverified ?? []).length} unverified, carried ${p.carried ?? 0} earlier turn; starts: ${p.parts.map((x) => x.text.split(/[:.]/)[0].slice(0, 30)).join(' / ')}` : (pulse.error?.message ?? 'no answer'));
-  if (p) await analysisHistory(api, toilProject, home, env, launchUrl, p, [...history, { prompt: p.prompt, answer: p.parts.map((x) => x.text).join('\n\n'), by: p.by }]);
+  if (p) await analysisHistory(api, toilProject, home, env, pageUrl, p, [...history, { prompt: p.prompt, answer: p.parts.map((x) => x.text).join('\n\n'), by: p.by }]);
 }
 
 /**
@@ -368,7 +356,7 @@ async function askAgent(api, toilProject, home, dataDir, env, launchUrl) {
  * The Analyses tab and the second one opened go through the layout check,
  * shot like every other view.
  */
-async function analysisHistory(api, toilProject, home, env, launchUrl, first, history) {
+async function analysisHistory(api, toilProject, home, env, pageUrl, first, history) {
   const fail = (what) => problems.push(`Analyses: ${what}`);
   const one = async (id) => {
     const res = id ? await api.get(`analyses/one?toilProject=${encodeURIComponent(toilProject)}&id=${encodeURIComponent(id)}`) : null;
@@ -405,7 +393,7 @@ async function analysisHistory(api, toilProject, home, env, launchUrl, first, hi
   const said = c ? [`${c.newlyBlocked.length} newly blocked`, `${c.cleared.length} cleared`, `points moved on ${c.points.length}`, c.sprint ? 'the sprint moved' : 'the sprint the same', `${c.cited.length} newly cited`, `${c.dropped.length} dropped`, c.recommendationChanged ? 'a new recommendation' : 'the same recommendation'].join(', ') : 'nothing to compare';
   step('Analyses: the history and what changed', ordered ? 'pass' : 'fail', `${Array.isArray(list) ? list.length : 0} kept, newest first; since the one before: ${said}`);
 
-  if (second) await layout('analyses', launchUrl, [`#/project/${toilProject}`, `#/project/${toilProject}/analyses`, `#/project/${toilProject}/analyses/${encodeURIComponent(second.record.id)}`]);
+  if (second) await layout('analyses', pageUrl, [`#/project/${toilProject}`, `#/project/${toilProject}/analyses`, `#/project/${toilProject}/analyses/${encodeURIComponent(second.record.id)}`]);
 }
 
 const startedAt = new Date();
@@ -454,7 +442,7 @@ try {
   const sampleEnv = { ...process.env, HOME: join(work, 'home'), USERPROFILE: join(work, 'home'), TOIL_UI_DATA_DIR: join(work, 'data') };
   const sample = await launch(['--sample'], sampleEnv);
   try {
-    await layout('sample', sample.launchUrl, ROUTES);
+    await layout('sample', sample.pageUrl, ROUTES);
   } finally {
     await sample.stop();
     rmSync(work, { recursive: true, force: true, maxRetries: 5 });
@@ -467,7 +455,7 @@ try {
   Object.assign(freshEnv, { HOME: join(fresh, 'home'), USERPROFILE: join(fresh, 'home'), TOIL_UI_DATA_DIR: join(fresh, 'data') });
   const first = await launch([], freshEnv);
   try {
-    await layout('first-run', first.launchUrl, [FIRST_RUN_ROUTE]);
+    await layout('first-run', first.pageUrl, [FIRST_RUN_ROUTE]);
   } finally {
     await first.stop();
     rmSync(fresh, { recursive: true, force: true, maxRetries: 5 });
@@ -507,13 +495,13 @@ try {
       if (!synced) problems.push(`sync: ${status.job.running ? 'still running after 10 minutes' : status.job.error ?? `${ready.toilProject} is ${state?.status ?? 'missing'}: ${failed.map((s) => `${s.area}: ${s.error}`).join('; ')}`}`);
       step(`Sync ${ready.toilProject}`, synced ? 'pass' : 'fail', `${status.job.fetched} call(s) to toil, ${status.job.requests} request(s), ${status.job.pages} page(s), ${status.job.retries} retr${status.job.retries === 1 ? 'y' : 'ies'}; ${state?.sources.map((s) => `${s.area} ${s.status}`).join(', ') ?? 'no Toil project state'}`);
 
-      const item = await firstItemRoute(real.launchUrl, ready.toilProject);
+      const item = await firstItemRoute(real.pageUrl, ready.toilProject);
       if (!item) problems.push(`real data: the ${ready.toilProject} Toil project page links no work item, so no item view was checked.`);
       // The settings pages come from the layout check's own list, so a page added there is checked on real data too.
       const routes = ['#/', `#/project/${ready.toilProject}`, `#/project/${ready.toilProject}/board`, `#/project/${ready.toilProject}/dependencies`, `#/project/${ready.toilProject}/worklog`, `#/project/${ready.toilProject}/worklog/standup`, ...(item ? [item] : []), ...ROUTES.filter((r) => r.startsWith('#/settings/'))];
-      await layout('real', real.launchUrl, routes);
+      await layout('real', real.pageUrl, routes);
 
-      if (ask) await askAgent(real.api, ready.toilProject, home, ready.env.TOIL_UI_DATA_DIR, ready.env, real.launchUrl);
+      if (ask) await askAgent(real.api, ready.toilProject, home, ready.env.TOIL_UI_DATA_DIR, ready.env, real.pageUrl);
       else step(askStep, 'skip', `not asked; pass --ask to ask ${agentLabel} one starter question`);
     } finally {
       await real.stop();

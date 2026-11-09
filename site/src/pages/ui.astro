@@ -33,15 +33,14 @@ const home = `#/project/${TOIL_PROJECT}`;
 /** The views the tour walks through: where each opens in the app, and what the frame does there once it loads. */
 const steps = [
   { id: 'projects', label: 'Toil projects', route: '#/', act: null, title: 'Every Toil project, one card each', body: 'Its sprint and burn-up, what is in progress and blocked, who is on it, and what changed since you last looked. The Toil project you opened last comes first.' },
-  { id: 'dashboard', label: 'Briefing', route: home, act: null, title: 'A briefing, one layer at a time', body: 'The sprint\'s status in one sentence, one line on why, and at most three cards for what needs attention. The full briefing, with the reasons behind it, is one step in, and each reason opens to its items. A briefing from an AI helper says so; without one, toil works it out by code and says that instead. Every other view is a tab and a link.' },
+  { id: 'dashboard', label: 'Briefing', route: home, act: null, title: 'A briefing, one layer at a time', body: 'The sprint\'s status in one sentence, one line on why, and at most three cards for what needs attention. The full briefing, with the reasons behind it, is one step in, and each reason opens to its items. A briefing from an AI agent says so; without one, toil works it out by code and says that instead. Every other view is a tab and a link.' },
   { id: 'board', label: 'Board', route: `${home}/board`, act: 'board', title: 'The board, without the clutter', body: 'The sprint by status, with every card that needs attention flagged and a filter for just those. Each card is a link to its item, and drag and drop never writes to your tracker on its own.' },
   { id: 'ask', label: 'Ask', route: home, act: 'ask', title: 'Ask a question', body: 'Ask a question: pick one of nine plain questions or type your own. The chat takes the screen, answers stream in under a status line, cite every item they rest on, say how sure they are, and suggest changes as proposal cards you apply yourself.' },
   { id: 'switcher', label: 'Agent switcher', route: home, act: 'switcher', title: 'Pick who answers', body: 'Claude, GitHub Copilot or Codex, whichever is on your machine, for this chat only. A chat switched mid-way carries over. The sample answers with a scripted preview.' },
-  { id: 'ticket', label: 'Ticket the work', route: home, act: 'ticket', title: 'Work with no ticket gets one', body: 'Ask for work that no ticket covers and the chat says so, lists the open items closest to it, and offers a sub-task or a new ticket as a proposal.' },
   { id: 'item', label: 'Item', route: `${home}/item/${encodeURIComponent('corp-jira:PAY-101')}`, act: null, title: 'Every item has a page', body: 'Its status and history, what it blocks, its pull requests and builds, and where it is deployed.' },
   { id: 'standup', label: 'Stand-up', route: `${home}/worklog/standup`, act: null, title: 'The stand-up, written from the worklog', body: 'Each person: done, in progress, blocked and next, every line numbered so the write-up can cite it.' },
   { id: 'worklog', label: 'What happened', route: `${home}/worklog`, act: null, title: 'What happened, day by day', body: 'What moved, merged, failed or recovered, what the agents did, and your own notes, kept on your machine.' },
-  { id: 'settings', label: 'Theme settings', route: '#/settings/toil', act: null, title: 'How far a theme goes', body: 'The theme picker and the checkboxes for wording, voice and particles, kept in this browser and never in toil\'s config.' },
+  { id: 'settings', label: 'Theme settings', route: '#/settings/appearance', act: null, title: 'How far a theme goes', body: 'The theme, light or dark, the font and Motion, kept in this browser and never in toil\'s config.' },
 ];
 const firstStep = 'dashboard';
 const crate = THEMES.find((t) => t.name === DEFAULT_THEME)!;
@@ -138,7 +137,7 @@ const crate = THEMES.find((t) => t.name === DEFAULT_THEME)!;
             </div>
           </fieldset>
           <fieldset class="uix-checks">
-            <legend>Settings, General</legend>
+            <legend>Settings, Appearance</legend>
             {CHECKBOXES.map((c) => (
               <label class="uix-check">
                 <input type="checkbox" checked data-check={c.name === 'Themed wording' ? 'wording' : 'voice'} />
@@ -191,7 +190,7 @@ const crate = THEMES.find((t) => t.name === DEFAULT_THEME)!;
                 <p>No style is added: the agent answers in plain wording.</p>
               </li>
               <li class="uix-layer">
-                <p class="uix-layer__name"><b>3. Your instructions</b> <span>from Settings, Agent</span></p>
+                <p class="uix-layer__name"><b>3. Your instructions</b> <span>from Settings, AI agent</span></p>
                 <p class="uix-quote">{STANDARD_PROMPT.instructions.text}</p>
                 <p class="uix-win">{STANDARD_PROMPT.instructions.rule}</p>
               </li>
@@ -224,7 +223,7 @@ const crate = THEMES.find((t) => t.name === DEFAULT_THEME)!;
                   </li>
                 )}
                 <li class="uix-layer">
-                  <p class="uix-layer__name"><b>3. Your instructions</b> <span>from Settings, Agent</span></p>
+                  <p class="uix-layer__name"><b>3. Your instructions</b> <span>from Settings, AI agent</span></p>
                   <p class="uix-quote">{t.prompt.instructions.text}</p>
                   <p class="uix-win">{t.prompt.instructions.rule}</p>
                 </li>

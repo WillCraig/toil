@@ -1,0 +1,22 @@
+/* Archiving a Toil project (#561): a card's quiet menu, the undo line, and the
+   closed "Archived (n)" disclosure. Layout and tokens only. */
+
+.toil-project-card { position: relative; }
+.toil-project-card .toil-project-card__head { padding-inline-end: 2.25rem; }
+.archive-menu__trigger { position: absolute; top: 0.6rem; inset-inline-end: 0.6rem; min-width: 2rem; line-height: 1; }
+/* Out of the way until the card is looked at, but never hidden from a keyboard or a touch screen. */
+@media (hover: hover) {
+  .archive-menu__trigger { opacity: 0.55; }
+  .toil-project-card:hover .archive-menu__trigger, .toil-project-card:focus-within .archive-menu__trigger, .archive-menu__trigger[data-pressed], .archive-menu__trigger[data-focus-visible] { opacity: 1; }
+}
+
+.archive-notice { margin-block: 0 var(--space, 1rem); }
+.archive-notice .btn { margin-inline-start: 0.25rem; }
+
+.archived { margin-block-start: 1.5rem; border-top: 1px solid var(--line); padding-top: 0.75rem; }
+.archived > summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; font-weight: 600; }
+.archived__list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+.archived__item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.archived__name { min-width: 0; overflow-wrap: anywhere; }
+.conn-card { position: relative; }
+.conn-card:has(> .archive-menu__trigger) .conn-head { padding-inline-end: 2.25rem; }

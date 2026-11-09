@@ -2,7 +2,7 @@
  * The meter for the agent's model usage (#295): what each SDK reported a
  * chat used, one normalized record per model call or running total, and the
  * one rule for adding records up. The server's ledger and caps, the chat's
- * footer and header, and Settings, Agent usage all read `addUp` here, so no
+ * footer and header, and Settings, Usage all read `addUp` here, so no
  * two places can disagree about a total.
  *
  * The rule: records with the same `id` are one report, seen more than once
@@ -176,7 +176,7 @@ export function costParts(t: UsageTotals, adapter: UsageAdapter): string[] {
   const out: string[] = [];
   if (t.costUsd['sdk-estimate'] !== undefined) out.push(`~${dollars(t.costUsd['sdk-estimate'])} (SDK estimate${t.plan ? ', API-equivalent: your plan is not billed per token' : ''})`);
   if (t.costUsd['your-rates'] !== undefined) out.push(`~${dollars(t.costUsd['your-rates'])} (computed from your rates)`);
-  if (!out.length) out.push(adapter === 'codex' ? 'no dollar figure (add your rates under Settings, Agent usage)' : 'cost not reported');
+  if (!out.length) out.push(adapter === 'codex' ? 'no dollar figure (add your rates under Settings, Usage)' : 'cost not reported');
   return out;
 }
 
@@ -329,7 +329,7 @@ export function amount(n: number, unit: CapUnit): string {
 }
 
 const whose = (c: CapStanding) => (c.scope === 'chat' ? 'This chat' : `${ADAPTER_LABEL[c.adapter]} today (UTC)`);
-const capName = (c: CapStanding) => `${ADAPTER_LABEL[c.adapter]}'s ${c.scope === 'chat' ? 'per-chat' : 'per-day'} cap (${c.key})`;
+const capName = (c: CapStanding) => `${ADAPTER_LABEL[c.adapter]}'s ${c.scope === 'chat' ? 'per-chat' : 'per-day'} cap`;
 
 /** The warning at 80%, or past the cap once a run that couldn't be stopped ended over it. */
 export function capWarning(c: CapStanding): string {
@@ -341,7 +341,7 @@ export function capWarning(c: CapStanding): string {
 export function capStop(c: CapStanding): { message: string; fix: string } {
   return {
     message: `${capName(c)} stopped this question: ${c.scope === 'chat' ? 'this chat' : whose(c)} has used ${amount(c.used, c.cap.unit)}, and the cap is ${amount(c.cap.limit, c.cap.unit)}.`,
-    fix: `${c.scope === 'chat' ? 'Start a new chat, or raise' : 'Wait for the next day (UTC), or raise'} the cap or turn it off under Settings, Agent usage. The cap counts only what the SDK reports; ${VENDOR[c.adapter]} own bill is the authority.`,
+    fix: `${c.scope === 'chat' ? 'Start a new chat, or raise' : 'Wait for the next day (UTC), or raise'} the cap or turn it off under Settings, Usage. The cap counts only what the SDK reports; ${VENDOR[c.adapter]} own bill is the authority.`,
   };
 }
 
@@ -422,7 +422,7 @@ export interface UsageView {
   sample: boolean;
 }
 
-/** What Settings, Agent usage reads and saves: the server's `api/usage`, or the preview's sample. */
+/** What Settings, Usage reads and saves: the server's `api/usage`, or the preview's sample. */
 export interface ModelUsageApi {
   view(): Promise<UsageView>;
   save(settings: UsageSettings): Promise<UsageView>;

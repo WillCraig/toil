@@ -91,7 +91,9 @@ export function findCli(l: CliLookup): string {
   const shimError = (found: string) =>
     new AgentError(
       `${l.label} was found at ${found}, which is a Windows command shim the SDK can't start.`,
-      `Set the CLI path in Settings to the ${l.command} executable itself (${l.command}.exe).`,
+      l.scripts
+        ? `That is a launcher script, not the CLI itself. Press Install for ${l.label} under Settings, Agent to put the real one beside Toil UI, or set the CLI path in Settings to ${l.command}.exe.`
+        : `Set the CLI path in Settings to the ${l.command} executable itself (${l.command}.exe).`,
     );
   if (l.configured) {
     if (!path.isAbsolute(l.configured)) throw new AgentError(`The ${l.label} path in Settings, ${JSON.stringify(l.configured)}, isn't an absolute path.`, 'Set the full path to the CLI, or clear it to use the one on PATH.');
@@ -114,23 +116,26 @@ export function findCli(l: CliLookup): string {
     .filter((d) => d !== '' && path.isAbsolute(d) && !(under(path.resolve(d), cwd) && !(homeInside && path.resolve(d) !== cwd)));
   // On Windows a real executable beats a shim in the same folder; PATHEXT order otherwise.
   const exts = l.platform === 'win32' ? ['.exe', '.com', ...(l.env.PATHEXT ?? '.CMD;.BAT').split(';').map((e) => e.toLowerCase()).filter((e) => e === '.cmd' || e === '.bat'), ''] : [''];
-  let shim: string | null = null;
+  const shims: string[] = [];
   for (const dir of dirs) {
     for (const ext of exts) {
       const candidate = path.join(dir, `${l.command}${ext}`);
       if (!isFile(candidate)) continue;
       if (l.platform === 'win32' && (SHIM.test(candidate) || ext === '')) {
-        shim ??= candidate;
+        shims.push(candidate);
         continue;
       }
       return candidate;
     }
   }
-  if (shim && l.scripts) {
-    const script = shimScript(shim, (l.readText ?? realReadText)(shim) ?? '', path);
-    if (script && isFile(script)) return script;
+  // Every shim on PATH is tried, not only the first: an editor's launcher script can shadow the npm shim behind it.
+  if (l.scripts) {
+    for (const shim of shims) {
+      const script = shimScript(shim, (l.readText ?? realReadText)(shim) ?? '', path);
+      if (script && isFile(script)) return script;
+    }
   }
-  if (shim) throw shimError(shim);
+  if (shims[0]) throw shimError(shims[0]);
   throw new AgentError(
     `Toil UI found no ${l.command} on PATH, so it can't start ${l.label}. It never downloads one.`,
     `Install ${l.label} the way your organization approves, so ${l.command} is on PATH, or set its path in Settings, then ask again.`,

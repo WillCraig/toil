@@ -19,7 +19,7 @@ import { stubToil, type StubToil } from './toil-stub.ts';
  * 1000 items, a feed that goes stale, and a feed that fails.
  */
 
-const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'launch-token' }, signal: new AbortController().signal };
+const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'loopback' }, signal: new AbortController().signal };
 const HOUR = 3_600_000;
 const folders: string[] = [];
 const caches: Cache[] = [];

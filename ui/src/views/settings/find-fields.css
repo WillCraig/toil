@@ -1,0 +1,9 @@
+/* Find the fields (src/views/settings/FindFields.tsx): the wizard's optional step and the box in Settings. Tokens come from the theme. */
+.find-fields { display: grid; gap: 0.75rem; min-width: 0; }
+.find-fields__type { display: grid; gap: 0.4rem; min-width: 0; }
+.find-fields__type h4 { overflow-wrap: anywhere; }
+.find-fields__alias { width: 100%; min-width: 8rem; min-height: 44px; }
+.find-fields input[type="checkbox"] { width: 1.25rem; height: 1.25rem; accent-color: var(--accent); }
+.find-fields__save, .find-fields__results { display: grid; gap: 0.5rem; min-width: 0; }
+.find-fields__done { overflow-wrap: anywhere; }
+.find-fields code { overflow-wrap: anywhere; }

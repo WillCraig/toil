@@ -10,7 +10,7 @@
 
 import { ENTER_MOTIFS, FACE_VALUES, LOOP_MOTIFS, MOMENT_KINDS, TRACK_MOTIFS } from '../src/moments/schema.ts';
 import { TERMS, TOKENS, type ThemeManifest } from '../src/theme-pack.ts';
-import { STANDARD, WORD_KEYS, commandsIn, placeholders, type WordKey } from '../src/wording.ts';
+import { STANDARD, WORD_KEYS, commandsIn, isFunctional, placeholders, type WordKey } from '../src/wording.ts';
 
 /** The only files a theme folder may hold. */
 export const THEME_FILE_TYPES = new Set(['.css', '.json', '.svg', '.webp', '.png', '.avif', '.woff2']);
@@ -55,8 +55,8 @@ export function cssProblems(name: string, css: string): string[] {
 }
 
 /**
- * Problems with a theme's wording (#283): only keys src/wording.ts knows,
- * plain text, and every `{placeholder}` and `toil …` command the standard
+ * Problems with a theme's wording (#283): only flavour keys src/wording.ts knows
+ * (a functional key is refused: it reads one plain text in every theme), plain text, and every `{placeholder}` and `toil …` command the standard
  * text has, so a themed line never drops the id or the command it shows.
  */
 export function lexiconProblems(lexicon: unknown): string[] {
@@ -68,6 +68,10 @@ export function lexiconProblems(lexicon: unknown): string[] {
       out.push(`theme.json: lexicon."${key}" isn't a word key (src/wording.ts).`);
       continue;
     }
+    if (isFunctional(key as WordKey)) {
+      out.push(`theme.json: lexicon."${key}" is a functional word (src/wording.ts): it names something a person acts on, so it reads the same plain text in every theme. Remove it from the lexicon.`);
+      continue;
+    }
     if (typeof text !== 'string' || !text.trim() || /[<>`]|\[\[/.test(text)) {
       out.push(`theme.json: lexicon."${key}" must be plain text.`);
       continue;
@@ -76,6 +80,24 @@ export function lexiconProblems(lexicon: unknown): string[] {
     if (placeholders(text).sort().join() !== placeholders(standard).sort().join()) out.push(`theme.json: lexicon."${key}" must keep the placeholders ${placeholders(standard).map((p) => `{${p}}`).join(', ') || '(none)'}.`);
     for (const command of commandsIn(standard)) if (!text.includes(command)) out.push(`theme.json: lexicon."${key}" must keep the command ${command}.`);
   }
+  return out;
+}
+
+/**
+ * Problems with a theme's thinking phrases (#561): three to eight lines, each
+ * plain text of a status line's length that ends in an ellipsis (it is an
+ * action under way, and says nothing is finished), none of them a claim of
+ * progress such as a percentage or "done".
+ */
+export function thinkingProblems(thinking: unknown): string[] {
+  if (thinking === undefined) return [];
+  if (!Array.isArray(thinking) || thinking.length < 3 || thinking.length > 8) return ['theme.json: "thinking" must be a list of 3 to 8 phrases.'];
+  const out: string[] = [];
+  for (const p of thinking) {
+    if (typeof p !== 'string' || !p.trim() || p.length > 60 || /[<>`]|\[\[|[\r\n]/.test(p) || !p.endsWith('…')) out.push(`theme.json: thinking ${JSON.stringify(p)} must be plain text of 60 characters or fewer that ends in "…".`);
+    else if (/\d|\b(done|finished|complete|completed|almost there)\b/i.test(p)) out.push(`theme.json: thinking "${p}" claims progress; a phrase is flavour, never a count or a finish.`);
+  }
+  if (new Set(thinking).size !== thinking.length) out.push('theme.json: thinking lists a phrase twice.');
   return out;
 }
 
@@ -114,7 +136,7 @@ export function manifestProblems(folder: string, raw: unknown): string[] {
   if (typeof m.radius !== 'string' || !/^\d+(\.\d+)?(px|rem|em)$/.test(m.radius)) out.push('theme.json: "radius" must be a length, like "6px".');
   for (const key of Object.keys(m.terms ?? {})) if (!(TERMS as readonly string[]).includes(key)) out.push(`theme.json: "${key}" isn't a word a theme can rename (${TERMS.join(', ')}).`);
   for (const [key, word] of Object.entries(m.terms ?? {})) if (typeof word !== 'string' || /[<>]/.test(word)) out.push(`theme.json: terms.${key} must be plain text.`);
-  out.push(...lexiconProblems(m.lexicon), ...voiceProblems(m.voice), ...alignmentProblems(m.alignments), ...momentsProblems(m.moments, (m.assets ?? {}) as Record<string, string>));
+  out.push(...lexiconProblems(m.lexicon), ...voiceProblems(m.voice), ...thinkingProblems(m.thinking), ...alignmentProblems(m.alignments), ...momentsProblems(m.moments, (m.assets ?? {}) as Record<string, string>));
   return out;
 }
 

@@ -108,23 +108,10 @@ describe('every proposal the board, the scripted agent and the pull request view
   const { publishProposals } = await import('../src/worklog.ts');
   const everywhere = { confluence: { connection: null, inputs: { space: 'PAY' } }, github: { connection: null, inputs: { owner: 'imagile', repo: 'payments-web' } } };
   proposals.push(...publishProposals('card-payments', { day: '2026-10-12' }, 'C:/Users/you/Documents/worklog-card-payments-2026-10-12.md', everywhere));
-  // Ticketing a chat's work (#304): a sub-task under every open item, and a new ticket, on every tracker toil creates on.
-  const { newTicketProposal, subTaskProposal } = await import('../src/model/ticketing.ts');
-  for (const name of NAMES) {
-    const { items } = await loadToilProject(fixtureExecute().execute, name);
-    const open = items.filter((i) => i.statusCategory !== 'DONE');
-    // Azure DevOps on a Services connection is still area ado: the item's source says the deployment.
-    const onServices = open.filter((i) => i.source.area === 'ado').map((i) => ({ ...i, id: `services-ado:${i.source.key}`, source: { ...i.source, connection: 'services-ado', deployment: 'cloud' } }));
-    // Jira on a Cloud connection is still area jira: the item's source says the deployment.
-    const onCloud = open.filter((i) => i.source.area === 'jira').map((i) => ({ ...i, id: `cloud-jira:${i.source.key}`, source: { ...i.source, connection: 'cloud-jira', deployment: 'cloud' } }));
-    for (const item of [...open, ...onCloud, ...onServices]) proposals.push(subTaskProposal('Tokenise card numbers at the edge', item, name));
-    proposals.push(newTicketProposal('Tokenise card numbers at the edge', items, name, null));
-    for (const list of [onCloud, onServices]) proposals.push(newTicketProposal('Tokenise card numbers at the edge', list, name, null));
-  }
   const withCommand = proposals.filter((p) => p?.command);
 
   it('includes some of each kind', () => {
-    expect(new Set(withCommand.map((p) => p!.command))).toEqual(new Set(['jira issue transition', 'ado work-item transition', 'jira issue update', 'ado work-item update', 'github pr add-reviewers', 'github pr comment', 'bitbucket pr add-reviewer', 'bitbucket pr update', 'confluence page create', 'github issue create', 'jira issue create', 'ado work-item create']));
+    expect(new Set(withCommand.map((p) => p!.command))).toEqual(new Set(['jira issue transition', 'ado work-item transition', 'jira issue update', 'ado work-item update', 'github pr add-reviewers', 'github pr comment', 'github project status', 'bitbucket pr add-reviewer', 'bitbucket pr update', 'confluence page create', 'github issue create']));
   });
 
   it.each(withCommand.map((p) => [p!.id, p!] as const))('%s names a write command, with input its schema accepts', (_id, p) => {

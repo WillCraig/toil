@@ -21,6 +21,7 @@ import { cacheData } from './agents/tools.ts';
 import { Cache, CacheError, wipeCacheFiles } from './cache.ts';
 import { areasFrom, settingsFrom } from './config.ts';
 import { createUiServer, type ToilProjectRenames } from './server.ts';
+import { loadMachineSecret, MachineSecretError } from './machine-secret.ts';
 import { ToilProjectAgents } from './agents/toil-project-agents.ts';
 import { parseSettings, SettingsError, themesNotice, USAGE } from './settings.ts';
 import { fixtureStore, sqliteStore } from './store.ts';
@@ -164,6 +165,7 @@ async function main(): Promise<number> {
         registry: registry.commands,
         execute,
         mapIds,
+        areas: areasFrom(registry),
         serveTools: (tools) => serveTools(tools),
         fallback: noAgent(),
         ledger,
@@ -240,7 +242,19 @@ async function main(): Promise<number> {
         }
       : undefined;
 
+  // The machine secret signs the browser's cookie (#561). It is made on the first start and read on every later one; never printed.
+  let machineSecret;
+  try {
+    machineSecret = loadMachineSecret(settings.dataDir, (message) => process.stderr.write(`toil-ui: ${message}\n`));
+  } catch (e) {
+    if (!(e instanceof MachineSecretError)) throw e;
+    process.stderr.write(`toil-ui: ${e.message}\n  Fix: ${e.fix}\n`);
+    cache?.close();
+    return 1;
+  }
+
   const ui = createUiServer({
+    machineSecret,
     ...(renames ? { renames } : {}),
     ...(toilProjectAgents ? { toilProjectAgents } : {}),
     settings,
@@ -279,8 +293,8 @@ async function main(): Promise<number> {
       settings.sample ? 'Serving sample data and the scripted agent; nothing connects to a tracker.' : 'Syncing through toil, read-only, with your own connections and Toil projects. Only its Settings pages, and a Toil project\'s name and description edited in place, change anything: toil\'s own connections and Toil projects, when you ask. The worklog keeps its pages and your notes in its data folder, and writes anywhere else only when you export one. Feedback goes to Imagile only when you send it.',
       ...(cache ? [`The cache is ${cache.paths.db}, kept ${settings.retentionDays} days after each sync; toil-ui wipe deletes it.`] : []),
       '',
-      'Open this URL in your browser. It carries this launch\'s token, so keep it to yourself:',
-      `  ${address.launchUrl}`,
+      'Open this URL in your browser. It holds no secret: your browser is let in by a cookie signed with the key in the data folder, and anything running as you on this machine can reach Toil UI too:',
+      `  ${address.url}`,
       '',
       'Press Ctrl+C to stop.',
       '',

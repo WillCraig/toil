@@ -42,6 +42,24 @@ export const bitbucketArea = defineArea({
   }),
   secrets: ['pat', 'apiToken', 'accessToken'],
   defaults: { deployment: 'server' },
+  choices: {
+    deployment: {
+      question: 'Which one is it?',
+      required: true,
+      options: [
+        { label: 'Cloud', value: 'cloud', hosts: ['bitbucket.org', 'api.bitbucket.org'] },
+        { label: 'Data Center', value: 'server' },
+      ],
+    },
+    baseUrl: {
+      options: [
+        { label: 'Bitbucket Cloud (https://api.bitbucket.org/2.0)', value: 'https://api.bitbucket.org/2.0', when: { deployment: 'cloud' } },
+        { label: 'Your Bitbucket server', value: null, when: { deployment: 'server' }, placeholder: 'https://bitbucket.imagile.dev' },
+      ],
+    },
+  },
+  // Project and target branch are Data Center's; Cloud has workspaces.
+  appliesTo: { project: ['server'], targetBranch: ['server'] },
   variants: {
     by: 'deployment',
     // Cloud takes either an access token, or an email with an API token; the request hook says which is missing.

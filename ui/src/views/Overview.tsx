@@ -23,7 +23,7 @@ import { parseRoute } from '../App.tsx';
 import { Help } from '../components/help.tsx';
 import { Cited, PrLink } from '../components/items.tsx';
 import { useData, useDerived } from '../data.ts';
-import { analysesHref, analysisHref, boardHref, dependenciesHref, itemHref, peekHref, peopleHref, personText, prsHref, shortKey, sourceLabel, worklogHref } from '../format.ts';
+import { analysesHref, analysisHref, boardHref, dependenciesHref, itemHref, peekHref, peopleHref, personText, prsHref, shortKey, sourceLabel, standupHref, worklogHref } from '../format.ts';
 import { Empty, TrackerAction } from '../components/empty.tsx';
 import { burnup } from '../model/burnup.ts';
 import { aging, cycleTimes, throughput } from '../model/flow.ts';
@@ -31,12 +31,13 @@ import { WAITING_LABEL, daysText, openQueue } from '../model/prs.ts';
 import type { BriefingReason } from '../model/briefing.ts';
 import { useSkins, useWords } from '../skins.tsx';
 import { usePlain } from '../plain-words.ts';
+import { StandupCard } from '../components/standup-card.tsx';
 import { Aging, CycleTime, SprintDetail, Throughput } from './Flow.tsx';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export function Overview() {
-  const { toilProject, byId, now } = useData();
+  const { toilProject, byId, now, worklog } = useData();
   const { health: h, insights: p } = useDerived();
   const view = useBriefing();
   const prefs = useBriefingPrefs();
@@ -117,6 +118,7 @@ export function Overview() {
           )}
         </div>
       )}
+      {worklog && <StandupCard api={worklog} />}
       <details
         className="briefing__full"
         open={prefs.fullOpen}
@@ -206,6 +208,7 @@ export function Overview() {
         <a href={dependenciesHref(toilProject.name)} title={plain.title('Dependencies')}>{plain.pw('Dependencies', 'What blocks what')}</a>
         <a href={prsHref(toilProject.name)} title={plain.title('Pull requests')}>{plain.pw('Pull requests', 'Code reviews')}</a>
         <a href={peopleHref(toilProject.name)}>People</a>
+        {worklog && <a href={standupHref(toilProject.name)}>Stand-up</a>}
         <a href={worklogHref(toilProject.name)} title={plain.title('Worklog')}>{plain.pw('Worklog', 'What happened')}</a>
         <a href={analysesHref(toilProject.name)} title={plain.title('Analyses')}>{plain.pw('Analyses', 'Past briefings')}</a>
       </nav>

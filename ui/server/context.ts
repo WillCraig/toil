@@ -3,7 +3,7 @@
  * server answers carries a `RequestContext`, and everything behind it (the
  * Store, the Agent) takes the viewer from there, never from a process global.
  * In v1 the viewer is always the person who started `toil-ui`, behind the
- * launch token; real viewers arrive later as a new auth layer in front of this
+ * loopback-only server; real viewers arrive later as a new auth layer in front of this
  * type, not as a rewrite of what sits behind it. A visitor badge, issued to
  * the only person in the building.
  */
@@ -15,8 +15,8 @@ export interface Viewer {
   id: string;
   /** How a view names them. */
   name: string;
-  /** How they proved who they are: the launch token, in v1. */
-  via: 'launch-token';
+  /** How they got in: from this machine, over loopback, in v1. */
+  via: 'loopback';
 }
 
 export interface RequestContext {
@@ -33,5 +33,5 @@ export function localViewer(): Viewer {
   } catch {
     // Some containers have no passwd entry for the uid. The name is for display only.
   }
-  return { id: 'local', name, via: 'launch-token' };
+  return { id: 'local', name, via: 'loopback' };
 }

@@ -1,7 +1,7 @@
 /**
  * Which agent the chat answers with when nobody has picked one in it (#494):
  * the one last used for this toil project, if it can still answer; else the default
- * from Settings, Agent, if it can; else the first agent that is ready; else
+ * from Settings, AI agent, if it can; else the first agent that is ready; else
  * nothing, which is the old behaviour (the server tries Settings' choice and
  * says why it can't). Pure, so the order is tested without a page. Seating by
  * precedent, then by policy, then by whoever turned up.

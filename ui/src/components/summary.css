@@ -46,3 +46,10 @@
 .sum-card__title a:hover { text-decoration-color: currentColor; }
 .sum-howrow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; }
 .sum-howrow > .sum-how { flex: 1 1 auto; min-width: 0; }
+
+.sum-standup { display: grid; gap: 0.5rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: 0.5rem; }
+.sum-standup__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; }
+.sum-standup__head h2 { margin: 0; font-size: 1.05rem; }
+.sum-standup__head .btn { margin-inline-start: auto; }
+.sum-standup h3 { margin: 0.35rem 0 0.1rem; font-size: 0.9rem; }
+.sum-standup .rows { margin: 0; }

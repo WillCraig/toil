@@ -6,6 +6,9 @@
 
 /* Controls: the look is ours, the behaviour React Aria's. */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
+/* A link dressed as a button gets the frame a <button> gets from app.css, at the same specificity as the variants below so --accent and --small still win. */
+.btn:where(a) { box-sizing: border-box; min-height: 44px; padding: 0 0.75rem; border: 1px solid var(--muted); border-radius: var(--radius); background: var(--raised); color: var(--ink); font: inherit; text-decoration: none; cursor: pointer; }
+.btn:where(a):hover { border-color: var(--ink); }
 .btn[data-hovered] { border-color: var(--ink); }
 .btn[data-focus-visible], .starter[data-focus-visible], .menu-item[data-focus-visible], .card-grip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .btn[data-disabled], .starter[data-disabled] { cursor: not-allowed; opacity: 0.75; }
@@ -13,14 +16,21 @@
 .btn--quiet { border-color: transparent; background: transparent; color: var(--link); text-decoration: underline; }
 .btn--accent { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 .choice { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9375rem; color: var(--muted); }
+/* Choices stacked in a card share one label column and one control width, so their controls line up (ui/README.md, Forms and rows of controls). */
+.panel > .choice { display: grid; grid-template-columns: 8.5rem minmax(12rem, 18rem); align-items: center; gap: 0.4rem 0.75rem; }
+.panel > .choice .choice-button { min-width: 0; width: 100%; }
+@media (max-width: 29.99rem) { .panel > .choice { grid-template-columns: minmax(0, 1fr); } }
 .choice-button { color: var(--ink); min-width: 7rem; justify-content: space-between; }
 .popover { background: var(--raised); border: 1px solid var(--muted); border-radius: var(--radius); box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); min-width: var(--trigger-width, 10rem); }
 .menu { padding: 0.25rem; outline: none; max-height: 60vh; overflow: auto; }
-.menu-item { display: flex; align-items: center; min-height: 44px; padding: 0 0.75rem; border-radius: var(--radius); color: var(--ink); cursor: pointer; outline: none; }
+.menu-item { display: flex; align-items: center; min-height: 44px; padding: 0 0.75rem; border-radius: var(--radius); color: var(--ink); cursor: pointer; outline: none; text-decoration: none; }
 .menu-item[data-focused], .menu-item[data-hovered] { background: var(--surface); }
 .menu-item[data-selected] { font-weight: 600; }
 .menu-item[data-selected]::after { content: "\2713"; margin-left: auto; padding-left: 1rem; }
 .menu-header { padding: 0.4rem 0.75rem 0.2rem; font-size: 0.8125rem; font-weight: 600; color: var(--muted); }
+.nowrap { white-space: nowrap; }
+/* A heading that takes focus by script (a wizard moving to its next step) shows no ring; keyboard focus elsewhere keeps its own. */
+.focus-quiet:focus, .focus-quiet:focus-visible { outline: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* Status chips, avatars and insight chips. */
@@ -91,6 +101,7 @@
 /* The board. */
 .board { display: grid; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.25rem; }
 .column { background: var(--bg); border: 1px solid var(--line); border-top: 4px solid var(--muted); border-radius: var(--radius); padding: 0.6rem; display: grid; gap: 0.6rem; align-content: start; min-height: 10rem; min-width: 0; }
+.column__more { justify-self: start; }
 .column--in_progress { border-top-color: var(--link); }
 .column--done { border-top-color: var(--ok); }
 .column--over { outline: 3px dashed var(--focus); outline-offset: -3px; }
@@ -118,7 +129,11 @@
 /* The whole card is the handle. A finger may still scroll across it (touch-action stays manipulation); only a hold picks it up. */
 .card-grip { display: grid; gap: 0.45rem; padding: 0.6rem; border-radius: inherit; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .card--dragging .card-grip { cursor: grabbing; }
-.card-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.35rem; }
+/* A card that can't be moved has no grab cursor; its reason is read out always and drawn on hover or focus, so the card doesn't grow under a pointer passing by. */
+.card-grip[data-immovable] { cursor: default; }
+.card-why { margin: 0; font-size: 0.8125rem; color: var(--muted); }
+.card:not(:hover):not(:focus-within) .card-why { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.card-top{ display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.35rem; }
 .card-key .key { color: var(--link); font-weight: 600; }
 .card-key:hover .key { text-decoration: underline; }
 .card-key { -webkit-user-drag: none; }
@@ -192,6 +207,17 @@
 .ask-status__line { margin: 0; flex: 1 1 12rem; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 .ask-status__line code { font-weight: 400; overflow-wrap: anywhere; }
 .ask-status__time { font-weight: 400; color: var(--muted); }
+/* The thinking indicator (#561): a ~1em icon beside "N questions in this chat" and the status line. It spins only where
+   motion is welcome; otherwise it is the same icon, still. */
+.ask-bar__count { display: inline-flex; align-items: center; gap: 0.35em; }
+.thinking-icon { width: 1em; height: 1em; flex: none; vertical-align: -0.125em; overflow: visible; }
+.thinking-icon__track { fill: none; stroke: var(--line); stroke-width: 2; }
+.thinking-icon__arc { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+.ask-status__line .thinking-icon { margin-right: 0.4em; }
+@media (prefers-reduced-motion: no-preference) {
+  .thinking-icon { animation: toil-spin 1.1s linear infinite; }
+}
+@keyframes toil-spin { to { transform: rotate(360deg); } }
 .ask-suggest { justify-self: start; }
 .ask-switch { text-align: center; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); padding: 0.4rem 0; margin: 0; }
 .agent-switch { min-height: 36px; }
@@ -353,7 +379,7 @@
 /* The usage lines (#552): one readable line, the breakdown behind a fold. */
 .usage-details summary, .chat-usage summary { cursor: pointer; }
 .chat-usage[open] > summary, .usage-details[open] > summary { margin-bottom: 0.15rem; }
-/* First-run setup is not a fault: the AI helper page says so calmly, in the info tone, with the steps first and the detail one step in. */
+/* First-run setup is not a fault: the AI agent page says so calmly, in the info tone, with the steps first and the detail one step in. */
 .agent-hint { display: grid; gap: 0.4rem; padding: 0.6rem 0.75rem; border: 1px solid var(--line); border-left: 4px solid var(--link); border-radius: var(--radius); background: var(--raised); }
 .agent-hint p, .agent-steps { margin: 0; }
 .agent-steps { padding-left: 1.25rem; display: grid; gap: 0.2rem; }
@@ -361,3 +387,86 @@
 .agent-details p { margin: 0.25rem 0 0; font-size: 0.875rem; overflow-wrap: anywhere; }
 .agent-advanced { display: grid; gap: 0.6rem; }
 .agent-advanced[open] > summary { margin-bottom: 0.25rem; }
+.install-sub { margin: 0.5rem 0 0.15rem; font-size: 0.9375rem; }
+.install-steps { margin: 0; padding-left: 1.25rem; display: grid; gap: 0.25rem; font-size: 0.9375rem; }
+.install-registry { border: 1px solid var(--line); border-radius: var(--radius); padding: 0.6rem 0.75rem; display: grid; gap: 0.5rem; }
+.install-registry summary { font-weight: 600; cursor: pointer; }
+.install-registry__row { display: grid; gap: 0.5rem; grid-template-columns: minmax(0, 1fr); }
+.install-registry__row label { display: grid; gap: 0.25rem; }
+@media (min-width: 40rem) { .install-registry__row { grid-template-columns: minmax(0, 1fr) auto; align-items: end; } }
+
+/* The Waiting now table (#561): one idea a cell, roomy gutters, detail one press in. */
+.pr-queue[data-wide] table { min-width: 62rem; }
+.pr-queue th, .pr-queue td { padding-right: 1.5rem; }
+.pr-queue th.l-table__actions, .pr-queue td.l-table__actions { padding-right: 0; }
+.cell-more { display: inline; margin-left: 0.4rem; }
+.cell-more > summary { display: inline; cursor: pointer; color: var(--muted); text-decoration: underline dotted; text-underline-offset: 3px; list-style: none; }
+.cell-more > summary::-webkit-details-marker { display: none; }
+.cell-more > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.cell-more > p { margin: 0.25rem 0 0; max-width: 24ch; }
+.pr-queue .flags { grid-template-columns: max-content; }
+.pr-queue .pr-author, .pr-queue .flags li, .pr-queue .pr-size .field { white-space: nowrap; }
+.pr-size { display: grid; gap: 0.25rem; }
+.diffbar { display: inline-flex; gap: 2px; }
+.diffbar__sq { display: block; width: 0.6rem; height: 0.6rem; border-radius: 1px; background: var(--line); }
+.diffbar__sq--add { background: var(--ok); }
+/* Deletions are danger-coloured and also striped, so the two never rest on colour alone. */
+.diffbar__sq--del { background: repeating-linear-gradient(135deg, var(--danger) 0 2px, color-mix(in srgb, var(--danger) 35%, transparent) 2px 4px); }
+.diffbar__sq--none { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+@container l-table (max-width: 28rem) {
+  .pr-queue[data-wide] table { min-width: 0; }
+  .pr-queue th, .pr-queue td { padding-right: 0; }
+  .pr-queue td.l-table__actions { padding: 0; }
+  .pr-queue .flags { grid-template-columns: minmax(0, 1fr); }
+  .pr-queue .pr-author, .pr-queue .flags li, .pr-queue .pr-size .field { white-space: normal; overflow-wrap: anywhere; }
+}
+
+/* The connection form (#561): the live required/optional badge, the (i) beside a label, what a field says under itself, and an address built around a word. */
+.need { margin-inline-start: 0.4rem; padding: 0 0.4rem; border: 1px solid var(--muted); border-radius: var(--radius); font-size: 0.75rem; font-weight: 400; text-transform: lowercase; }
+.need--required { border-color: var(--accent); }
+.info { display: inline-block; margin-inline-start: 0.35rem; }
+.info > summary { cursor: pointer; list-style: none; display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 1.5px solid currentColor; border-radius: 999px; font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 700; font-size: 0.875rem; line-height: 1; color: var(--accent); }
+.info > summary::-webkit-details-marker { display: none; }
+.info > summary:hover { background: var(--raised); }
+.info > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.problems { display: grid; gap: 0.25rem; margin: 0.25rem 0 0; }
+.problem--warning { border-inline-start: 3px solid var(--accent); padding-inline-start: 0.5rem; }
+.affix { display: flex; align-items: center; flex-wrap: wrap; gap: 0.25rem; }
+.affix input { flex: 1 1 10rem; min-width: 0; }
+.choice-field { display: grid; gap: 0.75rem; }
+.scopes__list { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; }
+.scopes__use h4 { margin: 0.75rem 0 0.25rem; }
+.scopes__commands { overflow-wrap: anywhere; display: block; }
+.scopes__entries > li { display: grid; gap: 0.1rem; padding-block: 0.35rem; }
+.setup__existing > li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; align-items: baseline; padding-block: 0.25rem; }
+.repo-list { display: grid; gap: 0.5rem; border: 0; padding: 0; justify-items: start; }
+.repo-list > .repo-row, .repo-list > .note { justify-self: stretch; }
+.repo-row { display: grid; gap: 0.25rem; }
+.btn[aria-disabled="true"] { opacity: 0.6; cursor: not-allowed; }
+
+/* Settings, AI agent: each helper is one row, its choice on the left and Install at the right edge, its details one press in. */
+.helper-list { display: grid; gap: 0.5rem; }
+.helper-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.4rem 0.75rem; min-width: 0; }
+.helper-row > .agent-choice { min-width: 0; }
+.helper-row__wide { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 29.99rem) { .helper-row { grid-template-columns: minmax(0, 1fr); } }
+
+/* A field's label row: the label, its required or optional badge and its (i) on one line. */
+.field-row__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.4rem; min-width: 0; }
+.field-row__head .info { margin: 0; }
+
+/* Open, the text floats under the (i) as a tooltip card, so nothing on the page shifts; in a form's label row it spans the field. */
+.info { position: relative; }
+.field-row__head { position: relative; }
+.field-row__head .info { position: static; }
+.info[open] > .info__text { position: absolute; z-index: 20; top: calc(100% + 0.35rem); left: 0; width: min(24rem, 80vw); margin: 0; padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius); background: var(--raised); box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); }
+.field-row__head .info[open] > .info__text { right: 0; width: auto; }
+/* The row is the box, so a helper's choice, its Install and its details read as one thing; the choice inside keeps no box of its own. */
+.helper-row { padding: 0.25rem 0.75rem 0.5rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.helper-row > .agent-choice { border: 0; box-shadow: none; background: transparent; padding-inline: 0; }
+.helper-row:has([data-selected]) { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+
+/* A Toil project's edit page: one section open at a time, the rest a line each. */
+.edit-group { border-top: 1px solid var(--line); padding: 0.75rem 0; }
+.edit-group > summary { cursor: pointer; font-weight: 600; font-size: 1.05rem; }
+.edit-group[open] > summary { margin-bottom: 0.75rem; }

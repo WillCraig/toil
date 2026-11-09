@@ -39,22 +39,18 @@ Toil UI <version> (beta, local only), on toil <version>
 Syncing through toil, read-only, with your own connections and Toil projects. Only its Settings pages, and a Toil project's name and description edited in place, change anything: toil's own connections and toilProjects, when you ask. The worklog keeps its pages and your notes in its data folder, and writes anywhere else only when you export one. Feedback goes to Imagile only when you send it.
 The cache is /home/you/.toil-ui/cache/toil-ui.db, kept 30 days after each sync; toil-ui wipe deletes it.
 
-Open this URL in your browser. It carries this launch's token, so keep it to yourself:
-  http://127.0.0.1:53117/?token=<token>
+Open this URL in your browser. It holds no secret: your browser is let in by a cookie signed with the key in the data folder, and anything running as you on this machine can reach Toil UI too:
+  http://127.0.0.1:53117/
 ```
 
-Open that URL. The page trades the token for a session, and the token leaves the
-address bar. The tab keeps the session in `sessionStorage`, so reloading the page
-works. A new tab needs the URL again, and so does a restart of `toil-ui`, which always
-ends the session; each start prints a new token. A duplicated tab, or one the browser
-restores, can carry the session while the same `toil-ui` is still running. Toil UI opens no browser itself.
+Open that URL. There is nothing to paste and nothing stored by the page: the first
+time your browser opens the page, the server sets a cookie, and the browser sends it
+back with every call. Reload, bookmark, open a new tab or restart `toil-ui`, and it
+still works. Toil UI opens no browser itself.
 
-Why the token, and why `sessionStorage`: the server can run toil with your own
-connections, so something has to keep other local processes and users out of it, and
-the token is that lock. A cookie would have made reloads easy, but a browser sends a
-cookie to every port on `127.0.0.1`, so any other local server would receive the
-session. `sessionStorage` belongs to this exact origin (port included) and is never
-sent anywhere. `localStorage` would outlive the tab, so it isn't used.
+Why this and not a token in the URL: the maintainer chose a local-only tool with no
+step for the person and nothing in `sessionStorage` (#561). What does the work
+instead is in **The checks on the door**, below, with what they don't protect against.
 
 `toil-ui --sample` serves the sample Toil projects and the scripted agent that
 [the site's Toil UI page](https://imagile-dev.github.io/toil/ui/) runs on, with
@@ -66,15 +62,44 @@ Until you have a Toil project and it has synced once, the Toil projects view sho
 checklist in place of the empty page:
 
 1. **Connect a tracker** opens Settings, Connections at the add form. If an agent following the toil skill's `setup.md` already created the connection, you only enter its secret here, on its row.
-2. **Create a Toil project** opens Settings, Toil projects at Create a Toil project.
+2. **Create a Toil project** opens the New Toil project wizard (`#/new-project`, below).
 3. **Sync** starts the first sync, as the Sync panel's Sync now does.
 
 Each step ticks itself off from toil's own state: `toil connections list` for a
 connection to Jira, Azure DevOps or GitHub (one made by env vars counts), `toil
-projects list` for a Toil project, and the Sync panel for the sync. Beside the steps,
-**Try the sample data** shows `npx @imagile-dev/toil-ui --sample` with a Copy
-button, to restart Toil UI on the sample Toil projects. The checklist goes once the first
+projects list` for a Toil project, and the Sync panel for the sync. Beside the steps, **Set it up step by step** opens the setup wizard (`#/setup`, below). The checklist goes once the first
 sync finishes. Each step's (i) explains it and links to these docs.
+
+## The setup wizard
+
+For someone new to AI, toil and Toil UI, `#/setup` walks through setup one question a screen, with Back and one Next button, which stays disabled until the page is done (an optional page has a "Not now" choice), and a "Step 3 of 7" line. It opens from **Set it up step by step** on the first run, from **Set up toil, step by step** in the command palette, from the link under Settings' heading, and by its own address.
+
+1. **Welcome** says what toil and Toil UI are, and that nothing in your tools changes without you.
+2. **An AI agent (optional)** comes first, so it can explain the rest. It is the AI agent page's own Install dialog and Save, explained for someone who has never used one: what it is, that it only reads and suggests, that it uses the subscription you already have so Toil UI stores no key, and that it never sees your login. Choose "Not now" and every later step is what it always was, with one small line, "Set up an AI agent to get explanations here", that brings you back here and then returns you to where you were.
+3. **Which tools do you use?** lists the areas toil can connect to, from the server's own registry: GitHub, Jira, Azure DevOps, Bitbucket, Confluence and SonarQube first, the rest under **More tools**. A tool you already have a connection to says so.
+4. **Link your tools** takes each ticked tool in turn with the same form as Settings, Connections: the settings in text boxes, and the login in a masked box that goes to toil's own `connections login` path and the OS credential store, as it does in Settings. The wizard never keeps it, and no AI agent, guide or suggestion ever sees it. The new connection starts with changes off (writes off in toil's words), and the screen says so. **Test the link** runs `toil connections test`.
+5. **Your Toil project** creates one (`projects init`, an optional repository with `projects add-repo`, then `projects link` for each tool set up) or links the tools to one you already have.
+6. **Let toil learn your Jira fields (optional)** is Settings' Find the fields.
+7. **All set** says what was set up and offers **Sync now**.
+
+### The guide
+
+Once an AI agent is ready (installed, its program found, and chosen here or in Settings), the Tools, Link, Toil project and Jira fields steps show a guide beside the step: two columns from 1000px wide, and below the step behind **Ask the guide**, closed, on a phone or tablet. Each step offers starter questions ("Which scopes does my token need?", "Where do I find my Jira site name?", "Cloud or Data Center?", "What is a Toil project?", "What does Sprint mean here?") and a question box labelled **Ask a question (never paste a token here)**. The chat is kept as you move between steps.
+
+It is a guide, not an operator. The server gives it its own prompt (`ui/server/agents/guide.ts`) and three read tools: `docs_list` and `docs_read`, which read toil's own skill pages for the tools you chose (the pages the MCP server serves as resources, embedded in the server), and `connection_scopes`, which says what a tool's token needs. Once a Toil project exists it also gets toil's live reads for it; it needs no sync and no Toil project before then. What it is told is built on the server from three places and no others: the wizard's whitelisted state (the step, the tools ticked, the one being linked, a Cloud or Data Center choice and the address the form composed, with no login or query in it, and the Toil project's name), `connections list` run read-only (name, tool, address, writes, and the same "token: saved, from an environment variable or missing" badge Settings shows, never a value), and the docs. A change it suggests comes back as a card with the command it would type and **Run this**, which runs it through the same config call the wizard's own buttons use, after the page checks it again; only `connections add` (with plain `--set` settings, no login), `projects init`, `projects add-repo` and `projects link` are offered a button. Its answers are not in the worklog, which is about work.
+
+**No secret reaches it.** The connection form reports only what it would send as settings (a form's `submission`, which holds no secret by construction), and the wizard whitelists `deployment` and the address from them. A message is checked before it is sent, three times over, by the same function (`looksLikeSecret`, `ui/src/guide.ts`: toil's own `checkSecret()` paste check on the message, each word and each pair, the usual credential prefixes such as `ghp_`, `github_pat_`, `ATATT`, `glpat-`, `xox` and `AKIA`, a `Bearer` header, a JWT or private key, an address with a login in it, `password:` and `token=` with a value, and one long key-shaped word): in the panel, in the page's client, and at the server's route, which refuses it before it reads another field, and again in the host before the connection list, the agent, the usage ledger or the worklog is touched. A refused message is cleared, never kept, logged, audited or echoed, and the notice says: "That looks like a token. Type it in the masked box in the step instead; the guide never needs it." Nothing is stored in the browser: closing the tab ends the chat.
+
+The wizard keeps its progress in the page only; it adds no config key. Connections it saved stay saved if you close the tab. Every change is one of the commands in the allowlist Settings uses, so each is in toil's audit log as `toil-ui`.
+
+## The New Toil project wizard
+
+`#/new-project` is a separate, short wizard for the one job of making a Toil project, so nobody who already has their tools set up lands on "Step 5 of 7" of the first run. It looks and behaves like the setup wizard (a "Step 2 of 4" line, Back, one primary button that stays disabled with a plain reason until the page is done, and a **Not now** on each optional page) and has no AI agent guide. The **New Toil project** buttons (the Toil projects page, Settings, the first-run checklist), the command palette's **Create a Toil project**, and the old addresses `#/setup/project` and `#/settings/projects/+new` (which are rewritten to it) all open it.
+
+1. **Name it**: a name (lowercase letters, digits and single hyphens, not already taken) and an optional description.
+2. **Where does it live? (optional)**: folders or repository addresses, or **Not now**.
+3. **Which tools does it use?**: your existing tool links, each tool's main one ticked, one per tool, or **Not now**.
+4. **Create it**: a summary and one **Create `<name>`** button, which runs `projects init`, `projects add-repo` for each folder, then `projects link` for each tool, never with `--shared`, and says what it is doing as it goes. A folder that fails does not undo the Toil project: it is listed with a **Retry**. Then **Open `<name>`**, and **Name your Jira fields** when Jira was linked. With changes turned off the button stays disabled and says so. The wizard keeps its place in the page only, as the setup wizard does.
 
 ## What it reads
 
@@ -110,9 +135,14 @@ in any view.
 
 ## Plain words
 
-Screens read in everyday words by default: a pull request is a **code review**, an agent an **AI helper**, with toil's own term in the hover. Facts, numbers, commands and errors read the same either way. **Settings, General** (and the command palette) turn it off, kept in this browser; `?words=standard` in the address does too. Themed wording and themed agent voice are off until chosen.
+Screens always read in everyday words: a pull request is a **code review**, an agent an **AI agent**, with toil's own term in the hover. There is no switch. Anything a person reads to act (a menu item, tab, button, label, heading, an error and its fix) is plain English and identical in every theme; a theme speaks only in ledes and explanations, loading text, empty-state sentences and its moments (**Words** in `docs/themes.md`). Facts, numbers, commands and errors read the same everywhere. Themed wording is on by default and themed agent voice is off until chosen.
 
-The tabs read **Summary**, **Board**, **What blocks what** (Dependencies), **Code reviews**, **People**, **What happened** (Worklog) and **Past briefings** (Analyses); Analyze is **Get a briefing**. A panel's source reads "From Jira and GitHub", with the commands one step in. **Settings → General** has a **Plain words** switch with an (i), and the command palette has **Use plain words** / **Use toil's own terms**. Quoted titles, the tracker's words and a briefing's own sentences are never reworded.
+The tabs read **Summary**, **Board**, **What blocks what** (Dependencies), **Code reviews**, **People**, **What happened** (Worklog) and **Past briefings** (Analyses); Analyze is **Get a briefing**. A panel's source reads "From Jira and GitHub", with each tool and how many reads it took one step in. **Settings → Appearance** has a **Font** control: the theme's own type first, then pairings made only of fonts already bundled (`docs/themes.md`, **Fonts**). Quoted titles, the tracker's words and a briefing's own sentences are never reworded.
+
+## Plain copy: no terminal in the words
+
+- **Toil UI never shows a terminal command, an environment variable name or a file path as copy** (the maintainer's decision, 2026-11-09). Its readers are product owners and managers, not developers. So no "Runs `toil …`" line, no `TOIL_*` name, no config-file location, no `--flag`, no "Saves: area github, baseUrl …" summary; a login says **Saved on this computer** or **Set outside Toil UI, so it can't be changed here**. Errors and their fixes stay honest (principle 4) but are worded in plain English, and an error toil itself worded is kept as toil said it. Where a thing can only be done in a terminal, the screen says Toil UI can't do it yet, rather than quoting the command.
+- **The one exception is an approval card:** a proposed change shown before a person presses Run ("Proposed change, not applied", the Board's proposals, the AI agent's setup suggestions, an install awaiting its press) shows what will run, because that is what the person is approving.
 
 ## The Toil projects view
 
@@ -125,15 +155,33 @@ filled, plus `projects list` and `projects show` for the Toil projects themselve
   pull requests wait on a review; the people with work in it, as avatars; its sources
   as badges; when it was last synced; and how many work items and pull requests
   changed since this browser last opened its dashboard.
-- **Which card leads:** the Toil project opened most recently in this browser, or, before
+- **Unknown is not zero (principle 12):** a Toil project that has never synced has
+  read nothing, so its counts show a dash (`–`, spoken as "not read yet") instead of
+  `0`, and the sprint and "since you last looked" lines stay off until a sync has
+  read something. Once it has synced, a `0` is a real count.
+- **Card order:** the Toil project opened most recently in this browser, or, before
   any was opened, the one with the most in motion (in progress, blocked and waiting on
-  review together), takes two columns where they fit. On a wide screen the grid goes
+  review together), comes first unless the person set an order with a card's **Move earlier** /
+  **Move later** (kept in this browser). Every card is the same size. On a wide screen the grid goes
   wider than the dashboards and fits more cards across; at 375px it is one column.
 - **What this browser remembers:** when each dashboard was last opened, in
   `localStorage`, never sent anywhere. Without it (a private window) the cards just
   say nothing about "since".
 - **A Toil project's top row** uses the same parts: the description beside the name, the
   sources as badges, and the sprint's day (The Toil project page, below).
+
+### Archiving a Toil project (#561)
+
+A card's quiet "more" menu holds Archive, and so does the command palette (type
+"archive") and each of your own Toil projects under Settings, Toil projects. It runs
+`toil projects archive <toilProject>` on the settings pages' path, so the file is
+changed by toil and nothing is deleted. One line under the header says what happened
+and has an Undo. The archived ones leave the list, the switcher and the sync figures,
+and wait under a closed "Archived (n)" at the bottom of the page, each with Unarchive
+(`toil projects unarchive`), which the palette offers too. The list reads them with
+`toil projects list --archived`; if that fails the disclosure is not drawn, because
+unknown is not none. The preview changes nothing, so it shows the sample's archived
+project and no controls.
 
 ### Renaming and describing a Toil project
 
@@ -145,6 +193,12 @@ its audit log as `caller: "toil-ui"`. Escape cancels, and a refusal shows toil's
 message and fix under the field. Only a Toil project in your own folder can be renamed or
 described; a checked-in one is refused with the `toil projects import` fix.
 
+A card's menu has **Edit**, which opens a **Name** and **Description** form with one **Save**: it makes one `toil projects describe` call carrying only what changed. The top row keeps the pencil and the inline field.
+
+### Editing a Toil project
+
+Each of your own Toil projects has an edit page at `#/settings/projects/<name>/<section>`, reached from the card menu's **Edit** or **Edit sources**, from Settings, Toil projects, the command palette, or by its address. Its sections are grouped: **Sources** (repositories and the tools linked), **Field names** (with **Find the fields**, which reads a Jira project's custom fields), **People**, **Work in progress limit** and **How Analyze briefs**. Each saves through toil's own `projects` commands on the settings pages' path, so the write gate and the audit log apply as they do anywhere else, and a link to a connection with writes on is refused here as it is over MCP.
+
 A rename keeps everything Toil UI holds for the Toil project: the server moves its cache
 (responses, items, history, sources, sync runs, notes and agent runs), its assignments
 and its worklog pages to the new name once toil has renamed the file, so its
@@ -153,14 +207,17 @@ message, while a sync or an assignment of that Toil project is running, since bo
 by name as they go. What can't be moved is said beside toil's result, and the next
 sync reads the Toil project afresh under its new name.
 
+## Switching Toil projects
+
+The app's header carries a project picker right after the brand, before the views, on every page and in every theme. Its button names the Toil project you are in (**All Toil projects** on a page that belongs to none); its menu lists **All Toil projects** and each Toil project, with the current one checked. Picking one keeps the tab you are on (Code reviews stays Code reviews), and a page that is not a tab lands on the project's Summary. It is the header's way to the Toil projects page (the header has no "Toil projects" link of its own, only Settings), so it is drawn whenever there is at least one Toil project; with none, the brand goes home. On a phone the same list is the first thing in the header's Menu.
+
 ## The Toil project page
 
 A Toil project opens on its **Overview**, the briefing, in a frame all of its pages share:
 
-- **The top row:** on the Overview, a **Diagram** link (`#/project/<name>/job/diagram`) draws the Toil project's repositories as a C4 diagram in Mermaid; the steps that need a folder on disk (`util size`, `git log`, `deps scan`) are reported unchecked. Its name, with the pencil that renames it; **Switch**, for another
-  Toil project or the Toil projects view; the sprint and its day; its description, cut to one
-  line with the whole of it in its tooltip, and its sources (on a phone, a **Details** button beside the name opens them); and the Ask bar, with the
-  **AI helpers** button beside it (The agent, below).
+- **The top row:** on the Overview, a **Diagram** link (`#/project/<name>/job/diagram`) draws the Toil project's repositories as a C4 diagram in Mermaid; the steps that need a folder on disk (`util size`, `git log`, `deps scan`) are reported unchecked. Its name; the sprint and its day; its description, cut to one
+  line with the whole of it in its tooltip, its sources and a quiet **Edit** link at the end of that line (on a phone, a **Details** button beside the name opens them, the link with them); and the Ask bar, with the
+  **AI agents** button beside it (The agent, below). Moving to another Toil project is the picker in the app's header, right after the brand, on every page (see below).
 - **The tabs**, one address each: **Overview** (`#/project/<name>`), **Board**
   (`/board`, with how many of its cards need attention), **Dependencies**
   (`/dependencies`), **Pull requests** (`/prs`), **People** (`/people`), **Worklog**
@@ -168,8 +225,8 @@ A Toil project opens on its **Overview**, the briefing, in a frame all of its pa
   is the Board tab's **Readiness** view, the stand-up is the Worklog's, and an item's
   page sits under Board, so every address from before the tabs still opens. On a
   narrow screen the tabs scroll sideways; the Agents button sits beside the Ask bar at
-  every width (a compact **AI** with its count on a phone, still named "AI helpers"), so the tabs get the whole row.
-- **The Agents panel**, closed by default at every width: one **Agents** button (**AI helpers** in plain words)
+  every width (a compact **AI** with its count on a phone, still named "AI agents"), so the tabs get the whole row.
+- **The Agents panel**, closed by default at every width: one **Agents** button (**AI agents** in plain words)
   beside the Ask bar, counting what waits on you (the tracker's inbox, proposals to approve and
   questions to answer, and any assignment or proposal that failed, since a closed panel must not hide a failure). From 1200px wide it opens the panel beside every tab, and remembers
   whether you left it open (in `localStorage`); below that it opens a drawer. The palette's
@@ -305,7 +362,7 @@ The Board tab flags each card that needs attention, with a flag beside its statu
 an edge in the warning colour: anything that needs action now or a look (Insights,
 below), but not what is only worth knowing. **Needs attention only** narrows the board
 to those cards, and the tab carries how many there are. Drag a card to another column,
-or press M on it for its menu, to propose the move: nothing changes until you apply
+or press M on it for its menu, to propose the move (a card that can't be moved can't be dragged, and shows the reason: a GitHub issue that isn't on a project board this Toil project reads, or an area with no status command; a GitHub move proposes `toil github project status --item <id> --to <status>`): nothing changes until you apply
 the command the proposal shows, and the card stays where its tracker says. Under the board are its
 stories with their pull requests, builds and deployments, then the builds and
 deployments themselves.
@@ -333,6 +390,24 @@ and the item view lists them all.
 | No estimate | It has no estimate | worth knowing |
 | Added mid-sprint | It joined the sprint after it started | worth knowing |
 
+## Tables and rows
+
+The pattern every table follows (`DataTable` in `src/components/layout.tsx`; the Waiting now table is the model):
+
+- **Actions get their own column,** the narrow last one (`actions: true` on the column): a quiet icon button that opens a menu, named for its row (`aria-label="Actions for …"`). Never a bordered text button under each row's title.
+- **One idea a cell.** A name and one badge, a state and one figure. Figures are compact (`32.6 d`, `326 · 8 files`); the sentence behind one is a `<details className="cell-more">` one press in. Nothing is dropped, only layered (principle 11); errors, source and verification stay on screen.
+- **Numbers as small visuals where they have a shape:** a diff-style bar of five squares for additions and deletions, never colour alone (a stripe pattern and the numbers beside it), as one `role="img"` whose `aria-label` carries every figure. An unknown figure is a dash, not zero (principle 12).
+- **Gutters:** every cell has room on its right (`1.5rem` in the queue), the actions column none, and stacked rows (under about 28rem) drop to label and value pairs. Check at 375, 768 and 1440px in Plain, Crate and Harvest.
+
+## Forms and rows of controls
+
+A label with its control is one row, and rows stacked in a card line up (the Settings, Theme card is the model, `.panel > .choice` in `src/views.css`):
+
+- **One label column, one control width.** Stacked rows share a label column wide enough for the longest label and give their controls the same width, so the controls start at the same left edge and end at the same right one. Never let each row size itself to its own label.
+- **A control that is a link is still a button.** A link that looks like one takes `btn`, which gives it the frame a `<button>` gets (`.btn:where(a)`); don't style a bare anchor and hope.
+- **Narrow:** under about 30rem a row is the label above its control, full width.
+- **Look at it, don't reason about it.** Screenshot every new or changed form at 375 and 1440px in Plain, Crate and Harvest; ragged edges, text with no frame and controls that don't line up don't show up in tests.
+
 ## Pull requests
 
 Each Toil project has a **Pull requests** tab (`#/project/<name>/prs`), built from OWI 0.2
@@ -340,8 +415,7 @@ changes:
 
 - **Waiting now:** the open pull requests, longest wait first, each with what it
   waits on (review, changes, checks, merge, or a draft its author holds), since when
-  in working days and why, who wrote it (a person, an agent or a bot, with the signal
-  that said so), the work items it names, and its size, XS to XL by changed lines.
+  in working days (`32.6 d`, the sentence behind it one press in), who wrote it (the name, and an Agent or Bot badge that opens the signal that said so), the work items it names, and its size, XS to XL by changed lines.
 - **Flags:** no first review in 2 working days, checks failing for over a day, a merge
   conflict, no linked work item, a work item done while its pull request is open, and
   a merged pull request whose item isn't done, each with what it rests on.
@@ -349,7 +423,7 @@ changes:
   merge (approval to merge) times, review rounds, sizes and merges per week, over six
   weeks, each split by people, agents and bots and each with its sample size and what
   couldn't be measured.
-- **Actions:** each open pull request has one **Actions** menu with **Review** (reads the pull request, its diff and checks, and drafts findings as comments you can post) and **Ship** (on a pull request a person wrote: drafts replies to its review; editing, the gate and pushing stay in your terminal). Each opens its own page, `#/project/<name>/job/review?target=<change id>` or `/job/ship?…`, which says what the job does and needs and has **Run**. The run goes through the Ask bar, so every write is a proposal card and the run is kept in the worklog. A job missing its code host's connection stays in the menu, dimmed, naming the connection to add. Ship stops after 3 finished rounds on one pull request; the next run is refused and says it needs a person (`needs-human`). The steps come from toil's workflow pages (`skills/toil/workflows/`).
+- **Actions:** each open pull request has one **Actions** menu, a quiet `…` icon button in its own narrow last column (named `Actions for <repo> #<n>`; stacked rows put it at the row's top corner), with **Review** (reads the pull request, its diff and checks, and drafts findings as comments you can post) and **Ship** (on a pull request a person wrote: drafts replies to its review; editing, the gate and pushing stay in your terminal). Each opens its own page, `#/project/<name>/job/review?target=<change id>` or `/job/ship?…`, which says what the job does and needs and has **Run**. The run goes through the Ask bar, so every write is a proposal card and the run is kept in the worklog. A job missing its code host's connection stays in the menu, dimmed, naming the connection to add. Ship stops after 3 finished rounds on one pull request; the next run is refused and says it needs a person (`needs-human`). The steps come from toil's workflow pages (`skills/toil/workflows/`).
 - **Suggested reviewers:** for an open pull request with nobody asked, the CODEOWNERS
   of its paths and the earlier reviewers of the same files and folders, each as a
   proposal with the `toil … --allow-write` line to ask them.
@@ -382,6 +456,16 @@ system (`toil projects person`, or **Settings, Toil projects**):
   it; it is applied only when someone presses the button, and an email that fits more
   than one candidate suggests nothing and says why. Accounts that only wrote bots'
   pull requests are left out and counted.
+- **Map** (#561) is on each such card: it opens a form in place to choose an existing
+  person or add a new one (a person or an agent), with a field for the identity in each
+  source the Toil project uses (GitHub, Jira, Azure DevOps, Bitbucket), the account's own
+  prefilled and a likely person from toil's matcher (`src/core/people-match.ts`) as the
+  starting choice. Save runs `toil projects person` through the same config path as
+  Settings; nothing is applied until it is pressed. **Save to this repository** (beside
+  the people, in the Map form once it has saved, and in Settings) runs `toil projects
+  people save`, which writes the people into the repository's `.toil/projects/<name>.json`
+  for any host (GitHub, Azure DevOps, Bitbucket); the page says which file changes, and
+  nothing is staged or committed.
 
 It shows what is on each plate and never scores anyone: no ranking, no productivity
 figure, no person-to-person comparison and no line or commit counts. Flow metrics
@@ -496,7 +580,11 @@ Toil UI posts nothing. With sample data, notes and export are off.
 
 ### Stand-up
 
-**Stand-up since the last working day**, on the Worklog
+**Stand-up since the last working day** leads the Summary too: a compact **Stand-up** card right under the
+headline answer and what needs attention shows the same report for the default range ("Yesterday" or "Since
+Friday"), five lines with **Show more** in place, and **Open the full stand-up**. With no sync behind it the card
+shows `–` and "Not read yet" with **Sync now**, never "nothing happened". The Summary's **Go to** row and the
+command palette (**Open the stand-up**) open it as well. The page, on the Worklog
 (`#/project/<name>/worklog/standup`), reshapes the worklog for a meeting: since the last
 working day through today (Friday through Monday on a Monday), or any range of up to 31
 days you pick (`#/project/<name>/worklog/standup/<from>/<to>`, or `/<day>` for one), and each day's page has a
@@ -550,12 +638,12 @@ running those commands through `@imagile-dev/toil/api`, never by editing a file:
   came from.
 - **Toil projects:** create one, add a repository, link an area, name a field, and
   show and check any of them. A Toil project's name and description are edited in place
-  on its card and dashboard, through `toil projects describe`. A link to a connection with writes on is refused
+  on its card and dashboard, through `toil projects describe`. The list has **New Toil project** (`#/new-project`) and an edit page for each (`#/settings/projects/<name>/<section>`: Sources, Field names, People, Work in progress limit, How Analyze briefs). A link to a connection with writes on is refused
   here, as over MCP: make it on the CLI.
-- **Bounds and time limit:** toil has no command for these, so they are shown
-  read-only, with the file or env var that sets them.
+- **Bounds and time limit:** toil has no command for these, so they are under
+  Settings, General, **Advanced**, shown read-only.
 - **Usage:** how toil is used on this machine, from `toil audit stats`, which
-  reads only toil's local audit log: calls per day, the split between Toil UI, the
+  reads only toil's local audit log. It opens on a one-line summary of calls, failures and changes, without Toil UI's own background calls; behind **More detail** are calls per day, the split between Toil UI, the
   CLI and MCP, the commands used most, the ones that fail most with their top
   error code and its usual fix (and, on request, their recent failures from
   `toil audit list`), and the commands nothing called. It needs a toil with
@@ -577,8 +665,8 @@ the agent, a usage cap) opens the settings page where it's set, at that value; i
 only navigates. **Help** in the header is a menu with the docs for the view you're on
 and **What's new** (below).
 
-Where a screen uses an AI term (tokens and the context window under Agent usage,
-model, harness and MCP under Agent, sandbox and permission mode in the Assign
+Where a screen uses an AI term (tokens and the context window under Usage,
+model, harness and MCP under AI agent, sandbox and permission mode in the Assign
 dialog's modes, session and system prompt in Renew all stale, hallucination in the
 chat's **About these answers**), its (i) popover also gives each term's first
 sentence from Context Overflow's glossary, with **Read more on Context Overflow**.
@@ -626,8 +714,8 @@ until you call it up.
 - **Jump** to a Toil project, any of a Toil project's tabs (Overview, Board, Dependencies,
   Pull requests, People, Worklog, Analyses), a saved analysis, a settings page, or a
   theme.
-- **Run** Sync now (where Toil UI keeps a cache), **Use plain words** / **Use toil's own terms**, and on a Toil project's page Ask (it
-  focuses the Ask bar), Analyze, **Review a pull request**, **Ship: answer a review** and **Diagram <Toil project>** (each opens its job's page), **Open the Agents panel** (**Open the AI helpers panel** in plain words), the agent that answers this chat, and Assign the
+- **Run** Sync now (where Toil UI keeps a cache), and on a Toil project's page Ask (it
+  focuses the Ask bar), Analyze, **Review a pull request**, **Ship: answer a review** and **Diagram <Toil project>** (each opens its job's page), **Open the Agents panel** (**Open the AI agents panel** in plain words), the agent that answers this chat, and Assign the
   item you were on to an agent: the board card that had focus, or the item whose
   page is open.
 - Matching is fuzzy and ignores case: `pay12` finds `PAY-12`, and each word you
@@ -665,8 +753,8 @@ request: the kind, a title, the details and your email. It sends through
   agree to the report on screen and no other.
 - **Only what you typed.** toil adds its version and commit, nothing else: no
   Toil project, connection, host or cached data.
-- **The same lock as Settings.** `api/feedback` needs the session, the page's
-  Origin and the CSRF token, takes the four fields and nothing else, and runs
+- **The same checks as Settings.** `api/feedback` needs the cookie, the page's own
+  Host and Origin and a JSON body, takes the four fields and nothing else, and runs
   `toil feedback` and no other command. Your tick becomes the yes to the command's
   own consent question. With sample data it sends nothing. With a toil that has no
   `feedback` command (0.1.0-alpha.2), the dialog says so and points at the site's
@@ -680,6 +768,7 @@ dashboards make, for every Toil project, and stores the answers. The work items 
 through toil's Open Work Item mapping, with their status changes and the pull
 requests, builds and deployments that name them.
 
+- **Nothing moves while it runs.** A running sync shows as a small card over the lower corner of the window (along the bottom edge on a phone), with the theme's loader inside it, never in the page itself, so the page you are reading stays where it is.
 - **Incremental.** After the first sync, Jira and Azure DevOps searches, and a
   GitHub repository's issues, ask only for what changed since the last good sync (`updatedSince`, five minutes early in
   case the clocks disagree), and the GitHub board marks the issues whose
@@ -719,7 +808,7 @@ requests, builds and deployments that name them.
   floor of 6 weeks (see What it reads). An analysis goes once
   it is older than the retention period, and with its Toil project when toil no longer
   has it.
-- **Wiping it.** **Wipe the cache** in the Sync panel deletes it after asking
+- **Wiping it.** **Wipe the cache**, under Settings, General, **Advanced**, deletes it after asking
   first. `toil-ui wipe` does the same from a terminal, once `toil-ui` has
   stopped: a running Toil UI holds `toil-ui.lock` in the data folder, and the
   command refuses while it does. Your trackers are never touched. The next sync fetches everything again.
@@ -745,7 +834,7 @@ conversation stays, for the rest of the Toil project's pages, until you reload.
 
 - **The guided start** (#552) is what the chat shows before the first question:
   "What would you like to know about {name}?", then nine plain questions in four groups
-  (How are we doing? What's in the way? Backlog. For others), beside **Before you ask**. What each is good for is its hover; the one line on the page is that "Who might need help?" never ranks anyone. The dialog's title is the project's name. You can still type your own, except with no AI helper set up, when the questions are off and the notice links to **Settings → AI helper**. Pressing a question asks its text
+  (How are we doing? What's in the way? Backlog. For others), beside **Before you ask**. What each is good for is its hover; the one line on the page is that "Who might need help?" never ranks anyone. The dialog's title is the project's name. You can still type your own, except with no AI agent set up, when the questions are off and the notice links to **Settings → AI agent**. Pressing a question asks its text
   through the same path as typing it; after the first answer the same questions are the
   **Suggestions** menu. The questions are `src/guided-questions.ts`, not the server's
   starters, which still back `api/agent/starters`.
@@ -770,9 +859,9 @@ conversation stays, for the rest of the Toil project's pages, until you reload.
   question on the server and keeps what had arrived. Claude and Copilot stream as they
   write; Codex's SDK hands over its text a message at a time, so with Codex the status
   line is what moves between messages.
-- **The wording follows the theme** when themed wording is on and plain words are off: the bar's placeholder, the welcome and the status
-  words are in each game theme's voice, and Plain stays neutral. With plain words on (the default), they read in plain words. The starter questions
-  read the same in every theme.
+- **The wording follows the theme only where nothing depends on it**: with themed wording on, the bar's welcome and note are in each game
+  theme's voice and Plain stays neutral. The placeholder and the status line's source words read the same plain text in every theme, and so
+  do the starter questions.
 - **Analyze** briefs the Toil project in one press (#494). It is the guided start's first
   question, "Give me the full briefing", and still the command palette's Get a briefing and the
   Analyses tab's button; the Ask bar has no button of its own for it. Its question comes from toil,
@@ -806,7 +895,7 @@ conversation stays, for the rest of the Toil project's pages, until you reload.
   ordinary question, records the agent it was asked of, in `<data folder>/toil-project-agents.json` (an adapter name per
   Toil project name, Toil UI's own state, never in the Toil project file). The next time the chat
   opens on that Toil project it starts on that agent if it can still answer, else on the
-  default from Settings, Agent (Claude, GitHub Copilot or Codex), else the first agent
+  default from Settings, AI agent (Claude, GitHub Copilot or Codex), else the first agent
   that is ready, else as before, with the server trying the default and saying why it
   can't. A few words beside **Answered by** say which: "last used on this Toil project",
   "your default", "your default can't run", "the first one ready" or
@@ -825,16 +914,16 @@ dependency that is loaded only when it answers:
 | GitHub Copilot | `@github/copilot-sdk` | `copilot` (the Copilot CLI) | your Copilot seat, through the CLI |
 | Codex | `@openai/codex-sdk` | `codex` (the Codex CLI) | the CLI's ChatGPT sign-in or its own API key setup |
 
-Choose the default under **Settings, Agent**: the adapter, each adapter's model
+Choose the default under **Settings, AI agent**: the adapter, each adapter's model
 (empty for its CLI's default), the CLI's path (empty to use the one on `PATH`) and,
 for Claude, the endpoint. The choice is kept in `<data folder>/agent.json`, never in
 toil's config, and has no field for a key: each SDK signs in the way its CLI does.
 
 ### Installing an adapter's SDK
 
-**Settings, Agent** (**AI helper** in plain words) opens on the steps to get going and each
-helper with its state (Ready, Not set up yet in a calm tone, or Needs one more step with the
-reason shown), and an **Install** button on each helper that isn't installed. Whether its SDK
+**Settings, AI agent** opens on the steps to get going and each
+AI agent with its state (Ready, Not set up yet in a calm tone, or Needs one more step with the
+reason shown), and an **Install** button on each AI agent that isn't installed. Whether its SDK
 is installed and at which version against the one Toil UI was tested with, which CLI it would
 start, and anything worth knowing, are one step in under **Details for whoever sets it up**;
 models, the CLI path and the endpoint are behind **Advanced**. A missing SDK has an **Install** button, which shows the one
@@ -845,7 +934,7 @@ npm install --global --prefix <the prefix Toil UI is installed in> --ignore-scri
 ```
 
 Pressing **Install** runs it through the npm that came with your Node, with no shell and
-your own npm config, so your organization's registry and proxy apply. npm's output
+your own npm config, so your organization's registry and proxy apply. If the install fails, Toil UI offers a registry helper: on a press, it writes one `registry=<url>` line to the user npmrc (`ui/server/agents/npmrc.ts`) and you try again. The Copilot CLI's package installs along with its SDK (`docs/decisions/561-ai-helper-installs.md`). npm's output
 streams into the dialog, and Toil UI then loads the SDK to prove it installed; a
 failure shows npm's own message and the fix. **Copy command** is beside it, for a
 machine where you'd rather run it yourself. This is the one thing Toil UI runs npm
@@ -925,33 +1014,21 @@ for (docs/decisions/343-ask-up-front.md).
   be on the same drive. `toil-ui wipe` deletes this home with the cache, along with
   Codex's record of Toil UI's questions, and leaves your own `auth.json` alone.
 
-- **Your own instructions.** Under **Settings, Agent**, general instructions (for
+- **Your own instructions.** Under **Settings, AI agent**, general instructions (for
   example "answer in British English") and a custom voice, each up to 4,000
   characters, kept in `agent.json` beside the adapter. They come after the rules in
   the prompt, and the rules win: they can't change the citations, the figures, the
   proposals or what the tools can do. **Show the full prompt** shows exactly what
   the agent is sent.
 
-With no adapter chosen, the chat says in plain words that no AI helper is set up and where
-an engineer sets one up (Settings, Agent), with the three adapters and their packages one
+With no adapter chosen, the chat says in plain words that no AI agent is set up and where
+an engineer sets one up (Settings, AI agent), with the three adapters and their packages one
 step in, behind **Details for whoever sets it up**; its switcher can still
-choose an installed one for that chat. The notice goes as soon as a helper can answer: the chat
-reads the helpers again whenever the page moves, so installing on the Settings page needs no
-reload. A helper that is installed but can't start yet says so instead, with the reason one step
+choose an installed one for that chat. The notice goes as soon as an AI agent can answer: the chat
+reads the AI agents again whenever the page moves, so installing on the Settings page needs no
+reload. An AI agent that is installed but can't start yet says so instead, with the reason one step
 in. `toil-ui --sample` keeps the scripted agent,
 which answers its starter questions, Analyze and the workflow jobs from the sample data (a job's answer says nothing was read and lists every check as unchecked).
-
-### Not ticketed yet
-
-When you ask the chat for work that names no ticket (not a question, which ends in `?` or
-opens with what, why, how and the like, and no key such as `PAY-12` or `#42`), a **Not ticketed yet** banner lists up to three of the
-Toil project's open items likeliest to cover it, scored as `toil util owi similar` scores
-them, each with why. Attach the work to one by naming its key in your branch and
-commits, which writes nothing, or press **Ticket this** for proposals: a sub-task
-under each match, and a new ticket on the Toil project's tracker. They are proposal cards
-like the chat's others, with the command line to run through toil's write gate, and
-nothing is created until you run one. With no match, it says there is no likely
-ticket and offers only a new one. It asks once per chat, and **Not now** hides it.
 
 ### What the agent's models used
 
@@ -971,7 +1048,7 @@ called):
 - **In the chat's footer**, from the second answer (one answer's usage is the chat's), the chat's running total, split by model, and how full
   the last answer's context got, where the SDK says (Claude and Copilot; Codex's SDK
   doesn't). On a phone the chat's header is one line, "Answered by … · Change".
-- **Settings, Agent usage** (beside Usage, which counts toil's own commands): the last
+- **Settings, Usage**, under its **More detail** (beside the count of toil's own commands): the last
   30 days by day, adapter, model and Toil project, the chats that used the most, and an
   **Export as CSV** download made in the page.
 - **One adding-up rule**, `addUp` in `src/model-usage.ts`, read by the server's caps,
@@ -981,7 +1058,7 @@ called):
   sync's cleanup or a Toil project leaving never lowers a total. It follows the cache's
   retention, `toil-ui wipe` clears it, and it is never sent anywhere.
 
-**Caps** are optional and off until you turn one on, under Settings, Agent usage: a
+**Caps** are optional and off until you turn one on, under Settings, Usage: a
 per-chat and a per-day (UTC) cap for each adapter, in tokens, dollars (Claude's SDK
 estimate, or Codex from your rates) or Copilot premium requests. At 80% the answer
 says so; at 100% the question stops, naming the cap and how to raise it. Claude and
@@ -1038,7 +1115,7 @@ you apply it.
 - **Limits.** One assignment runs at a time and each has 20 minutes, both changeable
   in the sidebar's **Limits** (1 to 3 at once, 1 to 240 minutes), kept in
   `<data folder>/assignments.json`. An assignment is one chat to the usage caps under
-  **Settings, Agent usage**, so a per-chat cap is a per-assignment cap. Either limit
+  **Settings, Usage**, so a per-chat cap is a per-assignment cap. Either limit
   stops a run cleanly, saying which.
 - **The transcript** keeps the prompts, every tool call, the agent's text, the
   commands and file changes Codex reports, and each proposal and what came of it.
@@ -1053,7 +1130,7 @@ you apply it.
 ## Stale sessions
 
 An agent works from the instructions it got when it started. Upgrade toil, edit the
-Toil project or change your instructions under **Settings, Agent**, and the chats and
+Toil project or change your instructions under **Settings, AI agent**, and the chats and
 assignments already going are still on the old ones. Toil UI records what each one
 started on, says which have gone stale and why, and renews them on request.
 
@@ -1113,7 +1190,7 @@ call, its progress, or a state that didn't change never notifies.
   assignments assigned, started or renewed here), and quiet hours, which hold every
   notice while the title still counts.
 - **Plain words.** Notices read the same in every theme: the theme's wording stays in
-  the views.
+  the views' flavour text.
 - **Where it listens.** The server's `api/assignments/events?since=latest` stream,
   which carries what a notice says with each event, and a minute's read of the
   Toil project on screen for sessions gone stale.
@@ -1135,8 +1212,8 @@ the worklog's facts, never from the bell.
 
 Eight built-in themes: Plain, Crate (the default), Harvest, Starship, Realm, Sprawl,
 Frontier and Overworld. Pick
-one from the header, or under **Settings, General**, where two checkboxes say how far
-it goes, both off by default (#552):
+one from the header, or under **Settings, Appearance**, where two checkboxes say how far
+it goes, wording on and the agent voice off by default (#552, #561):
 
 - **Themed wording:** the theme's own lede, eyebrows, dashboard notes, empty
   states and loading lines, and its names for a sprint, a board or an epic beside
@@ -1147,19 +1224,16 @@ it goes, both off by default (#552):
   dungeon master in Realm, a laconic netrunner in Sprawl, a dry telegraph operator
   in Frontier, an old sage in a cave in Overworld. It changes phrasing only.
 
-Every theme has a light and a dark scheme. **Appearance**, in Settings, General or the
+Every theme has a light and a dark scheme. **Light or dark**, in Settings, Appearance or the
 command palette, picks one; System, the default, follows your operating system.
 
-A theme with particles also gets **Particles and ambient effects**, kept for each
-theme on its own: off, that theme's particles are gone entirely, while its other
-motion keeps following **Reduce motion and effects** (and the operating system's
-reduced-motion setting, which stops everything).
+**Motion**, one select under Settings, Appearance, is Full, Subtle or Off: Off is what reduced motion was, and Subtle also turns the theme's particles off. The operating system's reduced-motion setting stops everything.
 
 Crate, Harvest, Starship, Realm, Sprawl, Frontier and Overworld also have **theme moments**: a launch splash while the first read
 runs, their own loading screens with the real progress and a rotating line of their own,
 an entrance as a Toil project opens, a transition between its tabs, and a short moment when a
 sync brings an item done, a build passed or failed, a blocker cleared, a pull request
-merged, or a sprint's end. **Theme motion**, under Settings, General, plays them in full,
+merged, or a sprint's end. **Motion**, under Settings, Appearance, plays them in full,
 subtly or not at all, and is off whenever reduced motion is asked for. Every loading
 screen also carries a **toil tip**, one line with a Read more link, which **Toil tips on
 loading screens** turns off. Waits under 300 ms show no loading screen at all.
@@ -1175,19 +1249,47 @@ left in the data folder by an earlier alpha is not read, and Toil UI says so whe
 starts. [Themes](https://imagile-dev.github.io/toil/docs/themes/) has the whole
 story, the composed prompt included.
 
-## The lock on the door
+## The checks on the door
 
-Any program on the machine, or a web page using DNS rebinding, can reach a local
-port, so the server lets in only the browser holding this launch's token:
+The server binds loopback only (`127.0.0.1` or `::1`; any other `--host` is refused).
+A web page open in your browser can still send requests to a port on `127.0.0.1`, by
+posting a form or by rebinding its own domain to loopback, so every request passes
+these checks, before a route runs:
 
-- **The token.** A random token per start, in the URL it prints. The page trades it
-  for a session id, which the tab keeps in `sessionStorage` (see Start it) and
-  sends as a header on every API call. Nothing is kept in a cookie: a browser would send one to any other server
-  on `127.0.0.1`, whatever its port.
-- **The Host header.** Only the exact `127.0.0.1:<port>` it printed is answered.
-- **No CORS.** No `Access-Control-*` header is ever sent. Every POST also needs the
-  page's own `Origin`, a JSON body, and the session's CSRF token.
-- **No network but toil's.** It talks to the hosts in your toil connections, and
+- **A cookie.** The first time `toil-ui` runs it makes 32 random bytes in
+  `machine-secret` in its data folder (`~/.toil-ui/`), mode 0600 on macOS and Linux, and
+  reads the same file on every later start. It never leaves the machine and is never
+  printed, logged or sent. When a browser navigates to the page itself
+  (`Sec-Fetch-Dest: document`, `Sec-Fetch-Site` none or same-origin), the server sets
+  the `toil-ui` cookie: a random id, the time, and an HMAC-SHA256 of both with the
+  secret; `HttpOnly` (no script can read it), `SameSite=Strict`, 30 days. It can't be
+  `Secure`, which a browser won't keep over plain `http`. Every API call needs a valid
+  one, compared in constant time. A page on another site can't have it sent with a
+  request, and a cross-site navigation is refused the cookie.
+- **The peer and the Host header.** The connection must come from loopback, and the
+  `Host` must be `127.0.0.1:<port>`, `localhost:<port>` or `[::1]:<port>`.
+- **Origin and Fetch Metadata.** An API call whose `Origin` isn't this server's own, or
+  whose `Sec-Fetch-Site` isn't `same-origin`, is refused, and a POST must be
+  `application/json`, which a plain cross-site form cannot send. With the cookie's
+  `SameSite=Strict`, that is why there is no CSRF header.
+- **No CORS.** No `Access-Control-*` header is ever sent and `OPTIONS` is refused.
+
+A program that isn't a browser gets the cookie the way a browser does: `GET /` from
+this machine with `Sec-Fetch-Dest: document` and `Sec-Fetch-Site: none`, then send the
+`toil-ui=…` value from `Set-Cookie` back in `Cookie` (`ui/scripts/smoke.mjs` does).
+
+What this does not do: **any program running on this machine as you can read
+`machine-secret`, or ask for the page as a browser would and get a cookie.** On a
+shared machine, another account can reach the port too, unless the operating system
+restricts loopback between users; the secret file itself stays yours. Cookies are not
+scoped to a port, so another local web server on `127.0.0.1` is sent this cookie
+too. On Windows the file takes the permissions of your profile folder (restricting it
+would need `icacls`, a program toil doesn't add). The server runs toil with your own
+connections, so run `toil-ui` only where you would run a database client. Writes still
+need the connection's `writes` setting and the Settings page's own confirmations, and
+secrets are still entered only in Settings, going to the OS credential store.
+
+**No network but toil's.** It talks to the hosts in your toil connections, and
   nothing else, apart from a feedback report you send, which toil sends to Imagile. The agent CLI you choose talks to its own model endpoint.
 
 ## Run against a real repository
@@ -1229,21 +1331,21 @@ GitHub CLI signed in (`gh auth login`), or `TOIL_GITHUB_TOKEN` set in the shell.
   `--home <dir>` uses another folder.
 - **Ask with Codex.** Install the SDK in the clone without saving it
   (`npm install --no-save --ignore-scripts @openai/codex-sdk@0.160.0`), then choose
-  Codex under **Settings, Agent**. The script points `CODEX_HOME` at your real
+  Codex under **Settings, AI agent**. The script points `CODEX_HOME` at your real
   `~/.codex`, which is where Toil UI finds the `auth.json` it links into its own
   Codex home.
 - **Ask with GitHub Copilot, on a cheap model.** Install `@github/copilot-sdk@1.0.16`
-  the same way (or press **Install** under **Settings, Agent**). The Copilot CLI found
+  the same way (or press **Install** under **Settings, AI agent**). The Copilot CLI found
   its own sign-in from the scratch home in our runs; if it says it isn't signed in, run
   `copilot` once on its own. Then pick the model: Copilot lists the models your
   account can use, each with its premium-request multiplier (`/model` in the CLI, or
   the SDK's `listModels()`). Choose the lowest, ideally one at 0×; otherwise the
   cheapest multiplier, such as `mai-code-1.1-flash` at 0.25×, never a premium model.
-  Type its id as Copilot's model under **Settings, Agent**, and check the model each
+  Type its id as Copilot's model under **Settings, AI agent**, and check the model each
   answer names and the premium requests under it.
 - **Ask with Claude, on Haiku.** Install `@anthropic-ai/claude-agent-sdk@0.3.289` and
   `zod@4.6.5` the same way, and type `haiku` (or `claude-haiku-5-5`) as Claude's
-  model under **Settings, Agent**; empty would be Claude Code's own default, which
+  model under **Settings, AI agent**; empty would be Claude Code's own default, which
   may be Opus. Claude Code keeps its sign-in in `~/.claude`, which the scratch home
   hides, and refreshing it from there would rewrite your credentials file, so the
   script only reads it: a `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` in the

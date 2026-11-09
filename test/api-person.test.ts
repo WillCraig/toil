@@ -71,7 +71,12 @@ describe('the registry', () => {
 
   it("says what a connection to each area holds, in the order connections add asks", () => {
     const fields = registry.areas.find((a) => a.name === 'jira')!.connection;
-    expect(fields[0]).toEqual({ name: 'baseUrl', description: 'Jira root: the Data Center server (https://jira.imagile.dev), or the Cloud site (https://<your-site>.atlassian.net)', secret: false, password: false, default: null, required: true });
+    expect(fields[0]).toMatchObject({ name: 'baseUrl', description: 'Jira root: the Data Center server (https://jira.imagile.dev), or the Cloud site (https://<your-site>.atlassian.net)', secret: false, password: false, default: null, required: true });
+    // Cloud or Data Center is a radio the person must choose, and the address is made from it; the email is Cloud's.
+    expect(fields.find((f) => f.name === 'deployment')!.choices).toMatchObject({ required: true, options: [{ label: 'Cloud', value: 'cloud' }, { label: 'Data Center', value: 'server' }] });
+    expect(fields[0]!.choices!.options.map((o) => o.when)).toEqual([{ deployment: 'cloud' }, { deployment: 'server' }]);
+    expect(fields.find((f) => f.name === 'email')).toMatchObject({ appliesTo: ['cloud'], requiredFor: ['cloud'] });
+    expect(registry.areas.find((a) => a.name === 'jira')!.variantBy).toBe('deployment');
     expect(fields.at(-1)).toMatchObject({ name: 'apiToken', secret: true, password: false, required: true });
     expect(fields.find((f) => f.name === 'project')).toMatchObject({ secret: false, required: false });
   });

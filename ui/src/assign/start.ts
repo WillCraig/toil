@@ -20,8 +20,8 @@ export function startReadyWith(api: AssignmentsApi, toilProject: string): StartR
     const list = await api.list(toilProject);
     const able = list.adapters.filter((a) => !a.problem && !a.implement);
     const adapter = able.find((a) => a.name === list.preferred) ?? able[0];
-    if (!adapter) throw new Error('No adapter here can take implement mode (only Codex can, once its SDK and CLI are set up under Settings, Agent), so nothing was started.');
-    if (!list.repos.length) throw new Error(`${toilProject} lists no repository with a local path, so implement mode has nothing to work in; add one with toil projects add-repo ${toilProject} <folder>. Nothing was started.`);
+    if (!adapter) throw new Error('No adapter here can take implement mode (only Codex can, once its SDK and CLI are set up under Settings, AI agent), so nothing was started.');
+    if (!list.repos.length) throw new Error(`${toilProject} lists no repository with a local path, so implement mode has nothing to work in; add one under Settings, Toil projects. Nothing was started.`);
     if (list.repos.length > 1) throw new Error(`${toilProject} lists ${list.repos.length} repositories with a local path (${list.repos.map((r) => r.name).join(', ')}), and one plan can't say which each item needs; assign each item from its page instead. Nothing was started.`);
     const busy = new Set(list.assignments.filter((a) => a.mode === 'implement' && (a.state === 'queued' || a.state === 'working')).map((a) => a.item));
     const fresh = plan.items.filter((id) => !busy.has(id));

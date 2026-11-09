@@ -28,27 +28,36 @@ export function toilProjectsCommands(areas: readonly AnyArea[]): AnyCommand[] {
     path: ['projects', 'list'],
     description: 'List every toil project toil can see, where each lives, and any that are broken',
     toolDescription:
-      'Lists every toil project toil can read: your own (~/.toil/projects), the folders listed in projectPaths or TOIL_PROJECT_PATHS, and the ones checked into the repository the folder is in. Each has its name, description, source (user, listed or repo), file, and the file that takes precedence when two share a name. Broken files are listed with what is wrong. Reads local files only.',
-    input: z.object({ cwd: cwdField }),
+      'Lists every toil project toil can read: your own (~/.toil/projects), the folders listed in projectPaths or TOIL_PROJECT_PATHS, and the ones checked into the repository the folder is in. Each has its name, description, source (user, listed or repo), file, and the file that takes precedence when two share a name. Archived toil projects (projects_archive) are left out unless all or archived is set; archivedHidden says how many were. Broken files are listed with what is wrong. Reads local files only.',
+    input: z.object({
+      cwd: cwdField,
+      all: z.boolean().optional().describe('Include archived toil projects with the rest'),
+      archived: z.boolean().optional().describe('List only the archived toil projects'),
+    }),
     writes: false,
     writesLocal: false,
-    options: [cwdOption],
-    examples: [{}, { cwd: '.' }],
+    options: [cwdOption, { flags: '--all', field: 'all', description: 'Include archived toil projects' }, { flags: '--archived', field: 'archived', description: 'List only archived toil projects' }],
+    examples: [{}, { cwd: '.' }, { all: true }, { archived: true }],
     run: async (input, ctx) => {
       const catalog = toilProjectsOf(ctx);
+      if (input.all && input.archived) throw new ToilError('INVALID_INPUT', 'Pass --all or --archived, not both.', { fix: '--all lists every toil project; --archived lists only the archived ones.' });
       const { files, folder, warnings } = catalog.scan(input.cwd);
       for (const w of warnings) ctx.warn(w);
       const places = catalog.places(input.cwd);
       const first = new Map<string, string>();
       for (const f of files) if (f.toilProject && !first.has(f.toilProject.name)) first.set(f.toilProject.name, f.file);
+      const valid = files.filter((f): f is ToilProjectFile & { toilProject: ToilProject } => f.toilProject !== undefined);
+      // Archived is only hidden here: a folder's repo still resolves to it, so a call never quietly loses its context.
+      const shown = valid.filter((f) => (input.archived ? f.toilProject.archived === true : input.all || f.toilProject.archived !== true));
       return {
         folder: folder.path ? { path: forwardSlashes(folder.path), from: folder.from } : null,
         places: { user: forwardSlashes(places.user), listed: places.listed.map(forwardSlashes), repo: places.repo ? forwardSlashes(places.repo) : null },
-        toilProjects: files
-          .filter((f): f is ToilProjectFile & { toilProject: ToilProject } => f.toilProject !== undefined)
+        archivedHidden: input.all || input.archived ? 0 : valid.length - shown.length,
+        toilProjects: shown
           .map((f) => ({
             name: f.toilProject.name,
             description: f.toilProject.description ?? null,
+            archived: f.toilProject.archived === true,
             source: f.source,
             file: forwardSlashes(f.file),
             shadowedBy: first.get(f.toilProject.name) === f.file ? null : forwardSlashes(first.get(f.toilProject.name)!),
@@ -83,6 +92,7 @@ export function toilProjectsCommands(areas: readonly AnyArea[]): AnyCommand[] {
         repo: applied.repo ?? null,
         // Your own toil project's bindings are yours; anyone else's need `toil projects import` before a write follows them.
         adopted: source === 'user',
+        archived: toilProject.archived === true,
         areas: resolvedAreas(catalog, ctx.manage!.config, areas, applied),
         toilProject: toilProjectContent(toilProject),
         problems: applied.file.problems.map(problemOut),

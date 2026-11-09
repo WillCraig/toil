@@ -23,7 +23,7 @@ import { JIRA_PAGE, stubToil, type StubToil } from './toil-stub.ts';
  * the cache exactly as they render from toil.
  */
 
-const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'launch-token' }, signal: new AbortController().signal };
+const ctx: RequestContext = { viewer: { id: 'local', name: 'you', via: 'loopback' }, signal: new AbortController().signal };
 const TOIL = { version: '0.1.0-alpha.2', contractVersion: 1 };
 const folders: string[] = [];
 const caches: Cache[] = [];

@@ -20,7 +20,7 @@ import type { AdapterList, Agent } from '../agent.ts';
 import type { AnalysesApi } from '../analyses.ts';
 import type { Route } from '../App.tsx';
 import { sendCommand, type UiCommand } from '../commands.ts';
-import { analysisHref, dateTime, toilProjectHref, itemHref, shortKey, STATUS_CATEGORY_LABEL, toilProjectEditHref } from '../format.ts';
+import { analysisHref, dateTime, toilProjectHref, itemHref, shortKey, standupHref, STATUS_CATEGORY_LABEL, toilProjectEditHref } from '../format.ts';
 import { fuzzyRank } from '../fuzzy.ts';
 import type { ToilProjectData } from '../load.ts';
 import type { AnalysisSummary } from '../model/analysis.ts';
@@ -28,7 +28,7 @@ import { keyLabel, SHORTCUTS, type Shortcut } from '../shortcuts.ts';
 import { TOIL_PROJECT_TABS } from '../views/ToilProjectShell.tsx';
 import { FACE } from '../model/jobs.ts';
 import { jobHref } from './jobs.tsx';
-import { setPlain, usePlain } from '../plain-words.ts';
+import { usePlain } from '../plain-words.ts';
 import type { SyncedAt } from '../views/ToilProjects.tsx';
 import { SETTINGS_PAGES } from '../views/Settings.tsx';
 import { Help } from './help.tsx';
@@ -55,6 +55,8 @@ export interface PaletteEntry {
   detail?: string;
   /** What the query is matched against; the label when absent. */
   text?: string;
+  /** Found only by typing: one per Toil project would bury the commands that are always shown (principle 11). */
+  typed?: true;
   /** A place to go, or something to do. */
   go: { href: string } | { command: UiCommand } | { run: () => void };
 }
@@ -93,45 +95,59 @@ export interface EntriesInput {
   scheme: 'system' | 'light' | 'dark';
   setScheme: (scheme: 'system' | 'light' | 'dark') => void;
   onSync: (() => void) | undefined;
+  /** Archives (true) or unarchives (false) a Toil project (#561); absent where the page may not change things. */
+  onArchive?: ((name: string, archive: boolean) => void) | undefined;
+  /** The archived Toil projects, for the Unarchive entries. */
+  archivedNames?: string[];
   /** The item the focus was on when the palette opened, in the toil project on screen. */
   focused: string | null;
   canAssign: boolean;
   adapters: AdapterList | null;
   agentSettings: boolean;
   openShortcuts: () => void;
-  /** Plain words on (src/plain-words.ts): the entries that name a tab, a Toil project or an AI helper use the plain names. */
-  plain?: boolean;
+  /** Whether a worklog is kept, which the stand-up is folded from. */
+  hasWorklog?: boolean;
 }
 
 /** Every entry the palette can show, before any query. */
 export function paletteEntries(x: EntriesInput): PaletteEntry[] {
-  const pw = (standard: string, plain: string) => (x.plain ? plain : standard);
+  const pw = (_standard: string, plain: string) => plain;
   const out: PaletteEntry[] = [];
-  const here = x.route.view === 'toilProjects' || x.route.view === 'settings' ? null : x.route.toilProject;
+  const here = x.route.view === 'toilProjects' || x.route.view === 'settings' || x.route.view === 'setup' || x.route.view === 'newProject' ? null : x.route.toilProject;
   const current = here ? x.loaded[here] : undefined;
   if (x.onSync) out.push({ id: 'cmd:sync', group: 'commands', label: 'Sync now', detail: 'Read every Toil project through toil into the cache', go: { run: x.onSync } });
   if (here && current?.ok) {
     out.push({ id: 'cmd:ask', group: 'commands', label: `Ask about ${here}`, detail: 'Focus the Ask bar', go: { command: { kind: 'ask' } } });
-    out.push({ id: 'cmd:analyze', group: 'commands', label: pw(`Analyze ${here}`, `Get a briefing on ${here}`), detail: pw("The agent's pulse check of the Toil project", "An AI helper writes a briefing of what needs attention"), go: { command: { kind: 'analyze' } } });
-    out.push({ id: 'cmd:agents', group: 'commands', label: pw('Open the Agents panel', 'Open the AI helpers panel'), detail: pw('Assignments, the inbox and limits', 'What the AI helpers are doing, and what waits on you'), text: 'agents ai helpers assignments inbox', go: { command: { kind: 'agents' } } });
+    out.push({ id: 'cmd:analyze', group: 'commands', label: pw(`Analyze ${here}`, `Get a briefing on ${here}`), detail: pw("The agent's pulse check of the Toil project", "An AI agent writes a briefing of what needs attention"), go: { command: { kind: 'analyze' } } });
+    out.push({ id: 'cmd:agents', group: 'commands', label: pw('Open the Agents panel', 'Open the AI agents panel'), detail: pw('Assignments, the inbox and limits', 'What the AI agents are doing, and what waits on you'), text: 'agents ai agents assignments inbox', go: { command: { kind: 'agents' } } });
+    if (x.hasWorklog) out.push({ id: 'cmd:standup', group: 'commands', label: 'Open the stand-up', detail: `Since the last working day, in ${here}`, text: 'stand-up standup daily meeting since yesterday what happened', go: { href: standupHref(here) } });
     // The workflow jobs (#532): each opens its own page, which says what it needs and has the Run button.
     out.push({ id: 'cmd:job:review', group: 'commands', label: pw('Review a pull request', 'Check a code change'), detail: FACE.review.gist, text: 'review pull request code review job', go: { href: jobHref(here, 'review') } });
     out.push({ id: 'cmd:job:ship', group: 'commands', label: pw('Ship: answer a review', 'Answer the review of my code change'), detail: FACE.ship.gist, text: 'ship answer review pull request job author', go: { href: jobHref(here, 'ship') } });
     out.push({ id: 'cmd:job:diagram', group: 'commands', label: pw(`Diagram ${here}`, `Draw the architecture of ${here}`), detail: FACE['map-codebase'].gist, text: 'diagram draw architecture c4 map codebase job', go: { href: jobHref(here, 'map-codebase') } });
     const item = x.focused ? current.value.items.find((i) => i.id === x.focused) : undefined;
-    if (item && x.canAssign) out.push({ id: 'cmd:assign', group: 'commands', label: pw(`Assign ${shortKey(item)} to an agent`, `Give ${shortKey(item)} to an AI helper`), detail: item.title, go: { command: { kind: 'assign', id: item.id } } });
+    if (item && x.canAssign) out.push({ id: 'cmd:assign', group: 'commands', label: pw(`Assign ${shortKey(item)} to an agent`, `Give ${shortKey(item)} to an AI agent`), detail: item.title, go: { command: { kind: 'assign', id: item.id } } });
     for (const o of x.adapters?.options ?? []) {
       if (!o.ready) continue;
       const label = o.model ? `${o.label} (${o.model})` : o.label;
       out.push({ id: `cmd:agent:${o.name}`, group: 'commands', label: `Answer with ${label}`, detail: 'For this chat, from its next question', go: { command: { kind: 'agent', name: o.name, label } } });
     }
   }
-  if (x.agentSettings) out.push({ id: 'cmd:agent-default', group: 'commands', label: 'Choose the default agent', detail: 'Settings, Agent', go: { href: '#/settings/agent' } });
-  out.push({ id: 'cmd:plain-words', group: 'commands', label: pw('Use plain words', "Use toil's own terms"), detail: pw('Everyday words for tabs and headings', 'Pull request, agent'), text: 'plain words everyday terms jargon', go: { run: () => setPlain(!x.plain) } });
+  if (x.agentSettings) out.push({ id: 'cmd:agent-default', group: 'commands', label: 'Choose the default AI agent', detail: 'Settings, AI agent', go: { href: '#/settings/agent' } });
+  out.push({ id: 'cmd:setup', group: 'commands', label: 'Set up toil, step by step', detail: 'The setup wizard: tools, a Toil project, an AI agent', text: 'setup wizard guided get started connect tools onboarding', go: { href: '#/setup' } });
+  out.push({ id: 'cmd:new-project', group: 'commands', label: 'Create a Toil project', detail: 'Name it, say where it lives and pick its tools', text: 'new create toil project name folder repository tools', typed: true, go: { href: '#/new-project' } });
+  // Reading a few Jira issues to name its custom fields in a Toil project, in Settings or, with no Toil project yet, the wizard that makes one.
+  out.push({ id: 'cmd:find-fields', group: 'commands', label: 'Find your Jira fields', detail: 'Name story points and sprints in a Toil project', text: 'find jira fields custom field discover story points sprint customfield', go: { href: x.toilProjects[0] ? toilProjectEditHref(x.toilProjects[0], 'find-fields') : '#/setup' } });
   out.push({ id: 'cmd:shortcuts', group: 'commands', label: 'Keyboard shortcuts', detail: `Press ${SHORTCUTS.shortcuts.keys.join('')} anywhere`, go: { run: x.openShortcuts } });
 
   out.push({ id: 'toilProject:*', group: 'toilProjects', label: 'All Toil projects', go: { href: '#/' } });
   for (const d of x.toilProjects) out.push({ id: `toilProject:${d}`, group: 'toilProjects', label: d, go: { href: toilProjectHref(d) } });
+  // Putting one away and bringing it back (#561): one more way to each, found by typing archive or the name.
+  const onArchive = x.onArchive;
+  if (onArchive) {
+    for (const d of x.toilProjects) out.push({ id: `cmd:archive:${d}`, group: 'commands', label: `Archive ${d}`, detail: 'Hide it from the list; nothing is deleted', text: `archive put away hide ${d}`, typed: true, go: { run: () => onArchive(d, true) } });
+    for (const d of x.archivedNames ?? []) out.push({ id: `cmd:unarchive:${d}`, group: 'commands', label: `Unarchive ${d}`, detail: 'Put it back in the list', text: `unarchive restore bring back ${d}`, typed: true, go: { run: () => onArchive(d, false) } });
+  }
   for (const d of x.toilProjects) {
     // With plain words on, a tab is found by either name: its plain label shows, and its own term still matches a search.
     for (const t of TOIL_PROJECT_TABS) out.push({ id: `tab:${d}:${t.id}`, group: 'tabs', label: pw(t.label, t.plain), detail: d, text: `${pw(t.label, t.plain)} ${t.label} ${d}`, go: { href: t.href(d) } });
@@ -168,7 +184,7 @@ export function paletteEntries(x: EntriesInput): PaletteEntry[] {
 export function paletteResults(entries: PaletteEntry[], query: string, here: string | null): Array<{ group: PaletteGroup; entries: PaletteEntry[] }> {
   const q = query.trim();
   if (!q) {
-    const shown = entries.filter((e) => e.group !== 'items' && e.group !== 'analyses' && (e.group !== 'tabs' || e.detail === here));
+    const shown = entries.filter((e) => !e.typed && e.group !== 'items' && e.group !== 'analyses' && (e.group !== 'tabs' || e.detail === here));
     return GROUP_ORDER.map((group) => ({ group, entries: shown.filter((e) => e.group === group) })).filter((g) => g.entries.length);
   }
   const ranked = fuzzyRank(entries, q, (e) => e.text ?? e.label);
@@ -198,7 +214,7 @@ export function CommandPalette({ isOpen, onOpenChange, agent, analysesApi, readi
   // The wall clock when it opened, for how old a cache is: the App's own clock is when its data was read.
   const [at, setAt] = useState(0);
   const names = input.toilProjects.join('\n');
-  const here = input.route.view === 'toilProjects' || input.route.view === 'settings' ? null : input.route.toilProject;
+  const here = input.route.view === 'toilProjects' || input.route.view === 'settings' || input.route.view === 'setup' || input.route.view === 'newProject' ? null : input.route.toilProject;
 
   // Each time it opens: the adapters and the saved analyses, both read from what the server already has.
   useEffect(() => {
@@ -215,7 +231,7 @@ export function CommandPalette({ isOpen, onOpenChange, agent, analysesApi, readi
   // Built on each render while it's open, which is cheap next to a keystroke (a few hundred entries), and not at all
   // while it's closed: the App re-renders often (a streaming answer), and every item of every toil project is a lot to list for nothing.
   const plain = usePlain();
-  const entries = isOpen ? paletteEntries({ ...input, analyses, adapters, at, plain: plain.on }) : [];
+  const entries = isOpen ? paletteEntries({ ...input, analyses, adapters, at }) : [];
   const results = paletteResults(entries, query, here);
   const byId = new Map(entries.map((e) => [e.id, e]));
 

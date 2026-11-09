@@ -16,7 +16,7 @@
 import { CONFIG_COMMANDS, CONFIG_READS, DEFAULT_TIMEOUT_MS, type AreaInfo, type ConfigApi, type ConnectionsData, type SettingsInfo } from '../config.ts';
 import type { Envelope } from '../toil.ts';
 import AREAS from './config-areas.json' with { type: 'json' };
-import { TOIL_PROJECTS, fileOf, listData, showData } from './toil-projects.ts';
+import { TOIL_PROJECTS, archivedListData, fileOf, listData, showData } from './toil-projects.ts';
 import { callKey } from './execute.ts';
 import { usageCanned } from './usage.ts';
 
@@ -101,9 +101,38 @@ interface Answer {
   data: unknown;
 }
 
+/**
+ * `jira field discover` on the preview's Jira: one Story with a sprint and
+ * points, one Bug with a Crew, and no Epic to read, which is unknown, not none.
+ * Shaped as toil prints it (src/areas/jira/discover.ts); the commands are
+ * the ones it is sure of.
+ */
+export const FIELD_DISCOVERY = {
+  deployment: 'cloud',
+  mode: 'sample',
+  project: 'PAY',
+  issueTypes: [
+    { name: 'Story', id: '10001', sampled: ['PAY-107'], status: 'sampled', fields: ['customfield_10016', 'customfield_10020', 'customfield_10200'] },
+    { name: 'Bug', id: '10002', sampled: ['PAY-104'], status: 'sampled', fields: ['customfield_10200'] },
+    { name: 'Epic', id: '10003', sampled: null, status: 'no-sample', fields: null },
+  ],
+  fields: [
+    { id: 'customfield_10016', name: 'Story point estimate', schema: { type: 'number', custom: 'com.atlassian.jira.plugin.system.customfieldtypes:float' }, example: '3', issueTypes: ['Story'], alias: 'storyPointEstimate', owi: { field: 'estimate', confidence: 'high', why: 'a number named "Story point estimate", where Jira keeps story points' } },
+    { id: 'customfield_10020', name: 'Sprint', schema: { type: 'array', custom: 'com.pyxis.greenhopper.jira:gh-sprint' }, example: 'Sprint 7 (active)', issueTypes: ['Story'], alias: 'sprint', owi: { field: 'iteration', confidence: 'high', why: "Jira Software's own Sprint field" } },
+    { id: 'customfield_10200', name: 'Crew', schema: { type: 'option', custom: 'com.atlassian.jira.plugin.system.customfieldtypes:select' }, example: 'Platform', issueTypes: ['Story', 'Bug'], alias: 'crew', owi: null },
+  ],
+  commands: [
+    'toil projects field <toil-project> jira storyPointEstimate customfield_10016',
+    'toil projects field <toil-project> jira estimate customfield_10016 --replace',
+    'toil projects field <toil-project> jira sprint customfield_10020',
+    'toil projects field <toil-project> jira iteration customfield_10020 --replace',
+  ],
+};
+
 export const CONFIG_CANNED: Answer[] = [
   { command: 'connections list', input: {}, data: FIXTURE_CONNECTIONS },
   { command: 'projects list', input: {}, data: listData() },
+  { command: 'projects list', input: { archived: true }, data: archivedListData() },
   ...TOIL_PROJECTS.map((d) => ({ command: 'projects show', input: { toilProject: d.name }, data: showData(d) })),
   ...TOIL_PROJECTS.map((d) => ({ command: 'projects check', input: { toilProject: d.name }, data: { name: d.name, file: fileOf(d.name), source: 'user', ok: true, problems: [] } })),
   ...FIXTURE_CONNECTIONS.connections.map((c) => ({
@@ -112,6 +141,7 @@ export const CONFIG_CANNED: Answer[] = [
     data: { name: c.name, area: c.area, host: c.host, live: true, authenticated: true, request: PROBES[c.area] ?? null },
   })),
   ...usageCanned(),
+  { command: 'jira field discover', input: { connection: 'corp-jira', project: 'PAY', perType: 1 }, data: FIELD_DISCOVERY },
   { command: 'projects onboard', input: { plan: true }, data: ONBOARD_PLAN },
   // No theme set: toil's default, Crate, which is Toil UI's too (#467).
   { command: 'theme list', input: {}, data: THEME_LIST },

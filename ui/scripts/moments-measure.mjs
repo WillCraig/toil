@@ -171,7 +171,7 @@ const press = (entry) => `(async () => {
 async function previewPasses(browser, base, theme) {
   const tab = await openTab(browser);
   try {
-    await tab.send('Page.navigate', { url: themed(base, theme.name, '#/settings/toil') });
+    await tab.send('Page.navigate', { url: themed(base, theme.name, '#/settings/appearance') });
     for (let i = 0; i < 100 && !(await tab.evaluate("Boolean(document.querySelector('[data-preview-menu]'))")); i++) await wait(100);
     await wait(1500);
     const result = {};

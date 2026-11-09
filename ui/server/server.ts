@@ -3,25 +3,32 @@
  * so the package's only runtime dependency stays toil. It serves the built
  * SPA and a small JSON API under the base path, on loopback, behind a lock:
  *
- * - **The launch token.** Each start makes a random token and prints one URL
- *   that carries it, as Jupyter does. The page trades it (`POST api/session`)
- *   for a session id and sends it as `X-Toil-UI-Session` on every API call; the
- *   API answers nothing without one. No cookie is ever set: browsers send
- *   cookies to every port on a host, so one would reach any other server on
- *   127.0.0.1. The page keeps the id in `sessionStorage` instead (#485), which
- *   is scoped to this exact origin and never sent by the browser, so a reload
- *   resumes through `GET api/session`; a new tab takes the launch URL again
- *   (a duplicated or browser-restored tab can carry the id), and a restart of
- *   this server (sessions are in memory) always ends it. The token stays: it
- *   is what keeps other local processes and users out of an API that runs toil
- *   with the person's connections. The static files hold no data and need no
- *   session.
- * - **The Host header.** Only the exact `127.0.0.1:<port>` (or `[::1]:<port>`)
- *   the server printed is answered, so a page using DNS rebinding to reach the
- *   port is refused before anything else is read.
- * - **No CORS.** No `Access-Control-*` header is ever sent. Every POST also
- *   needs the page's own `Origin`, a JSON body, and the session's CSRF token in
- *   `X-Toil-UI-CSRF`, so another page can't make one even blind.
+ * - **Loopback only.** The server binds `127.0.0.1` or `::1` (settings.ts
+ *   refuses any other address) and refuses a request whose peer isn't loopback.
+ * - **A cookie, and no step for the person** (#561, the maintainer's call).
+ *   There is no launch token, session id, CSRF header or browser storage.
+ *   Toil UI keeps a machine secret in its data folder (machine-secret.ts); when
+ *   a browser navigates to the app page itself (`Sec-Fetch-Dest: document`,
+ *   `Sec-Fetch-Site` none or same-origin) the server sets a cookie signed with
+ *   it: `HttpOnly`, `SameSite=Strict`, 30 days, no data in it. It is not
+ *   `Secure`, because a browser won't keep that over plain http. Every API call
+ *   needs a valid cookie, compared in constant time. A cross-site page's request
+ *   doesn't carry a SameSite=Strict cookie, and the checks below refuse it anyway.
+ * - **The Host header.** Only `127.0.0.1:<port>`, `localhost:<port>` and
+ *   `[::1]:<port>` are answered, so a page using DNS rebinding to reach the
+ *   port under its own name is refused before anything else is read.
+ * - **Origin and Fetch Metadata.** An API call whose `Origin` is present and
+ *   isn't the origin the request was addressed to, or whose `Sec-Fetch-Site` is
+ *   present and isn't `same-origin`, is refused. A POST must be
+ *   `application/json`, which a plain cross-site form can't send. These, with
+ *   SameSite=Strict, are why no CSRF header is needed.
+ * - **No CORS.** No `Access-Control-*` header is ever sent, and `OPTIONS` is
+ *   refused, so no other page can read an answer or pass a preflight.
+ *
+ *   What this does not do: any program running on this machine as the same
+ *   user can read the machine secret, or fetch the page the way a browser does
+ *   and get a cookie. Cookies are not scoped to a port, so another local web
+ *   server on 127.0.0.1 is sent this one too. The static files hold no data.
  *
  * Every request becomes a `RequestContext` with its viewer before a Store or
  * Agent sees it. Reads are only the commands the views make (`READ_COMMANDS`),
@@ -34,8 +41,8 @@
  * agent (#251) answers on `agent/ask`, streamed as NDJSON when asked, and its
  * settings are `agent/settings`, the person's instructions and custom voice
  * among them (#283), and `agent/prompt` shows the system prompt a question
- * would get in the page's theme. `agent/mcp` is the one route without a
- * session: it serves one question's read tools to the Codex CLI, by that
+ * would get in the page's theme. `agent/mcp` is the one route with a
+ * credential of its own: it serves one question's read tools to the Codex CLI, by that
  * question's bearer token, and refuses anything carrying a page's `Origin`.
  * The worklog (#308) is `worklog/month`, `worklog/day` and `worklog/standup` (#345) to read, and
  * `worklog/rebuild`, `worklog/note` and `worklog/export`, each an explicit
@@ -44,16 +51,19 @@
  * The history of analyses (#395) is `analyses` and `analyses/one`, read
  * only: the server keeps each Analyze itself as its answer ends whole, and
  * says which on the answer's last line, so nothing the page sends writes one.
- * The building has one door, one key and a guest book, and the guest book is
- * toil's audit log.
+ * The building has one door, a doorman who reads the visitor's address, and a
+ * guest book, and the guest book is toil's audit log. The key was retired.
  */
 
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { homedir } from 'node:os';
+import { checkRegistry, npmrcPath, RegistryError, setRegistry } from './agents/npmrc.ts';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { extname, isAbsolute, join, normalize, relative, sep } from 'node:path';
 import { ANALYZE, type Answer, type AskExtra, type HistoryTurn } from '../src/agent.ts';
+import { GUIDE_MAX, GUIDE_REFUSAL, GUIDE_REFUSAL_FIX, looksLikeSecret, readGuideState, type GuideRequest } from '../src/guide.ts';
 import { isWhole, type AnalysisKeeper } from './analyses.ts';
 import type { Envelope, ExecutePerson } from '../src/toil.ts';
 import type { AreaInfo, SettingsInfo } from '../src/config.ts';
@@ -67,6 +77,7 @@ import type { ToilProjectAgents } from './agents/toil-project-agents.ts';
 import { answerMcp, McpGrants } from './agents/mcp.ts';
 import type { ServeTools } from './agents/runtime.ts';
 import { StyleError, styleFrom, type StyleChoice } from './agents/voices.ts';
+import { COOKIE_MAX_AGE_SECONDS, cookieNamed, issueCookie, verifyCookie } from './machine-secret.ts';
 import { localViewer, type RequestContext, type Viewer } from './context.ts';
 import type { Settings } from './settings.ts';
 import { READ_COMMANDS, type Access, type Store } from './store.ts';
@@ -84,7 +95,7 @@ export interface UiServerOptions {
   agent: Agent;
   /** The built SPA (dist/app/). */
   appDir: string;
-  /** Toil UI's own version, and the toil it runs on, for the session and refusals. */
+  /** Toil UI's own version, and the toil it runs on, for the info the page reads and for refusals. */
   version: string;
   toil: { version: string; contractVersion: number };
   /** Commands `/api/config` may run (#253): CONFIG_COMMANDS unless a test narrows it. */
@@ -115,8 +126,8 @@ export interface UiServerOptions {
   renames?: ToilProjectRenames;
   /** The server's own staleness (#305): `api/fingerprint`. Absent with sample data, which never goes out of date. */
   serverStatus?: () => ServerStatus;
-  /** Tests pass a fixed token; a real start makes one. */
-  token?: string;
+  /** The 32 bytes that sign the browser's cookie (machine-secret.ts). A real start reads the file in the data folder; a test without one gets a fresh secret. */
+  machineSecret?: Buffer;
   viewer?: Viewer;
 }
 
@@ -147,15 +158,12 @@ export interface UiServer {
   /** Serves tools as an MCP server on `api/agent/mcp` for one run (Codex, #251). */
   serveTools: ServeTools;
   /** Starts listening; resolves with the address and the one URL to open. */
-  listen(): Promise<{ origin: string; url: string; launchUrl: string }>;
+  listen(): Promise<{ origin: string; url: string }>;
   close(): Promise<void>;
 }
 
-/** A browser holds a session; a launch admits this many before the oldest is dropped (Bounds). */
-export const MAX_SESSIONS = 32;
 /** The largest POST body the API reads. Its calls are a command name and a few fields. */
 export const MAX_BODY = 256 * 1024;
-export const CSRF_HEADER = 'x-toil-ui-csrf';
 /** The longest question the agent takes, in characters. */
 export const MAX_PROMPT = 8000;
 
@@ -207,8 +215,11 @@ function rememberer(store: ToilProjectAgents, toilProject: string, adapter: stri
   return { one, stream };
 }
 
-/** The session id the page got for the launch token, on every API call. Never a cookie. */
-export const SESSION_HEADER = 'x-toil-ui-session';
+/** The addresses a loopback peer shows as: IPv4, IPv6 and IPv4 mapped into IPv6. */
+const LOOPBACK_PEERS: ReadonlySet<string> = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+/** The cookie's name. Cookies are not scoped to a port, so one name serves every Toil UI on this machine that shares the secret. */
+const COOKIE_NAME = 'toil-ui';
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -238,21 +249,9 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Cache-Control': 'no-store',
 };
 
-interface Session {
-  csrf: string;
-}
-
-const secret = () => randomBytes(32).toString('base64url');
-
 /** The fields a feedback call carries: what the person typed, and nothing Toil UI knows. */
 const FEEDBACK_FIELDS: ReadonlySet<string> = new Set(['kind', 'title', 'body', 'email']);
 const FEEDBACK_SHAPE = 'Send { "fields": { "kind": "bug", "title": "…", "body": "…", "email": "you@example.com" } }, with "consent": true to send it.';
-
-function same(a: string, b: string): boolean {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
-}
 
 class HttpError extends Error {
   constructor(readonly status: number, message: string, readonly fix: string) {
@@ -353,11 +352,10 @@ async function readJsonValue(req: IncomingMessage): Promise<unknown> {
 
 export function createUiServer(options: UiServerOptions): UiServer {
   const { settings, store, agent, appDir } = options;
-  const token = options.token ?? secret();
   const viewer = options.viewer ?? localViewer();
+  const machineSecret = options.machineSecret ?? randomBytes(32);
   const configCommands = options.configCommands ?? CONFIG_COMMANDS;
   const configInfo = options.config ?? { areas: [], settings: settingsFrom(process.env) };
-  const sessions = new Map<string, Session>();
   const base = settings.basePath;
   let host = '';
   const mcp = new McpGrants(() => `http://${host}${base}api/agent/mcp`);
@@ -377,10 +375,8 @@ export function createUiServer(options: UiServerOptions): UiServer {
     meta: { command, durationMs: 0, version: options.toil.version, contractVersion: options.toil.contractVersion },
   } as Envelope);
 
-  /** What the page needs about the server, and its session's CSRF token. */
-  const sessionInfo = (id: string, session: Session) => ({
-    session: id,
-    csrf: session.csrf,
+  /** What the page needs to know about the server. Nothing in it is a credential. */
+  const serverInfo = () => ({
     version: options.version,
     toil: options.toil,
     viewer: { id: viewer.id, name: viewer.name },
@@ -403,7 +399,7 @@ export function createUiServer(options: UiServerOptions): UiServer {
    * An answer as it streams: NDJSON, one line per version of the answer, each
    * the whole of it so far, ending with `{ "done": true }`, or with
    * `{ "error": … }` when the agent fails partway. NDJSON over fetch, not SSE,
-   * because the session is a header and EventSource can't send one (#250).
+   * because a POST body carries the question and EventSource can't send one (#250).
    */
   const streamAnswer = async (res: ServerResponse, answers: AsyncIterable<Answer>) => {
     res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Type': 'application/x-ndjson; charset=utf-8' });
@@ -492,39 +488,6 @@ export function createUiServer(options: UiServerOptions): UiServer {
     return options.sync;
   };
 
-  const sessionOf = (req: IncomingMessage): { id: string; session: Session } | undefined => {
-    const id = req.headers[SESSION_HEADER];
-    if (typeof id !== 'string' || !id) return undefined;
-    for (const [key, session] of sessions) if (same(key, id)) return { id: key, session };
-    return undefined;
-  };
-
-  /** A POST must come from this page: its Origin and a JSON body. */
-  const checkOrigin = (req: IncomingMessage) => {
-    if (req.headers.origin !== `http://${host}`) throw new HttpError(403, `This server takes requests only from its own page, http://${host}.`, 'Use Toil UI in the browser tab its launch URL opened.');
-    if (!/^application\/json(\s*;|$)/i.test(req.headers['content-type'] ?? '')) throw new HttpError(415, 'The API takes JSON only.', 'Send Content-Type: application/json.');
-  };
-
-  /** And, once signed in, the session's CSRF token. */
-  const checkCsrf = (req: IncomingMessage, session: Session) => {
-    const csrf = req.headers[CSRF_HEADER];
-    if (typeof csrf !== 'string' || !same(csrf, session.csrf)) throw new HttpError(403, "The request didn't carry this session's CSRF token.", `Send the csrf value ${base}api/session gave in the ${CSRF_HEADER} header.`);
-  };
-
-  /** `POST api/session`: the launch token for a new session id, which the page keeps in its tab's `sessionStorage` (#485). */
-  const signIn = async (req: IncomingMessage, res: ServerResponse) => {
-    checkOrigin(req);
-    const body = await readJson(req);
-    if (typeof body.token !== 'string' || !same(body.token, token)) {
-      throw new HttpError(401, "That isn't this launch's token.", 'Open the URL toil-ui printed when it started; each start prints a new one.');
-    }
-    if (sessions.size >= MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
-    const id = secret();
-    const session: Session = { csrf: secret() };
-    sessions.set(id, session);
-    json(res, 200, sessionInfo(id, session));
-  };
-
   const run = async (req: IncomingMessage, res: ServerResponse, ctx: RequestContext, access: Access) => {
     const body = await readJson(req);
     const command = body.command;
@@ -606,20 +569,11 @@ export function createUiServer(options: UiServerOptions): UiServer {
 
   const api = async (req: IncomingMessage, res: ServerResponse, route: string, url: URL, ctx: RequestContext) => {
     const key = `${req.method === 'HEAD' ? 'GET' : req.method} ${route}`;
-    if (key === 'POST session') return signIn(req, res);
     if (key === 'POST agent/mcp') return mcpCall(req, res, ctx);
-    const signedIn = sessionOf(req);
-    if (!signedIn) {
-      throw new HttpError(401, `The API answers only a page signed in to this launch, with its session id in ${SESSION_HEADER}.`, 'Open the URL toil-ui printed when it started; a tab keeps its session across a reload, but not across a restart of toil-ui.');
-    }
-    if (req.method === 'POST') {
-      checkOrigin(req);
-      checkCsrf(req, signedIn.session);
-    }
     if (await assignmentRoute(key, req, res, url, options.assignments, { readJson, json, headers: SECURITY_HEADERS })) return;
     switch (key) {
-      case 'GET session':
-        json(res, 200, sessionInfo(signedIn.id, signedIn.session));
+      case 'GET info':
+        json(res, 200, serverInfo());
         return;
       case 'POST execute':
         return run(req, res, ctx, 'read');
@@ -663,6 +617,20 @@ export function createUiServer(options: UiServerOptions): UiServer {
           json(res, 502, { error: agentFailure(e) });
         }
         return;
+      }
+      case 'POST agent/guide': {
+        // The setup guide (#561). The refusal comes first, before the body is read any further: a message that looks like a secret is never passed on, kept or logged.
+        const body = await readJson(req);
+        if (!agent.guide) throw new HttpError(404, 'This Toil UI has no setup guide.', 'Start toil-ui without --sample, with an AI agent chosen in Settings.');
+        if (typeof body.message !== 'string' || !body.message.trim()) throw new HttpError(400, 'A question needs its text.', 'Send { "chat": "<chat id>", "message": "<question>", "state": { "step": "connect", "areas": [] } }.');
+        if (body.message.length > GUIDE_MAX || looksLikeSecret(body.message)) throw new HttpError(400, GUIDE_REFUSAL, GUIDE_REFUSAL_FIX);
+        if (typeof body.chat !== 'string' || !CHAT_ID.test(body.chat)) throw new HttpError(400, 'Name the chat by its id: letters, digits and hyphens.', 'Send chat as an id of 8 to 64 letters, digits and hyphens.');
+        const state = readGuideState(body.state);
+        if (typeof state === 'string') throw new HttpError(400, state, 'Send only what the wizard names: the step, the tools, and the plain settings it lists.');
+        const history = extraOf({ history: body.history }).history ?? [];
+        if (history.some((t) => looksLikeSecret(t.prompt))) throw new HttpError(400, GUIDE_REFUSAL, GUIDE_REFUSAL_FIX);
+        const request: GuideRequest = { chat: body.chat, message: body.message, state };
+        return streamAnswer(res, agent.guide(ctx, request, checkedStyle(body), history));
       }
       case 'GET analyses': {
         const toilProject = named(url.searchParams.get('toilProject'), 'toilProject', `Ask ${base}api/analyses?toilProject=<name>.`);
@@ -731,6 +699,17 @@ export function createUiServer(options: UiServerOptions): UiServer {
         const adapter = installAdapter(body.adapter);
         if (typeof body.command !== 'string') throw new HttpError(400, 'Send the command the dialog showed, so only that command runs.', 'Send { "adapter": "<name>", "command": "<the command as shown>" }.');
         return streamInstall(res, control(), adapter, body.command, ctx.signal);
+      }
+      case 'POST agent/npm-registry': {
+        // One line, registry=<url>, in the person's own user npmrc, for an install that couldn't reach the public registry (npmrc.ts).
+        const body = await readJson(req);
+        try {
+          json(res, 200, setRegistry(npmrcPath(process.env, homedir()), checkRegistry(body.registry)));
+        } catch (e) {
+          if (e instanceof RegistryError) throw new HttpError(400, e.message, e.fix);
+          throw e;
+        }
+        return;
       }
       case 'POST agent/settings': {
         const body = await readJson(req);
@@ -822,11 +801,11 @@ export function createUiServer(options: UiServerOptions): UiServer {
         return worklogCall(res, () => worklog().exportTo(named(body.toilProject, 'toilProject', shape), what, named(body.folder, 'folder', shape)));
       }
       default:
-        throw new HttpError(404, `There is no ${key} in the API.`, `The API is under ${base}api/: session, execute, config, config/areas, config/settings, feedback, sync, cache/wipe, usage, usage/settings, worklog/month, worklog/day, worklog/standup, worklog/rebuild, worklog/note, worklog/export, analyses, analyses/one, fingerprint, agent/starters, agent/ask, agent/session, agent/renew, agent/prompt, agent/settings, agent/adapters, agent/install, agent/mcp and assignments.`);
+        throw new HttpError(404, `There is no ${key} in the API.`, `The API is under ${base}api/: info, execute, config, config/areas, config/settings, feedback, sync, cache/wipe, usage, usage/settings, worklog/month, worklog/day, worklog/standup, worklog/rebuild, worklog/note, worklog/export, analyses, analyses/one, fingerprint, agent/starters, agent/ask, agent/guide, agent/session, agent/renew, agent/prompt, agent/settings, agent/adapters, agent/install, agent/mcp and assignments.`);
     }
   };
 
-  const serveFile = async (res: ServerResponse, route: string) => {
+  const serveFile = async (res: ServerResponse, route: string, extra: Record<string, string> = {}) => {
     let rel: string;
     try {
       rel = decodeURIComponent(route) || 'index.html';
@@ -839,16 +818,39 @@ export function createUiServer(options: UiServerOptions): UiServer {
     if (rel.includes('\0') || rel.includes(':') || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) return text(res, 404, 'Not found.');
     try {
       if (!(await stat(file)).isFile()) return text(res, 404, 'Not found.');
-      send(res, 200, TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', await readFile(file));
+      send(res, 200, TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', await readFile(file), extra);
     } catch {
       text(res, 404, 'Not found.');
     }
   };
 
+  /** A refusal of the request itself, in the body shape the page reads for any API failure. */
+  const refuse = (res: ServerResponse, status: number, message: string, fix: string) => json(res, status, { error: { message, fix } });
+
+  /** The names this server answers to: its own address, and the other two ways a browser spells loopback. */
+  const hostNames = () => {
+    const port = host.slice(host.lastIndexOf(':') + 1);
+    return new Set([host, `127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
+  };
+
+  /** The Set-Cookie for a navigation a browser made to the page, or none when the request isn't one. */
+  const pageCookie = (req: IncomingMessage): Record<string, string> => {
+    const site = req.headers['sec-fetch-site'];
+    if (req.method !== 'GET' || req.headers['sec-fetch-dest'] !== 'document' || (site !== 'none' && site !== 'same-origin')) return {};
+    return { 'Set-Cookie': `${COOKIE_NAME}=${issueCookie(machineSecret)}; Path=/; Max-Age=${COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Strict` };
+  };
+
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
-    // Before anything else: a Host this server didn't print is a page trying to reach the port by another name.
-    if ((req.headers.host ?? '').toLowerCase() !== host) return text(res, 403, `This server answers only to http://${host}. Open the URL toil-ui printed when it started.`);
-    const url = new URL(req.url ?? '/', `http://${host}`);
+    // Before anything else: a Host this server doesn't answer to is a page trying to reach the port by another name (DNS rebinding).
+    const peer = req.socket.remoteAddress;
+    if (peer === undefined || !LOOPBACK_PEERS.has(peer)) {
+      return refuse(res, 403, `This server answers only to programs on this machine, not to ${peer ?? 'an unknown address'}.`, `Open http://${host}${base} in a browser on the machine where toil-ui runs.`);
+    }
+    const asked = (req.headers.host ?? '').toLowerCase();
+    if (!hostNames().has(asked)) {
+      return refuse(res, 403, `This server answers only to ${[...hostNames()].join(', ')}, not ${JSON.stringify(req.headers.host ?? '')}.`, `Open http://${host}${base}, the address toil-ui printed when it started.`);
+    }
+    const url = new URL(req.url ?? '/', `http://${asked}`);
     const path = url.pathname;
     if (path === base.slice(0, -1)) return send(res, 308, 'text/plain; charset=utf-8', '', { Location: `${base}${url.search}` });
     if (!path.startsWith(base)) return text(res, 404, `Toil UI is served under ${base}.`);
@@ -857,8 +859,29 @@ export function createUiServer(options: UiServerOptions): UiServer {
     if (req.method !== 'GET' && req.method !== 'HEAD' && !(isApi && req.method === 'POST')) {
       return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed.\n', { Allow: isApi ? 'GET, HEAD, POST' : 'GET, HEAD' });
     }
-    // The app's files hold no data, so they need no session; the page signs in through the API.
-    if (!isApi) return serveFile(res, route);
+    // The app's files hold no data, so they need no checks beyond the Host's.
+    // The page itself is where a browser is let in: only a top-level navigation to it, from nowhere or from itself, is given the cookie.
+    if (!isApi) return serveFile(res, route, route === '' || route === 'index.html' ? pageCookie(req) : {});
+
+    // A browser sends Origin on every cross-site request, a GET that changes state (the assignments inbox) included. The API answers its own page only.
+    // The MCP route keeps its own, stricter refusal of any Origin.
+    const mcpRoute = route === 'api/agent/mcp';
+    const origin = req.headers.origin;
+    if (!mcpRoute && origin !== undefined && origin !== `http://${asked}`) {
+      return refuse(res, 403, `This server takes requests only from its own page, http://${asked}, not from ${JSON.stringify(origin)}.`, 'Use Toil UI in the browser tab toil-ui opened; another website cannot call it.');
+    }
+    if (!mcpRoute && req.method === 'POST' && !/^application\/json(\s*;|$)/i.test(req.headers['content-type'] ?? '')) {
+      return refuse(res, 415, 'The API takes JSON only.', 'Send Content-Type: application/json.');
+    }
+
+    const fetchSite = req.headers['sec-fetch-site'];
+    if (fetchSite !== undefined && fetchSite !== 'same-origin') {
+      return refuse(res, 403, `This server takes requests only from its own page, not from one that is ${JSON.stringify(fetchSite)} to it.`, 'Use Toil UI in the browser tab toil-ui opened; another website cannot call it.');
+    }
+    // The MCP route is the agent CLI's, by its own bearer token; every other call is the page's, and carries the cookie.
+    if (!mcpRoute && !verifyCookie(machineSecret, cookieNamed(req.headers.cookie, COOKIE_NAME))) {
+      return refuse(res, 401, "This browser hasn't been let in: the request carried no valid Toil UI cookie.", `Open http://${host}${base} from the address bar or a bookmark, not from a link on another site, then reload.`);
+    }
 
     const controller = new AbortController();
     res.on('close', () => controller.abort());
@@ -890,7 +913,7 @@ export function createUiServer(options: UiServerOptions): UiServer {
           const { port } = server.address() as AddressInfo;
           host = settings.host.includes(':') ? `[${settings.host}]:${port}` : `${settings.host}:${port}`;
           const origin = `http://${host}`;
-          resolveListen({ origin, url: `${origin}${base}`, launchUrl: `${origin}${base}?token=${token}` });
+          resolveListen({ origin, url: `${origin}${base}`, });
         });
       }),
     close: async () => {

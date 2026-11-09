@@ -1,0 +1,41 @@
+/* The setup wizard (src/views/Setup.tsx): one card, one question. Tokens come from the theme. */
+.setup { display: grid; gap: 1rem; min-width: 0; }
+.setup__progress { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; font-weight: 600; }
+.setup__bar { flex: 1 1 8rem; max-width: 20rem; height: 0.5rem; accent-color: var(--accent); }
+.setup__card { display: grid; gap: 1rem; min-width: 0; }
+/* With a guide: the step and the guide side by side on a wide screen, the guide folded below the step on a narrow one. */
+.setup__layout { display: grid; gap: 1rem; min-width: 0; }
+.setup__layout[data-guided] { align-items: start; }
+@media (min-width: 1000px) { .setup__layout[data-guided] { grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem); } .setup__layout[data-guided] .guide-side { position: sticky; top: 1rem; } }
+.setup__offer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0; }
+.setup__title { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.setup__title h1 { font-size: 1.5rem; overflow-wrap: anywhere; }
+.setup__tools { display: grid; gap: 0.5rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.setup__tools legend { padding: 0; margin-bottom: 0.5rem; font-weight: 600; }
+.setup__tool label { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr); gap: 0.75rem; align-items: start; min-height: 44px; padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); cursor: pointer; }
+.setup__tool input { width: 1.25rem; height: 1.25rem; margin-top: 0.15rem; accent-color: var(--accent); }
+.setup__tool span { display: grid; gap: 0.2rem; min-width: 0; }
+.setup__tool .tag { justify-self: start; }
+.setup__actions, .setup__nav { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.setup__nav { justify-content: flex-end; padding-top: 0.75rem; border-top: 1px solid var(--line); }
+.setup__summary { display: grid; gap: 0.4rem; padding-left: 1.25rem; }
+.setup .btn { min-height: 44px; }
+.setup a.btn { display: inline-flex; align-items: center; text-decoration: none; }
+@media (max-width: 599px) { .setup__nav { justify-content: stretch; } .setup__nav .btn { flex: 1 1 auto; } }
+/* A linked tool's panel: the claim, the test, its answer and the way to a login, each given room. */
+[data-setup-linked], [data-setup-replace] { display: grid; gap: 1rem; min-width: 0; }
+[data-setup-linked] > p, [data-setup-replace] > p { margin: 0; }
+.setup__login-help { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+/* The AI agent step: one list, one choice. A helper that can't start yet shows why and its Install beside it. */
+.setup__helpers { display: grid; gap: 0.5rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.setup__helpers legend { padding: 0; margin-bottom: 0.5rem; font-weight: 600; }
+.setup__helpers ul { display: grid; gap: 0.5rem; }
+.setup__helper { display: grid; gap: 0.35rem; padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); min-width: 0; }
+.setup__helper p { margin: 0; }
+.setup__helper .btn { justify-self: start; }
+.setup__helper-choice { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr); gap: 0.75rem; align-items: start; min-height: 44px; cursor: pointer; }
+.setup__helper-choice input { width: 1.25rem; height: 1.25rem; margin-top: 0.15rem; accent-color: var(--accent); }
+.setup__helper-choice input:disabled { cursor: not-allowed; }
+/* Next's reason sits beside it, and Back stays on the left. */
+.setup__nav [data-setup-back] { margin-right: auto; }
+.setup__why { margin: 0; text-align: right; }

@@ -19,8 +19,8 @@ Toil UI's users are often new to agents, so where a screen uses an AI term, its 
 
 | Where | Terms |
 |---|---|
-| Settings, Agent usage, and its caps | token, input tokens, output tokens, cache tokens, context window, effort |
-| Settings, Agent | model, model provider, harness, MCP, tool call |
+| Settings, Usage, and its caps | token, input tokens, output tokens, cache tokens, context window, effort |
+| Settings, AI agent | model, model provider, harness, MCP, tool call |
 | The Assign dialog's modes | sandbox, permission mode, human-in-the-loop, human review |
 | Renew all stale | session, system prompt, skill |
 | The chat's About these answers | hallucination, primary source, non-determinism |
@@ -41,8 +41,8 @@ A **pencil** beside a configurable value opens the settings page where it's set,
 | A Toil project's sources, on its card and in its top row | Settings, Toil projects, at the form that links an area, for that Toil project |
 | The work-in-progress limit and the people, in the People view | Settings, Toil projects, at that form |
 | The fields, on an item's page | Settings, Toil projects, at the form that names a field |
-| The adapter, on an assignment's page | Settings, Agent |
-| A cap notice under an answer, and an assignment's limits | Settings, Agent usage, at the caps |
+| The adapter, on an assignment's page | Settings, AI agent |
+| A cap notice under an answer, and an assignment's limits | Settings, Usage, at the caps |
 
 The pencil only navigates: it never changes anything, and the page it opens makes every change through its own form. Its name says what it edits ("Edit the corp-jira connection"), and it's the same size and in the same place in every theme. When the value it names is gone, a connection since removed say, the page says so.
 

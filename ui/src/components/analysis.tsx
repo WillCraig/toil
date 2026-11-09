@@ -12,6 +12,7 @@ import { readBriefing, type Briefing } from '../../../src/core/brief/answer.ts';
 import type { AnswerPart } from '../agent.ts';
 import { dateTime } from '../format.ts';
 import { structureOf, textOfParts, unchanged, type AnalysisChanges } from '../model/analysis.ts';
+import { useWords } from '../skins.tsx';
 import { Cited, TicketChip } from './items.tsx';
 import './analysis.css';
 
@@ -26,11 +27,12 @@ const ADAPTER_LABEL: Record<string, string> = { claude: 'Claude', copilot: 'GitH
 /** `level`: the heading level of its labels, one below the heading it sits under. `done` false: still streaming, so a missing label is not yet a slip. */
 export function AnalysisBody({ parts, briefing, open = false, level = 4, done = true }: { parts: readonly AnswerPart[]; briefing?: Briefing | null; open?: boolean; level?: 3 | 4; done?: boolean }) {
   const H = level === 3 ? 'h3' : 'h4';
+  const words = useWords();
   const text = textOfParts(parts);
   // A briefing (#494) the server lifted out, or one still in the text (the preview's scripted agent, or mid-stream).
   const read = briefing ? { briefing, rest: text } : text.includes('```briefing') ? readBriefing(text) : null;
   if (read?.briefing) return <BriefingBody briefing={read.briefing} evidence={read.rest} open={open} H={H} />;
-  if (read && !done) return <p className="note">Writing the briefing…</p>;
+  if (read && !done) return <p className="note">{words('loading.briefing')}</p>;
   const s = structureOf(text);
   if (!s) {
     return (

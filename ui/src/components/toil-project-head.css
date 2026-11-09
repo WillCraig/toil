@@ -24,6 +24,7 @@ main[data-view="toil-projects"] { max-width: 1680px; }
 .count__value { font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; line-height: 1.2; }
 .count__label { color: var(--muted); font-size: 0.8125rem; }
 .count--warn .count__value { color: var(--warn); }
+.count--unknown .count__value { color: var(--muted, inherit); font-weight: 400; }
 
 .sprint-line { margin: 0; }
 .sprint-line__name { font-weight: 600; }
@@ -45,16 +46,25 @@ main[data-view="toil-projects"] { max-width: 1680px; }
 .toil-project-card__foot { display: grid; gap: 0.4rem; min-width: 0; border-top: 1px solid var(--line); padding-top: 0.6rem; }
 .toil-project-card__when { margin: 0; }
 
-/* The lead card takes two columns where two fit, and lays its work beside its sprint. */
-@media (min-width: 48rem) {
-  .toil-projects > .projects__lead { grid-column: span 2; }
+/* The lead card keeps only its larger heading; cards no longer change shape (the order is the person's, or the last opened first). */
+.toil-project-card--lead .toil-project-card__head h2 { font-size: 1.4rem; }
+
+/* Cards in one row share their rows: each card is a subgrid of six tracks (head, sprint, counts, trends, people, foot), so the
+   sprint line, the counts, the trends and the divider sit at the same height across the row whatever each card holds. */
+@supports (grid-template-rows: subgrid) {
+  .toil-projects { row-gap: 1.5rem; }
+  .toil-projects > li { display: contents; container-type: normal; }
+  .toil-projects > li > .toil-project-card { grid-row: span 6; grid-template-rows: subgrid; row-gap: 0.6rem; height: auto; container-type: normal; }
+  .toil-project-card__body { display: contents; }
+  .toil-project-card__head { grid-row: 1; }
+  .toil-project-card__sprint { grid-row: 2; }
+  .toil-project-card .count-strip { grid-row: 3; }
+  .toil-project-card .trends { grid-row: 4; }
+  .toil-project-card .avatars { grid-row: 5; align-self: start; }
+  .toil-project-card__foot { grid-row: 6; align-self: end; }
 }
-@container (min-width: 36rem) {
-  .toil-project-card--lead .toil-project-card__body { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); column-gap: 1.25rem; align-items: start; }
-  .toil-project-card--lead .toil-project-card__sprint { grid-row: span 2; }
-  .toil-project-card--lead .mini-burnup { height: 4rem; }
-  .toil-project-card--lead .toil-project-card__head h2 { font-size: 1.4rem; }
-}
+/* A description keeps to two lines so a long one doesn't push the rest down; the full text is one press away in Edit. */
+.toil-project-card__head .editable--description:not(.editable--open) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* The dashboard's header: badges and counts on one line where they fit, so the panels start higher. */
 .toil-project-head h1 { margin-bottom: 0; }
@@ -106,3 +116,22 @@ h1 .edit-hint, h2 .edit-hint, h1 .edit-error, h2 .edit-error { letter-spacing: n
   .toil-project-card .edit-pencil, .toil-project-card .edit-link { opacity: 0; transition: opacity 0.12s; }
   .toil-project-card:hover .edit-pencil, .toil-project-card:hover .edit-link, .toil-project-card:focus-within .edit-pencil, .toil-project-card:focus-within .edit-link { opacity: 1; }
 }
+
+/* The Toil projects page's heading with its New Toil project button beside it. */
+.view-head__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
+.view-head__row h1 { margin: 0; }
+.view-head__row a.btn { display: inline-flex; align-items: center; text-decoration: none; min-height: 44px; }
+
+/* The past week as two small lines, shown whether or not the toil project runs sprints. */
+.trends { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.4rem 1rem; list-style: none; padding: 0; margin: 0; }
+.trend { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "total line" "label label"; align-items: center; gap: 0.1rem 0.5rem; min-width: 0; }
+.trend__total { grid-area: total; font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; line-height: 1.2; }
+.trend__label { grid-area: label; color: var(--muted); font-size: 0.8125rem; }
+.trend__line { grid-area: line; display: block; width: 100%; height: 1.25rem; overflow: visible; }
+.trend__line polyline { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend--unknown .trend__total { color: var(--muted); font-weight: 400; }
+
+/* The card's one edit form: labels over fields, Save and Cancel under them. */
+.edit-details { display: grid; gap: 0.35rem; }
+.edit-details label { font-weight: 600; font-size: 0.9rem; }
+.edit-details__actions { display: flex; gap: 0.5rem; margin-top: 0.4rem; }

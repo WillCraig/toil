@@ -131,6 +131,8 @@ export interface Answer {
   how: string[];
   /** Says the status word is an estimate, or that it is too early for a pace. */
   basis: string | null;
+  /** The sentence says it all: the headline is the sentence alone, with no "Word:" in front. */
+  bare?: boolean;
 }
 
 /** The panels whose read failed, in words: an all-clear that skipped them would be claiming what it didn't check. */
@@ -173,7 +175,7 @@ export function answerOf(c: Ctx): Answer {
   const s = c.view.code.sprint;
   const h = c.h;
   if (!s || !h) {
-    return { status: 'none', word: 'No sprint', sentence: 'No sprint is running right now.', why: 'No sprint with dates was found, so there is nothing to measure the work against.', how: [`Sprints are read from ${sourcesText(c.d)}.`], basis: null };
+    return { status: 'none', word: 'No sprint', sentence: 'No sprint is running right now.', why: 'No sprint with dates was found, so there is nothing to measure the work against.', how: [`Sprints are read from ${sourcesText(c.d)}.`], basis: null, bare: true };
   }
   if (s.points.total === 0) {
     // Nothing is estimated, so "all 0 points are done" would be a claim with nothing under it.
@@ -241,11 +243,20 @@ export interface Card {
 const holdText = (h: { items: number; points: number } | undefined) => (h && h.items > 0 ? ` ${plural(h.items, 'other story', 'other stories')} (${pts(h.points)}) ${h.items === 1 ? 'waits' : 'wait'} behind it.` : '');
 
 /** The biggest risk: the briefing's top reason, its first item and what waits behind it. */
-function riskCard(c: Ctx): Card | null {
+/** The first reason, and in it the first item that is still open: a story already finished is no risk to anything. */
+function riskPick(c: Ctx) {
   const top = c.view.reasons[0];
-  const first = top?.items[0];
-  const item = first ? c.byId.get(first.id) : undefined;
-  if (!top || !first || !item) return null;
+  for (const first of top?.items ?? []) {
+    const item = c.byId.get(first.id);
+    if (item && !isDone(item)) return { top: top!, first, item };
+  }
+  return null;
+}
+
+function riskCard(c: Ctx): Card | null {
+  const pick = riskPick(c);
+  if (!pick) return null;
+  const { top, first, item } = pick;
   const row = c.queue.find((r) => r.items.includes(item.id));
   const waited = row?.wait.days ?? null;
   const why =
@@ -259,7 +270,8 @@ function riskCard(c: Ctx): Card | null {
   const owner = nameOf(personIn(c, item.assignee, item.source.area));
   return {
     id: 'risk',
-    kicker: 'Biggest risk to the sprint',
+    // With no sprint running there is nothing for it to be a risk to.
+    kicker: c.view.code.sprint ? 'Biggest risk to the sprint' : 'Biggest risk right now',
     title: item.title,
     key: keyOf(item),
     why,
@@ -293,8 +305,9 @@ function blockedCard(c: Ctx, covered: string | null): Card | null {
 }
 
 /** The oldest code review waiting for a first look, past the working days the team's rule allows. */
-function reviewCard(c: Ctx): Card | null {
-  const late = c.queue.filter((r) => r.wait.on === 'review' && (r.wait.days ?? 0) > PICKUP_DAYS);
+function reviewCard(c: Ctx, covered: Set<string> = new Set()): Card | null {
+  // A review of work another card already tells is that card's story, not a second one.
+  const late = c.queue.filter((r) => r.wait.on === 'review' && (r.wait.days ?? 0) > PICKUP_DAYS && !r.items.some((id) => covered.has(id)));
   if (!late.length) return null;
   const r = late[0]!;
   const days = Math.round(r.wait.days ?? 0);
@@ -314,8 +327,8 @@ function reviewCard(c: Ctx): Card | null {
 }
 
 /** The fallback when one of the three is empty: stories that wait to start but aren't ready to. */
-function notReadyCard(c: Ctx): Card | null {
-  const items = (c.h?.items ?? []).filter((i) => i.statusCategory === 'TODO' && flows(i));
+function notReadyCard(c: Ctx, covered: Set<string> = new Set()): Card | null {
+  const items = (c.h?.items ?? []).filter((i) => i.statusCategory === 'TODO' && flows(i) && !covered.has(i.id));
   const rows = items.map((i) => ({ i, r: c.ready.get(i.id)! })).filter((x) => x.r && x.r.verdict !== 'ready');
   if (!rows.length) return null;
   const count = (check: string) => rows.filter((x) => x.r.why.some((w) => w.check === check)).length;
@@ -372,6 +385,14 @@ export function pickCards(found: { risk: Card | null; blocked: Card | null; revi
 
 export function cardsOf(c: Ctx): Card[] {
   const risk = riskCard(c);
-  const riskId = c.view.reasons[0]?.items[0]?.id ?? null;
-  return pickCards({ risk, blocked: blockedCard(c, risk ? riskId : null), review: reviewCard(c), ready: notReadyCard(c) }, failedReads(c));
+  const riskId = risk ? (riskPick(c)?.item.id ?? null) : null;
+  const blocked = blockedCard(c, riskId);
+  // One story, one card: what an earlier card already names is left out of the later ones.
+  const covered = new Set<string>(riskId ? [riskId] : []);
+  if (blocked?.action?.item) {
+    covered.add(blocked.action.item);
+    for (const id of behindAll(c.held, blocked.action.item)) covered.add(id);
+  }
+  const review = reviewCard(c, covered);
+  return pickCards({ risk, blocked, review, ready: notReadyCard(c, covered) }, failedReads(c));
 }

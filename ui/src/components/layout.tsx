@@ -96,7 +96,7 @@ export function Scroller({ label, className, children, hint = 'Scroll sideways f
   const hintId = useId();
   return (
     <div className={cx('l-scroll', className)} data-more-start={edges.start || undefined} data-more-end={edges.end || undefined}>
-      <div ref={ref} className="l-scroll__body" data-scroller="" role="region" aria-label={label} tabIndex={overflowing ? 0 : undefined} aria-describedby={overflowing ? hintId : undefined}>
+      <div ref={ref} className="l-scroll__body" data-scroller="" role="region" aria-label={label} tabIndex={0} aria-describedby={overflowing ? hintId : undefined}>
         {children}
       </div>
       {overflowing && (
@@ -116,6 +116,12 @@ export interface Column<T> {
   cell: (row: T) => ReactNode;
   /** The column that names the row (a `<th scope="row">`). */
   rowHeader?: boolean;
+  /**
+   * `actions`: a narrow last column of quiet icon buttons or a menu. Its heading
+   * is read by screen readers only, and when the table stacks it sits at the
+   * row's top corner instead of under a label.
+   */
+  actions?: boolean;
 }
 
 /**
@@ -134,8 +140,8 @@ export function DataTable<T>({ label, caption, columns, rows, rowKey, wide = fal
           <thead role="rowgroup">
             <tr role="row">
               {columns.map((c, i) => (
-                <th key={i} role="columnheader" scope="col">
-                  {c.header}
+                <th key={i} role="columnheader" scope="col" className={c.actions ? 'l-table__actions' : undefined}>
+                  {c.actions ? <span className="sr-only">{c.header}</span> : c.header}
                 </th>
               ))}
             </tr>
@@ -146,7 +152,7 @@ export function DataTable<T>({ label, caption, columns, rows, rowKey, wide = fal
                 {columns.map((c, i) => {
                   const Cell = c.rowHeader ? 'th' : 'td';
                   return (
-                    <Cell key={i} role={c.rowHeader ? 'rowheader' : 'cell'} scope={c.rowHeader ? 'row' : undefined}>
+                    <Cell key={i} role={c.rowHeader ? 'rowheader' : 'cell'} scope={c.rowHeader ? 'row' : undefined} className={c.actions ? 'l-table__actions' : undefined}>
                       <span className="l-table__label" aria-hidden="true">
                         {c.label}
                       </span>

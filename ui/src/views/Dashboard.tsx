@@ -179,7 +179,7 @@ function BoardTab({ person }: { person?: string }) {
 
   return (
     <div className="tab-panels">
-      <Panel id="board" title={term('board', h ? `${h.sprint.name} board` : 'Board')} calls={toilProject.calls.work} alerts={false}>
+      <Panel id="board" title={term('board', h ? `${h.sprint.name} board` : 'All the work')} calls={toilProject.calls.work} alerts={false}>
         {(toilProject.readTargets ?? []).filter((t) => !t.work).map((t) => (
           <p key={t.label} className="note">
             {t.label}: work items not read
@@ -194,8 +194,7 @@ function BoardTab({ person }: { person?: string }) {
             Needs attention only ({flagged.length})
           </Checkbox>
           <span className="board-tools__help">
-            <Help topic="insights" />
-            <Help topic="board" />
+            <Help topic="board" note="A card with a flag needs action now or a look: it is blocked, its build fails, or it has gone quiet." />
           </span>
         </div>
         <Board items={cards} />
@@ -272,7 +271,8 @@ function BoardFilter({ name, shown, all }: { name: string | null; shown: number;
   const line = useRef<HTMLParagraphElement>(null);
   // Opened straight from a link or a reload, the shell moves no focus, so the board panel, heading and all, is brought into view here.
   useEffect(() => {
-    (line.current?.closest('section') ?? line.current)?.scrollIntoView?.({ block: 'start' });
+    // Only as far as it takes to see the filter's line: the header and tabs above it stay in view.
+    (line.current?.closest('section') ?? line.current)?.scrollIntoView?.({ block: 'nearest' });
   }, []);
   const on = (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`;
   return (

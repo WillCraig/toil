@@ -2,13 +2,14 @@
  * Assigning work items to an agent (#293): the queue's states and limits,
  * the tracker's inbox that only ever queues, applying through toil's gate,
  * the events, the prompts' fences, the files and settings, the runner's
- * proposals, the sample, and the HTTP routes behind the session.
+ * proposals, the sample, and the HTTP routes behind the Host and Origin checks.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request } from 'node:http';
+import { cookieHeader, letInto } from './let-in.ts';
 import { afterAll, describe, expect, it } from 'vitest';
 import { actorOf, branchName, inboxMatch, proposalDiff, settledState, type AdapterChoice, type AssignmentEvent } from '../src/assign/model.ts';
 import { AssignError, AssignmentQueue, RunStopped, type QueueOptions, type RunContext, type RunResult } from '../src/assign/queue.ts';
@@ -149,7 +150,7 @@ describe('the assignment queue', () => {
     await h.tick();
     expect(h.queue.get(a.id)).toMatchObject({ state: 'failed', stop: { reason: 'time', message: 'Stopped at the time limit of 20 minutes, before the agent finished.' } });
     const b = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-102', mode: 'refine', adapter: 'codex' });
-    h.runs[1]!.reject(new RunStopped('usage', "Codex's per-chat cap (codex.chat) stopped this question.", 'Raise the cap.'));
+    h.runs[1]!.reject(new RunStopped('usage', "Codex's per-chat cap stopped this question.", 'Raise the cap.'));
     await h.tick();
     expect(h.queue.get(b.id)).toMatchObject({ state: 'failed', stop: { reason: 'usage' } });
     expect(h.timers[0]!.cleared && h.timers[1]!.cleared).toBe(true);
@@ -411,7 +412,7 @@ describe('the assignment routes', () => {
   const call = (origin: string, path: string, o: { method?: string; headers?: Record<string, string>; body?: unknown } = {}) =>
     new Promise<{ status: number; body: string }>((resolve, reject) => {
       const u = new URL(path, origin);
-      const req = request({ host: u.hostname, port: u.port, path: `${u.pathname}${u.search}`, method: o.method ?? 'GET', headers: { host: u.host, ...o.headers } }, (res) => {
+      const req = request({ host: u.hostname, port: u.port, path: `${u.pathname}${u.search}`, method: o.method ?? 'GET', headers: { host: u.host, ...cookieHeader(origin), ...o.headers } }, (res) => {
         let body = '';
         res.setEncoding('utf8');
         res.on('data', (c: string) => {
@@ -425,32 +426,33 @@ describe('the assignment routes', () => {
       req.end();
     });
 
-  it('lists, assigns, applies by id, and streams events, all behind the session', async () => {
+  it('lists, assigns, applies by id, and streams events, behind the Host and Origin checks', async () => {
     const s = sampleQueue(fixtureExecute().execute, { delay: 1 });
     await s.ready;
-    const ui = createUiServer({ settings: settings(), store: fixtureStore(), agent: fixtureAgent(), appDir: folder, version: 't', toil: { version: 't', contractVersion: 1 }, token: 'tok', assignments: { queue: s.queue } });
+    writeFileSync(join(folder, 'index.html'), '<!doctype html>');
+    const ui = createUiServer({ settings: settings(), store: fixtureStore(), agent: fixtureAgent(), appDir: folder, version: 't', toil: { version: 't', contractVersion: 1 }, assignments: { queue: s.queue } });
     const { origin } = await ui.listen();
+    await letInto(origin);
     try {
-      expect((await call(origin, '/api/assignments?toilProject=card-payments')).status).toBe(401);
-      const signed = await call(origin, '/api/session', { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: { token: 'tok' } });
-      const session = JSON.parse(signed.body) as { session: string; csrf: string; assignments: boolean };
-      expect(session.assignments).toBe(true);
-      const h = { 'x-toil-ui-session': session.session };
-      const post = { ...h, origin, 'content-type': 'application/json', 'x-toil-ui-csrf': session.csrf };
-      const list = JSON.parse((await call(origin, '/api/assignments?toilProject=card-payments', { headers: h })).body) as { assignments: unknown[] };
+      const info = JSON.parse((await call(origin, '/api/info')).body) as { assignments: boolean };
+      expect(info.assignments).toBe(true);
+      // Reading the assignments queues the inbox, so a GET from another website is refused too.
+      expect((await call(origin, '/api/assignments?toilProject=card-payments', { headers: { origin: 'https://rebind.imagile.dev' } })).status).toBe(403);
+      const post = { origin, 'content-type': 'application/json' };
+      const list = JSON.parse((await call(origin, '/api/assignments?toilProject=card-payments')).body) as { assignments: unknown[] };
       expect(list.assignments).toHaveLength(5);
       const made = await call(origin, '/api/assignments', { method: 'POST', headers: post, body: { toilProject: 'card-payments', item: 'corp-jira:PAY-103', mode: 'investigate', adapter: 'codex' } });
       expect(made.status).toBe(201);
-      // Without the CSRF token, nothing is applied.
-      expect((await call(origin, '/api/assignments/apply', { method: 'POST', headers: { ...h, origin, 'content-type': 'application/json' }, body: { id: 'sample-needsyou-0002', proposal: 'x' } })).status).toBe(403);
+      // From another website, nothing is applied.
+      expect((await call(origin, '/api/assignments/apply', { method: 'POST', headers: { origin: 'https://rebind.imagile.dev', 'content-type': 'application/json' }, body: { id: 'sample-needsyou-0002', proposal: 'x' } })).status).toBe(403);
       const missing = await call(origin, '/api/assignments/apply', { method: 'POST', headers: post, body: { id: 'sample-needsyou-0002', proposal: 'no-such' } });
       expect(missing.status).toBe(404);
       expect((await call(origin, '/api/assignments/settings', { method: 'POST', headers: post, body: { concurrent: 1, timeLimitMinutes: 5 } })).status).toBe(404);
-      const events = await call(origin, '/api/assignments/events?since=0', { headers: h });
+      const events = await call(origin, '/api/assignments/events?since=0');
       expect(events.status).toBe(200);
       expect(JSON.parse(events.body.split('\n')[0]!)).toMatchObject({ seq: expect.any(Number), kind: expect.any(String) });
       // since=latest (#306) skips what already happened: the first line is the next event, carrying what a notice says.
-      const next = call(origin, '/api/assignments/events?since=latest', { headers: h });
+      const next = call(origin, '/api/assignments/events?since=latest');
       await new Promise((r) => setTimeout(r, 50));
       await call(origin, '/api/assignments', { method: 'POST', headers: post, body: { toilProject: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' } });
       expect(JSON.parse((await next).body.split('\n')[0]!)).toMatchObject({ kind: 'created', item: 'corp-jira:PAY-103', itemTitle: expect.any(String), adapter: 'codex', origin: 'person', stop: null, pending: 0, questions: 0 });

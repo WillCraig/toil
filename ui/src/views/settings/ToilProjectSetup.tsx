@@ -12,10 +12,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { pairs, type AreaInfo, type ConfigApi, type ConnectionsData } from '../../config.ts';
 import type { Envelope } from '../../toil.ts';
-import { Card, CardGrid, Cluster, DataTable, Path, Stack, Url } from '../../components/layout.tsx';
+import { Card, CardGrid, Cluster, DataTable, Stack, Url } from '../../components/layout.tsx';
 import { RepoSetup } from './RepoSetup.tsx';
+import { FindFields } from './FindFields.tsx';
+import { toilProjectEditHref } from '../../format.ts';
+import { areaLabel, toolName } from '../../setup.ts';
+import { CardMenu } from '../../components/card-menu.tsx';
+import { usePlain } from '../../plain-words.ts';
+import { ArchiveNoticeLine, ArchivedDisclosure, type ArchiveNotice } from '../../components/archive.tsx';
 import { Help, useLandOn } from '../../components/help.tsx';
-import { AreaField, ChangeForm, CheckField, OutcomeLine, SelectField, TextField, commandLine, failedOutcome, outcomeOf, type Outcome } from './parts.tsx';
+import { AreaField, ChangeForm, CheckField, Info, OutcomeLine, SelectField, TextField, failedOutcome, outcomeOf, type Outcome } from './parts.tsx';
 import { Loader } from '../../moments/Moments.tsx';
 import { isLensId, lensDef, LENSES, type LensId } from '../../../../src/core/brief/brief.ts';
 import { analyzePrompt, AUDIENCES, type Audience, type ToilProjectAnalyze, type FocusSource } from '../../../../src/core/brief/prompt.ts';
@@ -44,25 +50,39 @@ const fromEnvelope = <T,>(e: Envelope): Loaded<T> => (e.ok ? { ok: true, value: 
 export type ToilProjectTarget = { toilProject: string; section: string | null };
 
 /** The form each section's edit link lands on, by its heading's id. */
-const SECTION_FORM: Record<string, string> = { sources: 'toil-project-form-sources', repos: 'toil-project-form-repos', fields: 'toil-project-form-fields', people: 'toil-project-form-people', wip: 'toil-project-form-wip', analyze: 'toil-project-form-analyze' };
+const SECTION_FORM: Record<string, string> = { sources: 'toil-project-form-sources', repos: 'toil-project-form-repos', fields: 'toil-project-form-fields', 'find-fields': 'toil-project-form-find-fields', people: 'toil-project-form-people', wip: 'toil-project-form-wip', analyze: 'toil-project-form-analyze' };
 
 /** `at`: a toil project's section to land on (#346); `toForm`: Create a toil project, which the first-run checklist opens (#416). */
 export function ToilProjectSetup({ config, at, toForm = false }: { config: ConfigApi; at?: ToilProjectTarget; toForm?: boolean }) {
   const [list, setList] = useState<Loaded<{ toilProjects: ListedToilProject[]; places: { user: string } }> | null>(null);
+  // The archived ones (#561): null when they could not be read, which is not none and draws nothing.
+  const [archived, setArchived] = useState<Array<{ name: string; description: string | null }> | null>(null);
+  const [notice, setNotice] = useState<ArchiveNotice | null>(null);
   const [areas, setAreas] = useState<AreaInfo[]>([]);
   const [connections, setConnections] = useState<ConnectionsData['connections']>([]);
-  const [selected, setSelected] = useState(at?.toilProject ?? '');
-  // A later edit link on the same page (back and forward) chooses its toil project too.
-  useEffect(() => {
-    if (at?.toilProject) setSelected(at.toilProject);
-  }, [at?.toilProject]);
   const reload = useCallback(async () => {
     try {
       setList(fromEnvelope(await config.run('projects list', {})));
     } catch (e) {
       setList({ ok: false, message: e instanceof Error ? e.message : String(e) });
     }
+    try {
+      const gone = await config.run('projects list', { archived: true });
+      setArchived(gone.ok ? (gone.data as { toilProjects: Array<{ name: string; description: string | null }> }).toilProjects.map((d) => ({ name: d.name, description: d.description ?? null })) : null);
+    } catch {
+      setArchived(null);
+    }
   }, [config]);
+  /** Archives or unarchives through toil's own command, then reads both lists again. */
+  const archive = async (name: string, putAway: boolean) => {
+    try {
+      const env = await config.run(putAway ? 'projects archive' : 'projects unarchive', { toilProject: name });
+      setNotice(env.ok ? { kind: putAway ? 'archived' : 'unarchived', name } : { kind: 'failed', name, message: `${env.error.message}${env.error.fix ? ` ${env.error.fix}` : ''}` });
+      if (env.ok) await reload();
+    } catch (e) {
+      setNotice({ kind: 'failed', name, message: e instanceof Error ? e.message : String(e) });
+    }
+  };
   useEffect(() => {
     void reload();
     config.areas().then(setAreas, () => setAreas([]));
@@ -75,69 +95,120 @@ export function ToilProjectSetup({ config, at, toForm = false }: { config: Confi
   // The form takes focus once the list has loaded and the toil project is chosen; with no section, the toil project picker does.
   const found = Boolean(at && list?.ok && list.value.toilProjects.some((d) => d.name === at.toilProject));
   useLandOn(toForm ? 'toil-project-change' : at ? (found ? (SECTION_FORM[at.section ?? ''] ?? 'toil-project-change') : 'toil-project-change') : null, Boolean(list));
-  if (!list) return <Loader size="panel" message="Reading your Toil projects with toil projects list…" />;
+  if (!list) return <Loader size="panel" message="Reading your Toil projects…" />;
   if (!list.ok) {
     return (
       <div role="alert" className="failure">
         <p>
-          <code>toil projects list</code> failed: {list.message}
+          Your Toil projects didn't load: {list.message}
         </p>
       </div>
     );
   }
   const toilProjects = list.value.toilProjects;
-  const target = toilProjects.find((d) => d.name === selected)?.name ?? toilProjects[0]?.name ?? '';
+
+  // One Toil project's own page: its sources and everything else you can change about it (#561).
+  if (at) {
+    return <EditToilProject config={config} name={at.toilProject} section={at.section} toilProjects={toilProjects} found={found} areas={areas} connections={connections} />;
+  }
 
   return (
     <>
-      <RepoSetup config={config} areas={areas} onChanged={reload} />
       <Card as="section" className="panel" aria-labelledby="toil-project-list">
-        <h2 id="toil-project-list">Your Toil projects</h2>
+        <div className="view-head__row">
+          <h2 id="toil-project-list">Your Toil projects</h2>
+          {toilProjects.length > 0 && (
+            <a className="btn" href="#/new-project" data-new-toil-project="">
+              New Toil project
+            </a>
+          )}
+        </div>
         <p className="lede">
-          From <code>toil projects list</code>; yours are in <Path value={list.value.places.user} what="folder path" />. <Help topic="toil-project-list" />
+          Each one covers a body of work: its repositories, tools and people. <Help topic="toil-project-list" />
         </p>
+        {notice && <ArchiveNoticeLine notice={notice} onUndo={(name, putAway) => void archive(name, putAway)} onDismiss={() => setNotice(null)} />}
         {toilProjects.length === 0 ? (
-          <p>toil sees no Toil projects yet. Create one below.</p>
+          <p>
+            No Toil projects yet. <a className="btn btn--accent" href="#/new-project" data-new-toil-project="">New Toil project</a>
+          </p>
         ) : (
           <CardGrid min="lg" className="conn-cards">
             {toilProjects.map((d) => (
               <li key={d.file}>
-                <ToilProjectCard toilProject={d} config={config} />
+                <ToilProjectCard toilProject={d} config={config} {...(!config.disabled && d.source === 'user' ? { onArchive: (name: string) => void archive(name, true) } : {})} />
               </li>
             ))}
           </CardGrid>
         )}
+        <ArchivedDisclosure archived={archived} onUnarchive={config.disabled ? null : (name) => void archive(name, false)} />
       </Card>
+      <RepoSetup config={config} areas={areas} onChanged={reload} />
+    </>
+  );
+}
+
+const GROUPS: Array<{ id: string; label: string; sections: string[] }> = [
+  { id: 'sources', label: 'Sources', sections: ['sources', 'repos'] },
+  { id: 'fields', label: 'Field names', sections: ['fields', 'find-fields'] },
+  { id: 'people', label: 'People', sections: ['people'] },
+  { id: 'wip', label: 'Work in progress limit', sections: ['wip'] },
+  { id: 'analyze', label: 'How Analyze briefs', sections: ['analyze'] },
+];
+
+/** The edit page for one Toil project: its sources first, every other change one section further in (principle 11). */
+function EditToilProject({ config, name, section, toilProjects, found, areas, connections }: { config: ConfigApi; name: string; section: string | null; toilProjects: ListedToilProject[]; found: boolean; areas: AreaInfo[]; connections: ConnectionsData['connections'] }) {
+  const { pw } = usePlain();
+  const first = GROUPS.find((g) => section && g.sections.includes(section))?.id ?? 'sources';
+  const [open, setOpen] = useState<string>(first);
+  useEffect(() => setOpen(first), [first]);
+  const here = toilProjects.find((d) => d.name === name);
+  return (
+    <>
+      <p className="note">
+        <a href="#/settings/projects" className="back-link">← All Toil projects</a>
+      </p>
       <Card as="section" className="panel" aria-labelledby="toil-project-change">
         <h2 id="toil-project-change" tabIndex={-1}>
-          Create or change a Toil project
+          Edit {name}
         </h2>
-        <p className="lede">
-          Each form runs one <code>toil projects</code> command. <Help topic="toil-project-setup" />
-        </p>
-        {at && list.ok && !found && (
+        {here?.description && <p className="lede">{here.description}</p>}
+        {!found ? (
           <p role="status" className="failure">
-            toil sees no Toil project named <code>{at.toilProject}</code>. It may have been removed or renamed; create it again below.
+            There is no Toil project named {name}. It may have been removed or renamed; <a href="#/new-project">create it again</a>.
           </p>
-        )}
-        <InitForm config={config} onChanged={reload} />
-        {toilProjects.length > 0 && (
-          <>
-            <SelectField label="Toil project to change" value={target} onChange={setSelected} options={toilProjects.map((d) => ({ value: d.name, label: `${d.name} (${d.source})` }))} hint="The forms below change this one." />
-            <AddRepoForm config={config} toilProject={target} />
-            <LinkForm config={config} toilProject={target} areas={areas} connections={connections} />
-            <FieldForm config={config} toilProject={target} areas={areas} />
-            <PersonForm config={config} toilProject={target} areas={areas} />
-            <WipLimitForm config={config} toilProject={target} />
-            <AnalyzeForm config={config} toilProject={target} />
-          </>
+        ) : (
+          GROUPS.map((g) => (
+            <details key={g.id} className="edit-group" data-edit-group={g.id} open={open === g.id} onToggle={(e) => { const o = (e.currentTarget as HTMLDetailsElement).open; setOpen((cur) => (o ? g.id : cur === g.id ? '' : cur)); }}>
+              <summary>{g.id === 'analyze' ? pw('How Analyze briefs', 'How briefings are made') : g.label}</summary>
+              {open === g.id && g.id === 'sources' && (
+                <>
+                  <AddRepoForm config={config} toilProject={name} />
+                  <LinkForm config={config} toilProject={name} areas={areas} connections={connections} />
+                </>
+              )}
+              {open === g.id && g.id === 'fields' && (
+                <>
+                  <FieldForm config={config} toilProject={name} areas={areas} />
+                  <FindFields config={config} toilProjects={toilProjects.map((d) => d.name)} toilProject={name} connections={connections} titleId="toil-project-form-find-fields" />
+                </>
+              )}
+              {open === g.id && g.id === 'people' && (
+                <>
+                  <PersonForm config={config} toilProject={name} areas={areas} />
+                  <PeopleSaveForm config={config} toilProject={name} />
+                </>
+              )}
+              {open === g.id && g.id === 'wip' && <WipLimitForm config={config} toilProject={name} />}
+              {open === g.id && g.id === 'analyze' && <AnalyzeForm config={config} toilProject={name} />}
+            </details>
+          ))
         )}
       </Card>
     </>
   );
 }
 
-function ToilProjectCard({ toilProject: d, config }: { toilProject: ListedToilProject; config: ConfigApi }) {
+function ToilProjectCard({ toilProject: d, config, onArchive }: { toilProject: ListedToilProject; config: ConfigApi; onArchive?: (name: string) => void }) {
   const [shown, setShown] = useState<Loaded<Shown> | null>(null);
   const [checked, setChecked] = useState<Outcome | null>(null);
   const [problems, setProblems] = useState<Array<{ level: string; path: string; message: string }>>([]);
@@ -163,6 +234,15 @@ function ToilProjectCard({ toilProject: d, config }: { toilProject: ListedToilPr
   };
   return (
     <Card className="conn-card" aria-labelledby={titleId}>
+      <CardMenu
+        name={d.name}
+        items={[
+          { id: 'show', label: shown ? 'Hide details' : 'Show details' },
+          { id: 'check', label: 'Check' },
+          ...(onArchive ? [{ id: 'archive', label: 'Archive', separated: true }] : []),
+        ]}
+        onAction={(id) => (id === 'show' ? void show() : id === 'check' ? void check() : id === 'archive' && onArchive?.(d.name))}
+      />
       <div className="conn-head">
         <h3 id={titleId}>
           <code>{d.name}</code>
@@ -173,17 +253,11 @@ function ToilProjectCard({ toilProject: d, config }: { toilProject: ListedToilPr
         </ul>
       </div>
       {d.description && <p>{d.description}</p>}
-      <p className="note">
-        <Path value={d.file} what={`${d.name}'s file path`} />
-        {d.shadowedBy && <> (a Toil project of the same name in {d.shadowedBy} takes precedence)</>}
-      </p>
+      {d.shadowedBy && <p className="note">Another Toil project with the same name takes precedence.</p>}
       <Cluster className="conn-actions">
-        <button type="button" className="btn" aria-expanded={shown !== null} onClick={show}>
-          {shown ? 'Hide' : 'Show'}
-        </button>
-        <button type="button" className="btn" onClick={check}>
-          Check
-        </button>
+        <a className="btn btn--accent" href={toilProjectEditHref(d.name, 'sources')} data-edit-toil-project="">
+          Edit
+        </a>
       </Cluster>
       <OutcomeLine outcome={checked} />
       {problems.length > 0 && (
@@ -197,7 +271,7 @@ function ToilProjectCard({ toilProject: d, config }: { toilProject: ListedToilPr
       )}
       {shown && !shown.ok && (
         <p role="alert" className="failure">
-          <code>toil projects show {d.name}</code> failed: {shown.message}
+          {d.name} couldn't be read: {shown.message}
         </p>
       )}
       {shown?.ok && <ShownToilProject shown={shown.value} />}
@@ -211,12 +285,12 @@ function ShownToilProject({ shown }: { shown: Shown }) {
   return (
     <Stack className="shown" gap="sm">
       <DataTable
-        label={`What ${shown.name} gives each area`}
-        caption={`What ${shown.name} gives each area`}
+        label={`What ${shown.name} gives each tool`}
+        caption={`What ${shown.name} gives each tool`}
         rows={areas}
         rowKey={([area]) => area}
         columns={[
-          { header: 'Area', label: 'Area', rowHeader: true, cell: ([area]) => area },
+          { header: 'Tool', label: 'Tool', rowHeader: true, cell: ([area]) => toolName(area) },
           { header: 'Connection', label: 'Connection', cell: ([, a]) => (a.error ? <span className="failure">{a.error.message}</span> : a.connection ? `${a.connection.value} (${a.connection.source})` : 'Your default') },
           { header: 'Writes', label: 'Writes', cell: ([, a]) => (a.writes === null ? '–' : a.writes ? 'On' : 'Off') },
           {
@@ -239,7 +313,7 @@ function ShownToilProject({ shown }: { shown: Shown }) {
           {shown.toilProject.people.map((p) => (
             <li key={p.name} className="any-break">
               {p.name}
-              {p.kind === 'agent' && ' (agent)'}
+              {p.kind === 'agent' && ' (AI agent)'}
               <span className="note">
                 {' '}
                 {Object.entries(p.ids ?? {})
@@ -276,33 +350,6 @@ function ShownToilProject({ shown }: { shown: Shown }) {
   );
 }
 
-function InitForm({ config, onChanged }: { config: ConfigApi; onChanged: () => Promise<void> }) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  return (
-    <ChangeForm
-      title="Create a Toil project"
-      explain="Makes an empty Toil project for one body of work in your own folder (~/.toil/projects/<name>.json). Add its repositories and areas with the forms below. It refuses a name you already have."
-      runs={commandLine('projects init', [name || '<name>', ...(description ? ['--description', '…'] : [])])}
-      submit="Create Toil project"
-      disabled={config.disabled}
-      onSubmit={async () => {
-        const e = await config.run('projects init', { name, ...(description ? { description } : {}) });
-        const outcome = outcomeOf(e, `${name} was created.`);
-        if (outcome.ok) {
-          setName('');
-          setDescription('');
-          await onChanged();
-        }
-        return outcome;
-      }}
-    >
-      <TextField label="Name" value={name} onChange={setName} required hint="Lowercase letters, digits and single hyphens, e.g. payments." />
-      <TextField label="Description" value={description} onChange={setDescription} hint="One line saying what the body of work is." />
-    </ChangeForm>
-  );
-}
-
 function AddRepoForm({ config, toilProject }: { config: ConfigApi; toilProject: string }) {
   const [location, setLocation] = useState('');
   const [name, setName] = useState('');
@@ -311,8 +358,7 @@ function AddRepoForm({ config, toilProject }: { config: ConfigApi; toilProject: 
     <ChangeForm
       titleId="toil-project-form-repos"
       title={`Add a repository to ${toilProject}`}
-      explain="Records a repository by its remote URL, or by a folder on this machine (its git root and origin remote). Any credential in a remote is left out of the file. toil then picks this Toil project for calls made in that repository."
-      runs={commandLine('projects add-repo', [toilProject, location || '<folder|remote>', ...(name ? ['--name', name] : []), ...(replace ? ['--replace'] : [])])}
+      explain="Adds a repository by its web address, or by a folder on this computer. Any password in an address is left out. Toil then uses this Toil project when you work in that repository."
       submit="Add repository"
       disabled={config.disabled}
       onSubmit={async () => outcomeOf(await config.run('projects add-repo', { toilProject, location, ...(name ? { name } : {}), ...(replace ? { replace } : {}) }), `The repository was added to ${toilProject}.`)}
@@ -333,14 +379,12 @@ function LinkForm({ config, toilProject, areas, connections }: { config: ConfigA
   const names = areas.map((a) => a.name);
   const chosen = names.includes(area) ? area : (names.includes('jira') ? 'jira' : names[0] ?? '');
   const ofArea = connections.filter((c) => c.area === chosen);
-  const args = [toilProject, chosen, ...(connection ? ['--connection', connection] : []), ...pairs(set).flatMap((p) => ['--set', p]), ...pairs(add).flatMap((p) => ['--add', p]), ...(replace ? ['--replace'] : [])];
   return (
     <ChangeForm
       titleId="toil-project-form-sources"
-      title={`Link an area to ${toilProject}`}
-      explain="Attaches an area to the Toil project: which of your connections its calls use (or your default), the keys it supplies to every call (project=PAY), and reference data lists (projects=FEES). toil refuses, from here, a link that would point the Toil project at a connection with writes on: a person makes that one with toil projects link in a terminal."
-      runs={commandLine('projects link', args)}
-      submit="Link area"
+      title={`Link a tool to ${toilProject}`}
+      explain="Attaches an area to the Toil project: which of your connections its calls use (or your default), the keys it supplies to every call (project=PAY), and reference data lists (projects=FEES). A link to a connection that allows writes can't be made from here; that is left to you in a terminal, so nothing can start changing your tools by accident."
+      submit="Link tool"
       disabled={config.disabled}
       onSubmit={async () =>
         outcomeOf(
@@ -349,9 +393,9 @@ function LinkForm({ config, toilProject, areas, connections }: { config: ConfigA
         )
       }
     >
-      <SelectField label="Area" value={chosen} onChange={(v) => (setArea(v), setConnection(''))} options={names.map((n) => ({ value: n, label: n }))} />
+      <SelectField label="Tool" value={chosen} onChange={(v) => (setArea(v), setConnection(''))} options={names.map((n) => ({ value: n, label: areaLabel(n) }))} />
       <SelectField label="Connection" value={connection} onChange={setConnection} options={[{ value: '', label: `Your ${chosen} default` }, ...ofArea.map((c) => ({ value: c.name, label: `${c.name}${c.writes ? ' (writes on)' : ''}` }))]} />
-      <AreaField label="Keys to set, one key=value per line" value={set} onChange={setSet} hint="The area's context inputs (project=PAY, owner=imagile) are applied to calls; any other key is kept as reference data." />
+      <AreaField label="Settings for every call, one key=value per line" value={set} onChange={setSet} hint="The area's context inputs (project=PAY, owner=imagile) are applied to calls; any other key is kept as reference data." />
       <AreaField label="Values to add to lists, one key=value per line" value={add} onChange={setAdd} hint="e.g. projects=FEES" />
       <CheckField label="Replace values already set" checked={replace} onChange={setReplace} />
     </ChangeForm>
@@ -365,17 +409,15 @@ function PersonForm({ config, toilProject, areas }: { config: ConfigApi; toilPro
   const [email, setEmail] = useState('');
   const [replace, setReplace] = useState(false);
   const list = pairs(ids);
-  const args = [toilProject, name ? (/\s/.test(name) ? `"${name}"` : name) : '<name>', ...list.flatMap((p) => ['--id', p]), ...(kind === 'agent' ? ['--kind', 'agent'] : []), ...(email ? ['--email', email] : []), ...(replace ? ['--replace'] : [])];
   return (
     <ChangeForm
       titleId="toil-project-form-people"
       title={`Add a person to ${toilProject}`}
       explain={
         <>
-          Says who someone is in each system, so the People view gathers their work from all of them: one area=identity per line, the user name, login or email that system shows. An agent is a person of kind agent. Their email is only compared, to suggest which accounts are theirs. Removing a person or an identity is a delete, made in a terminal with <code>toil projects person {toilProject} &lt;name&gt; --remove</code>.
+          Says who someone is in each system, so the People view gathers their work from all of them: one area=identity per line, the user name, login or email that system shows. An AI agent counts as a person too. Their email is only compared, to suggest which accounts are theirs. Toil UI can't remove a person yet.
         </>
       }
-      runs={commandLine('projects person', args)}
       submit="Add person"
       disabled={config.disabled}
       onSubmit={async () => {
@@ -392,10 +434,35 @@ function PersonForm({ config, toilProject, areas }: { config: ConfigApi; toilPro
       }}
     >
       <TextField label="Name" value={name} onChange={setName} required hint="As the team writes it, e.g. Pat Example." />
-      <AreaField label="Identities, one area=identity per line" value={ids} onChange={setIds} hint={<>e.g. jira=pat and github=pat-ex. Areas: {areas.map((a) => a.name).join(', ') || 'the ones toil has'}.</>} />
-      <SelectField label="Kind" value={kind} onChange={(v) => setKind(v === 'agent' ? 'agent' : 'human')} options={[{ value: 'human', label: 'Person' }, { value: 'agent', label: 'Agent' }]} />
+      <AreaField label="Accounts, one tool=account per line" value={ids} onChange={setIds} hint={<>e.g. jira=pat and github=pat-ex. Tools: {areas.map((a) => a.name).join(', ') || 'the ones you have'}.</>} />
+      <SelectField label="Kind" value={kind} onChange={(v) => setKind(v === 'agent' ? 'agent' : 'human')} options={[{ value: 'human', label: 'Person' }, { value: 'agent', label: 'AI agent' }]} />
       <TextField label="Email" value={email} onChange={setEmail} hint="Optional, e.g. you@example.com. Compared only, to suggest matches." />
       <CheckField label="Replace an identity, kind or email already set" checked={replace} onChange={setReplace} />
+    </ChangeForm>
+  );
+}
+
+function PeopleSaveForm({ config, toilProject }: { config: ConfigApi; toilProject: string }) {
+  const [replace, setReplace] = useState(false);
+  return (
+    <ChangeForm
+      titleId="toil-project-form-people-save"
+      title={`Save ${toilProject}'s people to a repository`}
+      explain={
+        <>
+          Saves the people (names, kinds, emails and the login or id each system shows, never a password) into this Toil project's copy in the repository Toil UI was started in, so teammates who get it share the mapping. If a copy exists only its people change, and people only it lists are kept. Nothing is committed: it goes in with your next change.
+        </>
+      }
+      submit="Save to this repository"
+      disabled={config.disabled}
+      onSubmit={async () => {
+        const e = await config.run('projects people save', { toilProject, ...(replace ? { replace } : {}) });
+        const d = (e.ok ? e.data : null) as { file?: string; created?: boolean; changed?: boolean; added?: string[]; updated?: string[] } | null;
+        const said = d?.created ? `Saved ${d.added?.length ?? 0} people to the repository.` : d?.changed === false ? 'The repository already has these people. Nothing changed.' : `Updated the repository's people: ${d?.added?.length ?? 0} added, ${d?.updated?.length ?? 0} changed.`;
+        return outcomeOf(e, `${said} Nothing was committed.`);
+      }}
+    >
+      <CheckField label="Take mine where the file lists the same person differently" checked={replace} onChange={setReplace} />
     </ChangeForm>
   );
 }
@@ -410,10 +477,9 @@ function WipLimitForm({ config, toilProject }: { config: ConfigApi; toilProject:
       title={`Set ${toilProject}'s work-in-progress limit`}
       explain={
         <>
-          How many items one person may have in progress at once, as the team agreed. The People view counts each person's work in progress against it, and names nobody else's. Clearing it is a delete, made in a terminal with <code>toil projects wip-limit {toilProject} --clear</code>.
+          How many items one person may have in progress at once, as the team agreed. The People view counts each person's work in progress against it, and names nobody else's. Toil UI can't clear a limit yet.
         </>
       }
-      runs={commandLine('projects wip-limit', [toilProject, limit || '<limit>', ...(replace ? ['--replace'] : [])])}
       submit="Set limit"
       disabled={config.disabled}
       onSubmit={async () => {
@@ -438,6 +504,8 @@ function AnalyzeForm({ config, toilProject }: { config: ConfigApi; toilProject: 
   const [shown, setShown] = useState<Loaded | { error: Outcome } | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [replace, setReplace] = useState(false);
+  const { pw } = usePlain();
+  const heading = `${pw('How Analyze briefs', 'How briefings are made for')} ${toilProject}`;
   useEffect(() => {
     let live = true;
     config.run('projects show', { toilProject }).then(
@@ -459,7 +527,7 @@ function AnalyzeForm({ config, toilProject }: { config: ConfigApi; toilProject: 
   if (shown && 'error' in shown) {
     return (
       <section aria-labelledby="toil-project-form-analyze" className="change-form">
-        <h3 id="toil-project-form-analyze">How Analyze briefs {toilProject}</h3>
+        <h3 id="toil-project-form-analyze" className="sr-only">{heading}</h3>
         <OutcomeLine outcome={shown.error} />
       </section>
     );
@@ -473,24 +541,28 @@ function AnalyzeForm({ config, toilProject }: { config: ConfigApi; toilProject: 
   return (
     <ChangeForm
       titleId="toil-project-form-analyze"
-      title={`How Analyze briefs ${toilProject}`}
+      title={heading}
+      quietTitle
       explain={
         <>
-          What Analyze looks for, and what the work is for; anything you leave follows the standard. <Help topic="analyze-settings" />
+          What {pw('Analyze looks for', 'a briefing looks for')}, and what the work is for; anything you leave follows the{' '}
+          <span className="nowrap">
+            standard. <Help topic="analyze-settings" />
+          </span>
         </>
       }
-      runs={commandLine('projects analyze set', inputArgs(input))}
-      submit="Save Analyze settings"
+      submit="Save"
       disabled={config.disabled ?? (shown ? null : 'Reading the Toil project…')}
-      onSubmit={async () => (Object.keys(input).length <= 1 ? { ok: true, message: 'Nothing changed, so nothing was saved.', warnings: [] } : outcomeOf(await config.run('projects analyze set', input), `${toilProject}'s Analyze settings are saved.`))}
+      onSubmit={async () => (Object.keys(input).length <= 1 ? { ok: true, message: 'Nothing changed, so nothing was saved.', warnings: [] } : outcomeOf(await config.run('projects analyze set', input), `How briefings are made for ${toilProject} is saved.`))}
     >
-      <TextField label="Goal of this work" value={d.goal} onChange={(goal) => set({ goal })} hint="One line. Analyze weighs everything against it." />
+      <TextField label="Goal of this work" value={d.goal} onChange={(goal) => set({ goal })} hint={pw('One line. Analyze weighs everything against it.', 'One line. Everything in a briefing is weighed against it.')} />
       <SelectField label="Written for" value={d.audience} onChange={(v) => set({ audience: AUDIENCES.includes(v as Audience) ? (v as Audience) : 'lead' })} options={[{ value: 'lead', label: 'A team lead' }, { value: 'engineer', label: 'An engineer on the team' }, { value: 'stakeholder', label: 'Someone outside the team' }]} />
-      <TextField label="Lenses, most important first" value={d.order} onChange={(order) => set({ order })} hint={`Lens ids separated by commas: ${LENSES.map((l) => l.id).join(', ')}.`} />
       <details className="analyze-lenses">
         <summary>
-          Lenses ({ids.filter((id) => !d.off.includes(id)).length} of {ids.length} on)
+          What it looks for ({ids.filter((id) => !d.off.includes(id)).length} of {ids.length} on)
         </summary>
+        {/* The order can only be set here, as names in a line, so the box stays, one step in and plainly labelled. */}
+        <TextField label="Order, most important first" value={d.order} onChange={(order) => set({ order })} hint={`Names separated by commas: ${LENSES.map((l) => l.id).join(', ')}.`} />
         {ids.map((id) => {
           const def = lensDef(id);
           return (
@@ -506,11 +578,11 @@ function AnalyzeForm({ config, toilProject }: { config: ConfigApi; toilProject: 
       <CheckField label="Replace settings already there" checked={replace} onChange={setReplace} />
       {preview && (
         <details className="analyze-preview">
-          <summary>The prompt Analyze will send</summary>
-          <pre className="analyze-preview__text" tabIndex={0} aria-label="The prompt Analyze will send">
+          <summary>{pw('The prompt Analyze will send', 'The instructions the agent will get')}</summary>
+          <pre className="analyze-preview__text" tabIndex={0} aria-label={pw('The prompt Analyze will send', 'The instructions the agent will get')}>
             {preview}
           </pre>
-          <p className="note">After toil's rules and before your own instructions and voice from Settings → Agent.</p>
+          <p className="note">After toil's rules and before your own instructions and voice from Settings, AI agent.</p>
         </details>
       )}
     </ChangeForm>
@@ -573,19 +645,6 @@ function changedInput(toilProject: string, was: Draft, d: Draft, ids: LensId[], 
   };
 }
 
-/** The input as `toil projects analyze set`'s arguments, so the line under the form is the one Save runs. */
-function inputArgs(input: Record<string, unknown>): string[] {
-  const flag: Record<string, string> = { goal: '--goal', audience: '--audience', order: '--order', on: '--on', off: '--off', threshold: '--threshold', watchFor: '--watch-for', leaveOut: '--leave-out', replace: '--replace' };
-  const out = [String(input.toilProject)];
-  for (const [key, value] of Object.entries(input)) {
-    if (key === 'toilProject' || !flag[key]) continue;
-    if (value === true) out.push(flag[key]!);
-    else if (Array.isArray(value)) for (const v of value) out.push(flag[key]!, String(v));
-    else out.push(flag[key]!, String(value));
-  }
-  return out;
-}
-
 function FieldForm({ config, toilProject, areas }: { config: ConfigApi; toilProject: string; areas: AreaInfo[] }) {
   const [area, setArea] = useState('');
   const [alias, setAlias] = useState('');
@@ -597,15 +656,22 @@ function FieldForm({ config, toilProject, areas }: { config: ConfigApi; toilProj
     <ChangeForm
       titleId="toil-project-form-fields"
       title={`Name a field in ${toilProject}`}
-      explain="Gives one of the area's fields a friendly name in this Toil project (storyPoints for customfield_10002), so commands and Toil UI's work items use the name. The OWI fields estimate, priority, type, team and dueDate are pointed at a team's own field the same way."
-      runs={commandLine('projects field', [toilProject, chosen, alias || '<alias>', id || '<field-id>', ...(replace ? ['--replace'] : [])])}
+      explain={
+        <>
+          Gives a tool's field a friendly name in this Toil project.{' '}
+          <span className="nowrap">
+            <Info label="naming a field" text="For example, call the field customfield_10002 storyPoints. Work items use the name. Estimate, priority, type, team and due date are pointed at your team's own field the same way. A name is one word, in camelCase." />
+          </span>{' '}
+          Don't know the id? <a href={toilProjectEditHref(toilProject, 'find-fields')}>Find the fields</a>.
+        </>
+      }
       submit="Name field"
       disabled={config.disabled}
       onSubmit={async () => outcomeOf(await config.run('projects field', { toilProject, area: chosen, alias, id, ...(replace ? { replace } : {}) }), `${alias} now names ${id} in ${toilProject}.`)}
     >
-      <SelectField label="Area" value={chosen} onChange={setArea} options={names.map((n) => ({ value: n, label: n }))} />
-      <TextField label="Alias" value={alias} onChange={setAlias} required hint="A camelCase name, e.g. storyPoints or estimate." />
-      <TextField label="Field id" value={id} onChange={setId} required hint="The service's own id, e.g. customfield_10002." />
+      <SelectField label="Tool" value={chosen} onChange={setArea} options={names.map((n) => ({ value: n, label: areaLabel(n) }))} />
+      <TextField label="Name" value={alias} onChange={setAlias} required hint="One word, e.g. storyPoints." />
+      <TextField label="Field id" value={id} onChange={setId} required hint="The tool's own id, e.g. customfield_10002." />
       <CheckField label="Point an existing alias at this field" checked={replace} onChange={setReplace} />
     </ChangeForm>
   );

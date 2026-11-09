@@ -52,7 +52,11 @@ const have = process.versions.node.split('.').map(Number);
 const line = PATCHED.find((p) => p[0] === have[0]);
 const refused = line ? have[1] < line[1] || (have[1] === line[1] && have[2] < line[2]) : have[0] < PATCHED[PATCHED.length - 1][0];
 if (refused) {
-  fail(`toil needs ${NEED}, the releases that fix CVE-2026-111497, and this is ${process.versions.node}.`, `Install ${NEED} from https://nodejs.org, then run node scripts/setup.mjs again.`);
+  // Warns and carries on, as toil itself does (src/core/runtime.ts): the reason stays on screen, the decision is the user's.
+  const bar = '!'.repeat(78);
+  console.error(`${bar}
+WARNING: THIS NODE (${process.versions.node}) HAS A KNOWN REMOTE CODE EXECUTION, CVE-2026-111497, IN ITS BROTLI DECODER. Setup is running anyway. Install ${NEED} from https://nodejs.org.
+${bar}`);
 }
 
 // Runs npm with its output streamed. npm is npm.cmd on Windows, which only a shell

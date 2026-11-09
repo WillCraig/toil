@@ -444,7 +444,7 @@ export class AssignmentQueue {
   /** Refuses an adapter that can't run here, or can't take this mode. */
   private usable(adapter: AssignAdapter, mode: Assignment['mode']) {
     const choice = this.o.runner.adapters().find((a) => a.name === adapter);
-    if (choice?.problem) throw new AssignError(choice.problem, 'Set the adapter up under Settings, Agent, or choose another.');
+    if (choice?.problem) throw new AssignError(choice.problem, 'Set the adapter up under Settings, AI agent, or choose another.');
     if (mode === 'implement' && choice?.implement) throw new AssignError(choice.implement, 'Choose an adapter the dialog offers for implement mode, or refine or investigate instead.');
   }
 
@@ -458,7 +458,7 @@ export class AssignmentQueue {
 
   private async repoFor(toilProject: string, name: string | undefined): Promise<RepoChoice> {
     const repos = await this.o.repos(toilProject);
-    if (!repos.length) throw new AssignError(`${toilProject} lists no repository with a local path, so implement mode has nothing to clone.`, `Add one with toil projects add-repo ${toilProject} <folder>, then assign again.`);
+    if (!repos.length) throw new AssignError(`${toilProject} lists no repository with a local path, so implement mode has nothing to clone.`, `Add one under Settings, Toil projects, then assign again.`);
     if (name === undefined) {
       if (repos.length === 1) return repos[0]!;
       throw new AssignError(`${toilProject} lists ${repos.length} repositories; say which one to work in.`, `Choose one of ${repos.map((r) => r.name).join(', ')}.`);
@@ -619,7 +619,7 @@ export class AssignmentQueue {
       const why = controller.signal.aborted ? controller.signal.reason : null;
       if (e instanceof RunStopped && e.usage) r.usage = e.usage;
       let stop: Stop;
-      if (why === 'time') stop = { reason: 'time', message: `Stopped at the time limit of ${timeLimitMinutes} minutes, before the agent finished.`, fix: 'Raise the limit under Settings, Agent, or assign a smaller piece of the item.' };
+      if (why === 'time') stop = { reason: 'time', message: `Stopped at the time limit of ${timeLimitMinutes} minutes, before the agent finished.`, fix: 'Raise the limit under Settings, AI agent, or assign a smaller piece of the item.' };
       else if (why === 'cancelled') stop = { reason: 'cancelled', message: 'Stopped by a person in Toil UI.', fix: null };
       else if (e instanceof RunStopped) stop = { reason: e.reason, message: e.message, fix: e.fix };
       else if (e instanceof AssignError) stop = { reason: 'error', message: e.message, fix: e.fix };

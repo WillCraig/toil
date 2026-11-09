@@ -17,7 +17,7 @@ import { sendCommand } from '../commands.ts';
 import type { ConfigApi, ConnectionRow, ConnectionsData } from '../config.ts';
 import { useData } from '../data.ts';
 import { useChatScope } from './ask.tsx';
-import { toilProjectHref } from '../format.ts';
+import { prName, toilProjectHref } from '../format.ts';
 import { FACE, availability, jobOf, jobPrompt, jobLabel, type Availability, type Face, type JobId } from '../model/jobs.ts';
 import type { Change } from '../toil.ts';
 import './jobs.css';
@@ -93,13 +93,17 @@ export function PullRequestActions({ change, info, plain }: { change: Change; in
   if (!jobs.length) return null;
   return (
     <MenuTrigger>
-      <Button className="btn btn--small jobs-trigger" aria-label={`Actions for ${change.title}`} data-job-actions="">
-        Actions
+      <Button className="btn jobs-trigger" aria-label={`Actions for ${prName(change.id)}`} data-job-actions="">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+          <circle cx="3" cy="8" r="1.4" fill="currentColor" />
+          <circle cx="8" cy="8" r="1.4" fill="currentColor" />
+          <circle cx="13" cy="8" r="1.4" fill="currentColor" />
+        </svg>
       </Button>
       <Popover className="popover menu-popover" placement="bottom end" offset={6}>
         <Menu
           className="menu jobs-menu"
-          aria-label={`Actions for ${change.title}`}
+          aria-label={`Actions for ${prName(change.id)}`}
           onAction={(key) => {
             const id = String(key) as JobId;
             const job = jobs.find((j) => j.id === id);
@@ -131,7 +135,7 @@ export function DiagramLink() {
   const { toilProject } = useData();
   return (
     <p className="note jobs-link">
-      <a href={jobHref(toilProject.name, 'map-codebase')} data-job-link="map-codebase">
+      <a href={jobHref(toilProject.name, 'map-codebase')} data-job-link="map-codebase" className="nowrap">
         Draw its architecture
       </a>
     </p>

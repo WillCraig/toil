@@ -105,5 +105,5 @@ describe('the table', () => {
 });
 
 it('points the sample at a theme and a route', () => {
-  expect(themed('http://127.0.0.1:4000/?token=abc', 'realm', '#/settings/toil')).toBe('http://127.0.0.1:4000/?token=abc&theme=realm#/settings/toil');
+  expect(themed('http://127.0.0.1:4000/', 'realm', '#/settings/toil')).toBe('http://127.0.0.1:4000/?theme=realm#/settings/toil');
 });

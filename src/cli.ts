@@ -8,7 +8,7 @@ import { createSecretStore } from './core/keychain.js';
 import { cliProgress, type ProgressEvent } from './core/progress.js';
 import { terminalPrompter } from './core/prompt.js';
 import { createMcpServer } from './mcp/server.js';
-import { unsupportedNode } from './core/runtime.js';
+import { nodeBanner } from './core/runtime.js';
 import { checkOutputFile, createNodeContext, writeOutputFile } from './node-context.js';
 import { runProgram, type CliIO, type GlobalOptions, type ProgramOptions } from './program.js';
 import { areas, commands, routedAliases } from './registry.js';
@@ -138,14 +138,11 @@ export async function main(): Promise<void> {
     }
   };
 
-  const tooOld = unsupportedNode(process.versions.node, VERSION);
+  const banner = nodeBanner(process.versions.node);
+  if (banner) process.stderr.write(banner);
 
   try {
-    if (tooOld) {
-      // Node below the floor: one envelope, before anything that needs the newer APIs runs.
-      process.stdout.write(`${JSON.stringify(tooOld)}\n`);
-      process.exitCode = 1;
-    } else if (wantsWelcome(process.argv.slice(2), process.stdin, process.stdout, process.env)) {
+    if (wantsWelcome(process.argv.slice(2), process.stdin, process.stdout, process.env)) {
       const data = welcomeData();
       const save = saveFor(data.configPath, { user: accountName(), home: homedir() });
       const ended = await runWelcome({ input: process.stdin, output: process.stdout, env: process.env, run: runForMenu, reload: welcomeData, save, probeBackground: true }, data);

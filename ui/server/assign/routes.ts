@@ -1,6 +1,6 @@
 /**
  * The assignment routes (#293), under `api/assignments`, behind the
- * session and CSRF checks every other route has (server.ts):
+ * Host, Origin and JSON checks every other route has (server.ts):
  *
  *   GET  assignments?toil project=<name>        the toil project's assignments, the inbox read again first
  *                                          (&inbox=0: only read, queueing nothing)

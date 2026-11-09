@@ -4,9 +4,9 @@
   "group": "source",
   "order": 1,
   "covers": "Pull requests, reviews, issues, projects, checks",
-  "credential": "Fine-grained PAT",
+  "credential": "Personal access token (classic or fine-grained)",
   "credentialNote": "In GitHub Actions, GITHUB_TOKEN and GITHUB_API_URL are used when no toil token or base URL is set",
-  "credentialWhere": "Settings → Developer settings → Personal access tokens → Fine-grained tokens",
+  "credentialWhere": "Settings → Developer settings → Personal access tokens",
   "status": "unit",
   "host": "https://ghe.imagile.dev",
   "supported": {

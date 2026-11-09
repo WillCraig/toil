@@ -185,7 +185,7 @@ export const routes: Route[] = [
   { url: new RegExp(`^${JIRA.replace(/\./g, '\\.')}/secure/attachment/10001/screenshot\\.png$`), respond: { text: 'PNG!', headers: { 'content-type': 'image/png' } } },
 
   // check-toil-project's project lookup. Invented from the docs: GET /rest/api/2/project/{key}.
-  { url: api('/project/PROJ'), respond: json({ id: '10000', key: 'PROJ', name: 'Project' }) },
+  { url: api('/project/PROJ'), respond: json({ id: '10000', key: 'PROJ', name: 'Project', issueTypes: [{ id: '10001', name: 'Bug' }] }) },
 
   // Fields: the recorded examples' schema shapes.
   {

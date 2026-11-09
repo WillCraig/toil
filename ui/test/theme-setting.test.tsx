@@ -37,9 +37,9 @@ afterEach(() => {
 });
 
 describe('how deep a theme goes, for someone who has not chosen (#552)', () => {
-  it('starts with themed wording and themed agent voice off', () => {
+  it('starts with themed wording on and the themed agent voice off (#561)', () => {
     const { wording, voice } = choiceAt('');
-    expect([wording, voice]).toEqual([false, false]);
+    expect([wording, voice]).toEqual([true, false]);
   });
 
   it('keeps a choice this browser saved, either way', () => {

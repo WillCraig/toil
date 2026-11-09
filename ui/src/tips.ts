@@ -9,7 +9,7 @@
  * words it: the text below reads the same in every theme, as a notification
  * does. The order is shuffled once per browser session, and a tip seen this
  * session isn't shown again until every one has been. Tips can be switched
- * off under Settings, General, and the choice is kept in this browser only.
+ * off under Settings, Appearance, and the choice is kept in this browser only.
  * The induction pack, read one line at a time while the kettle boils.
  */
 
@@ -26,19 +26,19 @@ export interface Tip {
 
 export const TIPS: readonly Tip[] = [
   { id: 'board-m', text: 'Press M on a focused board card to open its menu: propose a move, or assign it to an agent.', topic: 'assignments' },
-  { id: 'board-drag', text: 'Drag a board card to another column to propose the move. Nothing changes in the tracker until you run the command it shows.', topic: 'board' },
-  { id: 'onboard', text: 'Joining a repository that already has a Toil project? toil projects onboard sets up the connections it needs.', topic: 'repo-setup' },
+  { id: 'board-drag', text: 'Drag a board card to another column to propose the move. Nothing changes in the tracker until you approve it.', topic: 'board' },
+  { id: 'onboard', text: 'Joining a repository that already has a Toil project? Set up this repo, under Settings, Toil projects, checks the connections it needs.', topic: 'repo-setup' },
   { id: 'analyses', text: "Every Analyze is kept in the Toil project's Analyses tab, with what changed since the one before.", topic: 'analyses' },
   { id: 'notify', text: 'Notifications come only when an agent changes state. Pick which states, quiet hours and only your own under Settings, General.', topic: 'notifications' },
-  { id: 'write-gate', text: "Toil UI only reads. A change goes through toil's write gate: writes on for the connection, and --allow-write on the call.", topic: 'proposal' },
-  { id: 'theme-depth', text: 'Themed wording and Themed agent voice, under Settings, General, set how far a theme goes. Buttons, ids and errors never change.', topic: 'themed-wording' },
-  { id: 'theme-motion', text: "Theme motion, under Settings, General, plays a theme's moments in full, subtly, or not at all.", topic: 'theme-motion' },
-  { id: 'audit', text: "Every call Toil UI makes is in toil's audit log as toil-ui. Settings, Usage sums it up.", topic: 'audit' },
+  { id: 'write-gate', text: "Toil UI only reads. A change needs writes allowed on the connection, and your approval each time.", topic: 'proposal' },
+  { id: 'theme-depth', text: 'Themed wording and Themed agent voice, under Settings, Appearance, set how far a theme goes. Buttons, ids and errors never change.', topic: 'themed-wording' },
+  { id: 'theme-motion', text: "Motion, under Settings, Appearance, plays a theme's animations in full, subtly, or not at all.", topic: 'theme-motion' },
+  { id: 'audit', text: "Settings, Usage sums up how Toil is used, leaving out what Toil UI asks for in the background.", topic: 'audit' },
   { id: 'sync', text: 'After the first sync, a sync asks Jira, Azure DevOps and GitHub issues only for what changed since the last good one.', topic: 'sync' },
   { id: 'last-good', text: 'A source that fails to sync keeps its last good copy, marked stale, and the Sync panel shows toil\'s message and fix.', topic: 'sync' },
-  { id: 'standup', text: "The stand-up, under the Worklog tab, folds the worklog's days into done, in progress and blocked, by code alone.", topic: 'standup' },
+  { id: 'standup', text: "The stand-up, on the Summary and under the Worklog tab, folds the worklog's days into done, in progress and blocked, by code alone.", topic: 'standup' },
   { id: 'readiness', text: "The Board's Readiness view says which items are ready to start, worked out from the cache with no model call.", topic: 'readiness' },
-  { id: 'wipe', text: 'toil-ui wipe deletes everything Toil UI synced to this machine. Your trackers are never touched.', topic: 'sync' },
+  { id: 'wipe', text: 'Settings, General, Advanced can wipe everything Toil UI synced to this computer. Your trackers are never touched.', topic: 'sync' },
   { id: 'palette', text: 'Ctrl+K (Cmd+K on a Mac) opens the command palette: jump to a Toil project, a tab, an item or a setting, or run Sync, Analyze and Ask.', topic: 'palette' },
   { id: 'help', text: 'Help in the header opens the docs section for the view in front of you, and every (i) has a Read more link.', topic: 'toilProjects' },
 ];

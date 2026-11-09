@@ -3,7 +3,7 @@
    Colours come from the theme's tokens, so every theme styles it; a verdict
    is always a word as well as a colour. */
 
-.verdict { display: inline-block; padding: 0.05rem 0.55rem; border-radius: 999px; border: 1px solid currentColor; font-size: 0.8125rem; font-weight: 700; white-space: nowrap; background: var(--raised); }
+.verdict { display: inline-block; padding: 0.05rem 0.55rem; border-radius: 999px; border: 1px solid currentColor; font-size: 0.8125rem; font-weight: 700; max-width: 100%; background: var(--raised); }
 .verdict--ready { color: var(--ok); }
 .verdict--thin { color: var(--warn); }
 .verdict--blocked { color: var(--danger); }

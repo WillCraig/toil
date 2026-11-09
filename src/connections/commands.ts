@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 import { pairingKey, type AnyArea } from '../core/area.js';
-import { defineConfigCommand, type AnyCommand } from '../core/command.js';
+import { defineCommand, defineConfigCommand, type AnyCommand } from '../core/command.js';
+import { describeScopes } from '../core/scopes.js';
 import {
   CONFIG_VERSION,
   CONNECTION_NAME,
@@ -15,7 +16,7 @@ import {
   type EditableConfig,
   type Settings,
 } from '../core/config.js';
-import { apiRequest } from '../core/api.js';
+import { apiRequest, apiResponse } from '../core/api.js';
 import { coerce, resolveConnection } from '../core/connection.js';
 import type { CommandContext, ConfigAccess } from '../core/context.js';
 import { hostMatches } from '../core/toil-project.js';
@@ -335,7 +336,27 @@ export function connectionsCommands(areas: readonly AnyArea[]): AnyCommand[] {
     },
   });
 
-  return [add, login, list, remove, test, writes, setDefault, migrate, importCommand(areas)];
+  // Local and read-only: it describes what toil's own code declares, so it needs no config and no connection.
+  const scopes = defineCommand({
+    path: ['connections', 'scopes'],
+    description: 'Show the scopes or permissions a credential needs for read-only use and for everything toil can do',
+    toolDescription:
+      "Returns, for each area whose credential has named scopes (github today), the kinds of credential it accepts (GitHub classic and fine-grained tokens), what read-only use needs (readOnly.needs), what everything toil can do needs (everything.needs), a link to the vendor's page for making one (createUrl, prefilled where the vendor supports it), and every scope with the commands that need it (entries). Set `area` for one area; an area that declares none returns an empty list with a warning, which means toil doesn't say, not that nothing is needed. Reads nothing from config and sends nothing.",
+    input: z.object({
+      area: z.string().optional().describe('Only this area, e.g. github'),
+    }),
+    writes: false,
+    options: [{ flags: '--area <area>', field: 'area', description: 'Only this area' }],
+    examples: [{}, { area: 'github' }],
+    run: async (input, ctx) => {
+      const chosen = input.area === undefined ? areas : [areaNamed(input.area)];
+      const described = chosen.flatMap((a) => (a.scopes ? [{ area: a.name, ...describeScopes(a.scopes) }] : []));
+      if (input.area !== undefined && described.length === 0) ctx.warn({ code: 'NO_SCOPES_DECLARED', message: `${input.area} declares no scopes, so toil doesn't say what its credential needs; that is not the same as nothing.` });
+      return { areas: described };
+    },
+  });
+
+  return [add, login, list, remove, test, writes, setDefault, migrate, importCommand(areas), scopes];
 }
 
 /** The area each connection in the raw file named, by name: a version 1 file has one per area key. */
@@ -569,7 +590,9 @@ export async function testConnection(ctx: CommandContext<unknown>, areas: readon
   }
   // JSON through core unless the area declares a text answer: a sign-in page served with a 200 is
   // the same HTTP error here that a real command would get, never a healthy connection.
-  const body = await apiRequest(area, { fetch: ctx.fetch, signal: ctx.signal, connection }, probe.path, { as: probe.as ?? 'json', ...(probe.query ? { query: probe.query } : {}) });
+  const apiCtx = { fetch: ctx.fetch, signal: ctx.signal, connection };
+  const first = await apiResponse(area, apiCtx, probe.path, { as: probe.as ?? 'json', ...(probe.query ? { query: probe.query } : {}) });
+  const body = first.data;
   if (probe.accepts && !probe.accepts(body)) {
     throw new ToilError('AUTH', `${area.name} answered GET ${probe.path} for connection "${name}" as an anonymous user, so its credential wasn't accepted.`, {
       fix: `Run toil connections login ${name} with a new credential, or replace the one its env var sets.`,
@@ -578,7 +601,24 @@ export async function testConnection(ctx: CommandContext<unknown>, areas: readon
   if (probe.authenticated === false) {
     ctx.warn({ code: 'NOT_AUTHENTICATED', message: `${area.name} has no cheap read that needs the credential, so this test shows the host answers, not that the credential works.` });
   }
-  return { name, area: area.name, host, live: true, authenticated: probe.authenticated !== false, request: `GET ${probe.path}` };
+  // Deeper than the one cheap read: what the credential itself says (its expiry), and the reads a real command would make.
+  const facts = probe.inspect?.(first.headers);
+  const expires = facts?.expires ?? null;
+  if (expires !== null) {
+    const days = (Date.parse(expires) - Date.now()) / 86_400_000;
+    if (days <= 7) ctx.warn({ code: 'CREDENTIAL_EXPIRES_SOON', message: days <= 0 ? `The credential on "${name}" expired ${expires}.` : `The credential on "${name}" expires ${expires}, in ${Math.max(1, Math.ceil(days))} day${Math.ceil(days) === 1 ? '' : 's'}.` });
+  }
+  const checked: string[] = [`GET ${probe.path}`];
+  for (const step of probe.deeper ?? []) {
+    try {
+      await apiRequest(area, apiCtx, step.path, { as: 'json' });
+    } catch (e) {
+      if (!(e instanceof ToilError)) throw e;
+      throw new ToilError(e.code, `${area.name} accepted the credential on GET ${probe.path} for connection "${name}", but ${step.what} failed: ${e.message}`, { ...(e.fix ? { fix: e.fix } : {}), details: { request: `GET ${step.path}` } });
+    }
+    checked.push(`GET ${step.path}`);
+  }
+  return { name, area: area.name, host, live: true, authenticated: probe.authenticated !== false, request: `GET ${probe.path}`, checked, expires, scopes: facts?.scopes ?? null };
 }
 
 function access(ctx: CommandContext<unknown>): ConfigAccess {

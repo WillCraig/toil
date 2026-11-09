@@ -15,7 +15,7 @@ import { Help } from './help.tsx';
 import './news.css';
 
 /** Settings, General, where which notices are kept is chosen. */
-export const NOTIFY_SETTINGS_HREF = '#/settings/toil';
+export const NOTIFY_SETTINGS_HREF = '#/settings/general';
 
 export function Bell({ history = store }: { history?: HistoryStore }) {
   const h = useSyncExternalStore(history.subscribe, history.get, history.get);

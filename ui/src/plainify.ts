@@ -9,7 +9,7 @@ const keepCase = (from: string, to: string) => (from[0] === from[0]!.toUpperCase
 
 /**
  * The two words that confuse most, swapped inside a sentence: pull request to
- * code review, agent to AI helper. A Toil project needs no swap, because toil
+ * code review, agent to AI agent. A Toil project needs no swap, because toil
  * calls it that too (#555). A `toil …` command is left alone, since a command is
  * typed exactly, and so is an agent inside an id, a package or a file name
  * (`@anthropic-ai/claude-agent-sdk`, `ui/server/agents/install.ts`,
@@ -18,5 +18,5 @@ const keepCase = (from: string, to: string) => (from[0] === from[0]!.toUpperCase
 export function plainify(text: string): string {
   return text
     .replace(/\b(pull request)(s?)\b/gi, (_m, w: string, s: string) => keepCase(w, 'code review') + s)
-    .replace(/(?<![\w:/@.-])(agent)(s?)\b(?![\w:/-]|\.\w)/gi, (_m, w: string, s: string) => keepCase(w, 'AI helper') + s);
+    .replace(/(?<![\w:/@.-])(agent)(s?)\b(?![\w:/-]|\.\w)/gi, (_m, w: string, s: string) => keepCase(w, 'AI agent') + s);
 }

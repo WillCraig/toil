@@ -605,3 +605,115 @@ describe('renaming and describing a toil project', () => {
     expect(JSON.parse(readFileSync(join(d.workspace, '.toil', 'projects', 'team.json'), 'utf8'))).toEqual({ name: 'team' });
   });
 });
+
+describe('archiving a toil project (#561)', () => {
+  const at = (d: ToilProjectDisk, name: string) => join(d.home, '.toil', 'projects', `${name}.json`);
+  const read = (d: ToilProjectDisk, name: string) => JSON.parse(readFileSync(at(d, name), 'utf8')) as Record<string, unknown>;
+  const names = (run: Run) => (ok(run).toilProjects as Array<{ name: string }>).map((p) => p.name);
+
+  it('archives and unarchives, on MCP too, and asking twice changes nothing', async () => {
+    const d = disk({ 'home/.toil/projects/pay.json': { name: 'pay', jira: { project: 'PAY' } }, 'home/.toil/projects/ops.json': { name: 'ops' } });
+    expect(ok(await mcp(d, 'projects_archive', { toilProject: 'pay' }))).toMatchObject({ name: 'pay', archived: true, changed: true });
+    expect(read(d, 'pay')).toMatchObject({ name: 'pay', archived: true, jira: { project: 'PAY' } });
+    expect(ok(await cli(d, ['projects', 'archive', 'pay']))).toMatchObject({ archived: true, changed: false });
+    expect(ok(await cli(d, ['projects', 'unarchive', 'pay']))).toMatchObject({ archived: false, changed: true });
+    expect(read(d, 'pay')).not.toHaveProperty('archived');
+    expect(ok(await mcp(d, 'projects_unarchive', { toilProject: 'pay' }))).toMatchObject({ archived: false, changed: false });
+  });
+
+  it('list hides archived by default and says how many, --all and --archived show them', async () => {
+    const d = disk({ 'home/.toil/projects/pay.json': { name: 'pay', archived: true }, 'home/.toil/projects/ops.json': { name: 'ops' } });
+    const plain = await cli(d, ['projects', 'list']);
+    expect(names(plain)).toEqual(['ops']);
+    expect(ok(plain)).toMatchObject({ archivedHidden: 1 });
+    const everything = await cli(d, ['projects', 'list', '--all']);
+    expect(names(everything).sort()).toEqual(['ops', 'pay']);
+    expect(ok(everything)).toMatchObject({ archivedHidden: 0, toilProjects: expect.arrayContaining([expect.objectContaining({ name: 'pay', archived: true })]) });
+    expect(names(await mcp(d, 'projects_list', { archived: true }))).toEqual(['pay']);
+    expect((await cli(d, ['projects', 'list', '--all', '--archived'])).envelope.error?.code).toBe('INVALID_INPUT');
+  });
+
+  it('show reports it, and an archived toil project still resolves, so a call keeps its context', async () => {
+    const d = disk({ 'home/.toil/projects/pay.json': { name: 'pay', archived: true, jira: { project: 'PAY' } } });
+    expect(ok(await cli(d, ['projects', 'show', 'pay']))).toMatchObject({ archived: true });
+  });
+
+  it('refuses one that is not in your own folder, with the import fix, and reports a bad flag in a file by key path', async () => {
+    const d = disk({ 'work/.toil/projects/team.json': { name: 'team' }, 'home/.toil/projects/bad.json': { name: 'bad', archived: 'yes' } });
+    d.write('work/.git/HEAD', 'ref: refs/heads/main\n');
+    const run = await cli(d, ['projects', 'archive', 'team']);
+    expect(run.envelope.error?.message).toContain('checked into a repository');
+    expect(run.envelope.error?.fix).toContain('projects import');
+    expect(JSON.parse(readFileSync(join(d.workspace, '.toil', 'projects', 'team.json'), 'utf8'))).toEqual({ name: 'team' });
+    expect(ok(await cli(d, ['projects', 'list'])).broken).toEqual([expect.objectContaining({ problems: [expect.objectContaining({ path: 'archived' })] })]);
+  });
+
+  it('is left out of a file shared with a team', async () => {
+    const d = disk({ 'home/.toil/projects/pay.json': { name: 'pay', archived: true } });
+    d.write('work/.git/HEAD', 'ref: refs/heads/main\n');
+    ok(await cli(d, ['projects', 'export', 'pay', '--file', 'shared/pay.json']));
+    expect(JSON.parse(readFileSync(join(d.workspace, 'shared', 'pay.json'), 'utf8'))).not.toHaveProperty('archived');
+  });
+});
+
+describe('mapping identities for any work-tracking area, and saving the people into a repository', () => {
+  const file = (d: ToilProjectDisk) => JSON.parse(readFileSync(join(d.home, '.toil', 'projects', 'pay.json'), 'utf8')) as { people?: Array<Record<string, unknown>> };
+  const fresh = (extra: Record<string, unknown> = {}) => disk({ 'home/.toil/projects/pay.json': { name: 'pay', ...extra } });
+
+  it('takes --github, --jira, --ado and --bitbucket as --id with the area filled in, through the same checks', async () => {
+    const d = fresh();
+    ok(await cli(d, ['projects', 'person', 'pay', 'Pat Example', '--github', 'pat-ex', '--jira', 'pat', '--ado', 'you@example.com', '--bitbucket', 'pexample']));
+    expect(file(d).people).toEqual([{ name: 'Pat Example', ids: { github: 'pat-ex', jira: 'pat', ado: 'you@example.com', bitbucket: 'pexample' } }]);
+    const twice = await cli(d, ['projects', 'person', 'pay', 'Sam', '--github', 'Pat-Ex']);
+    expect(twice.envelope.error?.message).toBe("The github identity Pat-Ex is already Pat Example's (toil project pay).");
+    const token = await cli(d, ['projects', 'person', 'pay', 'Sam', '--github', 'ghp_abcdefghijklmnopqrstuvwxyz0123456789']);
+    expect(token.envelope.error?.message).toContain("The github identity can't be used");
+    expect(JSON.stringify(token.envelope)).not.toContain('ghp_');
+  });
+
+  const RECORDS = JSON.stringify({
+    items: [{ id: 'j:PAY-1', source: { area: 'jira', connection: 'j', key: 'PAY-1', command: 'jira issue search' }, title: 'T', statusCategory: 'IN_PROGRESS', assignee: { id: 'acct-1', name: 'Pat Example', email: 'you@example.com' }, links: [] }],
+    changes: [{ id: 'g:o/r#1', source: { area: 'github', connection: 'g', key: 'o/r#1', command: 'github pr list' }, repo: 'o/r', title: 'P', state: 'OPEN', author: { id: 'pat-example', name: null, email: null }, reviewers: [], workItems: [] }],
+  });
+
+  it('suggests matches from OWI records, reads only, and never maps anything', async () => {
+    const d = fresh({ people: [{ name: 'Pat Example', email: 'you@example.com', ids: {} }] });
+    const run = ok(await cli(d, ['projects', 'people', 'suggest', 'pay', '--text', RECORDS]));
+    expect(run).toMatchObject({ toilProject: 'pay', read: 2, unmapped: [] });
+    expect((run.suggestions as Array<{ person: string; reason: string; input: { id: string[] } }>).map((s) => [s.person, s.reason, s.input.id])).toEqual([
+      ['Pat Example', 'login', ['github=pat-example']],
+      ['Pat Example', 'email', ['jira=acct-1']],
+    ]);
+    expect(file(d).people).toEqual([{ name: 'Pat Example', email: 'you@example.com', ids: {} }]);
+    expect((await mcp(d, 'projects_people_suggest', { toilProject: 'pay', text: RECORDS })).envelope.ok).toBe(true);
+    const none = await cli(d, ['projects', 'people', 'suggest', 'pay', '--text', '{"items":[],"changes":[]}']);
+    expect(none.envelope.error).toMatchObject({ code: 'INVALID_INPUT' });
+  });
+
+  it('saves the people into the repository file: creates it, then merges, refusing a person who differs without --replace', async () => {
+    const d = fresh({ people: [{ name: 'Pat Example', ids: { github: 'pat-ex' } }, { name: 'Claude', kind: 'agent', ids: { github: 'claude' } }] });
+    const repo = clone(d, 'api');
+    const target = join(repo, '.toil', 'projects', 'pay.json');
+    expect(ok(await cli(d, ['projects', 'people', 'save', 'pay', '--repo', repo]))).toMatchObject({ created: true, added: ['Pat Example', 'Claude'] });
+    expect(JSON.parse(readFileSync(target, 'utf8'))).toMatchObject({ name: 'pay', people: [{ name: 'Pat Example' }, { name: 'Claude', kind: 'agent' }] });
+    // Nothing differs: nothing is written.
+    expect(ok(await cli(d, ['projects', 'people', 'save', 'pay', '--repo', repo]))).toMatchObject({ created: false, changed: false, added: [], updated: [] });
+    // The repository's file gains a teammate; the person who differs is refused, then taken with --replace, and the teammate stays.
+    d.write('work/api/.toil/projects/pay.json', { name: 'pay', people: [{ name: 'Pat Example', ids: { github: 'pat-old' } }, { name: 'Sam Example', ids: { github: 'sam-ex' } }] });
+    const refused = await cli(d, ['projects', 'people', 'save', 'pay', '--repo', repo]);
+    expect(refused.envelope.error).toMatchObject({ code: 'INVALID_INPUT', fix: 'Pass --replace to take yours, or change the file by hand.' });
+    expect(ok(await cli(d, ['projects', 'people', 'save', 'pay', '--repo', repo, '--replace']))).toMatchObject({ changed: true, added: ['Claude'], updated: ['Pat Example'], kept: ['Sam Example'] });
+    expect((JSON.parse(readFileSync(target, 'utf8')) as { people: Array<{ name: string; ids: Record<string, string> }> }).people.map((p) => [p.name, p.ids.github])).toEqual([
+      ['Pat Example', 'pat-ex'],
+      ['Sam Example', 'sam-ex'],
+      ['Claude', 'claude'],
+    ]);
+  });
+
+  it('refuses to save people it has none of, and a folder that is not a repository root', async () => {
+    const d = fresh();
+    expect((await cli(d, ['projects', 'people', 'save', 'pay', '--repo', clone(d, 'api')])).envelope.error?.message).toContain('has no people to save');
+    const d2 = fresh({ people: [{ name: 'Pat', ids: {} }] });
+    expect((await cli(d2, ['projects', 'people', 'save', 'pay', '--repo', d2.workspace])).envelope.error?.code).toBe('INVALID_INPUT');
+  });
+});

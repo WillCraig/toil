@@ -24,7 +24,9 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AdapterList, AdapterOption, Answer, AnswerActivity, AskExtra, Starter } from '../../src/agent.ts';
+import { NO_AGENT_DETAILS, NO_AGENT_FIX, NO_AGENT_NOTICE, type AdapterList, type AdapterOption, type Answer, type AnswerActivity, type AskExtra, type Starter } from '../../src/agent.ts';
+import type { AreaInfo, ConnectionsData } from '../../src/config.ts';
+import { GUIDE_MAX, GUIDE_REFUSAL, GUIDE_REFUSAL_FIX, looksLikeSecret, type GuideRequest } from '../../src/guide.ts';
 import { runFromAnswer, type AgentRun } from '../../src/model/worklog.ts';
 import { capStandings, capStop, capWarning, codexCost, UsageSettingsError, WARN_AT, type AnswerUsage, type CapStanding, type ChatTurn, type UsageRecord } from '../../src/model-usage.ts';
 import type { Execute } from '../../src/toil.ts';
@@ -35,6 +37,7 @@ import { claudeRuntime } from './claude.ts';
 import { AgentError } from './cli.ts';
 import { codexRuntime } from './codex.ts';
 import { copilotRuntime } from './copilot.ts';
+import { GuideRefusal, guideAnswer, guideContext, guideSystem, guideTools, pagesFor } from './guide.ts';
 import { jobQuestion, knownTargets } from './jobs.ts';
 import { analyzeQuestion, promptFor, STARTERS, systemPrompt, withHistory } from './prompts.ts';
 import { staleness, type ChatSession, type Fingerprint } from '../../src/fingerprint.ts';
@@ -46,6 +49,7 @@ import { cliFor, Latest, loadSdk, nodeImporter, type Activity, type AdapterName,
 import { loadUsageSettings, memoryLedger, type UsageLedger } from '../usage.ts';
 import { checkAgentSettings, cliPathOf, loadAgentSettings, modelOf, saveAgentSettings, DEFAULT_AGENT_SETTINGS, ENDPOINTS, type AgentSettings } from './settings.ts';
 import { promptStyle, type StyleChoice } from './voices.ts';
+import { CALLER } from '../store.ts';
 import { cacheTools, toilProjectReader, Ledger, liveTools, peopleTools, proposalTool, prTools, readinessTools, recorded, standupTool, worklogTool, type AgentData, type MapIds, type ReadCommand, type ToolSpec } from './tools.ts';
 
 /** A task Toil UI wrote for an agent (#293): an assignment's run. */
@@ -80,6 +84,8 @@ export interface AgentHostOptions {
   registry: readonly ReadCommand[];
   execute: Execute;
   mapIds: MapIds;
+  /** toil's areas as the settings pages describe them (their connection fields and scopes): the setup guide's context and its scope lookup (#561). */
+  areas?: readonly AreaInfo[];
   serveTools: ServeTools;
   /** What answers when no adapter is chosen. */
   fallback: Agent;
@@ -159,6 +165,9 @@ export interface AgentStatus {
   kind: string;
 }
 
+/** What the usage ledger files a setup guide question under: it is about no Toil project. */
+const GUIDE_PROJECT = '(setup guide)';
+
 /** How many questions may run at once (Bounds): each one starts a CLI. */
 export const MAX_RUNS = 2;
 
@@ -189,6 +198,8 @@ export class AgentHost implements Agent {
   readonly ledger: UsageLedger;
   /** Each chat's fingerprint (#305), by chat id, oldest first. */
   private readonly chats = new Map<string, ChatRecord>();
+  /** The setup guide's turn counter, so each question is its own turn in the usage ledger. */
+  private guideTurns = 0;
 
   constructor(private readonly o: AgentHostOptions) {
     this.runtimes = o.runtimes ?? [claudeRuntime(o.version), copilotRuntime(), codexRuntime()];
@@ -360,6 +371,76 @@ export class AgentHost implements Agent {
       // The person closed the pane or the page mid-answer: the run stopped, with what it had said so far.
       if (record.outcome === 'running') record = { ...(last ? runFromAnswer(record, now(), last) : { ...record, finishedAt: now() }), outcome: 'stopped' };
       await report();
+    }
+  }
+
+  /**
+   * One question to the setup guide (#561), about the wizard's step and the
+   * non-secret state it names. It is checked first, before a record, a
+   * connection list or an agent exists: a message that looks like a secret,
+   * or any earlier question that does, is refused with the same notice the page
+   * shows, and nothing of it is kept. Then it runs like any question (the
+   * chosen adapter, the same caps and ledger, the same streamed answer) with
+   * the guide's own prompt and tools, and no Toil project or sync needed. It
+   * is not a worklog run: it is about setup, not about anyone's work.
+   */
+  async *guide(ctx: RequestContext, req: GuideRequest, style: StyleChoice | null = null, history: ReadonlyArray<{ prompt: string; answer: string; by?: string }> = []): AsyncIterable<Answer> {
+    if (req.message.length > GUIDE_MAX || [req.message, ...history.map((t) => t.prompt)].some(looksLikeSecret)) throw new GuideRefusal(GUIDE_REFUSAL, GUIDE_REFUSAL_FIX);
+    const runtime = this.runtime();
+    if (!runtime) throw new AgentError(NO_AGENT_NOTICE, `${NO_AGENT_DETAILS} ${NO_AGENT_FIX}`);
+    const known = new Set((this.o.areas ?? []).map((a) => a.name));
+    const unknown = [...req.state.areas, ...(req.state.area ? [req.state.area] : [])].filter((a) => known.size > 0 && !known.has(a));
+    if (unknown.length) throw new AgentError(`toil has no tool ${unknown.join(', ')}.`, 'Name a tool from the list on the Tools step.');
+    if (this.running >= MAX_RUNS) throw new AgentError(`${MAX_RUNS} questions are already running.`, 'Wait for an answer, then ask again.');
+    this.running++;
+    let run: Promise<void> | undefined;
+    try {
+      // What the guide is told of the machine: connections as toil lists them, which never carries a value. Read-only, and not the page's say-so.
+      const listed = await this.o.execute('connections list', {}, { readOnly: true, caller: CALLER, signal: ctx.signal });
+      const rows = listed.ok ? (listed.data as ConnectionsData).connections : null;
+      const areas = this.o.areas ?? [];
+      const now = this.clock();
+      const system = guideSystem(guideContext(req.state, rows, areas), pagesFor(req.state), now, promptStyle(style, this.settings));
+      const ledger = new Ledger();
+      const by = this.byOf(runtime);
+      const { text, carried } = withHistory(req.message, history);
+      const who = { adapter: runtime.name, model: modelOf(this.settings, runtime.name), ...(carried ? { carried } : {}) };
+      const out = new Latest<Answer>();
+      let sofar = '';
+      const doing = (activity: AnswerActivity) => out.push({ ...partial(sofar, { prompt: req.message, by }), ...who, activity });
+      doing({ phase: 'thinking' });
+      // Reads only: the docs, a tool's scopes, and (once a Toil project exists) toil's live reads for it.
+      const tools = recorded([...guideTools(req.state, areas), ...(req.state.project ? liveTools(req.state.project, this.o.registry, this.o.execute, this.o.mapIds, ledger) : [])], ledger).map((t): ToolSpec => ({
+        ...t,
+        run: (input, signal) => {
+          doing({ phase: 'tool', tool: t.command ?? t.name, source: t.command ? 'live' : 'registry' });
+          return t.run(input, signal);
+        },
+      }));
+      run = this.once({
+        runtime,
+        toilProject: GUIDE_PROJECT,
+        turn: { id: req.chat, turn: ++this.guideTurns },
+        system,
+        prompt: text,
+        tools,
+        workspace: null,
+        signal: ctx.signal,
+        onText: (t) => {
+          sofar = t;
+          doing({ phase: 'writing' });
+        },
+      }).then(
+        ({ text: final, usage }) => {
+          out.push({ ...guideAnswer(final, { prompt: req.message, by }), ...who, usage });
+          out.end();
+        },
+        (e: unknown) => out.end(e),
+      );
+      yield* out;
+    } finally {
+      await run;
+      this.running--;
     }
   }
 

@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
-import { standardWords } from './words.ts';
 import { MAX_HISTORY_ANSWER, MAX_HISTORY_TURNS, NO_AGENT_NOTICE, type AdapterList, type Agent, type AskExtra } from '../src/agent.ts';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { askBar, openChat } from './chat.ts';
@@ -26,7 +25,7 @@ import { fixtureAnalyses } from '../src/fixtures/analyses.ts';
  */
 
 const item = (toilProject: string, id: string) => `#/project/${toilProject}/item/${encodeURIComponent(id)}`;
-const ROUTES = ['#/', '#/project/card-payments', '#/project/card-payments/board', '#/project/card-payments/dependencies', '#/project/card-payments/analyses', '#/project/card-payments/analyses/sample-analysis-2', '#/project/settlement', '#/project/checkout-web', '#/project/checkout-web/prs', '#/project/card-payments/prs', '#/project/checkout-web/people', '#/project/card-payments/people', '#/project/settlement/people', '#/project/card-payments/board/person%3AJ.%20Smith', '#/project/card-payments/worklog', '#/project/checkout-web/worklog/2026-10-12', item('card-payments', 'corp-jira:PAY-101'), '#/project/card-payments/command-center', '#/project/settlement/command-center', '#/settings', '#/settings/projects', '#/settings/toil', '#/settings/usage', '#/settings/agent'];
+const ROUTES = ['#/', '#/project/card-payments', '#/project/card-payments/board', '#/project/card-payments/dependencies', '#/project/card-payments/analyses', '#/project/card-payments/analyses/sample-analysis-2', '#/project/settlement', '#/project/checkout-web', '#/project/checkout-web/prs', '#/project/card-payments/prs', '#/project/checkout-web/people', '#/project/card-payments/people', '#/project/settlement/people', '#/project/card-payments/board/person%3AJ.%20Smith', '#/project/card-payments/worklog', '#/project/checkout-web/worklog/2026-10-12', item('card-payments', 'corp-jira:PAY-101'), '#/project/card-payments/command-center', '#/project/settlement/command-center', '#/settings', '#/settings/projects', '#/settings/general', '#/settings/usage', '#/settings/agent'];
 
 async function open(hash: string, { preview = true, execute = fixtureExecute().execute, agent = scriptedAgent(), config = fixtureConfig(), agentSettings, worklog = fixtureWorklog(), analyses = fixtureAnalyses() }: { preview?: boolean; execute?: Execute; agent?: Agent; config?: ConfigApi; agentSettings?: AgentSettingsPanelProps; worklog?: WorklogApi | null; analyses?: AnalysesApi | null } = {}) {
   window.location.hash = hash;
@@ -62,17 +61,16 @@ async function metric(name: RegExp) {
 
 beforeEach(() => {
   localStorage.clear();
-  standardWords();
   document.documentElement.removeAttribute('data-theme');
 });
 
 describe('every view', () => {
   it.each(ROUTES)('%s carries the preview banner, the views and when the data was read', async (hash) => {
     await open(hash);
-    expect(screen.getByRole('note')?.textContent).toContain('Toil UI beta, on sample data.');
+    expect(screen.getByRole('note')?.textContent).toContain('Toil UI beta, showing sample data.');
     const nav = screen.getByRole('navigation', { name: 'Views' });
-    expect(within(nav).getAllByRole('link')[0]!.textContent).toBe('Toil projects');
-    expect(screen.getByText(/Sample data read 13 Oct 2026, 08:00 UTC through toil, read-only/)).toBeTruthy();
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Settings']);
+    expect(screen.getByText(/Sample data read 13 Oct 2026, 08:00 UTC without changing anything/)).toBeTruthy();
   });
 
   it.each(ROUTES.flatMap((r) => [[r, 'plain'], [r, 'crate']]))('%s in %s has no axe violations', async (hash, theme) => {
@@ -97,8 +95,9 @@ describe('every view', () => {
 
   it("marks the current view in the navigation, and the current tab in the Toil project's tabs (#394)", async () => {
     await open('#/project/settlement');
-    expect(within(tabs('settlement')).getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBe('page');
-    expect(screen.getByRole('link', { name: 'Toil projects' }).getAttribute('aria-current')).toBeNull();
+    expect(within(tabs('settlement')).getByRole('link', { name: 'Summary' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.queryByRole('link', { name: 'Toil projects' })).toBeNull();
+    expect(within(screen.getByRole('navigation', { name: 'Views' })).getByRole('link', { name: 'Settings' }).getAttribute('aria-current')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('settlement');
   });
 });
@@ -119,8 +118,7 @@ describe('the Toil project list', () => {
     expect(badges(all[0]!)).toEqual(['Bitbucket', 'Jenkins', 'Jira', 'OpenShift']);
     expect(badges(all[1]!)).toEqual(['Azure DevOps']);
     expect(badges(all[2]!)).toEqual(['Bitbucket', 'GitHub', 'OpenShift']);
-    expect(within(all[2]!).getAllByRole('link').map((l) => l.getAttribute('href'))).toEqual(['#/project/checkout-web', '#/settings/projects/checkout-web/sources']);
-    expect(within(all[2]!).getByRole('link', { name: "Edit checkout-web's sources" })).toBeTruthy();
+    expect(within(all[2]!).getAllByRole('link').map((l) => l.getAttribute('href'))).toEqual(['#/project/checkout-web']);
   });
 
   it("previews each Toil project's sprint, counts and people from the data its dashboard reads", async () => {
@@ -128,9 +126,9 @@ describe('the Toil project list', () => {
     const [pay, settle, web] = await cards();
     expect(pay!.textContent).toContain('Sprint 42 3 working days left of 10, 3 of 21 points done');
     expect(within(pay!).getByRole('img', { name: 'Burn-up: 3 of 21 points done' })).toBeTruthy();
-    expect(within(pay!).getByRole('list', { name: 'Counts' }).textContent).toBe('3 in progress2 blocked1 PR waits on review');
-    expect(within(settle!).getByRole('list', { name: 'Counts' }).textContent).toBe('3 in progress1 blocked0 PRs wait on review');
-    expect(within(web!).getByRole('list', { name: 'Counts' }).textContent).toBe('2 in progress0 blocked2 PRs wait on review');
+    expect(within(pay!).getByRole('list', { name: 'Counts' }).textContent).toBe('3 in progress2 blocked1 code review waiting');
+    expect(within(settle!).getByRole('list', { name: 'Counts' }).textContent).toBe('3 in progress1 blocked0 code reviews waiting');
+    expect(within(web!).getByRole('list', { name: 'Counts' }).textContent).toBe('2 in progress0 blocked2 code reviews waiting');
     expect(within(pay!).getByRole('list', { name: /^People: / }).getAttribute('aria-label')).toContain('J. Smith');
     expect(within(pay!).getByRole('img', { name: 'J. Smith' })).toBeTruthy();
     // The preview syncs nothing, and this browser has never opened a dashboard.
@@ -156,14 +154,28 @@ describe('the Toil project list', () => {
     window.location.hash = '#/';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview={false} synced={{ settlement: { at: '2026-10-13T07:00:00Z', status: 'partial' } }} />);
     const all = await cards();
-    expect(all.find((c) => c.textContent?.startsWith('settlement'))!.textContent).toContain('Synced 13 Oct 2026, 07:00 UTC, some sources failed.');
-    expect(all.find((c) => c.textContent?.startsWith('checkout-web'))!.textContent).toContain('Not synced yet.');
+    expect(all.find((c) => within(c).getByRole('heading').textContent?.startsWith('settlement'))!.textContent).toContain('Updated 13 Oct 2026, 07:00 UTC, some sources failed.');
+    expect(all.find((c) => within(c).getByRole('heading').textContent?.startsWith('checkout-web'))!.textContent).toContain('Not updated yet.');
   });
 
-  it('says which commands fed it', async () => {
-    await open('#/');
-    expect(screen.getByText(/Fed by/).textContent).toContain('toil projects list');
-    expect(screen.getByText(/Fed by/).textContent).toContain('toil projects show ×3');
+  it('shows a dash, not 0, for a Toil project that has never synced, and real zeros once it has (principle 12)', async () => {
+    window.location.hash = '#/';
+    render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview={false} synced={{ settlement: { at: '2026-10-13T07:00:00Z', status: 'ok' } }} />);
+    const all = await cards();
+    const never = all.find((c) => within(c).getByRole('heading').textContent?.startsWith('checkout-web'))!;
+    expect(within(never).getAllByText('–')).toHaveLength(3);
+    expect(never.textContent).not.toContain('No sprint running.');
+    expect(never.textContent).not.toMatch(/since you last looked/);
+    const done = all.find((c) => within(c).getByRole('heading').textContent?.startsWith('settlement'))!;
+    expect(within(done).queryByText('–')).toBeNull();
+  });
+
+  it('says which tools fed it, in plain words and with no command names', async () => {
+    await open('#/project/card-payments/board');
+    await waitFor(() => expect(document.querySelector('.fed-by')).not.toBeNull(), { timeout: 3000 });
+    const fed = document.querySelector('.fed-by')!;
+    expect(fed.querySelector('summary')!.textContent).toMatch(/^From /);
+    expect(fed.textContent).not.toMatch(/toil projects|execute[(]/);
   });
 });
 
@@ -191,54 +203,58 @@ describe("editing a Toil project's name and description in place (#342)", () => 
     expect(screen.queryByRole('button', { name: /^Rename / })).toBeNull();
   });
 
-  it('saves a description with Enter through toil projects describe, and Escape cancels', async () => {
+  // The project page's header has one Edit link to the edit page; renaming and describing live in each card's menu on the home page.
+  async function fromCard(name: string, item: string, config: ConfigApi) {
     const user = userEvent.setup();
-    const config = editable((input) => okEnvelope({ name: input.toilProject, description: input.description, renamed: null, changed: true }));
-    await open('#/project/settlement', { config });
-    await user.click(screen.getByRole('button', { name: "Edit settlement's description" }));
-    const field = screen.getByRole('textbox', { name: 'Description of settlement' });
-    await user.clear(field);
-    await user.type(field, 'Nightly settlement{Escape}');
+    await open('#/', { config });
+    await user.click(await screen.findByRole('button', { name: `Menu for ${name}` }));
+    await user.click(await screen.findByRole('menuitem', { name: item }));
+    return user;
+  }
+
+  it('saves the name and description together with one Save, and Cancel leaves it alone', async () => {
+    const config = editable((input) => okEnvelope({ name: (input.name as string | undefined) ?? input.toilProject, description: input.description, renamed: null, changed: true }));
+    const user = await fromCard('settlement', 'Edit', config);
+    const form = screen.getByRole('form', { name: 'Edit settlement' });
+    await user.clear(within(form).getByRole('textbox', { name: 'Description' }));
+    await user.type(within(form).getByRole('textbox', { name: 'Description' }), 'Nightly settlement');
+    await user.click(within(form).getByRole('button', { name: 'Cancel' }));
     expect(config.runs).toEqual([]);
-    expect(screen.queryByRole('textbox', { name: 'Description of settlement' })).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: "Edit settlement's description" }));
-    await user.click(screen.getByRole('button', { name: "Edit settlement's description" }));
-    await user.clear(screen.getByRole('textbox', { name: 'Description of settlement' }));
-    await user.type(screen.getByRole('textbox', { name: 'Description of settlement' }), 'Nightly settlement{Enter}');
+    expect(screen.queryByRole('form', { name: 'Edit settlement' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Menu for settlement' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    const again = screen.getByRole('form', { name: 'Edit settlement' });
+    await user.clear(within(again).getByRole('textbox', { name: 'Description' }));
+    await user.type(within(again).getByRole('textbox', { name: 'Description' }), 'Nightly settlement');
+    await user.click(within(again).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(config.runs).toEqual([{ command: 'projects describe', input: { toilProject: 'settlement', description: 'Nightly settlement' } }]));
-    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Description of settlement' })).toBeNull());
-    // Written into what's loaded: the dashboard isn't read again for a new description.
-    expect(document.querySelector('.toil-project-bar__desc')!.textContent).toBe('Nightly settlement✎');
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'Edit settlement' })).toBeNull());
   });
 
-  it("shows toil's message and fix when it refuses, and keeps the field open", async () => {
-    const user = userEvent.setup();
+  it("shows toil's message and fix when it refuses, and keeps the form open", async () => {
     const config = editable(() => ({ ok: false, data: null, error: { code: 'INVALID_INPUT', message: 'You already have a Toil project named "settlement".', fix: 'Choose another name.' }, meta }) as unknown as Envelope);
-    await open('#/project/card-payments', { config });
-    await user.click(screen.getByRole('button', { name: 'Rename card-payments' }));
-    const field = screen.getByRole('textbox', { name: 'New name for card-payments' });
+    const user = await fromCard('card-payments', 'Edit', config);
+    const form = screen.getByRole('form', { name: 'Edit card-payments' });
+    const field = within(form).getByRole('textbox', { name: 'Name' });
     await user.clear(field);
-    await user.type(field, 'settlement{Enter}');
+    await user.type(field, 'settlement');
+    await user.click(within(form).getByRole('button', { name: 'Save' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe('You already have a Toil project named "settlement". Fix: Choose another name.');
     expect(field.getAttribute('aria-invalid')).toBe('true');
-    expect(screen.getByRole('textbox', { name: 'New name for card-payments' })).toBeTruthy();
+    expect(screen.getByRole('form', { name: 'Edit card-payments' })).toBeTruthy();
   });
 
-  it('follows a rename to the Toil project under its new name, keeping what this browser remembers', async () => {
-    const user = userEvent.setup();
+  it('keeps what this browser remembers under the new name after a rename', async () => {
     localStorage.setItem('toil-ui:looked', JSON.stringify({ 'card-payments': '2026-10-12T00:00:00Z' }));
     const config = editable((input) => okEnvelope({ name: input.name, description: null, renamed: { from: input.toilProject, to: input.name }, changed: true }));
-    await open('#/project/card-payments/people', { config });
-    window.location.hash = '#/project/card-payments';
-    await screen.findByRole('button', { name: 'Rename card-payments' });
-    await user.click(screen.getByRole('button', { name: 'Rename card-payments' }));
-    const field = screen.getByRole('textbox', { name: 'New name for card-payments' });
+    const user = await fromCard('card-payments', 'Edit', config);
+    const form = screen.getByRole('form', { name: 'Edit card-payments' });
+    const field = within(form).getByRole('textbox', { name: 'Name' });
     await user.clear(field);
     await user.type(field, 'payments-v2{Enter}');
-    await waitFor(() => expect(window.location.hash).toBe('#/project/payments-v2'));
-    expect(config.runs[0]).toEqual({ command: 'projects describe', input: { toilProject: 'card-payments', name: 'payments-v2' } });
-    expect(JSON.parse(localStorage.getItem('toil-ui:looked')!)).toHaveProperty('payments-v2');
+    await waitFor(() => expect(config.runs[0]).toEqual({ command: 'projects describe', input: { toilProject: 'card-payments', name: 'payments-v2' } }));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('toil-ui:looked')!)).toHaveProperty('payments-v2'));
   });
 
   it("puts the Toil project's name, description, sources and sprint day in its top row (#394)", async () => {
@@ -279,7 +295,7 @@ describe('a place the sync could not read (#542)', () => {
 describe('the pull requests view', () => {
   it('ranks the open pull requests by wait, with what each waits on, its author kind, items and flags', async () => {
     await open('#/project/checkout-web/prs');
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Pull requests');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Code reviews');
     const rows = within(panel('Waiting now')).getAllByRole('row').slice(1);
     expect(rows.map((r) => within(r).getByRole('rowheader').textContent)).toEqual([
       expect.stringContaining('payments-web #51 Retry the address lookup once'),
@@ -288,18 +304,44 @@ describe('the pull requests view', () => {
       expect.stringContaining('payments-web #53 Keep focus'),
     ]);
     expect(rows[0]!.textContent).toContain('Checks');
-    expect(rows[0]!.textContent).toContain('for 2 working days: its checks are failing');
-    expect(rows[0]!.textContent).toContain('· Agent (trailer: Co-Authored-By: Claude');
-    expect(rows[0]!.textContent).toContain('No linked work item');
-    expect(rows[1]!.textContent).toContain('· Agent (branch: branch copilot/receipt-currency)');
-    expect(rows[2]!.textContent).toContain('L (325 lines, 3 files)');
-    expect(rows[3]!.textContent).toContain('Draft (its author)');
+    // The age is a compact figure; the sentence, and what said an agent wrote it, are one step in.
+    const cell = (r: HTMLElement, n: number) => within(r).getAllByRole('cell')[n]!;
+    expect(cell(rows[0]!, 0).textContent).toMatch(/Checks\s*2 working days/);
+    expect(within(cell(rows[0]!, 0)).getByText(/for 2 working days: its checks are failing/)).toBeTruthy();
+    expect((cell(rows[0]!, 1).querySelector('details') as HTMLDetailsElement).open).toBe(false);
+    expect(within(cell(rows[0]!, 1)).getByText('Agent')).toBeTruthy();
+    expect(cell(rows[0]!, 1).textContent).toContain('trailer: Co-Authored-By: Claude');
+    expect(rows[0]!.textContent).toContain('No work item');
+    expect(cell(rows[1]!, 1).textContent).toContain('branch: branch copilot/receipt-currency');
+    expect(within(cell(rows[2]!, 3)).getByRole('img').getAttribute('aria-label')).toMatch(/^325 lines changed, \d+ added and \d+ deleted, 3 files$/);
+    expect(cell(rows[2]!, 3).textContent).toContain('L');
+    expect(cell(rows[3]!, 0).textContent).toContain('Draft (its author)');
+  });
+
+  it('gives each row a quiet icon Actions button in its own narrow column, named for the pull request', async () => {
+    await open('#/project/checkout-web/prs');
+    const table = within(panel('Waiting now')).getByRole('table');
+    const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers.at(-1)).toBe('Actions');
+    const buttons = within(table).getAllByRole('button', { name: /^Actions for / });
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const b of buttons) {
+      expect(b.closest('td')!.className).toContain('l-table__actions');
+      expect(b.textContent).toBe('');
+      expect(b.getAttribute('aria-label')).toMatch(/^Actions for .+ #\d+$/);
+    }
   });
 
   it('lists the flags with their evidence, and every flow figure with its sample size, split by author kind', async () => {
     await open('#/project/checkout-web/prs');
     const flags = panel('Flags');
-    expect(within(flags.querySelector('ul.rows') as HTMLElement).getAllByRole('listitem').map((li) => li.textContent!.split(':')[0])).toEqual([
+    // Grouped by kind, and only the first three flags show until asked for the rest.
+    const groups = () => Array.from(flags.querySelectorAll('[data-flag-group] h3')).map((h) => h.textContent);
+    const flagged = () => flags.querySelectorAll('[data-flag-group] li');
+    expect(flagged()).toHaveLength(3);
+    await userEvent.click(within(flags).getByRole('button', { name: 'Show 2 more' }));
+    expect(flagged()).toHaveLength(5);
+    expect(groups().map((g) => g!.replace(/\s*\d+$/, ''))).toEqual([
       'Work item done, pull request still open',
       'Merged, work item not done',
       'No first review in 2 working days',
@@ -327,7 +369,7 @@ describe('the pull requests view', () => {
 
   it("is a tab of the Toil project's, current on its own page", async () => {
     await open('#/project/settlement/prs');
-    const tab = within(tabs('settlement')).getByRole('link', { name: 'Pull requests' });
+    const tab = within(tabs('settlement')).getByRole('link', { name: 'Code reviews' });
     expect(tab.getAttribute('href')).toBe('#/project/settlement/prs');
     expect(tab.getAttribute('aria-current')).toBe('page');
   });
@@ -335,16 +377,17 @@ describe('the pull requests view', () => {
 
 describe('a dashboard', () => {
   it.each([
-    ['card-payments', ['jira issue search', 'jira issue history'], ['bitbucket pr list', 'bitbucket pr get'], ['jenkins pipeline runs'], ['openshift deployment list']],
-    ['settlement', ['ado work-item iterations', 'ado work-item search', 'ado work-item get-many', 'ado work-item history'], ['ado pr list', 'ado pr get'], ['ado run list'], ['ado run list']],
-    ['checkout-web', ['github project items', 'github issue get', 'github issue history'], ['github pr list', 'github pr get', 'bitbucket pr list', 'bitbucket pr get'], ['github pr get'], ['openshift deployment list']],
-  ])('%s names the commands that fed each panel', async (name, work, prs, builds, deployments) => {
+    ['card-payments', ['Jira'], ['Bitbucket'], ['Jenkins'], ['OpenShift']],
+    ['settlement', ['Azure DevOps'], ['Azure DevOps'], ['Azure DevOps'], ['Azure DevOps']],
+    ['checkout-web', ['GitHub'], ['GitHub', 'Bitbucket'], ['GitHub'], ['OpenShift']],
+  ])('%s names the tools that fed each panel', async (name, work, prs, builds, deployments) => {
     await open(`#/project/${name}/board`);
-    const fed = (region: HTMLElement) => within(region).getByText(/Fed by/).textContent;
-    for (const c of work) expect(fed(panel('Sprint 42 board'))).toContain(`toil ${c}`);
-    for (const c of prs) expect(fed(panel('Stories, pull requests, builds and deployments'))).toContain(`toil ${c}`);
-    for (const c of builds) expect(fed(panel('Builds'))).toContain(`toil ${c}`);
-    for (const c of deployments) expect(fed(panel('Deployments'))).toContain(`toil ${c}`);
+    const fed = (region: HTMLElement) => region.querySelector('.fed-by')!.textContent!;
+    for (const t of work) expect(fed(panel('Sprint 42 board'))).toContain(t);
+    for (const t of prs) expect(fed(panel('Stories, code reviews, builds and deployments'))).toContain(t);
+    for (const t of builds) expect(fed(panel('Builds'))).toContain(t);
+    for (const t of deployments) expect(fed(panel('Deployments'))).toContain(t);
+    expect(document.body.textContent).not.toMatch(/The exact toil commands/);
   });
 
   it('shows a story with its pull request, its build and where it runs, in one row', async () => {
@@ -373,7 +416,7 @@ describe('a dashboard', () => {
 
   it("shows the sprint's figures and each risk's reasons", async () => {
     await open('#/project/settlement');
-    const sprint = await metric(/^Burn-up /);
+    const sprint = await metric(/^Points done /);
     expect(sprint.querySelector('h2')!.textContent).toBe('Sprint 42: day 7 of 9');
     expect(within(sprint).getByRole('list', { name: 'Sprint figures' }).textContent).toContain('Done1 of 16points, 2 items');
     expect(sprint.textContent).toContain('Blocked by Azure DevOps 2302');
@@ -447,12 +490,14 @@ describe('the views on a dashboard (#252, #253)', () => {
     const cards = (region: HTMLElement) => within(region).getAllByRole('listitem').filter((li) => li.classList.contains('card'));
     expect(cards(col('To do')).map((c) => within(c).getAllByRole('link')[0]!.textContent)).toEqual(['2303', '2306']);
     const card = cards(col('In progress')).find((li) => li.textContent?.includes('2304'))!;
-    expect(card.textContent).toContain('Active · In progress');
+    // The column already says In progress, so the card's own status word is not followed by it again.
+    expect(card.textContent).toContain('Active');
+    expect(card.textContent).not.toContain('Active · In progress');
     expect(card.textContent).toContain('M. Lind');
     // The source and the estimate share a line; each insight is an icon with its word kept as text and tooltip.
     expect(card.querySelector('.card-meta .field')!.textContent).toMatch(/^Azure DevOps · /);
-    const aging = within(card).getByText('Aging').closest('li')!;
-    expect(aging.getAttribute('title')).toBe('Aging');
+    const aging = within(card).getByText('Open a long time').closest('li')!;
+    expect(aging.getAttribute('title')).toBe('Open a long time');
     expect(aging.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true');
   });
 
@@ -579,33 +624,57 @@ describe('the views on a dashboard (#252, #253)', () => {
     await waitFor(() => expect(document.activeElement).toBe(grip));
   });
 
+  it('keeps a card that is not on a GitHub project board from being dragged, says why, and leaves the others draggable', async () => {
+    // One board item loses its project item id, as an issue the board doesn't hold would have none.
+    const canned = CANNED.map((c) => (c.command === 'github project items' ? { ...c, data: (c.data as Array<Record<string, unknown>>).map((b) => ((b.content as { number?: number } | undefined)?.number === 43 ? { ...b, id: 0 } : b)) } : c));
+    await open('#/project/checkout-web/board', { execute: fixtureExecute(canned).execute });
+    const board = await screen.findByRole('region', { name: /board/i });
+    const grips = Array.from(board.querySelectorAll<HTMLElement>('.card-grip[data-item]'));
+    const github = grips.filter((g) => g.dataset.item!.startsWith('github:'));
+    expect(github.length).toBeGreaterThan(0);
+    const off = github.filter((g) => g.hasAttribute('data-immovable'));
+    const on = github.filter((g) => !g.hasAttribute('data-immovable'));
+    expect(off).toHaveLength(1);
+    expect(on.length).toBeGreaterThan(0);
+    for (const g of on) expect(g.getAttribute('aria-roledescription')).toBe('draggable card');
+    // Every card the board refuses to drag names its reason where a screen reader gets it, and offers no move in its menu.
+    for (const g of off) {
+      expect(g.getAttribute('aria-roledescription')).toBeNull();
+      expect(document.getElementById(g.getAttribute('aria-describedby')!)!.textContent).toMatch(/isn't on a GitHub project board/);
+      fireEvent.contextMenu(g);
+      const menu = await screen.findByRole('menu');
+      expect(within(menu).getAllByRole('menuitem', { name: /To do|In progress|Done/ }).every((m) => m.getAttribute('aria-disabled') === 'true')).toBe(true);
+      await userEvent.keyboard('{Escape}');
+    }
+  });
+
   it('draws the metrics as sparklines, each opening its full chart, which lists what it could not compute (#394)', async () => {
     await open('#/project/checkout-web');
     const strip = screen.getByRole('region', { name: 'Metrics' });
     expect(within(strip).getAllByRole('button').map((b) => b.textContent)).toEqual([
-      'Burn-up 1 of 11 points, show the full chart',
-      'Throughput 0.4 a week, show the full chart',
-      'Cycle time 0 items timed, show the full chart',
-      'Aging WIP 0 in progress, show the full chart',
-      'PR wait 2 working days, 3 open, show the full chart',
+      'Points done 1 of 11 points, show the full chart',
+      'Finished 0.4 a week, show the full chart',
+      'Time to finish 0 items timed, show the full chart',
+      'Work getting old 0 in progress, show the full chart',
+      'Review wait 2 working days, 3 open, show the full chart',
     ]);
-    let dialog = await metric(/^Throughput /);
+    let dialog = await metric(/^Finished /);
     expect(within(dialog).getAllByRole('img').length).toBeGreaterThan(0);
     expect(dialog.textContent).toContain('3 finished in 6 weeks');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    dialog = await metric(/^Cycle time /);
+    dialog = await metric(/^Time to finish /);
     expect(dialog.textContent).toContain('No finished item here has a cycle time the data can show.');
     expect(dialog.textContent).toContain('Unknown: Never recorded as In progress before Done.');
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    dialog = await metric(/^Aging WIP /);
+    dialog = await metric(/^Work getting old /);
     expect(dialog.textContent).toContain('Unknown: No move into In progress recorded.');
   });
 
   it('draws the dependency graph, and lists every link in words', async () => {
     await open('#/project/card-payments/dependencies');
-    const graph = panel('Dependencies');
+    const graph = panel('What blocks what');
     await waitFor(() => expect(graph.querySelector('.react-flow')).not.toBeNull());
     expect([...graph.querySelectorAll(':scope > ul.rows > li')].map((li) => li.textContent)).toEqual([
       'Jira PAY-101 Tokenise card numbers at the edge blocks Jira PAY-102 Store tokens in the vault (blocks)',
@@ -636,12 +705,12 @@ describe('the views on a dashboard (#252, #253)', () => {
   it('says so when a Toil project has no links to draw', async () => {
     localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'plain' }));
     await open('#/project/checkout-web/dependencies');
-    await waitFor(() => expect(panel('Dependencies').textContent).toContain("No links between this Toil project's items."));
+    await waitFor(() => expect(panel('What blocks what').textContent).toContain("No links between this Toil project's items."));
   });
 
   it("charts the sprint's burn-up with its figures in a table", async () => {
     await open('#/project/settlement');
-    const sprint = await metric(/^Burn-up /);
+    const sprint = await metric(/^Points done /);
     expect(sprint.querySelector('svg.chart title')!.textContent).toBe('Sprint 42 burn-up: 1 of 16 points done after 9 days, with 3 days to go. Scope grew from 11 to 16 points.');
     expect(within(sprint).getByRole('table', { name: 'Sprint 42 burn-up by day' })).toBeTruthy();
   });
@@ -656,13 +725,13 @@ describe('the chat up front (#343)', () => {
     for (const route of ['#/project/card-payments', '#/project/card-payments/prs', '#/project/card-payments/people', '#/project/card-payments/worklog', item('card-payments', 'corp-jira:PAY-102')]) {
       await open(route);
       const bar = askBar('card-payments');
-      expect(within(bar).getByRole('textbox', { name: 'Your question' }).getAttribute('placeholder')).toBe('Ask about card-payments');
+      expect(within(bar).getByRole('textbox', { name: 'Your question' }).getAttribute('placeholder')).toBe('Ask a question about card-payments');
       expect(within(bar).queryByRole('button', { name: /Analyze|briefing/ })).toBeNull();
       cleanupView();
     }
     setTheme('crate');
     await open('#/project/card-payments');
-    expect(within(askBar('card-payments')).getByRole('textbox', { name: 'Your question' }).getAttribute('placeholder')).toBe('Ask the dock about card-payments');
+    expect(within(askBar('card-payments')).getByRole('textbox', { name: 'Your question' }).getAttribute('placeholder')).toBe('Ask a question about card-payments');
   });
 
   it('opens a focused view with the context strip, the guided start with its questions, and Escape to leave', async () => {
@@ -693,6 +762,58 @@ describe('the chat up front (#343)', () => {
     await userEvent.click(within(askBar('settlement')).getByRole('button', { name: 'Open the conversation' }));
     chat = await screen.findByRole('dialog', { name: 'Ask about settlement' });
     expect([...chat.querySelectorAll('.turn h3')].filter((h) => !h.closest('article')).map((h) => h.textContent)).toEqual(['Are we going to finish the sprint?', 'Who might need help?']);
+  });
+
+  describe('the thinking indicator (#561)', () => {
+    /** An agent whose answer arrives when `release` is called, so the wait can be looked at. */
+    function slowAgent() {
+      let release: () => void = () => undefined;
+      const wait = new Promise<void>((resolve) => (release = resolve));
+      const agent: Agent = { starters: () => [], ask: async (_d, prompt) => (await wait, { prompt, parts: [{ text: 'Done.' }], citations: [], by: 'Codex', proposals: [] }) };
+      return { agent, release };
+    }
+
+    async function askAndClose(agent: Agent) {
+      await open('#/project/card-payments', { agent, preview: false });
+      const chat = await openChat('card-payments');
+      await userEvent.type(within(chat).getByRole('textbox', { name: 'Your question' }), 'Who is blocked?{Enter}');
+      await waitFor(() => expect(chat.querySelector('[data-ask-status]')).not.toBeNull());
+      return chat;
+    }
+
+    it("shows the theme's phrase with an icon in the focused view and the Ask bar, and the standard one in Plain", async () => {
+      setTheme('harvest');
+      const { agent, release } = slowAgent();
+      const chat = await askAndClose(agent);
+      const line = chat.querySelector('[data-ask-status]')!;
+      expect(line.getAttribute('role')).toBe('status');
+      expect(line.getAttribute('aria-label')).toBe('Answer progress');
+      expect(line.textContent).toMatch(/^Fertilizing digital soil…/);
+      expect(line.querySelector('[data-thinking-icon]')!.getAttribute('aria-hidden')).toBe('true');
+      expect(within(chat).getByRole('button', { name: 'Stop' })).toBeTruthy();
+      await userEvent.click(within(chat).getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Ask about card-payments' })).toBeNull());
+      const bar = askBar('card-payments');
+      const live = within(bar).getByRole('status', { name: 'Answer progress' });
+      expect(live.getAttribute('aria-live')).toBe('polite');
+      expect(live.textContent).toMatch(/^Fertilizing digital soil… · \d+ s$/);
+      expect(bar.querySelector('[data-thinking-icon]')).not.toBeNull();
+      expect(bar.textContent).toContain('1 question in this chat, Fertilizing digital soil…');
+      release();
+      await waitFor(() => expect(bar.querySelector('[data-thinking-icon]')).toBeNull());
+      // The live region stays, empty, so the next wait is announced.
+      expect(within(bar).getByRole('status', { name: 'Answer progress' }).textContent).toBe('');
+    });
+
+    it('reads the standard phrases in Plain and with themed wording off', async () => {
+      setTheme('plain');
+      const { agent, release } = slowAgent();
+      const chat = await askAndClose(agent);
+      expect(chat.querySelector('[data-ask-status]')!.textContent).toMatch(/^Reading your data…/);
+      release();
+      await waitFor(() => expect(chat.querySelector('[data-ask-status]')!.textContent).toMatch(/^Done in \d+ s$/));
+      expect(chat.querySelector('[data-thinking-icon]')).toBeNull();
+    });
   });
 
   it('keeps sending a long chat inside what the server takes: the last turns, each answer cut short (#344)', async () => {
@@ -824,7 +945,7 @@ describe('the chat up front (#343)', () => {
       const { unmount } = await open('#/project/card-payments', { agent: first.agent, preview: false });
       await userEvent.click(await within(askBar('card-payments')).findByRole('textbox', { name: 'Your question' }));
       const chat = await screen.findByRole('dialog', { name: 'Ask about card-payments' });
-      await userEvent.click(await within(chat).findByRole('button', { name: /change the agent for this chat/ }));
+      await userEvent.click(await within(chat).findByRole('button', { name: /change the AI agent for this chat/ }));
       await userEvent.click(await screen.findByRole('button', { name: /Codex/ }));
       await userEvent.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
       await within(chat).findByRole('heading', { level: 3, name: 'Analyze' });
@@ -844,10 +965,31 @@ describe('settings', () => {
   it('is in the navigation, and says the preview changes nothing', async () => {
     await open('#/settings');
     expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('aria-current')).toBe('page');
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe("toil's configuration");
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Settings');
+    // Settings opens on General, its first tab, and every tab's title is the same.
+    expect(screen.getByRole('link', { name: 'General' }).getAttribute('aria-current')).toBe('page');
+    window.location.hash = '#/settings/connections';
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Connections' }).getAttribute('aria-current')).toBe('page'));
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Settings');
     expect(document.body.textContent).toContain('Changes are turned off.');
-    expect(document.body.textContent).toContain('it has no configuration of yours to change');
   });
+
+  it('keeps #/settings/toil as an alias of General, and opens the connection form only when the address asks', async () => {
+    await open('#/settings/general');
+    expect(screen.getByRole('link', { name: 'General' }).getAttribute('aria-current')).toBe('page');
+    window.location.hash = '#/settings/connections';
+    await screen.findByRole('article', { name: 'corp-jira' });
+    expect(screen.queryByRole('form', { name: 'A new connection' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add a connection' })).toBeTruthy();
+    window.location.hash = '#/settings/connections/+add';
+    expect(await screen.findByRole('form', { name: 'A new connection' })).toBeTruthy();
+  });
+
+  /** Opens the add form the way a person does: the button, since the form is closed until asked for. */
+  async function addConnectionForm() {
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a connection' }));
+    return screen.findByRole('form', { name: 'A new connection' });
+  }
 
   /** The preview's config with changes on, recording what each change sent, and answering it ok. */
   function recording() {
@@ -868,32 +1010,32 @@ describe('settings', () => {
   it('in the preview, shows the connections with every change turned off, and still tests one', async () => {
     await open('#/settings/connections');
     const card = await screen.findByRole('article', { name: 'corp-jira' });
-    await userEvent.click(within(card).getByRole('button', { name: 'Turn writes off' }));
-    const form = within(card).getByRole('form', { name: 'Turn writes off for corp-jira' });
-    expect((within(form).getByRole('button', { name: 'Turn writes off' }) as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(within(card).getByRole('button', { name: 'Make read only' }));
+    const form = within(card).getByRole('form', { name: 'Make corp-jira read only' });
+    expect((within(form).getByRole('button', { name: 'Make read only' }) as HTMLButtonElement).disabled).toBe(true);
     expect(form.textContent).toContain('Turned off: This is the preview');
-    expect(form.textContent).toContain('Runs toil connections writes corp-jira off');
+    expect(form.textContent).not.toContain('Runs ');
     await userEvent.click(within(card).getByRole('button', { name: 'Test' }));
-    await waitFor(() => expect(card.textContent).toContain('corp-jira answered GET /rest/api/2/myself, so its credential works.'));
+    await waitFor(() => expect(card.textContent).toContain('corp-jira answered, so its login works'));
   });
 
   it('shows a connection made by env vars read-only, with where it came from', async () => {
     await open('#/settings/connections');
     const card = await screen.findByRole('article', { name: 'github' });
-    expect(within(card).queryByRole('button', { name: /Remove|Make default|Turn writes|Replace secret/ })).toBeNull();
+    expect(within(card).queryByRole('button', { name: /Remove|Make default|Make read only|Allow writes|Update login/ })).toBeNull();
     expect(within(card).getByRole('button', { name: 'Test' })).toBeTruthy();
-    expect(card.textContent).toContain('TOIL_CONN_GITHUB_*');
-    expect(card.textContent).toContain('token: CI variable');
+    expect(card.textContent).not.toContain('TOIL_');
+    expect(card.textContent).toContain("Set outside Toil UI, so it can't be changed here");
   });
 
   it("turns writes on only with the name typed, and sends what was typed as the command's own confirmation", async () => {
     const { config, sent } = recording();
     await open('#/settings/connections', { config });
     const card = await screen.findByRole('article', { name: 'corp-ado' });
-    await userEvent.click(within(card).getByRole('button', { name: 'Turn writes on' }));
-    const form = within(card).getByRole('form', { name: 'Turn writes on for corp-ado' });
-    await userEvent.type(within(form).getByRole('textbox', { name: /Type corp-ado to turn them on/ }), 'corp-ado');
-    await userEvent.click(within(form).getByRole('button', { name: 'Turn writes on' }));
+    await userEvent.click(within(card).getByRole('button', { name: 'Allow writes' }));
+    const form = within(card).getByRole('form', { name: 'Allow writes for corp-ado' });
+    await userEvent.type(within(form).getByRole('textbox', { name: /Type corp-ado to allow writes/ }), 'corp-ado');
+    await userEvent.click(within(form).getByRole('button', { name: 'Allow writes' }));
     expect(await within(form).findByRole('status')).toBeTruthy();
     expect(sent).toEqual([{ command: 'connections writes', input: { name: 'corp-ado', state: 'on' }, answers: { answers: { 'confirm-name': 'corp-ado' } } }]);
   });
@@ -901,30 +1043,33 @@ describe('settings', () => {
   it("adds a connection: every setting answered, the secret sent once and cleared from the page", async () => {
     const { config, sent } = recording();
     await open('#/settings/connections', { config });
-    const form = await screen.findByRole('form', { name: 'A new connection' });
+    const form = await addConnectionForm();
     await userEvent.type(within(form).getByRole('textbox', { name: /^Name/ }), 'corp-jira-2');
-    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Area' }), 'jira');
-    await userEvent.type(within(form).getByRole('textbox', { name: /^baseUrl/ }), 'https://jira.imagile.dev');
+    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Tool' }), 'jira');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Data Center' }));
+    await userEvent.type(within(form).getByRole('textbox', { name: /^Address/ }), 'https://jira.imagile.dev');
     const secret = within(form).getByLabelText(/^apiToken/) as HTMLInputElement;
     expect(secret.type).toBe('password');
     await userEvent.type(secret, 'fake-pat-abc12345');
-    expect(form.textContent).toContain('Saves: area jira, baseUrl https://jira.imagile.dev, apiToken to the OS credential store.');
+    expect(form.textContent).not.toContain('Saves:');
+    expect(form.textContent).not.toContain('credential store');
     await userEvent.click(within(form).getByRole('button', { name: 'Save connection' }));
     expect(await within(form).findByRole('status')).toBeTruthy();
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ command: 'connections add', input: { name: 'corp-jira-2', area: 'jira' }, answers: { secrets: { apiToken: 'fake-pat-abc12345' } } });
     const answers = (sent[0]!.answers as { answers: Record<string, string> }).answers;
-    expect(answers).toMatchObject({ confirm: 'y', 'setting:baseUrl': 'https://jira.imagile.dev', 'setting:project': '' });
-    expect((within(form).getByLabelText(/^apiToken/) as HTMLInputElement).value).toBe('');
+    expect(answers).toMatchObject({ confirm: 'y', 'setting:deployment': 'server', 'setting:baseUrl': 'https://jira.imagile.dev', 'setting:project': '', 'setting:email': '' });
+    // The form starts over, so the deployment must be chosen again and no secret box is left holding anything.
+    expect(within(form).queryByLabelText(/^apiToken/)).toBeNull();
     expect(document.body.textContent).not.toContain('fake-pat-abc12345');
   });
 
   it("answers an optional secret left blank with '', so toil skips it as the CLI does", async () => {
     const { config, sent } = recording();
     await open('#/settings/connections', { config });
-    const form = await screen.findByRole('form', { name: 'A new connection' });
+    const form = await addConnectionForm();
     await userEvent.type(within(form).getByRole('textbox', { name: /^Name/ }), 'ocp-lab');
-    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Area' }), 'openshift');
+    await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Tool' }), 'openshift');
     expect((within(form).getByLabelText(/^token/) as HTMLInputElement).required).toBe(false);
     await userEvent.click(within(form).getByRole('button', { name: 'Save connection' }));
     await waitFor(() => expect(sent).toHaveLength(1));
@@ -935,9 +1080,9 @@ describe('settings', () => {
     const { config, sent } = recording();
     await open('#/settings/connections', { config });
     const card = await screen.findByRole('article', { name: 'corp-jenkins' });
-    await userEvent.click(within(card).getByRole('button', { name: 'Replace secret' }));
-    const form = within(card).getByRole('form', { name: "Replace corp-jenkins's secret" });
-    await userEvent.click(within(form).getByRole('button', { name: 'Save to the credential store' }));
+    await userEvent.click(within(card).getByRole('button', { name: 'Update login' }));
+    const form = within(card).getByRole('form', { name: "Update corp-jenkins's login" });
+    await userEvent.click(within(form).getByRole('button', { name: 'Save securely' }));
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]).toMatchObject({ command: 'connections login', input: { name: 'corp-jenkins' }, answers: { secrets: { apiToken: '' } } });
   });
@@ -946,10 +1091,11 @@ describe('settings', () => {
     async function addForm() {
       const { config, sent } = recording();
       await open('#/settings/connections', { config });
-      const form = await screen.findByRole('form', { name: 'A new connection' });
+      const form = await addConnectionForm();
       await userEvent.type(within(form).getByRole('textbox', { name: /^Name/ }), 'corp-jira-2');
-      await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Area' }), 'jira');
-      await userEvent.type(within(form).getByRole('textbox', { name: /^baseUrl/ }), 'https://jira.imagile.dev');
+      await userEvent.selectOptions(within(form).getByRole('combobox', { name: 'Tool' }), 'jira');
+      await userEvent.click(within(form).getByRole('radio', { name: 'Data Center' }));
+      await userEvent.type(within(form).getByRole('textbox', { name: /^Address/ }), 'https://jira.imagile.dev');
       const secret = within(form).getByLabelText(/^apiToken/) as HTMLInputElement;
       const note = () => document.getElementById(secret.getAttribute('aria-describedby')!.split(' ')[0]!)!.textContent;
       const save = () => userEvent.click(within(form).getByRole('button', { name: 'Save connection' }));
@@ -960,7 +1106,8 @@ describe('settings', () => {
       const { secret, note, save, sent, form } = await addForm();
       expect(note()).toBe('Empty: this one is required');
       await save();
-      expect(within(form).getByRole('alert').textContent).toContain('apiToken: Nothing was entered, and this one is required.');
+      expect(form.textContent).toContain('Add the apiToken: Data Center needs it.');
+      expect(within(form).getByRole('button', { name: 'Save connection' }).getAttribute('aria-disabled')).toBe('true');
       expect(sent).toHaveLength(0);
       await userEvent.type(secret, 'fake-pat-abc12345');
       expect(note()).toBe('17 characters');
@@ -1017,35 +1164,42 @@ describe('settings', () => {
     it('says an empty field keeps the current secret when replacing one', async () => {
       await open('#/settings/connections');
       const card = await screen.findByRole('article', { name: 'corp-jenkins' });
-      await userEvent.click(within(card).getByRole('button', { name: 'Replace secret' }));
-      const form = within(card).getByRole('form', { name: "Replace corp-jenkins's secret" });
+      await userEvent.click(within(card).getByRole('button', { name: 'Update login' }));
+      const form = within(card).getByRole('form', { name: "Update corp-jenkins's login" });
       expect(form.textContent).toContain('Empty: the current secret is kept');
     });
   });
 
-  it('builds a Toil project through toil projects, and shows and checks one', async () => {
+  it('changes a Toil project through toil projects, shows and checks one, and sends creation to the wizard', async () => {
     const { config, sent } = recording();
     await open('#/settings/projects', { config });
     const card = await screen.findByRole('article', { name: 'settlement' });
-    await userEvent.click(within(card).getByRole('button', { name: 'Check' }));
+    await userEvent.click(within(card).getByRole('button', { name: /^Menu for / }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Check' }));
     expect(await within(card).findByText('settlement checks out: no problems.')).toBeTruthy();
     expect(within(card).getByText('settlement checks out: no problems.').closest('[role="status"]')).toBeTruthy();
-    await userEvent.click(within(card).getByRole('button', { name: 'Show' }));
+    await userEvent.click(within(card).getByRole('button', { name: /^Menu for / }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Show details' }));
     expect(within(card).getByRole('table').textContent).toContain('corp-ado (toil-project)');
 
-    const init = screen.getByRole('form', { name: 'Create a Toil project' });
-    await userEvent.type(within(init).getByRole('textbox', { name: /^Name/ }), 'payments');
-    await userEvent.click(within(init).getByRole('button', { name: 'Create Toil project' }));
+    expect(screen.queryByRole('form', { name: 'Create a Toil project' })).toBeNull();
+    expect(document.querySelector('a[data-new-toil-project]')!.getAttribute('href')).toBe('#/new-project');
+    // Each card's Edit opens that Toil project's own page, sources first; the forms are not on the list.
+    expect(screen.queryByRole('form', { name: 'Name a field in card-payments' })).toBeNull();
+    const editCard = screen.getByRole('article', { name: 'card-payments' });
+    expect(within(editCard).getByRole('link', { name: 'Edit' }).getAttribute('href')).toBe('#/settings/projects/card-payments/sources');
+    window.location.hash = '#/settings/projects/card-payments/fields';
+    await screen.findByRole('heading', { level: 2, name: 'Edit card-payments' });
     const field = screen.getByRole('form', { name: 'Name a field in card-payments' });
-    await userEvent.type(within(field).getByRole('textbox', { name: /^Alias/ }), 'storyPoints');
+    await userEvent.type(within(field).getByRole('textbox', { name: /^Name/ }), 'storyPoints');
     await userEvent.type(within(field).getByRole('textbox', { name: /^Field id/ }), 'customfield_10002');
     await userEvent.click(within(field).getByRole('button', { name: 'Name field' }));
-    const link = screen.getByRole('form', { name: 'Link an area to card-payments' });
-    await userEvent.type(within(link).getByRole('textbox', { name: /^Keys to set/ }), 'project=PAY');
-    await userEvent.click(within(link).getByRole('button', { name: 'Link area' }));
-    await waitFor(() => expect(sent).toHaveLength(3));
+    await userEvent.click(screen.getByText('Sources'));
+    const link = await screen.findByRole('form', { name: 'Link a tool to card-payments' });
+    await userEvent.type(within(link).getByRole('textbox', { name: /^Settings for every call/ }), 'project=PAY');
+    await userEvent.click(within(link).getByRole('button', { name: 'Link tool' }));
+    await waitFor(() => expect(sent).toHaveLength(2));
     expect(sent.map((s) => [s.command, s.input])).toEqual([
-      ['projects init', { name: 'payments' }],
       ['projects field', { toilProject: 'card-payments', area: 'jira', alias: 'storyPoints', id: 'customfield_10002' }],
       ['projects link', { toilProject: 'card-payments', area: 'jira', set: ['project=PAY'] }],
     ]);
@@ -1069,12 +1223,14 @@ describe('settings', () => {
     const table = await within(panelEl).findByRole('table');
     expect(table.textContent).toContain('host bitbucket-sdk.imagile.dev');
     expect(table.textContent).toContain('No connection yet');
-    expect(table.textContent).toContain('GET /api/v1');
+    expect(table.textContent).toContain('Worked');
     expect(panelEl.textContent).toContain('checkout-web: 3 of 4 areas ready.');
     expect(panelEl.textContent).toContain('error: bitbucket.host');
-    const add = within(panelEl).getByRole('form', { name: 'Add a bitbucket connection on bitbucket-sdk.imagile.dev' });
+    const add = within(panelEl).getByRole('form', { name: 'Add a Bitbucket connection on bitbucket-sdk.imagile.dev' });
     expect((within(add).getByRole('textbox', { name: /^Name/ }) as HTMLInputElement).value).toBe('bitbucket');
-    expect((within(add).getByRole('textbox', { name: /^baseUrl/ }) as HTMLInputElement).value).toBe('https://bitbucket-sdk.imagile.dev');
+    // The deployment is the person's to choose; the suggested address waits under Data Center.
+    await userEvent.click(within(add).getByRole('radio', { name: 'Data Center' }));
+    expect((within(add).getByRole('textbox', { name: /^Address/ }) as HTMLInputElement).value).toBe('https://bitbucket-sdk.imagile.dev');
     // A required secret left empty is refused before anything is sent (#358), so one is typed.
     await userEvent.type(add.querySelector('input[type=password]')!, 'fake-pat-abc12345');
     await userEvent.click(within(add).getByRole('button', { name: 'Save connection' }));
@@ -1082,36 +1238,48 @@ describe('settings', () => {
     const steps = sent.filter((s) => s.command === 'projects onboard' || s.command === 'connections add');
     expect(steps.map((s) => s.command)).toEqual(['projects onboard', 'connections add', 'projects onboard']);
     expect(steps[0]!.input).toEqual({ plan: true });
-    expect(steps[1]).toMatchObject({ input: { name: 'bitbucket', area: 'bitbucket' }, answers: { answers: { 'setting:baseUrl': 'https://bitbucket-sdk.imagile.dev', confirm: 'y' } } });
+    expect(steps[1]).toMatchObject({ input: { name: 'bitbucket', area: 'bitbucket' }, answers: { answers: { 'setting:deployment': 'server', 'setting:baseUrl': 'https://bitbucket-sdk.imagile.dev', confirm: 'y' } } });
   });
 
   it('shows the bounds and the time limit read-only, with where each is set', async () => {
-    await open('#/settings/toil');
+    await open('#/settings/general');
+    // Closed by default: the bounds are one step in, under Advanced, and name no file or variable.
+    const advanced = document.querySelector('[data-advanced]') as HTMLDetailsElement;
+    expect(advanced.open).toBe(false);
+    await userEvent.click(within(advanced).getByText('Advanced'));
     await screen.findByRole('heading', { name: 'Bounds' });
-    expect(document.body.textContent).toContain('Held: commands read and write files only inside the workspace.');
-    expect(document.body.textContent).toContain('/home/you/.toil/config.json');
-    expect(document.body.textContent).toContain("120 s, toil's default");
-    expect(screen.queryByRole('button', { name: /Save|Change/ })).toBeNull();
+    expect(advanced.textContent).toContain('Held: Toil reads and writes files only inside your working folder.');
+    expect(advanced.textContent).not.toContain('.toil');
+    expect(advanced.textContent).not.toContain('TOIL_');
+    expect(advanced.textContent).toContain("120 s, Toil's default");
+    expect(screen.queryByRole('button', { name: /^Save|Change/ })).toBeNull();
   });
 
-  it("has a Usage page with toil audit stats' figures, and opens a failing command's recent lines through toil audit list", async () => {
+  it("has a Usage page: a short plain summary first, everything else behind one More detail, and Toil UI's own calls left out", async () => {
     const config = fixtureConfig();
     await open('#/settings/usage', { config });
-    await screen.findByRole('heading', { name: 'Usage of toil' });
+    await screen.findByRole('heading', { name: 'How Toil is used' });
+    const more = document.querySelector('[data-usage-more]') as HTMLDetailsElement;
+    expect(more.open).toBe(false);
+    expect(more.querySelector('summary')!.textContent).toBe('More detail');
+    expect(document.querySelectorAll('[data-usage-more]')).toHaveLength(1);
+    expect(document.body.textContent).toMatch(/Since .*: \d+ calls?, \d+ failed/);
+    expect(document.body.textContent).not.toMatch(/toil audit|--by/);
     expect(screen.getByRole('link', { name: 'Usage' }).getAttribute('aria-current')).toBe('page');
     expect(document.body.textContent).not.toContain('Changes are turned off.');
     const until = config.calls[0]!.input.until;
     expect(until).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(config.calls.map((c) => [c.command, c.input])).toEqual([
-      ['audit stats', { by: ['day'], until }],
-      ['audit stats', { by: ['command'], unused: true, until }],
+      ['audit stats', { by: ['day', 'caller'], until }],
+      ['audit stats', { by: ['command', 'caller'], until }],
       ['audit stats', { by: ['via', 'caller'], until }],
     ]);
     expect(screen.getByRole('img', { name: /^Calls per day: \d+ calls in 30 days/ })).toBeTruthy();
-    const doors = panel('How toil was called');
-    for (const door of ['Toil UI', 'MCP', 'The CLI']) expect(doors.textContent).toContain(door);
+    const doors = panel('Who made the calls');
+    for (const door of ['Toil UI itself', 'An AI assistant', 'A terminal']) expect(doors.textContent).toContain(door);
+    // Toil UI's own calls are in this table, labelled, and in no total above it.
     const top = within(panel('Used most')).getAllByRole('rowheader').map((h) => h.textContent);
-    expect(top[0]).toBe('Commandjira issue get');
+    expect(top[0]).toBe('Whatjira issue get');
     const failing = panel('Failed most');
     expect(failing.textContent).toContain('Usual fix:');
     const show = within(failing).getAllByRole('button', { name: 'Show recent failures' })[0]!;
@@ -1121,15 +1289,13 @@ describe('settings', () => {
     expect(last.command).toBe('audit list');
     expect(last.input).toMatchObject({ outcome: 'failed', limit: 10 });
     expect(show.getAttribute('aria-expanded')).toBe('true');
-    const unused = panel('Not used');
-    expect(unused.textContent).toContain('6 commands had no call in this window');
-    expect(unused.textContent).toContain('(CLI only)');
+    expect(screen.queryByText(/had no call in this window/)).toBeNull();
   });
 
-  it("has an Agent page, which says what the local app offers and changes nothing in the preview", async () => {
+  it("has an AI agent page, which says what the local app offers and changes nothing in the preview", async () => {
     await open('#/settings/agent');
-    expect(screen.getByRole('link', { name: 'Agent' }).getAttribute('aria-current')).toBe('page');
-    const agentPanel = panel('Agent');
+    expect(screen.getByRole('link', { name: 'AI agent' }).getAttribute('aria-current')).toBe('page');
+    const agentPanel = panel('AI agent');
     for (const name of ['Claude', 'GitHub Copilot', 'Codex']) expect(agentPanel.textContent).toContain(name);
     expect(within(agentPanel).queryByRole('button')).toBeNull();
     expect(document.body.textContent).not.toContain('Changes are turned off.');
@@ -1149,17 +1315,53 @@ describe('settings', () => {
       },
     };
     const { container } = await open('#/settings/agent', { preview: false, agentSettings: { client } });
-    const card = await screen.findByRole('region', { name: 'Agents on this machine' });
+    const card = await screen.findByRole('region', { name: 'Your AI agents' });
     await userEvent.click(within(card).getByRole('button', { name: 'Install GitHub Copilot' }));
     const dialog = await screen.findByRole('dialog', { name: 'Install GitHub Copilot' });
     expect(within(dialog).getByRole('region', { name: 'The command' }).textContent).toBe('npm install --global --prefix /usr/local --ignore-scripts @x/y@1');
     expect(ran).toEqual([]);
+    // Before anything runs, the dialog says in plain words what will and won't happen.
+    expect(within(dialog).getByRole('list', { name: 'What this will do' }).textContent).toContain('Download @github/copilot-sdk 0.3.289');
+    expect(within(dialog).getByRole('list', { name: 'What this will do' }).textContent).toContain('install scripts');
+    expect(within(dialog).getByRole('list', { name: "What it won't do" }).textContent).toContain('Sign in for you');
+    expect(within(dialog).queryByRole('list', { name: 'What changed' })).toBeNull();
     expect(within(dialog).getByRole('button', { name: 'Copy command' })).toBeTruthy();
     expect(await violations(container)).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Install' }));
     await waitFor(() => expect(within(dialog).getByRole('log', { name: "npm's output" }).textContent).toBe('added 105 packages in 8s'));
     await waitFor(() => expect(dialog.textContent).toContain('Installed @github/copilot-sdk'));
+    expect(within(dialog).getByRole('list', { name: 'What changed' }).textContent).toContain('Still yours');
     expect(ran).toEqual(['copilot: npm install --global --prefix /usr/local --ignore-scripts @x/y@1']);
+  }, AXE_TIMEOUT);
+
+  it('when an install fails, offers the organization-registry helper, which writes only the registry line and reports the file', async () => {
+    const saved: string[] = [];
+    const client = {
+      status: async () => STATUS({ adapter: 'none', model: null, cliPath: null, endpoint: null, instructions: null, voice: null, models: {}, cliPaths: {} }),
+      save: async (s: AgentSettings) => STATUS(s),
+      prompt: async () => '',
+      installPlan: NO_INSTALL.installPlan,
+      install: async () => {
+        throw new Error('npm stopped with exit code 1: ENOTFOUND registry.npmjs.org');
+      },
+      setRegistry: async (registry: string) => {
+        saved.push(registry);
+        return { file: '/home/me/.npmrc', registry: 'https://a.example.com/npm/', previous: null };
+      },
+    };
+    await open('#/settings/agent', { preview: false, agentSettings: { client } });
+    const card = await screen.findByRole('region', { name: 'Your AI agents' });
+    await userEvent.click(within(card).getByRole('button', { name: 'Install GitHub Copilot' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Install GitHub Copilot' });
+    expect(dialog.querySelector('[data-registry-help]')).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Install' }));
+    await waitFor(() => expect(dialog.querySelector('[data-registry-help]')).not.toBeNull());
+    expect(dialog.textContent).toContain('Artifactory');
+    expect(dialog.textContent).toContain('never asks for a password');
+    await userEvent.type(within(dialog).getByLabelText('Registry address'), 'https://a.example.com/npm');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save to my .npmrc' }));
+    await waitFor(() => expect(dialog.textContent).toContain('Saved registry=https://a.example.com/npm/ in /home/me/.npmrc'));
+    expect(saved).toEqual(['https://a.example.com/npm']);
   }, AXE_TIMEOUT);
 
   const STATUS = (settings: AgentSettings, installed = false): AgentStatus => ({
@@ -1184,21 +1386,19 @@ describe('settings', () => {
   it('in the local app, shows first-run setup as steps in a calm tone, the packages one step in, and never in red', async () => {
     const client = { status: async () => STATUS({ adapter: 'none', model: null, cliPath: null, endpoint: null, instructions: null, voice: null, models: {}, cliPaths: {} }), save: async (s: AgentSettings) => STATUS(s), prompt: async () => '', ...NO_INSTALL };
     const { container } = await open('#/settings/agent', { preview: false, agentSettings: { client } });
-    const agentPanel = panel('Agent');
-    const choice = await screen.findByRole('region', { name: 'Which one answers' });
-    await within(choice).findByRole('radiogroup', { name: 'Which one answers' });
-    // The steps come first, in the info tone, and the install buttons sit right under them.
-    const steps = agentPanel.querySelector('[data-setup-steps]') as HTMLElement;
-    expect(steps.textContent).toContain('Press Install');
-    expect(steps.querySelector('.failure')).toBeNull();
-    expect(document.querySelector('.agent-missing, .failure')).toBeNull();
-    const rows = [...document.querySelectorAll('.adapter-status__row')];
+    const choice = await screen.findByRole('region', { name: 'Your AI agents' });
+    const agentPanel = choice;
+    await within(choice).findByRole('radiogroup', { name: 'Which AI agent answers' });
+    // One card: each helper is a row with its choice, its state and Install, never in red.
+    expect(choice.querySelector('.agent-missing, .failure')).toBeNull();
+    expect(within(choice).getAllByRole('button', { name: /^Install / })).toHaveLength(3);
+    const rows = [...document.querySelectorAll('.helper-row[data-adapter]')];
     expect(rows.map((r) => r.getAttribute('data-state'))).toEqual(['new', 'new', 'new']);
     expect(rows[0]!.textContent).toContain('Not set up yet');
-    // The package, the tested version and the CLI problem are one step in, behind the details.
+    // The CLI problem is one step in; package names and npm notes aren't on screen, behind the details.
     const fold = rows[0]!.querySelector('details')!;
     expect(fold.open).toBe(false);
-    expect(fold.textContent).toContain('@anthropic-ai/claude-agent-sdk');
+    expect(fold.textContent).not.toContain('@anthropic-ai/claude-agent-sdk');
     expect(fold.textContent).toContain('Toil UI found no claude on PATH');
     // Models, CLI path and endpoint are advanced: behind a fold, below the steps.
     expect((choice.querySelector('details[data-advanced]') as HTMLDetailsElement).open).toBe(false);
@@ -1212,7 +1412,7 @@ describe('settings', () => {
     const client = { status: async () => ({ ...base, adapters }), save: async (s: AgentSettings) => STATUS(s), prompt: async () => '', ...NO_INSTALL };
     await open('#/settings/agent', { preview: false, agentSettings: { client } });
     const row = await waitFor(() => {
-      const r = document.querySelector('.adapter-status__row[data-adapter="claude"]');
+      const r = document.querySelector('.helper-row[data-adapter="claude"]');
       if (!r) throw new Error('not yet');
       return r as HTMLElement;
     });
@@ -1227,15 +1427,18 @@ describe('settings', () => {
     const changed: AgentStatus[] = [];
     const client = { status: async () => STATUS({ adapter: 'none', model: null, cliPath: null, endpoint: null, instructions: null, voice: null, models: {}, cliPaths: {} }, true), save: async (s: AgentSettings) => (saves.push(s), STATUS(s, true)), prompt: async () => '', ...NO_INSTALL };
     const { container } = await open('#/settings/agent', { preview: false, agentSettings: { client, onChange: (s) => changed.push(s) } });
-    const choice = await screen.findByRole('region', { name: 'Which one answers' });
+    const choice = await screen.findByRole('region', { name: 'Your AI agents' });
     await userEvent.click(await within(choice).findByRole('radio', { name: /^Claude/ }));
     await userEvent.click(within(choice).getByText(/^Advanced:/));
     await userEvent.type(within(choice).getByRole('textbox', { name: "Claude's model" }), 'sonnet');
     await userEvent.click(within(choice).getByRole('radio', { name: 'Amazon Bedrock' }));
     expect(await violations(container)).toEqual([]);
-    await userEvent.click(within(choice).getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(within(choice).getByRole('status').textContent).toBe('Saved: Claude answers from the next question.'));
-    expect(saves).toEqual([{ adapter: 'claude', model: 'sonnet', cliPath: null, endpoint: 'bedrock', instructions: null, voice: null, models: { claude: 'sonnet' }, cliPaths: {} }]);
+    // The instructions below are part of the same form, so there is one Save for the whole page.
+    await userEvent.type(screen.getByRole('textbox', { name: 'General instructions' }), ' lead with risks ');
+    expect(screen.getAllByRole('button', { name: 'Save' })).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getAllByRole('status').map((s) => s.textContent)).toContain('Saved: Claude answers from the next question, with your instructions.'));
+    expect(saves).toEqual([{ adapter: 'claude', model: 'sonnet', cliPath: null, endpoint: 'bedrock', instructions: 'lead with risks', voice: null, models: { claude: 'sonnet' }, cliPaths: {} }]);
     expect(changed).toHaveLength(1);
   }, AXE_TIMEOUT);
 });
@@ -1246,8 +1449,8 @@ describe('the agent pane, with a real adapter', () => {
     await open('#/project/card-payments', { agent, preview: false });
     const chat = await openChat('card-payments');
     // In everyday words first (#552; these tests read toil's own terms, and the plain wording is in guided-ask.test.tsx): none yet, and where an engineer sets one up. The packages are one step in, behind a fold.
-    const notice = within(chat).getByText(/No agent is set up yet/).closest('[data-no-agent]')!;
-    expect(within(notice as HTMLElement).getByRole('link', { name: 'Set up an agent' }).getAttribute('href')).toBe('#/settings/agent');
+    const notice = within(chat).getByText(/No AI agent is set up yet/).closest('[data-no-agent]')!;
+    expect(within(notice as HTMLElement).getByRole('link', { name: 'Set up an AI agent' }).getAttribute('href')).toBe('#/settings/agent');
     const fold = notice.querySelector('details')!;
     expect(fold.open).toBe(false);
     expect(fold.textContent).toContain('GitHub Copilot');
@@ -1281,7 +1484,7 @@ describe('failures', () => {
   it("shows a failed call on its own panel with toil's message and fix, and the rest still loads", async () => {
     const without = (c: Canned) => !(c.command === 'bitbucket pr list');
     await open('#/project/card-payments/prs', { execute: fixtureExecute(CANNED.filter(without)).execute });
-    expect(screen.getAllByRole('alert').map((a) => a.textContent).join(' ')).toMatch(/toil bitbucket pr list failed: The preview has no sample answer .* Add the call to CANNED/);
+    expect(screen.getAllByRole('alert').map((a) => a.textContent).join(' ')).toMatch(/Reading Bitbucket failed: The preview has no sample answer .* Add the call to CANNED/);
     window.location.hash = '#/project/card-payments/board';
     expect((await screen.findByRole('region', { name: 'Sprint 42 board' })).textContent).toContain('PAY-102');
   });
@@ -1310,15 +1513,15 @@ describe('an item', () => {
     await open(item('settlement', 'corp-ado:2305'));
     expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('Schedule the export job');
     expect(screen.getByText('Microsoft.VSTS.Scheduling.OriginalEstimate')).toBeTruthy();
-    expect(screen.getByText(/read with/).textContent).toContain('toil ado work-item get-many');
+    expect(document.body.textContent).not.toContain('toil ado work-item get-many');
     expect(screen.getByRole('link', { name: 'Schedule the settlement export job' }).getAttribute('href')).toBe('https://ado.imagile.dev/DefaultCollection/Payments/_git/settlement/pullrequest/84');
     expect(screen.getByText(/settlement-deploy 20261008.1/).textContent).toContain('test');
   });
 
   it('shows its insights, each with its source, and its time in progress', async () => {
     await open(item('settlement', 'corp-ado:2304'));
-    const box = screen.getByRole('region', { name: 'Insights' });
-    expect(box.textContent).toContain('Aging');
+    const box = screen.getByRole('region', { name: 'Worth a look' });
+    expect(box.textContent).toContain('Open a long time');
     expect(box.textContent).toContain('Carried over from Payments\\Sprint 41');
     expect(box.textContent).toContain('Source: history.iterations');
     expect(box.textContent).toMatch(/In progress for 15 days, since 28 Sept? 2026, 09:00 UTC/);
@@ -1357,20 +1560,25 @@ describe('themes', () => {
     await openChat('card-payments');
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    await userEvent.click(screen.getByRole('button', { name: /Theme/ }));
+    // A Toil project's own header carries no theme picker; the home page's does, and Settings has it too.
+    expect(screen.queryByRole('button', { name: /Theme/ })).toBeNull();
+    window.location.hash = '#/';
+    await userEvent.click(await screen.findByRole('button', { name: /Theme/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'Plain' }));
     expect(document.documentElement.dataset.theme).toBe('plain');
     expect(screen.queryByRole('button', { name: /Appearance/ })).toBeNull();
+    window.location.hash = '#/project/card-payments';
+    await screen.findByRole('region', { name: 'Briefing' });
     await openChat('card-payments');
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(screen.getAllByRole('button').map((b) => b.textContent).filter((t) => !/Plain|Crate|System/.test(t ?? ''))).toEqual(before.filter((t) => !/Plain|Crate|System/.test(t ?? '')));
-    expect(JSON.parse(localStorage.getItem('toil-ui.theme')!)).toEqual({ theme: 'plain', scheme: 'system', wording: false, voice: false });
+    expect(screen.getAllByRole('button').map((b) => b.textContent).filter((t) => !/Plain|Crate|System|Show more/.test(t ?? ''))).toEqual(before.filter((t) => !/Plain|Crate|System|Show more/.test(t ?? '')));
+    expect(JSON.parse(localStorage.getItem('toil-ui.theme')!)).toEqual({ theme: 'plain', scheme: 'system', wording: true, voice: false });
   });
 
   it('picks Appearance in Settings, not the header', async () => {
-    await open('#/settings/toil');
-    await userEvent.click(await screen.findByRole('button', { name: /Appearance/ }));
+    await open('#/settings/appearance');
+    await userEvent.click(await screen.findByRole('button', { name: /Light or dark/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'Dark' }));
     expect(document.documentElement.dataset.scheme).toBe('dark');
   });
@@ -1392,12 +1600,12 @@ describe('how deep the theme goes (#283)', () => {
   it('says the empty states, loading lines and notes in the theme\'s words, and the standard ones with wording off', async () => {
     setTheme('crate');
     await open('#/project/checkout-web/dependencies');
-    await waitFor(() => expect(panel('Dependencies').textContent).toContain("No links between this Toil project's items: every crate stands on its own."));
+    await waitFor(() => expect(panel('What blocks what').textContent).toContain("No links between this Toil project's items: every crate stands on its own."));
     cleanupView();
     setTheme('crate', { wording: false });
     await open('#/project/checkout-web/dependencies');
-    await waitFor(() => expect(panel('Dependencies').textContent).toContain("No links between this Toil project's items."));
-    expect(panel('Dependencies').textContent).not.toContain('every crate');
+    await waitFor(() => expect(panel('What blocks what').textContent).toContain("No links between this Toil project's items."));
+    expect(panel('What blocks what').textContent).not.toContain('every crate');
   });
 
   it('never changes a control, a heading or a figure: the same buttons, links and headings with wording on and off', async () => {
@@ -1411,18 +1619,20 @@ describe('how deep the theme goes (#283)', () => {
     expect(names()).toEqual(off.map((n) => n.replace(/^heading: Sprint 42(?=:)/, 'heading: Ledger (Sprint 42').replace(/^(heading: Ledger \(Sprint 42: day \d+ of \d+)$/, '$1)').replace(/^heading: Dependencies$/, 'heading: War table (Dependencies)')));
   });
 
-  it('has both boxes off by default under the theme picker (#552), turns one on, and disables both, with a note, for Plain', async () => {
-    await open('#/settings/toil');
+  it('has wording on and the voice off by default under the theme picker (#552, #561), switches each, and disables both, with a note, for Plain', async () => {
+    await open('#/settings/appearance');
     const card = screen.getByRole('region', { name: 'Theme' });
     const wording = within(card).getByRole('checkbox', { name: 'Themed wording' }) as HTMLInputElement;
     const voice = within(card).getByRole('checkbox', { name: 'Themed agent voice' }) as HTMLInputElement;
-    expect([wording.checked, voice.checked]).toEqual([false, false]);
+    expect([wording.checked, voice.checked]).toEqual([true, false]);
     await userEvent.click(wording);
-    expect(JSON.parse(localStorage.getItem('toil-ui.theme')!)).toMatchObject({ theme: 'crate', wording: true, voice: false });
+    expect(JSON.parse(localStorage.getItem('toil-ui.theme')!)).toMatchObject({ theme: 'crate', wording: false, voice: false });
+    await userEvent.click(voice);
+    expect(JSON.parse(localStorage.getItem('toil-ui.theme')!)).toMatchObject({ theme: 'crate', wording: false, voice: true });
     expect(within(card).getByRole('button', { name: 'About themed wording' })).toBeTruthy();
     cleanupView();
     setTheme('plain');
-    const { container } = await open('#/settings/toil');
+    const { container } = await open('#/settings/appearance');
     const plain = screen.getByRole('region', { name: 'Theme' });
     for (const name of ['Themed wording', 'Themed agent voice']) {
       const box = within(plain).getByRole('checkbox', { name }) as HTMLInputElement;
@@ -1457,9 +1667,9 @@ describe('how deep the theme goes (#283)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'About these answers' });
     expect(dialog.textContent).toContain("Answers are written in Harvest's voice, or in your own custom voice if you saved one. A voice changes their phrasing only");
     expect(dialog.textContent).toContain('Answered by a scripted preview, not a model.');
-    expect(dialog.textContent).toContain('The agent only reads');
-    expect(within(dialog).getByRole('link', { name: 'Settings, Agent' }).getAttribute('href')).toBe('#/settings/agent');
-    expect(within(dialog).getByRole('link', { name: 'Settings, General' }).getAttribute('href')).toBe('#/settings/toil');
+    expect(dialog.textContent).toContain('The AI agent only reads');
+    expect(within(dialog).getByRole('link', { name: 'Settings, AI agent' }).getAttribute('href')).toBe('#/settings/agent');
+    expect(within(dialog).getByRole('link', { name: 'Settings, Appearance' }).getAttribute('href')).toBe('#/settings/appearance');
     expect(await violations(container)).toEqual([]);
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'About these answers' })).toBeNull());
@@ -1476,7 +1686,7 @@ describe('how deep the theme goes (#283)', () => {
     setTheme('starship');
     const { container } = await open('#/settings/agent');
     const card = screen.getByRole('region', { name: 'Instructions' });
-    expect(card.textContent).toContain("Instructions can't widen what the agent can do, since its tools only read.");
+    expect(card.textContent).toContain("Instructions can't widen what the AI agent can do, since it can only read.");
     expect(card.textContent).toContain('nothing is saved');
     expect(within(card).queryByRole('button', { name: 'Save' })).toBeNull();
     const general = within(card).getByRole('textbox', { name: 'General instructions' });
@@ -1510,8 +1720,10 @@ describe('how deep the theme goes (#283)', () => {
     await open('#/settings/agent', { preview: false, agentSettings: { client, toilProject: 'card-payments' } });
     const card = await screen.findByRole('region', { name: 'Instructions' });
     await userEvent.type(within(card).getByRole('textbox', { name: 'General instructions' }), 'Answer in British English.');
-    await userEvent.click(within(card).getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(within(card).getByRole('status').textContent).toBe('Saved: the next question uses them.'));
+    // No Save of their own: the page's one Save sends the AI agent and the instructions together.
+    expect(within(card).queryByRole('button', { name: 'Save' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getAllByRole('status').map((s) => s.textContent).join(' ')).toContain('with your instructions'));
     expect(saves).toEqual([{ ...base, instructions: 'Answer in British English.', voice: null }]);
     await userEvent.click(within(card).getByRole('button', { name: 'Show the full prompt' }));
     expect((await within(card).findByRole('region', { name: 'The full prompt' })).textContent).toBe('the composed prompt');
@@ -1578,7 +1790,8 @@ describe('the people view (#292)', () => {
     await open('#/project/card-payments/people');
     const matches = panel('Possible matches');
     expect(matches.textContent).toContain("Bitbucket achen (A. Chen) has A. Chen's email (you@example.com): probably A. Chen.");
-    expect(matches.textContent).toContain('Applies toil projects person card-payments "A. Chen" --id bitbucket=achen');
+    expect(matches.textContent).not.toContain('Applies ');
+    expect(matches.textContent).not.toContain('toil projects person');
     const button = within(matches).getByRole('button', { name: 'Map to A. Chen' }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(matches.textContent).toContain('Turned off: This is the preview');
@@ -1594,11 +1807,50 @@ describe('the people view (#292)', () => {
     expect(sent).toEqual([{ command: 'projects person', input: { toilProject: 'card-payments', name: 'A. Chen', id: ['bitbucket=achen'] } }]);
   });
 
+  it('maps an unmapped account from its card: a form for the sources the Toil project uses, turned off in the preview', async () => {
+    await open('#/project/checkout-web/people');
+    const bo = cards("Not in the Toil project's people")[0]!;
+    expect(within(bo).queryByRole('group', { name: 'Identities in each system' })).toBeNull();
+    await userEvent.click(within(bo).getByRole('button', { name: /^Map/ }));
+    const ids = within(bo).getByRole('group', { name: 'Identities in each system' });
+    // Only the systems this Toil project reads or names people in get a field.
+    expect(within(ids).getAllByRole('textbox').length).toBeGreaterThan(0);
+    expect(ids.textContent).not.toContain('Azure DevOps');
+    expect(within(bo).getByRole('button', { name: /^(Add them|Map to )/ }).hasAttribute('disabled')).toBe(true);
+    expect(bo.textContent).toContain('Turned off: This is the preview');
+    expect(bo.textContent).not.toMatch(/Runs |toil projects person/);
+  });
+
+  it('maps through toil projects person when pressed, then saves the people to the repository with toil projects people save', async () => {
+    const { config, sent } = recording();
+    await open('#/project/checkout-web/people', { config });
+    const bo = cards("Not in the Toil project's people")[0]!;
+    await userEvent.click(within(bo).getByRole('button', { name: /^Map/ }));
+    expect(sent).toEqual([]);
+    await userEvent.selectOptions(within(bo).getByLabelText('This account is'), 'A new person or AI agent');
+    await userEvent.click(within(bo).getByRole('button', { name: 'Add them' }));
+    expect(await within(bo).findByText(/is mapped to Bo W\. in checkout-web's people\./)).toBeTruthy();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ command: 'projects person', input: { toilProject: 'checkout-web', name: 'Bo W.', id: [expect.stringMatching(/^(github|bitbucket|jira|ado)=/)] } });
+    await userEvent.click(within(bo).getByRole('button', { name: 'Save to this repository' }));
+    expect(await within(bo).findByText(/Nothing was committed/)).toBeTruthy();
+    expect(sent[1]).toEqual({ command: 'projects people save', input: { toilProject: 'checkout-web' } });
+  });
+
+  it('offers Save to this repository beside the people, behind a disclosure that says which file changes', async () => {
+    await open('#/project/checkout-web/people');
+    const section = screen.getByRole('heading', { level: 2, name: 'People and agents' }).closest('section') as HTMLElement;
+    expect((within(section).getByRole('button', { name: 'Save to this repository' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(section.textContent).not.toContain('.toil/projects');
+    expect(section.textContent).toContain('Nothing is committed for you.');
+  });
+
   it('gives every account its own card when the Toil project lists nobody, and says how to map them', async () => {
     await open('#/project/settlement/people');
     expect(screen.queryByRole('heading', { level: 2, name: 'People and agents' })).toBeNull();
     expect(cards("Accounts in this Toil project's data").map((c) => within(c).getByRole('heading', { level: 3 }).textContent)).toEqual(['D. Okafor', 'J. Park', 'K. Nakamura', 'M. Lind']);
-    expect(document.body.textContent).toContain('toil projects person settlement "Pat Example" --id jira=pat --id github=pat-ex');
+    expect(document.body.textContent).toContain('in Settings, Toil projects.');
+    expect(document.body.textContent).not.toContain('toil projects person');
     expect(panel('Team').textContent).toContain('No limit is set in the Toil project.');
   });
 
@@ -1625,12 +1877,17 @@ describe('the people view (#292)', () => {
   it('shows the people and the limit on the settings page, with forms to add a person and set the limit', async () => {
     await open('#/settings/projects');
     const card = await screen.findByRole('article', { name: 'card-payments' });
-    await userEvent.click(within(card).getByRole('button', { name: 'Show' }));
+    await userEvent.click(within(card).getByRole('button', { name: /^Menu for / }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Show details' }));
     await waitFor(() => expect(card.textContent).toContain('J. Smith jira jsmith, bitbucket jsmith'));
     expect(card.textContent).toContain('Work-in-progress limit: 2 per person.');
+    window.location.hash = '#/settings/projects/card-payments/people';
+    await screen.findByRole('heading', { level: 2, name: 'Edit card-payments' });
     const person = screen.getByRole('form', { name: /Add a person to/ });
-    expect(person.textContent).toContain('--remove');
-    expect(screen.getByRole('form', { name: /work-in-progress limit/ }).textContent).toContain('toil projects wip-limit');
+    expect(person.textContent).not.toContain('--remove');
+    expect(person.textContent).not.toContain('toil projects');
+    await userEvent.click(screen.getByText('Work in progress limit'));
+    expect((await screen.findByRole('form', { name: /work-in-progress limit/ })).textContent).not.toContain('toil projects wip-limit');
   });
 });
 
@@ -1690,10 +1947,10 @@ describe('the readiness gate (#307)', () => {
   it('lists every open item with its verdict and why, slates only the ready ones, and keeps the start for #293', async () => {
     const fixture = fixtureExecute();
     await open('#/project/card-payments/command-center', { execute: fixture.execute });
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Command Center');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Ready to start?');
     // The Command Center is the Board tab's readiness view (#394).
     expect(within(tabs('card-payments')).getByRole('link', { name: /^Board/ }).getAttribute('aria-current')).toBe('page');
-    expect(within(screen.getByRole('navigation', { name: 'Board views' })).getByRole('link', { name: 'Readiness (Command Center)' }).getAttribute('aria-current')).toBe('page');
+    expect(within(screen.getByRole('navigation', { name: 'Board views' })).getByRole('link', { name: 'Ready to start?' }).getAttribute('aria-current')).toBe('page');
     const tally = screen.getByRole('list', { name: 'Open items by verdict' });
     expect([...tally.querySelectorAll('.team-figure')].map((f) => f.textContent)).toEqual(['1', '3', '2']);
     const slate = panel('Start every ready item');
@@ -1701,7 +1958,7 @@ describe('the readiness gate (#307)', () => {
     expect(slate.textContent).toMatch(/1 item is ready and would be slated, in the Toil project's order \(plan [0-9a-f]{8}\)\./);
     const start = within(slate).getByRole('button', { name: 'Start 1 ready item' });
     expect(start.hasAttribute('disabled')).toBe(true);
-    expect(slate.textContent).toContain('This view has no agent assignments, so it shows the plan it would start.');
+    expect(slate.textContent).toContain('This view has no AI agent assignments, so it shows the plan it would start.');
     const table = screen.getByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(7);
     expect(table.textContent).toContain('Blocked by Jira PAY-102 (To Do).');
@@ -1732,10 +1989,10 @@ describe('the readiness gate (#307)', () => {
     const started: Array<{ id: string; items: string[] }> = [];
     window.location.hash = '#/project/checkout-web/command-center';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview startReady={async (plan) => (started.push(plan), "Queued.")} />);
-    await screen.findByRole('heading', { level: 1, name: 'Command Center' });
+    await screen.findByRole('heading', { level: 1, name: 'Ready to start?' });
     const slate = panel('Start every ready item');
     const shownId = /\(plan ([0-9a-f]{8})\)/.exec(slate.textContent ?? '')![1];
-    expect(slate.textContent).toContain('Assigns each item above to an agent in implement mode, as listed');
+    expect(slate.textContent).toContain('Asks an AI agent to try a fix for each item above, as listed');
     await userEvent.click(within(slate).getByRole('button', { name: 'Start 1 ready item' }));
     expect(started).toEqual([{ id: shownId, items: ['github:imagile/payments-web#41'] }]);
     expect(await within(slate).findByText('Queued.')).toBeTruthy();
@@ -1751,7 +2008,7 @@ describe('the worklog (#308)', () => {
 
   it("opens on today's page, linked from the header, with the calendar of days that have one", async () => {
     await open('#/project/card-payments/worklog');
-    expect(within(tabs('card-payments')).getByRole('link', { name: 'Worklog' }).getAttribute('aria-current')).toBe('page');
+    expect(within(tabs('card-payments')).getByRole('link', { name: 'What happened' }).getAttribute('aria-current')).toBe('page');
     await screen.findByRole('heading', { name: 'Tuesday 13 October 2026' });
     const today = screen.getByRole('link', { name: /Tuesday 13 October 2026, today/ });
     expect(today.getAttribute('aria-current')).toBe('date');
@@ -1841,9 +2098,10 @@ describe('the stand-up (#345)', () => {
   it('is linked from the worklog, and folds since the last working day into team lines and a card per person', async () => {
     await open('#/project/card-payments/worklog');
     expect(screen.getByRole('link', { name: 'Stand-up since the last working day' }).getAttribute('href')).toBe('#/project/card-payments/worklog/standup');
+    expect((await screen.findByRole('link', { name: 'Stand-up for this day' })).className).toContain('btn--accent');
     cleanup();
     const view = await open('#/project/card-payments/worklog/standup');
-    expect(within(tabs('card-payments')).getByRole('link', { name: 'Worklog' }).getAttribute('aria-current')).toBe('page');
+    expect(within(tabs('card-payments')).getByRole('link', { name: 'What happened' }).getAttribute('aria-current')).toBe('page');
     expect(await screen.findByRole('heading', { name: 'Stand-up: card-payments, 12 Oct 2026 to 13 Oct 2026' })).toBeTruthy();
     const team = screen.getByRole('region', { name: 'Team' });
     expect(within(team).getAllByRole('listitem')[0]!.textContent).toMatch(/^F1Sprint 42: \d+ working days? left/);

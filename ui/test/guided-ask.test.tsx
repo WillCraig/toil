@@ -8,7 +8,6 @@ import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
 import { GROUPS, QUESTIONS } from '../src/guided-questions.ts';
 import { sourceLabel, sourceShort } from '../src/format.ts';
-import { resetPlain, setPlain } from '../src/plain-words.ts';
 import { loaded } from './harness.ts';
 
 /**
@@ -44,7 +43,6 @@ async function openChat(agent: Agent, toilProject = 'card-payments', preview = t
 
 beforeEach(() => {
   localStorage.clear();
-  resetPlain();
   window.history.replaceState(null, '', '/');
 });
 afterEach(() => {
@@ -104,14 +102,6 @@ describe('the guided start', () => {
     });
     await userEvent.click(await screen.findByText(/Get a briefing on/));
     await waitFor(() => expect(asked).toEqual(['analyze']));
-  });
-
-  it("wears toil's own words with plain words off: the same questions, a Toil project named as one", async () => {
-    setPlain(false);
-    const chat = await openChat(scriptedAgent());
-    expect(within(chat).getAllByRole('group', { name: 'Starter questions' })[0]!.querySelectorAll('button')).toHaveLength(9);
-    await userEvent.click(within(chat).getByRole('button', { name: 'What AI can see' }));
-    expect(within(chat).getByText("This Toil project's saved work:")).toBeTruthy();
   });
 });
 
@@ -235,13 +225,13 @@ describe('"How sure is this?"', () => {
 describe('with no agent set up', () => {
   const none: Agent = { notice: NO_AGENT_NOTICE, noticeDetails: NO_AGENT_DETAILS, starters: () => [], ask: () => Promise.reject(new Error('none')) };
 
-  it('says in plain words that no AI helper is set up, with a link to set one up, the packages behind a fold, and the questions off', async () => {
+  it('says in plain words that no AI agent is set up, with a link to set one up, the packages behind a fold, and the questions off', async () => {
     const chat = await openChat(none, 'card-payments', false);
     const notice = chat.querySelector('[data-no-agent]') as HTMLElement;
     const lead = notice.querySelector('p')!.textContent!;
-    expect(lead).toBe('No AI helper is set up yet, so nothing can answer questions. Set up an AI helper');
+    expect(lead).toBe('No AI agent is set up yet, so nothing can answer questions. Set up an AI agent');
     expect(lead).not.toMatch(/@|sdk|npm/i);
-    expect(within(notice).getByRole('link', { name: 'Set up an AI helper' }).getAttribute('href')).toBe('#/settings/agent');
+    expect(within(notice).getByRole('link', { name: 'Set up an AI agent' }).getAttribute('href')).toBe('#/settings/agent');
     const fold = notice.querySelector('details')!;
     expect(fold.open).toBe(false);
     expect(fold.textContent).toContain('@anthropic-ai/claude-agent-sdk');
@@ -254,7 +244,7 @@ describe('with no agent set up', () => {
   });
 });
 
-describe('after an AI helper is installed (the notice must not outlive it)', () => {
+describe('after an AI agent is installed (the notice must not outlive it)', () => {
   type Option = { name: string; label: string; model: null; ready: boolean; problem: string | null; fix: string | null; action: 'install' | 'fix' | null };
   const option = (over: Partial<Option>): Option => ({ name: 'claude', label: 'Claude', model: null, ready: false, problem: null, fix: null, action: null, ...over });
   /** An agent whose helpers the test changes between calls, as an install on the Settings page would. */
@@ -320,7 +310,7 @@ describe('the chat header and usage line (#552)', () => {
     expect(within(chat).getByRole('button', { name: 'About these answers' })).toBeTruthy();
     expect(within(chat).getByRole('button', { name: 'Close' })).toBeTruthy();
     await userEvent.click(within(line as HTMLElement).getByRole('button', { name: /^Change/ }));
-    expect(await screen.findByRole('heading', { name: 'AI helper for this chat' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'AI agent for this chat' })).toBeTruthy();
   });
 
   it('reads one line of usage inside the answer, the breakdown behind its fold, keeping a cap notice in the open', async () => {

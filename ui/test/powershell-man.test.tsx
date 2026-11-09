@@ -1,6 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { standardWords } from './words.ts';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.tsx';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureExecute, FIXTURE_NOW } from '../src/fixtures/execute.ts';
@@ -17,7 +16,6 @@ const typeSecret = (text: string, target: Window | HTMLElement = window) => {
 const openApp = () => render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview />);
 
 describe('the hidden arcade entry', () => {
-  beforeEach(standardWords);
 
   it('keeps the view behind it mounted and reads nothing while it is open', async () => {
     window.location.hash = '#/project/card-payments';
@@ -42,11 +40,11 @@ describe('the hidden arcade entry', () => {
   it('opens from the secret, contains focus, and returns to the previous route', async () => {
     window.location.hash = '#/settings';
     openApp();
-    await screen.findByRole('heading', { level: 1, name: "toil's configuration" });
+    await screen.findByRole('heading', { level: 1, name: 'Settings' });
     expect(screen.queryByRole('dialog', { name: 'Powershell Man' })).toBeNull();
     act(() => typeSecret('powershell'));
     const dialog = await screen.findByRole('dialog', { name: 'Powershell Man' });
-    expect(screen.getByRole('heading', { level: 1, name: "toil's configuration", hidden: true })).toBeDefined();
+    expect(screen.getByRole('heading', { level: 1, name: 'Settings', hidden: true })).toBeDefined();
     await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
     fireEvent.click(screen.getByRole('button', { name: 'Exit arcade' }));
     await waitFor(() => expect(window.location.hash).toBe('#/settings'));

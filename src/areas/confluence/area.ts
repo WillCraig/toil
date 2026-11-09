@@ -35,6 +35,22 @@ export const confluenceArea = defineArea({
   }),
   secrets: ['apiToken'],
   defaults: { deployment: 'server' },
+  choices: {
+    deployment: {
+      question: 'Which one is it?',
+      required: true,
+      options: [
+        { label: 'Cloud', value: 'cloud', hosts: ['*.atlassian.net'] },
+        { label: 'Data Center', value: 'server' },
+      ],
+    },
+    baseUrl: {
+      options: [
+        { label: 'Your Atlassian site', value: null, when: { deployment: 'cloud' }, compose: { prefix: 'https://', suffix: '.atlassian.net', label: 'Site name', placeholder: 'example-site' } },
+        { label: 'Your Confluence server', value: null, when: { deployment: 'server' }, placeholder: 'https://confluence.imagile.dev' },
+      ],
+    },
+  },
   variants: {
     by: 'deployment',
     of: {

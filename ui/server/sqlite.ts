@@ -2,7 +2,7 @@
  * `node:sqlite`, loaded quietly. It is built into Node 24, so the cache needs
  * no native module (#206), but Node 24 still marks it experimental and prints
  * an `ExperimentalWarning` to stderr the first time it loads. That line would
- * land in the user's terminal on every start, beside the launch URL, saying
+ * land in the user's terminal on every start, beside the URL, saying
  * something they can do nothing about. So the module is imported dynamically
  * (never at the top of the bundle) with that one warning filtered out, and
  * every other warning still printed. Once Node calls it stable the filter

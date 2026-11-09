@@ -46,7 +46,7 @@
 // --sample`). By hand, against any build:
 //
 //   npx vite preview --port 4173            (after `npx vite build`, in ui/)
-//   node scripts/layout-check.mjs --base http://127.0.0.1:4173/ [--theme crate] [--route '#/settings/projects'] [--width 375] [--motion full] [--shots <dir>] [--json <file>]
+//   node scripts/layout-check.mjs --base http://127.0.0.1:4173/ [--theme crate] [--route '#/settings/projects'] [--width 375] [--font <pair id>] [--motion full] [--shots <dir>] [--json <file>]
 //
 // Repo tooling only; nothing here ships. It measures twice and files once.
 /* global document, window, getComputedStyle, CSS -- inspect(), covered(), dragPlan(), hitTest() and dragMid() run in the page */
@@ -116,9 +116,11 @@ export const ROUTES = [
   '#/project/card-payments/assignment/sample-needsyou-0002',
   '#/project/card-payments/assignment/sample-failed-0000004',
   '#/project/card-payments/assignment/sample-working-0001',
+  '#/setup',
   '#/settings/connections',
   '#/settings/projects',
-  '#/settings/toil',
+  '#/settings/general',
+  '#/settings/appearance',
   '#/settings/usage',
   '#/settings/agent-usage',
   '#/settings/agent',
@@ -126,10 +128,10 @@ export const ROUTES = [
 export const WIDTHS = [375, 768, 1440];
 /**
  * The views checked a second time with motion on (#419): where the theme's moments play (the toil project entrance and
- * its tabs, the previews of the splash, a loading screen and the sprint recap under Settings, General). The full set
+ * its tabs, the previews of the splash, a loading screen and the sprint recap under Settings, Appearance). The full set
  * runs with reduced motion, which is also Theme motion off, so both are proven.
  */
-export const MOTION_ROUTES = ['#/', '#/project/card-payments', '#/project/card-payments/board', '#/project/card-payments/prs', '#/settings/toil'];
+export const MOTION_ROUTES = ['#/', '#/project/card-payments', '#/project/card-payments/board', '#/project/card-payments/prs', '#/settings/appearance'];
 
 /**
  * The first run (#416): the Toil projects view on a home with no toil projects, which verify:ui opens under this
@@ -353,7 +355,7 @@ function states(route, width, sample = true) {
   }
   // Help (#346), checked before the Ask states so no overlay of theirs is still closing: the first (i) on the page with its tooltip showing, as a keyboard user who
   // tabbed to it sees it, and pressed, with its popover and Read more link open. On the views with the most of them, at every width.
-  if (route === '#/project/card-payments' || route === '#/settings/connections' || route === '#/settings/toil' || route === '#/project/card-payments/people') {
+  if (route === '#/project/card-payments' || route === '#/settings/connections' || route === '#/settings/appearance' || route === '#/project/card-payments/people') {
     const first = `[...document.querySelectorAll('main [data-help]')].find((b) => b.getClientRects().length)`;
     const waitFor = (sel) => `(async () => { const deadline = Date.now() + 5000; while (!document.querySelector(${JSON.stringify(sel)}) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector(${JSON.stringify(sel)}) ? 1 : 0; })()`;
     // A real Tab first (`key`), so React Aria reads the focus that follows as a keyboard user's: it ignores keys a
@@ -363,7 +365,21 @@ function states(route, width, sample = true) {
     out.push({ name: 'help-tooltip', clearOverlays: true, key: 'Tab', setup: `(async () => { const b = ${first}; if (!b) return 0; b.scrollIntoView({ block: 'center' }); let seen = 0, scrolls = 0; const count = () => scrolls++; addEventListener('scroll', count, true); const watch = new MutationObserver(() => { if (document.querySelector('.help-tooltip')) seen++; }); watch.observe(document.body, { childList: true, subtree: true }); try { for (let i = 0; i < 3; i++) { b.blur(); b.focus(); const deadline = Date.now() + 2000; while (!document.querySelector('.help-tooltip') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (document.querySelector('.help-tooltip') && document.activeElement === b) return 1; } } finally { watch.disconnect(); removeEventListener('scroll', count, true); } const a = document.activeElement; return 'no tooltip after three focuses: focus on ' + (a ? a.tagName.toLowerCase() + (a.className ? '.' + String(a.className).split(' ').join('.') : '') + ' ' + (a.getAttribute('aria-label') ?? '') : 'nothing') + ', tooltip seen ' + seen + ' time(s), ' + scrolls + ' scroll event(s), ' + document.querySelectorAll('[role=dialog]').length + ' dialog(s) open'; })()`, undo: 'Escape', undoJs: 'document.activeElement?.blur()' });
     out.push({ name: 'help-popover', clearOverlays: true, setup: `(async () => { const b = ${first}; if (!b) return 0; b.scrollIntoView({ block: 'center' }); b.click(); return await ${waitFor('.help-popover [data-read-more]')}; })()`, undo: 'Escape' });
   }
-  if (route === '#/settings/projects') out.push({ name: 'shown', setup: clickAll('.conn-card button', '/^Show$/'), undoJs: clickAll('.conn-card button', '/^Hide$/') });
+  // The setup guide (#561): the sample's scripted guide is ready, so the Tools step has it beside it (open, from 1000px) or folded below (below it),
+  // then with an answer showing and a refused token notice, each reached through Start and the AI agent step. Back twice undoes it.
+  if (route === '#/setup') {
+    // Welcome's Start, then the AI agent step, whose Next stays off until one is chosen (a ready agent is picked when it is off), then Next shows the Tools step and its guide.
+    const toTools = `(async () => { await ${clickAll('[data-setup-next]')}; const next = () => [...document.querySelectorAll('[data-setup-next]')].find((b) => b.getClientRects().length); const deadline = Date.now() + 5000; while (!document.querySelector('[data-setup-helpers]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (next()?.disabled) { const pick = document.querySelector('[data-setup-helpers] input[type=radio]:not([disabled])'); if (!pick) return 'the AI agent step offers no agent that is ready, so the Tools step and its guide cannot be reached'; pick.click(); while (next()?.disabled && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); } await ${clickAll('[data-setup-next]')}; while (!document.querySelector('[data-guide]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('[data-guide]') ? 1 : 'the Tools step showed no guide'; })()`;
+    const openFold = `(async () => { const f = document.querySelector('[data-guide-fold] summary'); if (f && !f.parentElement.open) f.click(); return 1; })()`;
+    const back = `(async () => { await ${clickAll('[data-setup-back]')}; await ${clickAll('[data-setup-back]')}; return 1; })()`;
+    out.push({ name: 'guide', setup: `(async () => { const n = await ${toTools}; if (n !== 1) return n; await ${openFold}; return n; })()`, undoJs: back });
+    out.push({ name: 'guide-answered', setup: `(async () => { const n = await ${toTools}; if (n !== 1) return n; await ${openFold}; await ${clickAll('[data-guide-starter]', null, 5000)}; const deadline = Date.now() + 5000; while (!document.querySelector('[data-guide-log] .guide__turn p:not(.guide__question):not([role=status])') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('[data-guide-log] .guide__turn') ? 1 : 'the guide showed no answer'; })()`, undoJs: back });
+    const token = ['gh', 'p_', '0'.repeat(34), 'AB'].join('');
+    out.push({ name: 'guide-refused', setup: `(async () => { const n = await ${toTools}; if (n !== 1) return n; await ${openFold}; const t = document.querySelector('[data-guide-input]'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, 'my token is ${token}'); t.dispatchEvent(new Event('input', { bubbles: true })); await new Promise((r) => setTimeout(r, 100)); await ${clickAll('.guide__ask button[type=submit]')}; return document.querySelector('[data-guide-refused]') ? 1 : 'no refusal notice'; })()`, undoJs: back });
+  }
+  // Show and Hide are items in each card's menu now, not buttons on the card.
+  const menuItem = (label) => `(async () => { const deadline = Date.now() + 5000; let n = 0; for (const t of [...document.querySelectorAll('.conn-card .card-menu__trigger')].filter((b) => b.getClientRects().length)) { t.click(); let item; while (!(item = [...document.querySelectorAll('[role="menuitem"]')].find((i) => (i.textContent ?? '').trim() === ${JSON.stringify(label)})) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (item) { item.click(); n++; } else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); while (document.querySelector('[role="menu"]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); } return n; })()`;
+  if (route === '#/settings/projects') out.push({ name: 'shown', setup: menuItem('Show details'), undoJs: menuItem('Hide details') });
   // Set up this repo (#333): the sample's plan, with its table, check problems and the form for the missing connection.
   if (route === '#/settings/projects') {
     const plan = `document.querySelector('[aria-labelledby="repo-setup"] .shown')`;
@@ -413,8 +429,9 @@ function states(route, width, sample = true) {
   }
   // The toil project's frame (#394): the Agents drawer open below 1200px, the toil project switcher, and a metric's full chart from the Overview.
   if (/^#\/project\/[^/]+$/.test(route)) out.push({ name: sidebarWide ? 'agents-panel' : 'agents-drawer', setup: clickAll('[data-agents-open]'), undo: 'Escape', undoJs: closeDrawer });
+  // The switcher is in the header beside the brand (src/components/project-switcher.tsx), from 1024px; below it the same list is links inside the header's Menu, which the menu state opens.
   if (route === '#/project/card-payments') {
-    out.push({ name: 'toil-project-switch', setup: clickAll('[data-toil-project-switch]'), undo: 'Escape' });
+    if (!compact) out.push({ name: 'toil-project-switch', setup: clickAll('[data-toil-project-switch]'), undo: 'Escape' });
     for (const m of ['burnup', 'pr-wait']) out.push({ name: `chart-${m}`, setup: clickAll(`[data-metric="${m}"]`), undo: 'Escape', undoJs: clickAll('[data-chart-close]', null, 0) });
   }
   // The history (#395), set open rather than clicked, since the check has already opened every <details> once: an entry's what-changed opened; an analysis with its evidence unfolded, and a citation chip's detail as a keyboard user who tabbed to it sees it.
@@ -435,13 +452,14 @@ function states(route, width, sample = true) {
   // The stand-up (#345): the agent's write-up shown, with the fact lines it names marked in the report.
   if (/\/worklog\/standup/.test(route)) out.push({ name: 'written-up', setup: `(async () => { const n = ${clickAll('[data-standup-writeup]')}; await new Promise((r) => setTimeout(r, 300)); return n; })()` });
   if (/\/worklog$/.test(route)) out.push({ name: 'previous-month', setup: clickAll('.calendar-nav button', '/Previous month/'), undoJs: clickAll('.calendar-nav button', '/Next month/') });
-  // A toil project's name and description open for editing in place (#342), every pencil on the page at once: the longest the cards and the dashboard's header get.
-  if (route === '#/' || route === '#/project/settlement') out.push({ name: 'editing', setup: clickAll('[data-edit]'), undoJs: "document.querySelectorAll('.edit-field').forEach((i) => i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))" });
+  // Every Toil project card's menu says Edit, which opens its name and description as a form in the card (#561, EditDetails); all of them are opened at once, for the longest the cards get.
+  // The project page has no inline form (its Edit is a link to Settings), and the sources page it names is a view of its own.
+  if (route === '#/') out.push({ name: 'editing', setup: `(async () => { const shown = () => [...document.querySelectorAll('[data-card-menu]')].filter((b) => b.getClientRects().length); const deadline = Date.now() + 5000; while (!shown().length && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); let n = 0; for (const t of shown()) { t.click(); let edit; while (!(edit = [...document.querySelectorAll('[role="menuitem"]')].find((i) => (i.textContent ?? '').trim() === 'Edit')) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (!edit) break; edit.click(); while (document.querySelector('[role="menu"]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); n++; } return n; })()`, undoJs: "document.querySelectorAll('.edit-field').forEach((i) => i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))" });
   // Theme moments (#419), from their previews under Settings, General: a loading screen as the theme draws it, the
   // launch splash, and the sprint recap card, the largest moment. The recap is decoration, hidden from screen readers,
   // so it is shown to the check (aria-hidden lifted) for its layout and axe. With Theme motion off (the reduced-motion
   // pass) the splash and moments don't play, and their buttons say so by being disabled: that state checks the page as it is.
-  if (route === '#/settings/toil') {
+  if (route === '#/settings/appearance') {
     // Each preview is an entry in one menu: the menu is opened, then the entry pressed, as a person would.
     const pick = (entry) => `(async () => { const open = await ${clickAll('[data-preview-menu]')}; if (!open) return 'no preview menu button'; const deadline = Date.now() + 5000; while (!document.querySelector('[role="menu"]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const item = document.querySelector(${JSON.stringify(`[data-preview="${entry}"]`)}); if (!item) { document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return document.querySelector('[role="menu"] [data-preview="loader"]') ? 'none' : 0; } if (item.getAttribute('aria-disabled') === 'true') { item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return 'disabled'; } item.click(); return 'pressed'; })()`;
     out.push({ name: 'loading-screen', setup: `(async () => { const how = await ${pick('loader')}; if (how !== 'pressed') return how || 0; const deadline = Date.now() + 5000; while (!document.querySelector('[data-moment-preview] [data-loading] [role="status"]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('[data-moment-preview] [data-loading] [role="status"]') ? 1 : 'the loading screen preview opened with no progress status'; })()`, undo: 'Escape', undoJs: clickAll('[data-preview-close]', null, 0) });
@@ -453,7 +471,7 @@ function states(route, width, sample = true) {
   if (route === '#/settings/agent') out.push({ name: 'full-prompt', setup: clickAll('[data-full-prompt]', '/Show the full prompt/'), undoJs: clickAll('[data-full-prompt]', '/Hide the full prompt/') });
   // Install (#344): the dialog with the exact npm command, before anything runs, for the first SDK missing. On a
   // machine with every SDK installed there is no Install to press, which counts only when the status card says so.
-  if (route === '#/settings/agent') out.push({ name: 'install-dialog', setup: `(async () => { const deadline = Date.now() + 5000; while (!document.querySelector('.adapter-status__row') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const press = document.querySelector('[data-install]'); if (!press) return document.querySelectorAll('.adapter-status__row').length > 0 && !/Not installed/.test(document.querySelector('.adapter-status')?.textContent ?? 'Not installed') ? 1 : 0; press.click(); while (!document.querySelector('.install-command') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('.install-command') ? 1 : 0; })()`, undo: 'Escape' });
+  if (route === '#/settings/agent') out.push({ name: 'install-dialog', setup: `(async () => { const rows = () => document.querySelectorAll('.adapter-status__row, .helper-row[data-adapter]'); const deadline = Date.now() + 5000; while (!rows().length && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const press = document.querySelector('[data-install]'); if (!press) return rows().length > 0 && [...rows()].every((r) => r.dataset.state === 'ready') ? 1 : 0; press.click(); while (!document.querySelector('.install-command') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('.install-command') ? 1 : 0; })()`, undo: 'Escape' });
   return out;
 }
 
@@ -466,9 +484,12 @@ function states(route, width, sample = true) {
  */
 function dragPlan() {
   const cols = [...document.querySelectorAll('.board .column')];
-  const from = cols.findIndex((c) => c.querySelector('li.card'));
-  if (from < 0 || !cols[from + 1]) return null;
-  const grips = cols[from].querySelectorAll('li.card .card-grip');
+  // A card that can't move isn't draggable (canMove in src/model/board.ts), so only a movable one can be picked up.
+  const movable = (c) => c.querySelectorAll('li.card .card-grip:not([data-immovable])');
+  if (cols.length < 2) return { skip: 'no board with two columns to drag between' };
+  const from = cols.findIndex((c, i) => i < cols.length - 1 && movable(c).length);
+  if (from < 0) return { skip: 'no card on the board can be moved (each is immovable: ' + (document.querySelectorAll('.board li.card .card-grip[data-immovable]').length) + ' immovable card(s))' };
+  const grips = movable(cols[from]);
   const grip = grips[grips.length - 1];
   const r0 = grip.getBoundingClientRect();
   window.scrollBy(0, r0.top - window.innerHeight * 0.3);
@@ -516,13 +537,15 @@ function hitTest(item, x, y) {
  * or dialog left open over the board, the card's grip under the pointer, the
  * card picked up, the copy under the pointer, the ghost in the column.
  */
-async function dragCheck(page, width, shoot, inspectDropped) {
+async function dragCheck(page, width, shoot, inspectDropped, sample) {
   const none = { findings: [], violations: [] };
   // A menu an earlier state's Escape missed would take the press and close itself instead of the card moving.
   const open = await closeOverlays(page);
   if (open) return { problems: [`before the drag, "${open}" was still open after three Escapes, covering the board`], ...none };
   const plan = await page.evaluate(`(${dragPlan})()`);
-  if (!plan) return { problems: ['no board with two columns to drag between'], ...none };
+  // The sample's board always has a card that moves, so there it is a problem. On real data every card may be immovable
+  // (a GitHub issue that isn't on a project board has no Status to set): then the drag is skipped, and said so in the report.
+  if (plan.skip) return sample || !/^no card on the board can be moved/.test(plan.skip) ? { problems: [plan.skip], ...none } : { problems: [], skipped: plan.skip, ...none };
   const blocked = await page.evaluate(`(${hitTest})(${JSON.stringify(plan.item)}, ${plan.x}, ${plan.y})`);
   if (blocked) return { problems: [`before the drag, the card's grip at ${plan.x},${plan.y} is under ${blocked}, so a press there can't pick it up`], ...none };
   const settle = (ms) => page.evaluate(`new Promise((r) => setTimeout(r, ${ms}))`);
@@ -674,8 +697,9 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
         const drag = await dragCheck(page, width, (name) => shoot(`${slug}__${name}`), async () => ({
           findings: await page.evaluate(`(${inspect})(${JSON.stringify(CARDS)}, ${headerFits})`),
           violations: run.strict ? await axeRun(page, axeSource) : [],
-        }));
+        }), sample);
         for (const p of drag.problems) problems.push(`${where} (drag): ${p}`);
+        if (drag.skipped) reported.push(`${where}: skipped the board drag, ${drag.skipped}`);
         record('drag-dropped', drag.findings);
         for (const v of drag.violations) problems.push(`${where} (drag-dropped): axe ${v.id} (${v.impact}) at ${v.nodes.slice(0, 3).join(', ')}`);
         await page.evaluate('window.scrollTo(0, 0)');
@@ -719,7 +743,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const one = (flag) => many(flag)[0];
   const base = one('--base');
   if (!base) {
-    console.error('Usage: node scripts/layout-check.mjs --base <url> [--theme <name>] [--route <hash>] [--width <px>] [--motion full] [--shots <dir>] [--json <file>]');
+    console.error('Usage: node scripts/layout-check.mjs --base <url> [--theme <name>] [--route <hash>] [--width <px>] [--font <pair id>] [--motion full] [--shots <dir>] [--json <file>]');
     process.exit(2);
   }
   const themes = many('--theme');
@@ -730,6 +754,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     const u = new URL(base);
     u.searchParams.set('theme', theme);
     u.searchParams.set('scheme', scheme);
+    // A type pairing from Settings, Font (src/fonts.ts), to prove a wider face still fits (ui/docs/themes.md, Fonts).
+    if (one('--font')) u.searchParams.set('font', one('--font'));
     u.hash = route;
     return u.href;
   };
