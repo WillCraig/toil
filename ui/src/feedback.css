@@ -8,6 +8,8 @@
   inset: 0;
   z-index: 20;
   display: grid;
+  /* One column that can shrink below its content, so a dialog with an unbreakable word in it can't widen the overlay past a phone's width. */
+  grid-template-columns: minmax(0, 1fr);
   place-items: start center;
   padding: 2rem 16px;
   overflow-y: auto;
@@ -26,7 +28,7 @@
 .feedback-body { display: grid; gap: 1rem; padding: 1.25rem; min-width: 0; }
 .feedback-body h2 { font-size: 1.25rem; }
 /* A note may name the form's whole address, one word wider than a phone in the wider theme fonts. */
-.feedback-body p { overflow-wrap: anywhere; }
+.feedback-body p, .feedback-body li { overflow-wrap: anywhere; }
 .feedback-label { font-weight: 600; color: var(--ink); }
 .feedback-body .shells { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
 .feedback-details textarea {
