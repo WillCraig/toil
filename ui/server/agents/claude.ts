@@ -227,7 +227,7 @@ export function claudeRuntime(version: string): Runtime {
             abortController,
           },
         })) {
-          // Stopped (the page's cancel, or a cap): nothing more is read, whether or not the SDK has noticed yet.
+          // Stopped (the page's cancel): nothing more is read, whether or not the SDK has noticed yet.
           if (r.signal.aborted) throw new Error('The question was stopped.');
           if (m.type === 'system' && m.subtype === 'init') apiKeySource = m.apiKeySource;
           if (m.parent_tool_use_id) continue;

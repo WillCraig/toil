@@ -25,7 +25,8 @@ describe('which changes notify', () => {
     expect(t({ questions: 2, pending: 3 })!.why).toBe('asked 2 questions, 3 proposals to review');
     expect(t({ stop: 'injection' })!.why).toMatch(/looked like an instruction/);
     expect(t({ state: 'done' })).toMatchObject({ notable: 'done', why: 'finished' });
-    expect(t({ state: 'failed', stop: 'usage' })).toMatchObject({ notable: 'cap', why: 'stopped at its usage cap' });
+    // A usage-cap stop on an assignment recorded before caps were removed reads as any other failure.
+    expect(t({ state: 'failed', stop: 'usage', message: 'Stopped at a cap.' })).toMatchObject({ notable: 'failed', why: 'Stopped at a cap.' });
     expect(t({ state: 'failed', stop: 'time' })).toMatchObject({ notable: 'failed', why: 'stopped at its time limit' });
     expect(t({ state: 'failed', stop: 'error', message: 'Codex failed: not signed in.' })!.why).toBe('Codex failed: not signed in.');
     expect(t({ state: 'failed', stop: 'error', message: '' })!.why).toBe('failed');

@@ -80,21 +80,13 @@ button.btn:disabled { cursor: not-allowed; opacity: 0.75; }
 .usage-unused ul { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; list-style: none; padding: 0; }
 .usage-unused code { overflow-wrap: anywhere; }
 
-/* Settings, Agent usage (#295): the caps, one row each, and the Codex rates. */
-.caps-form { display: grid; gap: 1rem; }
-.caps-grid, .rates-grid { display: grid; gap: 0.5rem; border: 0; padding: 0; margin: 0; min-width: 0; }
+/* Settings, Usage (#295): the Codex rates. */
+.rates-form { display: grid; gap: 1rem; }
+.rates-grid { display: grid; gap: 0.5rem; border: 0; padding: 0; margin: 0; min-width: 0; }
 .rates-grid legend { font-weight: 600; padding: 0; margin-bottom: 0.25rem; }
-.cap-row { display: grid; grid-template-columns: minmax(0, 14rem) minmax(0, 9rem) minmax(0, 11rem) minmax(0, 1fr); align-items: center; gap: 0.5rem; }
-.cap-on { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600; overflow-wrap: anywhere; }
-.cap-on input { width: 1.25rem; height: 1.25rem; margin: 0; accent-color: var(--accent); flex: none; }
-.cap-limit, .rate input { font: inherit; min-height: 44px; width: 100%; min-width: 0; padding: 0.5rem 0.75rem; border: 1px solid var(--muted); border-radius: var(--radius); background: var(--raised); color: var(--ink); }
-.cap-row select { min-width: 0; width: 100%; text-overflow: ellipsis; }
-.cap-limit:disabled, .cap-row select:disabled { opacity: 0.6; }
-.cap-key { font-size: 0.8125rem; color: var(--muted); overflow-wrap: anywhere; }
+.rate input { font: inherit; min-height: 44px; width: 100%; min-width: 0; padding: 0.5rem 0.75rem; border: 1px solid var(--muted); border-radius: var(--radius); background: var(--raised); color: var(--ink); }
 .rate { display: grid; grid-template-columns: minmax(0, 9rem) minmax(0, 10rem); align-items: center; gap: 0.5rem; }
 @media (max-width: 40rem) {
-  .cap-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); }
-  .cap-on, .cap-key { grid-column: 1 / -1; }
   .rate { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 

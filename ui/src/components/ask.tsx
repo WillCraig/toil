@@ -50,7 +50,7 @@ import { ThinkingIcon, useNow, useThinkingPhrases } from './thinking.tsx';
 import { AnswerChecks, GuidedStart, PHONE } from './guided.tsx';
 import { GROUPS, QUESTIONS, type GuidedQuestion } from '../guided-questions.ts';
 
-/** A new chat's id: one per toil project's conversation, so the server can add up and cap the chat (#295). */
+/** A new chat's id: one per toil project's conversation, so the server can add up the chat (#295). */
 const newChatId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
 export interface Turn {

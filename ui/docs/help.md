@@ -19,7 +19,7 @@ Toil UI's users are often new to agents, so where a screen uses an AI term, its 
 
 | Where | Terms |
 |---|---|
-| Settings, Usage, and its caps | token, input tokens, output tokens, cache tokens, context window, effort |
+| Settings, Usage | token, input tokens, output tokens, cache tokens |
 | Settings, AI agent | model, model provider, harness, MCP, tool call |
 | The Assign dialog's modes | sandbox, permission mode, human-in-the-loop, human review |
 | Renew all stale | session, system prompt, skill |
@@ -42,7 +42,7 @@ A **pencil** beside a configurable value opens the settings page where it's set,
 | The work-in-progress limit and the people, in the People view | Settings, Toil projects, at that form |
 | The fields, on an item's page | Settings, Toil projects, at the form that names a field |
 | The adapter, on an assignment's page | Settings, AI agent |
-| A cap notice under an answer, and an assignment's limits | Settings, Usage, at the caps |
+| A notice under a Codex answer that its rates couldn't be read | Settings, Usage, at the Codex rates |
 
 The pencil only navigates: it never changes anything, and the page it opens makes every change through its own form. Its name says what it edits ("Edit the corp-jira connection"), and it's the same size and in the same place in every theme. When the value it names is gone, a connection since removed say, the page says so.
 
@@ -52,7 +52,7 @@ Every empty panel offers the one action that fills it, under one short line: no 
 
 ## The rule for new views
 
-- **A configurable value gets an edit link where it's shown**, to the exact settings section that sets it, through the helpers in `ui/src/format.ts` (`connectionEditHref`, `toilProjectEditHref`, `AGENT_SETTINGS_HREF`, `CAPS_HREF`) and the `EditLink` component. A new kind of setting adds its helper there, and its page lands on it with `useLandOn`.
+- **A configurable value gets an edit link where it's shown**, to the exact settings section that sets it, through the helpers in `ui/src/format.ts` (`connectionEditHref`, `toilProjectEditHref`, `AGENT_SETTINGS_HREF`, `RATES_HREF`) and the `EditLink` component. A new kind of setting adds its helper there, and its page lands on it with `useLandOn`.
 - **An empty panel goes through `Empty`** (`ui/src/components/empty.tsx`), whose `action` is required: one short line, the action that fills it, and an optional (i). `ui/test/empty-states.test.tsx` fails on a view that draws the theme's empty state any other way, and on an empty panel, rendered for an empty Toil project, with no link or button but an (i).
 - **A view keeps only its first line of explanation on the page.** The rest goes in a help topic, shown with `Help`. Text a person needs to act stays: what a form will do before it runs, a warning, an error and its fix.
 - **A help topic is defined once**, in `ui/src/help.ts`: a title, one or two sentences, and the docs page and heading it links to. `ui/test/help.test.tsx` resolves every link to a heading in the docs, and the site's build checks each against the pages it built, so renaming a heading means updating its topic in the same change.

@@ -15,8 +15,6 @@ import * as nodePath from 'node:path';
 export class AgentError extends Error {
   /** What a run used before it failed or was stopped (#295), so the page counts it as the ledger does. */
   usage?: AnswerUsage;
-  /** A usage cap stopped or refused the run (#295), rather than the run failing. */
-  capped?: boolean;
   constructor(message: string, readonly fix: string) {
     super(message);
   }

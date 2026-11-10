@@ -533,10 +533,8 @@ A page has:
   whose state a sync can see change): a build is recovered when a
   passing run follows a failing one of the same pull request or pipeline.
 - **Agent runs:** each question an agent adapter answers in the chat, when it
-  started and ended,
-  whether it finished, failed, was stopped or was stopped at a usage cap, what it
-  cited, and its proposals, each
-  with whether toil's audit log (`toil audit list`) shows a person ran that write on
+  started and ended, whether it finished, failed or was stopped, what it cited,
+  and its proposals, each with whether toil's audit log (`toil audit list`) shows a person ran that write on
   the same item afterwards. Each run's transcript is kept beside the pages and shown
   under the run, labelled as the agent's.
 - **Notes** a person added that day, on today's page.
@@ -661,7 +659,7 @@ An **(i)** beside a term explains it in a sentence or two when you hover or focu
 it, and pressing it opens the same words with a **Read more** link to the section
 of these docs that says the rest. A **pencil** beside a configurable value (a
 connection, a Toil project's sources, people, field names or work-in-progress limit,
-the agent, a usage cap) opens the settings page where it's set, at that value; it
+the agent, the Codex rates) opens the settings page where it's set, at that value; it
 only navigates. **Help** in the header is a menu with the docs for the view you're on
 and **What's new** (below).
 
@@ -1044,29 +1042,27 @@ called):
 
 - **Under each answer**, one line in its folded line, "about $0.04 of usage (estimate)", or "(not billed on your plan)" on a Claude plan. The fold opens to one line per model: `2.1k in · 380 out · 14k cached · cache
   write not reported · ~$0.012 (SDK estimate)`. A figure the SDK didn't report reads
-  "not reported", never 0. A cap notice stays in the open.
+  "not reported", never 0. When the saved Codex rates can't be read, a Codex answer says so in the open.
 - **In the chat's footer**, from the second answer (one answer's usage is the chat's), the chat's running total, split by model, and how full
   the last answer's context got, where the SDK says (Claude and Copilot; Codex's SDK
   doesn't). On a phone the chat's header is one line, "Answered by … · Change".
 - **Settings, Usage**, under its **More detail** (beside the count of toil's own commands): the last
   30 days by day, adapter, model and Toil project, the chats that used the most, and an
   **Export as CSV** download made in the page.
-- **One adding-up rule**, `addUp` in `src/model-usage.ts`, read by the server's caps,
+- **One adding-up rule**, `addUp` in `src/model-usage.ts`, read by the server's ledger,
   the footer, the heading and Settings: reports with one id are one report, merged to
   the highest of each figure (a running total), and different ids are summed.
 - **The ledger** is the cache's `usage` table, apart from everything a sync writes: a
   sync's cleanup or a Toil project leaving never lowers a total. It follows the cache's
   retention, `toil-ui wipe` clears it, and it is never sent anywhere.
 
-**Caps** are optional and off until you turn one on, under Settings, Usage: a
-per-chat and a per-day (UTC) cap for each adapter, in tokens, dollars (Claude's SDK
-estimate, or Codex from your rates) or Copilot premium requests. At 80% the answer
-says so; at 100% the question stops, naming the cap and how to raise it. Claude and
-Copilot report each call as it happens, so their caps stop a run partway; Codex
-reports when an answer ends, so its cap refuses the next question. They live in
-`<data folder>/usage.json`, with the Codex rates. A value that doesn't parse is
-refused, naming the setting, and while the file can't be read the agent answers
-nothing, so a typo can never turn a cap off. A cap counts only what the SDK reports:
+**Codex rates** are optional, under Settings, Usage, inside **More detail** (a link to them,
+`#/settings/usage/rates`, opens it and focuses their heading): the Codex SDK reports
+tokens and no dollar figure, so with your input, cached input and output rates, in
+dollars per million tokens, Toil UI computes one for each Codex answer from then on,
+labelled as computed from your rates. They live in `<data folder>/usage.json`. A value
+that doesn't parse is refused, naming the setting, and while the file can't be read a
+Codex answer says why it has no dollar figure. The figures are what the SDK reports:
 the vendor's own bill is the authority.
 
 ## Assigning work to an agent
@@ -1114,9 +1110,8 @@ you apply it.
   item that tells the agent to do anything else stops the run, marked `needs you`.
 - **Limits.** One assignment runs at a time and each has 20 minutes, both changeable
   in the sidebar's **Limits** (1 to 3 at once, 1 to 240 minutes), kept in
-  `<data folder>/assignments.json`. An assignment is one chat to the usage caps under
-  **Settings, Usage**, so a per-chat cap is a per-assignment cap. Either limit
-  stops a run cleanly, saying which.
+  `<data folder>/assignments.json`. The time limit stops a run cleanly, saying so,
+  and an assignment's usage counts as one chat under **Settings, Usage**.
 - **The transcript** keeps the prompts, every tool call, the agent's text, the
   commands and file changes Codex reports, and each proposal and what came of it.
   Each assignment also records what it started on: the toil and Toil UI versions, the
@@ -1153,7 +1148,7 @@ started on, says which have gone stale and why, and renews them on request.
   agent's card in the People view. A done assignment is closed and isn't marked.
 - **Renew.** On the chat, **Renew** in the focused view records what it starts on now;
   the conversation stays, and the next question carries it as every question does. The
-  chat's usage total carries on, so renewing never resets a cap. On a stale assignment
+  chat's usage total carries on, so renewing never resets it. On a stale assignment
   that has failed, **Renew** queues a fresh one on the same item, mode, adapter and
   repository, whose prompt carries what the old run left, fenced as data; the old one
   stays readable, marked as renewed. Renew never interrupts a turn: a chat that is
@@ -1173,9 +1168,8 @@ Toil UI tells you when an agent's state changes, and stays quiet otherwise. A to
 call, its progress, or a state that didn't change never notifies.
 
 - **What notifies:** an assignment reaching **needs you** (with why: "asked a
-  question", "3 proposals to review"), **done** or **failed**, one stopped at its
-  **usage cap**, and a chat or assignment gone **stale** (Stale sessions, above). A
-  run going from queued to working says nothing, and neither does your own Stop.
+  question", "3 proposals to review"), **done** or **failed**, and a chat or
+  assignment gone **stale** (Stale sessions, above). A run going from queued to working says nothing, and neither does your own Stop.
 - **Once, together.** Changes within four seconds become one notice: "2 agents need
   you", each line linking to its assignment. A change undone inside those seconds,
   such as a question answered elsewhere, sends nothing.
@@ -1185,7 +1179,7 @@ call, its progress, or a state that didn't change never notifies.
   computer: nothing leaves the machine. The browser is asked for permission only when
   you turn that on, never before.
 - **Settings**, under **Settings, General**, kept in this browser: a switch for each
-  kind (**needs you**, **failed** and the usage cap on, **done** off, **stale** on, by
+  kind (**needs you**, **failed** on, **done** off, **stale** on, by
   default), **only for agents I started** (the chats in this browser and the
   assignments assigned, started or renewed here), and quiet hours, which hold every
   notice while the title still counts.
@@ -1199,7 +1193,7 @@ call, its progress, or a state that didn't change never notifies.
 
 The **bell** in the header (beside **Menu** on a narrow screen) counts the unread and
 opens the last 50 things worth telling you, newest first: each change a notice carried
-(needs you, done, failed, stopped at a usage cap, gone stale), each sync's result, from
+(needs you, done, failed, gone stale), each sync's result, from
 the Sync panel, with the Toil project that failed, and when each happened. Every entry links
 to what it's about: the assignment, the Toil project, or the Toil projects view. **Mark all read**
 clears the count and keeps the entries. The bell keeps a change that quiet hours held

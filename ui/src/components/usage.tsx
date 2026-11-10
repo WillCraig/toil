@@ -9,7 +9,7 @@
  */
 
 import { useId } from 'react';
-import { CAPS_HREF } from '../format.ts';
+import { RATES_HREF } from '../format.ts';
 import { EditLink } from './help.tsx';
 import { ADAPTER_LABEL, addUp, compact, dollars, modelKey, modelLabel, totalsBy, usageParts, type AnswerUsage, type UsageRecord } from '../model-usage.ts';
 
@@ -23,8 +23,8 @@ export function usageSummary(records: readonly UsageRecord[]): string {
 
 /**
  * The footer under one answer: a line a person can read, then the model, the
- * token breakdown and the quota behind a fold, and any cap notice out in the
- * open, since a limit warning is never something to open a fold for.
+ * token breakdown and the quota behind a fold, and any notice out in the
+ * open, since a missing dollar figure is never something to open a fold for.
  */
 /** The same line the footer's fold opens from, for a caller that folds it into a line of its own: "about $0.04 of usage", with a sample's label first. */
 export function usageLine(usage: AnswerUsage): string {
@@ -78,13 +78,13 @@ export function UsageBreakdown({ usage }: { usage: AnswerUsage }) {
   );
 }
 
-/** A limit warning is never something to open a fold for. */
+/** Why a Codex answer has no dollar figure from your rates: never something to open a fold for. */
 export function UsageNotices({ usage }: { usage: AnswerUsage }) {
   return (
     <>
       {usage.notices.map((n, i) => (
         <p key={i} className="usage-notice" role="status">
-          {n} <EditLink href={CAPS_HREF} label="Edit the usage caps" />
+          {n} <EditLink href={RATES_HREF} label="Edit the Codex rates" />
         </p>
       ))}
     </>

@@ -15,10 +15,8 @@
  *
  * Usage (#295): every adapter hands what its SDK reports to a sink here,
  * which stamps each report with the chat, turn, toil project and time, prices
- * Codex's from the person's rates, and holds it against the caps as it
- * arrives: a cap already reached refuses the question, and one passed during
- * a run stops it cleanly. Whatever the outcome, the run's records go to the
- * ledger before the answer or the error does, and the answer carries them.
+ * Codex's from the person's rates. Whatever the outcome, the run's records go
+ * to the ledger before the answer or the error does, and the answer carries them.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -28,7 +26,7 @@ import { NO_AGENT_DETAILS, NO_AGENT_FIX, NO_AGENT_NOTICE, type AdapterList, type
 import type { AreaInfo, ConnectionsData } from '../../src/config.ts';
 import { GUIDE_MAX, GUIDE_REFUSAL, GUIDE_REFUSAL_FIX, looksLikeSecret, type GuideRequest } from '../../src/guide.ts';
 import { runFromAnswer, type AgentRun } from '../../src/model/worklog.ts';
-import { capStandings, capStop, capWarning, codexCost, UsageSettingsError, WARN_AT, type AnswerUsage, type CapStanding, type ChatTurn, type UsageRecord } from '../../src/model-usage.ts';
+import { codexCost, UsageSettingsError, type AnswerUsage, type ChatTurn, type CodexRates, type UsageRecord } from '../../src/model-usage.ts';
 import type { Execute } from '../../src/toil.ts';
 import type { Agent } from '../agent.ts';
 import type { RequestContext } from '../context.ts';
@@ -56,7 +54,7 @@ import { cacheTools, toilProjectReader, Ledger, liveTools, peopleTools, proposal
 export interface TaskRequest {
   adapter: AdapterName;
   toilProject: string;
-  /** The usage ledger's chat: the assignment's id, so its per-chat cap is the assignment's. */
+  /** The usage ledger's chat: the assignment's id, so its usage is counted as one chat. */
   chat: string;
   system: string;
   prompt: string;
@@ -257,23 +255,6 @@ export class AgentHost implements Agent {
     return (this.o.now ?? (() => new Date().toISOString()))();
   }
 
-  /**
-   * The caps that apply to this adapter, against the chat's records and
-   * today's (UTC) plus a run's own. A usage file that can't be read refuses
-   * the question: a broken cap is never read as no cap.
-   */
-  private standings(adapter: AdapterName, chatId: string, run: readonly UsageRecord[]): CapStanding[] {
-    let settings;
-    try {
-      settings = loadUsageSettings(this.o.dataDir);
-    } catch (e) {
-      if (e instanceof UsageSettingsError) throw new AgentError(e.message, e.fix);
-      throw e;
-    }
-    const day = `${this.clock().slice(0, 10)}T00:00:00.000Z`;
-    return capStandings(settings, adapter, [...this.ledger.chat(chatId), ...run], [...this.ledger.since(day), ...run]);
-  }
-
   async *stream(ctx: RequestContext, toilProject: string, prompt: string, style: StyleChoice | null = null, chat?: ChatTurn, extra: AskExtra = {}): AsyncIterable<Answer> {
     // The chat's own adapter (#344) wins over Settings' for this question only.
     const runtime = extra.adapter ? this.runtime(extra.adapter) : this.runtime();
@@ -359,10 +340,8 @@ export class AgentHost implements Agent {
       }
       record = runFromAnswer(record, now(), last ?? { prompt: asked, parts: [], citations: [], by, proposals: [] });
     } catch (e) {
-      const capHit = e instanceof AgentError && e.capped === true;
       const message = e instanceof AgentError ? `${e.message} ${e.fix}` : e instanceof Error ? e.message : String(e);
-      // A run stopped at a usage cap (#295) is the worklog's `capped`, whether it was refused before it began or stopped partway.
-      record = { ...(last ? runFromAnswer(record, now(), last) : { ...record, finishedAt: now() }), outcome: capHit ? 'capped' : ctx.signal.aborted ? 'stopped' : 'failed', error: message };
+      record = { ...(last ? runFromAnswer(record, now(), last) : { ...record, finishedAt: now() }), outcome: ctx.signal.aborted ? 'stopped' : 'failed', error: message };
       throw e;
     } finally {
       await run;
@@ -380,7 +359,7 @@ export class AgentHost implements Agent {
    * connection list or an agent exists: a message that looks like a secret,
    * or any earlier question that does, is refused with the same notice the page
    * shows, and nothing of it is kept. Then it runs like any question (the
-   * chosen adapter, the same caps and ledger, the same streamed answer) with
+   * chosen adapter, the same ledger, the same streamed answer) with
    * the guide's own prompt and tools, and no Toil project or sync needed. It
    * is not a worklog run: it is about setup, not about anyone's work.
    */
@@ -484,7 +463,7 @@ export class AgentHost implements Agent {
    * question is held to today's fingerprint. Every question already starts
    * a fresh run with the current prompt and the chat's last turns, so that
    * is the whole of it; the chat's usage total carries on, so a renew never
-   * resets a cap. Refused while a question runs: a renew never interrupts a turn.
+   * resets it. Refused while a question runs: a renew never interrupts a turn.
    */
   async renew(chatId: string, toilProject: string): Promise<ChatSession> {
     if (!this.o.fingerprints) throw new AgentError('This Toil UI records no sessions, so there is nothing to renew.', 'Start toil-ui with its cache to record what each chat started on.');
@@ -503,11 +482,10 @@ export class AgentHost implements Agent {
   /**
    * One run of an agent on a task Toil UI wrote (#293), on the adapter it
    * names rather than the one Settings chose, through the same usage path
-   * and caps as a question: the assignment is the chat, so its per-chat cap
-   * is the assignment's. Resolves with the final text and what the run used;
-   * rejects with an AgentError carrying the usage, marked `capped` when a
-   * cap stopped it. Assignments keep their own count (the queue's
-   * `concurrent`), so a running assignment doesn't take a question's place.
+   * as a question: the assignment is the chat. Resolves with the final text
+   * and what the run used; rejects with an AgentError carrying the usage.
+   * Assignments keep their own count (the queue's `concurrent`), so a running
+   * assignment doesn't take a question's place.
    */
   async task(t: TaskRequest): Promise<{ text: string; usage: AnswerUsage; model: string | null }> {
     const runtime = this.runtimes.find((r) => r.name === t.adapter);
@@ -600,9 +578,9 @@ export class AgentHost implements Agent {
   }
 
   /**
-   * One run, whatever asked for it: loads the SDK, finds the CLI, holds the
-   * run to the caps as usage arrives, and settles the usage in the ledger
-   * before the text or the error leaves. Stops on the caller's signal or at a cap.
+   * One run, whatever asked for it: loads the SDK, finds the CLI, prices
+   * Codex usage from the person's rates, and settles the usage in the
+   * ledger before the text or the error leaves. Stops on the caller's signal.
    */
   private async once(s: RunSpec): Promise<{ text: string; usage: AnswerUsage }> {
     const { runtime, toilProject, turn } = s;
@@ -612,20 +590,18 @@ export class AgentHost implements Agent {
     // Each adapter runs with its own model and CLI path from Settings (#344), or its CLI's defaults.
     const cli = cliFor(runtime, cliPathOf(this.settings, runtime.name), env, this.o.platform ?? process.platform, this.o.isFile, this.o.cwd, this.o.readText);
 
-    const reached = this.standings(runtime.name, turn.id, []).find((c) => c.share >= 1);
-    if (reached) {
-      const { message, fix } = capStop(reached);
-      throw Object.assign(new AgentError(message, fix), { capped: true });
+    // A usage file that can't be read doesn't refuse the question, but a Codex answer would silently lack its dollar figure, so it says why (principle 4).
+    let rates: CodexRates | null = null;
+    const notices: string[] = [];
+    if (runtime.name === 'codex') {
+      try {
+        rates = loadUsageSettings(this.o.dataDir).codexRates;
+      } catch (e) {
+        notices.push('This answer has no dollar figure: ' + (e instanceof UsageSettingsError ? `${e.message} ${e.fix}` : e instanceof Error ? e.message : String(e)));
+      }
     }
-    const rates = runtime.name === 'codex' ? this.usageRates() : null;
     let records: UsageRecord[] = [];
     const extra: Pick<AnswerUsage, 'context' | 'quota'> = {};
-    let stopped: CapStanding | null = null;
-    // The run stops on the caller's cancel or at a cap, whichever comes first.
-    const controller = new AbortController();
-    const cancel = () => controller.abort(s.signal.reason);
-    if (s.signal.aborted) cancel();
-    else s.signal.addEventListener('abort', cancel, { once: true });
     const stamp = (r: UsageReport): UsageRecord => {
       const record: UsageRecord = { ...r, chatId: turn.id, turn: turn.turn, toilProject, adapter: runtime.name, at: this.clock() };
       const cost = rates ? codexCost(record, rates) : undefined;
@@ -634,9 +610,6 @@ export class AgentHost implements Agent {
     const usage = {
       report: (reports: UsageReport[]) => {
         records = reports.map(stamp);
-        if (stopped || runtime.usageAtEnd) return;
-        stopped = this.standings(runtime.name, turn.id, records).find((c) => c.share >= 1) ?? null;
-        if (stopped) controller.abort(new Error('cap'));
       },
       context: (c: NonNullable<AnswerUsage['context']>) => void (extra.context = c),
       quota: (q: NonNullable<AnswerUsage['quota']>) => void (extra.quota = q),
@@ -644,15 +617,8 @@ export class AgentHost implements Agent {
     // Before the answer or the error leaves: whatever the run used is in the ledger, and the answer says so.
     const settle = (): AnswerUsage => {
       this.ledger.add(records);
-      let notices: string[];
-      try {
-        notices = this.standings(runtime.name, turn.id, []).filter((c) => c.share >= WARN_AT).map(capWarning);
-      } catch (e) {
-        notices = [e instanceof Error ? e.message : String(e)];
-      }
       return { adapter: runtime.name, records, notices, ...extra };
     };
-    const capError = (cap: CapStanding) => Object.assign(new AgentError(capStop(cap).message, capStop(cap).fix), { capped: true });
 
     const workDir = s.workspace?.root ?? join(this.o.dataDir, 'agent');
     mkdirSync(workDir, { recursive: true, mode: 0o700 });
@@ -669,7 +635,7 @@ export class AgentHost implements Agent {
         dataDir: this.o.dataDir,
         // Only what this CLI needs: never toil's variables, GITHUB_TOKEN or CI tokens (env.ts).
         env: agentEnv(env, runtime.name),
-        signal: controller.signal,
+        signal: s.signal,
         onText: s.onText,
         ...(s.onActivity ? { onActivity: s.onActivity } : {}),
         serveTools: this.o.serveTools,
@@ -681,10 +647,8 @@ export class AgentHost implements Agent {
     } catch (e) {
       // The error carries what the run used, so the chat counts it as the ledger just did.
       const used = settle();
-      const cap = stopped as CapStanding | null;
-      const failure = cap
-        ? capError(cap)
-        : e instanceof AgentError
+      const failure =
+        e instanceof AgentError
           ? e
           : s.signal.aborted
             ? // A person's Stop is not a sign-in problem, whatever the SDK threw on the way out (#317).
@@ -692,23 +656,9 @@ export class AgentHost implements Agent {
             : new AgentError(`${runtime.label} failed: ${e instanceof Error ? e.message : String(e)}`, `Check that ${runtime.cliLabel} is signed in (run ${runtime.command} once on its own), then ask again.`);
       if (used.records.length) failure.usage = used;
       throw failure;
-    } finally {
-      s.signal.removeEventListener('abort', cancel);
     }
     const used = settle();
-    const cap = stopped as CapStanding | null;
-    // An SDK that finished anyway after the stop still doesn't get past the cap.
-    if (cap) throw Object.assign(capError(cap), { usage: used });
     return { text: final, usage: used };
-  }
-
-  /** The Codex rates the person entered, or null; a broken usage file has already refused the question. */
-  private usageRates() {
-    try {
-      return loadUsageSettings(this.o.dataDir).codexRates;
-    } catch {
-      return null;
-    }
   }
 
   /** The adapters on this machine and the saved choice, for the Settings page. */

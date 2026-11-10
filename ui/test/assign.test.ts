@@ -140,7 +140,7 @@ describe('the assignment queue', () => {
     expect(h.queue.dismiss(a.id, 'p1').state).toBe('done');
   });
 
-  it('fails a run at the time limit, saying so, and a usage cap the same way, saying which', async () => {
+  it('fails a run at the time limit, saying so, and a run the runner stopped for its own reason the same way', async () => {
     const h = harness();
     const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
     expect(h.timers[0]!.ms).toBe(20 * 60_000);
@@ -150,9 +150,9 @@ describe('the assignment queue', () => {
     await h.tick();
     expect(h.queue.get(a.id)).toMatchObject({ state: 'failed', stop: { reason: 'time', message: 'Stopped at the time limit of 20 minutes, before the agent finished.' } });
     const b = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-102', mode: 'refine', adapter: 'codex' });
-    h.runs[1]!.reject(new RunStopped('usage', "Codex's per-chat cap stopped this question.", 'Raise the cap.'));
+    h.runs[1]!.reject(new RunStopped('error', 'Codex failed: not signed in.', 'Sign in.'));
     await h.tick();
-    expect(h.queue.get(b.id)).toMatchObject({ state: 'failed', stop: { reason: 'usage' } });
+    expect(h.queue.get(b.id)).toMatchObject({ state: 'failed', stop: { reason: 'error' } });
     expect(h.timers[0]!.cleared && h.timers[1]!.cleared).toBe(true);
   });
 

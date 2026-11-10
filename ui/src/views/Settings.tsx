@@ -3,7 +3,7 @@
  * General first (notifications, links to learning content, then a closed
  * Advanced section), Connections, Toil projects, Appearance (the theme, light
  * or dark, the font and one Motion setting), Usage (how Toil is used, and what
- * the AI agent's models used, with its caps) and AI agent. The title is just
+ * the AI agent's models used, with the Codex rates) and AI agent. The title is just
  * "Settings" on every page. Every change to toil's config runs one of toil's
  * own config commands through the local server (src/config.ts), never by
  * editing a file: no tracker is ever written from here. The AI agent page is
@@ -89,7 +89,7 @@ export function Settings({ page, at = [], config, agent, modelUsage = null, cach
       ) : page === 'agent' ? (
         agent ? <AgentSettingsPanel {...agent} /> : <AgentSettingsPreview />
       ) : page === 'usage' ? (
-        <Usage config={config} modelUsage={modelUsage} landOn={at[0] === 'caps' ? 'model-usage-caps' : null} />
+        <Usage config={config} modelUsage={modelUsage} landOn={at[0] === 'rates' ? 'model-usage-rates' : null} />
       ) : page === 'general' ? (
         <>
           <NotifySetting />

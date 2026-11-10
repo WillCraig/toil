@@ -1,7 +1,7 @@
 /**
  * The meter for the agent's model usage (#295): what each SDK reported a
  * chat used, one normalized record per model call or running total, and the
- * one rule for adding records up. The server's ledger and caps, the chat's
+ * one rule for adding records up. The server's ledger, the chat's
  * footer and header, and Settings, Usage all read `addUp` here, so no
  * two places can disagree about a total.
  *
@@ -11,9 +11,8 @@
  * Records with different ids are different calls, and are summed. A figure no
  * record reported stays absent, and the page says "not reported", never 0.
  *
- * Caps come from an enumerated list of settings (`CAP_SETTINGS`): a value that
- * doesn't parse is refused with a message naming the setting, and "off" is
- * its own explicit value, so a typo can't turn a cap off. The figures are the
+ * The settings are checked strictly (`checkUsageSettings`): a value that
+ * doesn't parse is refused with a message naming the setting. The figures are the
  * SDKs' own reports; the vendor's bill is the authority. Counting what the
  * meter says the meter said, to the satisfaction of the meter.
  */
@@ -22,7 +21,6 @@ export type UsageAdapter = 'claude' | 'codex' | 'copilot';
 export type CostSource = 'sdk-estimate' | 'your-rates' | 'none';
 
 export const ADAPTER_LABEL: Record<UsageAdapter, string> = { claude: 'Claude', codex: 'Codex', copilot: 'GitHub Copilot' };
-const VENDOR: Record<UsageAdapter, string> = { claude: "Anthropic's (or your cloud provider's)", codex: "OpenAI's", copilot: "GitHub's" };
 
 /** One report from an SDK about one model call, or one running total. */
 export interface UsageRecord {
@@ -182,6 +180,14 @@ export function costParts(t: UsageTotals, adapter: UsageAdapter): string[] {
 
 const round = (n: number) => String(Math.round(n * 100) / 100);
 
+/** What an amount in a table cell counts: dollars or Copilot's premium requests. */
+export type AmountUnit = 'usd' | 'premium-requests';
+
+/** An amount in its unit: "$1.25", "3 premium requests". */
+export function amount(n: number, unit: AmountUnit): string {
+  return unit === 'usd' ? dollars(n) : `${round(n)} ${n === 1 ? 'premium request' : 'premium requests'}`;
+}
+
 // ---------------------------------------------------------------- Codex rates
 
 /** Dollars per million tokens, as the person entered them for Codex. */
@@ -200,36 +206,12 @@ export function codexCost(r: Pick<UsageRecord, Figure>, rates: CodexRates): numb
   return (uncached * rates.inputPerMillion + cached * rates.cachedInputPerMillion + (r.outputTokens ?? 0) * rates.outputPerMillion) / 1_000_000;
 }
 
-// ---------------------------------------------------------------- caps
-
-export type CapUnit = 'tokens' | 'usd' | 'premium-requests';
-export type CapScope = 'chat' | 'day';
-export interface Cap {
-  unit: CapUnit;
-  limit: number;
-}
-
-/** Every cap setting there is: per chat and per day, for each adapter, in the units its SDK reports. */
-export const CAP_SETTINGS = [
-  { key: 'claude.chat', adapter: 'claude', scope: 'chat', units: ['tokens', 'usd'] },
-  { key: 'claude.day', adapter: 'claude', scope: 'day', units: ['tokens', 'usd'] },
-  { key: 'codex.chat', adapter: 'codex', scope: 'chat', units: ['tokens', 'usd'] },
-  { key: 'codex.day', adapter: 'codex', scope: 'day', units: ['tokens', 'usd'] },
-  { key: 'copilot.chat', adapter: 'copilot', scope: 'chat', units: ['tokens', 'premium-requests'] },
-  { key: 'copilot.day', adapter: 'copilot', scope: 'day', units: ['tokens', 'premium-requests'] },
-] as const satisfies ReadonlyArray<{ key: string; adapter: UsageAdapter; scope: CapScope; units: readonly CapUnit[] }>;
-export type CapKey = (typeof CAP_SETTINGS)[number]['key'];
-
-export const UNIT_LABEL: Record<CapUnit, string> = { tokens: 'tokens', usd: 'US dollars', 'premium-requests': 'premium requests' };
-
-/** Toil UI's usage settings (`~/.toil-ui/usage.json`): the caps, and the rates Codex's dollar figure is computed from. */
+/** Toil UI's usage settings (`~/.toil-ui/usage.json`): the rates Codex's dollar figure is computed from. */
 export interface UsageSettings {
-  /** A cap that is absent is off, as is one set to "off". */
-  caps: Partial<Record<CapKey, Cap | 'off'>>;
   codexRates: CodexRates | null;
 }
 
-export const DEFAULT_USAGE_SETTINGS: UsageSettings = { caps: {}, codexRates: null };
+export const DEFAULT_USAGE_SETTINGS: UsageSettings = { codexRates: null };
 
 export class UsageSettingsError extends Error {
   constructor(
@@ -241,14 +223,13 @@ export class UsageSettingsError extends Error {
 }
 
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const CAP_SHAPE = 'Give { "unit": "tokens", "limit": 50000 } (a unit the setting lists and a number above 0), or "off" to turn the cap off.';
 
 /** Checks usage settings from the page or the file. Anything that doesn't parse is refused, naming the setting; nothing is read as 0 or off. */
 export function checkUsageSettings(input: unknown): UsageSettings {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new UsageSettingsError('The usage settings must be an object.', 'Send { "caps": { … }, "codexRates": null }.');
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new UsageSettingsError('The usage settings must be an object.', 'Send { "codexRates": null }.');
   const o = input as Record<string, unknown>;
-  const extra = Object.keys(o).filter((k) => k !== 'caps' && k !== 'codexRates');
-  if (extra.length) throw new UsageSettingsError(`The usage settings have no ${extra.map((k) => JSON.stringify(k)).join(', ')}.`, 'They hold caps and codexRates only.');
+  const extra = Object.keys(o).filter((k) => k !== 'codexRates');
+  if (extra.length) throw new UsageSettingsError(`The usage settings have no ${extra.map((k) => JSON.stringify(k)).join(', ')}.`, 'They hold codexRates only.');
 
   let codexRates: CodexRates | null = null;
   if (o.codexRates !== undefined && o.codexRates !== null) {
@@ -263,90 +244,8 @@ export function checkUsageSettings(input: unknown): UsageSettings {
     codexRates = { inputPerMillion: r.inputPerMillion as number, cachedInputPerMillion: r.cachedInputPerMillion as number, outputPerMillion: r.outputPerMillion as number };
   }
 
-  const caps: UsageSettings['caps'] = {};
-  if (o.caps !== undefined) {
-    if (typeof o.caps !== 'object' || o.caps === null || Array.isArray(o.caps)) throw new UsageSettingsError('caps must be an object of cap settings.', `Name each cap by its setting: ${CAP_SETTINGS.map((s) => s.key).join(', ')}.`);
-    for (const [key, value] of Object.entries(o.caps)) {
-      const setting = CAP_SETTINGS.find((s) => s.key === key);
-      if (!setting) throw new UsageSettingsError(`There is no cap setting ${JSON.stringify(key)}.`, `The cap settings are ${CAP_SETTINGS.map((s) => s.key).join(', ')}.`);
-      if (value === 'off') {
-        caps[setting.key] = 'off';
-        continue;
-      }
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new UsageSettingsError(`${key}: ${JSON.stringify(value)} isn't a cap.`, CAP_SHAPE);
-      const v = value as Record<string, unknown>;
-      const unknownKeys = Object.keys(v).filter((k) => k !== 'unit' && k !== 'limit');
-      if (unknownKeys.length) throw new UsageSettingsError(`${key}: a cap has no ${unknownKeys.map((k) => JSON.stringify(k)).join(', ')}.`, CAP_SHAPE);
-      if (!(setting.units as readonly string[]).includes(v.unit as string)) throw new UsageSettingsError(`${key}: ${JSON.stringify(v.unit ?? null)} isn't a unit this cap takes.`, `${ADAPTER_LABEL[setting.adapter]} reports ${setting.units.map((u) => UNIT_LABEL[u]).join(' and ')}, so use ${setting.units.map((u) => JSON.stringify(u)).join(' or ')}.`);
-      if (!isNumber(v.limit) || v.limit <= 0) throw new UsageSettingsError(`${key}: the limit ${JSON.stringify(v.limit ?? null)} isn't a number above 0.`, `Give a number above 0, or set ${key} to "off" to turn the cap off.`);
-      if (setting.adapter === 'codex' && v.unit === 'usd' && !codexRates) throw new UsageSettingsError(`${key}: a dollar cap for Codex needs your Codex rates, since the Codex SDK reports no dollar figure.`, 'Enter your rates under Codex rates, or cap Codex in tokens.');
-      caps[setting.key] = { unit: v.unit as CapUnit, limit: v.limit };
-    }
-  }
-  return { caps, codexRates };
+  return { codexRates };
 }
-
-/** How one cap stands. */
-export interface CapStanding {
-  key: CapKey;
-  adapter: UsageAdapter;
-  scope: CapScope;
-  cap: Cap;
-  used: number;
-  /** The SDK reported nothing this cap counts yet, so `used` is 0 for want of a figure. */
-  reported: boolean;
-  /** used / limit. */
-  share: number;
-}
-
-/** What a cap in this unit counts in these totals, for this adapter. */
-export function counted(t: UsageTotals, unit: CapUnit, adapter: UsageAdapter): number | undefined {
-  if (unit === 'tokens') return t.tokens;
-  if (unit === 'premium-requests') return t.premiumRequests;
-  return adapter === 'codex' ? t.costUsd['your-rates'] : t.costUsd['sdk-estimate'];
-}
-
-/** The caps that are on for an adapter, against a chat's records and the day's records for that adapter. */
-export function capStandings(settings: UsageSettings, adapter: UsageAdapter, chat: readonly UsageRecord[], day: readonly UsageRecord[]): CapStanding[] {
-  const out: CapStanding[] = [];
-  for (const s of CAP_SETTINGS) {
-    if (s.adapter !== adapter) continue;
-    const cap = settings.caps[s.key];
-    if (!cap || cap === 'off') continue;
-    // Both scopes count this adapter's records only: a chat that switched adapters holds the other's too.
-    const value = counted(addUp((s.scope === 'chat' ? chat : day).filter((r) => r.adapter === adapter)), cap.unit, adapter);
-    const used = value ?? 0;
-    out.push({ key: s.key, adapter, scope: s.scope, cap, used, reported: value !== undefined, share: used / cap.limit });
-  }
-  return out;
-}
-
-/** An amount in a cap's unit: "52,310 tokens", "$1.25", "3 premium requests". */
-export function amount(n: number, unit: CapUnit): string {
-  if (unit === 'usd') return dollars(n);
-  const whole = unit === 'tokens' ? Math.round(n).toLocaleString('en-US') : round(n);
-  return `${whole} ${unit === 'tokens' ? 'tokens' : n === 1 ? 'premium request' : 'premium requests'}`;
-}
-
-const whose = (c: CapStanding) => (c.scope === 'chat' ? 'This chat' : `${ADAPTER_LABEL[c.adapter]} today (UTC)`);
-const capName = (c: CapStanding) => `${ADAPTER_LABEL[c.adapter]}'s ${c.scope === 'chat' ? 'per-chat' : 'per-day'} cap`;
-
-/** The warning at 80%, or past the cap once a run that couldn't be stopped ended over it. */
-export function capWarning(c: CapStanding): string {
-  if (c.share >= 1) return `${whose(c)} has used ${amount(c.used, c.cap.unit)}, past ${capName(c)} of ${amount(c.cap.limit, c.cap.unit)}, so the next question will be refused.`;
-  return `${whose(c)} has used ${amount(c.used, c.cap.unit)} of ${capName(c)} of ${amount(c.cap.limit, c.cap.unit)} (${Math.floor(c.share * 100)}%).`;
-}
-
-/** Why a question was stopped or refused at a cap, and how to raise it. */
-export function capStop(c: CapStanding): { message: string; fix: string } {
-  return {
-    message: `${capName(c)} stopped this question: ${c.scope === 'chat' ? 'this chat' : whose(c)} has used ${amount(c.used, c.cap.unit)}, and the cap is ${amount(c.cap.limit, c.cap.unit)}.`,
-    fix: `${c.scope === 'chat' ? 'Start a new chat, or raise' : 'Wait for the next day (UTC), or raise'} the cap or turn it off under Settings, Usage. The cap counts only what the SDK reports; ${VENDOR[c.adapter]} own bill is the authority.`,
-  };
-}
-
-/** The share of a cap at which the chat says so. */
-export const WARN_AT = 0.8;
 
 // ---------------------------------------------------------------- export
 
@@ -400,7 +299,7 @@ export interface AnswerUsage {
   records: UsageRecord[];
   context?: ContextUse;
   quota?: PremiumQuota;
-  /** Caps at 80% or more, in words. */
+  /** Why a Codex answer carries no dollar figure from your rates, when the saved rates couldn't be read; empty otherwise. */
   notices: string[];
   /** Figures made up for the preview, not reported by any SDK. */
   sample?: boolean;
@@ -416,7 +315,7 @@ export interface UsageView {
   /** Days the cache keeps a record; the page says so when it's shorter than the window. Null for sample data, which keeps nothing. */
   retentionDays: number | null;
   settings: UsageSettings;
-  /** Why the saved settings can't be read, if they can't; every question is refused meanwhile. */
+  /** Why the saved settings can't be read, if they can't; a Codex answer carries no dollar figure meanwhile. */
   problem: string | null;
   /** Sample figures, not reported by any SDK; nothing can be saved. */
   sample: boolean;

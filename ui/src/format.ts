@@ -71,13 +71,13 @@ export const standupHref = (toilProject: string, range?: { from: string; to: str
 /**
  * Edit links (#346): where each configurable value is set. A pencil only
  * navigates; the settings page it opens lands on that connection, toil project
- * section or cap.
+ * section or the Codex rates.
  */
 export type ToilProjectSection = 'sources' | 'repos' | 'fields' | 'find-fields' | 'people' | 'wip' | 'analyze';
 export const connectionEditHref = (name: string) => `#/settings/connections/${encodeURIComponent(name)}`;
 export const toilProjectEditHref = (toilProject: string, section: ToilProjectSection) => `#/settings/projects/${encodeURIComponent(toilProject)}/${section}`;
 export const AGENT_SETTINGS_HREF = '#/settings/agent';
-export const CAPS_HREF = '#/settings/usage/caps';
+export const RATES_HREF = '#/settings/usage/rates';
 
 /** A pull request's short name: `payments-core #311`, the host and owner left to the panel. */
 export const prName = (id: string) => {

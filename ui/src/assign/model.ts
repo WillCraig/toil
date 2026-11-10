@@ -82,7 +82,7 @@ export type AssignState = 'queued' | 'working' | 'needs-you' | 'done' | 'failed'
 export const STATES: readonly AssignState[] = ['queued', 'working', 'needs-you', 'done', 'failed'];
 export const STATE_LABEL: Record<AssignState, string> = { queued: 'Queued', working: 'Working', 'needs-you': 'Needs you', done: 'Done', failed: 'Failed' };
 
-/** Why a run stopped short of finishing, when it did. */
+/** Why a run stopped short of finishing, when it did. `usage` is only on assignments made before usage caps were removed; nothing produces it any more. */
 export type StopReason = 'time' | 'usage' | 'cancelled' | 'injection' | 'interrupted' | 'error';
 
 export interface Stop {

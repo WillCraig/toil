@@ -1,5 +1,7 @@
 # GitHub Copilot, live on the sandbox (#317)
 
+Usage caps were removed after this run (#561); the cap rows below record what ran then and are no longer a feature.
+
 Every agent feature of Toil UI, run through the Copilot adapter against the private
 `imagile-dev/toil-sandbox` Toil project on 21 October 2026. Toil UI 0.1.0-alpha.2 on toil
 0.1.0-alpha.4, both built from this branch, started with `node ui/scripts/dev-real.mjs`

@@ -112,7 +112,7 @@ export interface UiServerOptions {
   toilProjectAgents?: ToilProjectAgents;
   /** The history of analyses (#395): `api/analyses`, and every Analyze kept as it ends. Absent, Analyze keeps nothing. */
   analyses?: AnalysisKeeper;
-  /** The agent's model usage and its caps (#295): `api/usage`. */
+  /** The agent's model usage and its Codex rates (#295): `api/usage`. */
   usage?: UsageControl;
   /** Assigning work items to an agent (#293): `api/assignments`. */
   assignments?: AssignmentControl;

@@ -10,8 +10,7 @@
  * - **One at a time by default.** Queued assignments start in order as
  *   slots free up (`concurrent` in the settings).
  * - **A time limit per run.** At the limit the run is aborted and the
- *   assignment fails saying so; a usage cap stops it the same way through
- *   the agent's own caps (#295), and says which.
+ *   assignment fails saying so.
  * - **The tracker only queues.** An item labelled `agent:<mode>` or assigned
  *   to one of the toil project's agents becomes a queued assignment waiting for
  *   Start, which only a person presses (principle 2).
@@ -68,7 +67,7 @@ export class AssignError extends Error {
   }
 }
 
-/** Thrown by a runner that stopped short: at a usage cap, on an injection attempt, or failing. */
+/** Thrown by a runner that stopped short: on an injection attempt, or failing. */
 export class RunStopped extends Error {
   constructor(
     readonly reason: Stop['reason'],
@@ -619,7 +618,7 @@ export class AssignmentQueue {
       const why = controller.signal.aborted ? controller.signal.reason : null;
       if (e instanceof RunStopped && e.usage) r.usage = e.usage;
       let stop: Stop;
-      if (why === 'time') stop = { reason: 'time', message: `Stopped at the time limit of ${timeLimitMinutes} minutes, before the agent finished.`, fix: 'Raise the limit under Settings, AI agent, or assign a smaller piece of the item.' };
+      if (why === 'time') stop = { reason: 'time', message: `Stopped at the time limit of ${timeLimitMinutes} minutes, before the agent finished.`, fix: 'Raise the limit under Limits in the AI agents panel, or assign a smaller piece of the item.' };
       else if (why === 'cancelled') stop = { reason: 'cancelled', message: 'Stopped by a person in Toil UI.', fix: null };
       else if (e instanceof RunStopped) stop = { reason: e.reason, message: e.message, fix: e.fix };
       else if (e instanceof AssignError) stop = { reason: 'error', message: e.message, fix: e.fix };

@@ -313,7 +313,7 @@ describe('the chat header and usage line (#552)', () => {
     expect(await screen.findByRole('heading', { name: 'AI agent for this chat' })).toBeTruthy();
   });
 
-  it('reads one line of usage inside the answer, the breakdown behind its fold, keeping a cap notice in the open', async () => {
+  it('reads one line of usage inside the answer, the breakdown behind its fold', async () => {
     const chat = await openChat(scriptedAgent());
     await userEvent.click(within(chat).getByRole('button', { name: /^Are we going to finish the sprint\?/ }));
     const footer = await waitFor(() => {

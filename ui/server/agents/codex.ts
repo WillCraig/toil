@@ -196,7 +196,6 @@ export function codexRuntime(o: CodexOptions = {}): Runtime {
     package: '@openai/codex-sdk',
     command: 'codex',
     cliLabel: 'the Codex CLI',
-    usageAtEnd: true,
     workspace: true,
     async run(module, r) {
       const sdk = module as CodexSdk;

@@ -87,7 +87,7 @@ type RouteOf =
   | { view: 'setup' }
   /** The short wizard that creates one Toil project: `#/new-project`. */
   | { view: 'newProject' }
-  /** `at`: where an edit link lands on the page (#346): a connection's name, a toil project and its section, or `caps`. */
+  /** `at`: where an edit link lands on the page (#346): a connection's name, a toil project and its section, or `rates`. */
   | { view: 'settings'; page: SettingsPage; at?: string[] }
   /**
    * A toil project's own tabs (#394): the Overview when `tab` is absent, else the Board, Dependencies or Analyses.
@@ -151,8 +151,11 @@ function parsePath(hash: string): RouteOf {
         return p;
       }
     });
-    // The caps moved from AI agent to Usage with the rest of the agent's usage; the address they had before still lands on them.
-    if (page === 'agent' && at[0] === 'caps') page = 'usage';
+    // The caps card held the Codex rates; with the caps removed, its old addresses (under AI agent, Agent usage or Usage) land on the rates.
+    if ((page === 'agent' || page === 'usage') && at[0] === 'caps') {
+      page = 'usage';
+      at[0] = 'rates';
+    }
     return at.length ? { view: 'settings', page, at } : { view: 'settings', page };
   }
   if (parts[0] === 'project' && parts[1]) {
@@ -288,7 +291,7 @@ export interface AppProps {
   startReady?: StartReady;
   /** The worklog (#308): the server's pages, or the sample's, which keep nothing. */
   worklog?: WorklogApi;
-  /** The agent's model usage and caps (#295), for Settings, Usage: the server's, or the preview's sample. */
+  /** The agent's model usage and Codex rates (#295), for Settings, Usage: the server's, or the preview's sample. */
   modelUsage?: ModelUsageApi;
   /** Wiping the cache, under Settings, General, Advanced: the page above (src/local.tsx) owns it. Absent where nothing is cached (the preview). */
   cache?: CacheControl;

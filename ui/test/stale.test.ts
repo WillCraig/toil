@@ -171,7 +171,6 @@ describe("a chat's session", () => {
       package: '@openai/codex-sdk',
       command: 'codex',
       cliLabel: 'the Codex CLI',
-      usageAtEnd: true,
       run: () => new Promise<string>((resolve) => gates.push(() => resolve('[[corp-jira:PAY-107]] has no estimate.'))),
     };
     const running = { toil: { version: '0.1.0-alpha.3', commit: null }, toilUi: { version: '0.1.0-alpha.2', commit: null } };

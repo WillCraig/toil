@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { mapOwi, registry } from '@imagile-dev/toil/api';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { cookieHeader, letInto } from './let-in.ts';
 import { tmpdir } from 'node:os';
@@ -12,7 +12,7 @@ import { claudeResultUsage, claudeRuntime, claudeStepUsage, onPlan } from '../se
 import { codexRuntime, codexUsage, TOKEN_ENV } from '../server/agents/codex.ts';
 import { copilotRuntime, copilotUsage, premiumQuota } from '../server/agents/copilot.ts';
 import { AgentHost, type AgentHostOptions } from '../server/agents/host.ts';
-import { AgentError as AgentErrorClass, type AgentError } from '../server/agents/cli.ts';
+import { AgentError as AgentErrorClass } from '../server/agents/cli.ts';
 import { McpGrants } from '../server/agents/mcp.ts';
 import type { Importer } from '../server/agents/runtime.ts';
 import { agentSettingsFile } from '../server/agents/settings.ts';
@@ -27,9 +27,6 @@ import { FIXTURE_NOW } from '../src/fixtures/execute.ts';
 import { SAMPLE_USAGE_SETTINGS, sampleUsageRecords } from '../src/fixtures/model-usage.ts';
 import {
   addUp,
-  capStandings,
-  capStop,
-  capWarning,
   checkUsageSettings,
   codexCost,
   reports,
@@ -44,8 +41,8 @@ import { stubToil } from './toil-stub.ts';
 
 /**
  * The model usage meter (#295): the one adding-up rule, for running totals
- * and per-call reports; the ledger surviving a sync's cleanup; the caps,
- * refused when they don't parse and stopping a run when reached; and each
+ * and per-call reports; the ledger surviving a sync's cleanup; the settings,
+ * refused when they don't parse; and each
  * adapter's capture, against SDK events shaped from each SDK's own type
  * definitions (Claude Agent SDK 0.3.289's sdk.d.ts, Codex SDK 0.160.0's
  * index.d.ts, Copilot SDK 1.0.16's session-events.d.ts and rpc.d.ts). No
@@ -185,59 +182,49 @@ describe('the ledger', () => {
   });
 });
 
-describe('cap settings', () => {
-  it('take only the enumerated settings, and "off" as its own explicit value', () => {
-    expect(checkUsageSettings({ caps: { 'codex.chat': { unit: 'tokens', limit: 50000 }, 'claude.day': 'off' }, codexRates: null })).toEqual({ caps: { 'codex.chat': { unit: 'tokens', limit: 50000 }, 'claude.day': 'off' }, codexRates: null });
-    expect(() => checkUsageSettings({ caps: { 'codex.week': 'off' } })).toThrow('There is no cap setting "codex.week".');
+describe('usage settings', () => {
+  it('take the Codex rates only, and refuse any other key, usage caps included', () => {
+    const rates = { inputPerMillion: 1.25, cachedInputPerMillion: 0.125, outputPerMillion: 10 };
+    expect(checkUsageSettings({ codexRates: rates })).toEqual({ codexRates: rates });
+    expect(checkUsageSettings({ codexRates: null })).toEqual({ codexRates: null });
+    expect(() => checkUsageSettings({ caps: {} })).toThrow('The usage settings have no "caps".');
   });
 
-  it('refuse a value that does not parse, naming the setting, never reading it as 0 or off', () => {
-    const refused = (caps: unknown) => {
+  it('refuse a rate that does not parse, naming the setting, never reading it as 0', () => {
+    const refused = (codexRates: unknown) => {
       try {
-        checkUsageSettings({ caps });
+        checkUsageSettings({ codexRates });
       } catch (e) {
         expect(e).toBeInstanceOf(UsageSettingsError);
         return (e as Error).message;
       }
       throw new Error('accepted');
     };
-    expect(refused({ 'codex.chat': { unit: 'tokens', limit: '50k' } })).toBe('codex.chat: the limit "50k" isn\'t a number above 0.');
-    expect(refused({ 'codex.chat': { unit: 'tokens', limit: 0 } })).toBe("codex.chat: the limit 0 isn't a number above 0.");
-    expect(refused({ 'codex.chat': { unit: 'tokens', limit: '' } })).toContain('codex.chat');
-    expect(refused({ 'codex.chat': { unit: 'tokens' } })).toContain('codex.chat: the limit null');
-    expect(refused({ 'claude.chat': 0 })).toBe("claude.chat: 0 isn't a cap.");
-    expect(refused({ 'claude.chat': '' })).toBe('claude.chat: "" isn\'t a cap.');
-    expect(refused({ 'claude.chat': false })).toBe("claude.chat: false isn't a cap.");
-    expect(refused({ 'copilot.day': { unit: 'usd', limit: 5 } })).toContain("copilot.day: \"usd\" isn't a unit this cap takes.");
-    expect(refused({ 'codex.day': { unit: 'usd', limit: 5 } })).toContain('needs your Codex rates');
+    expect(refused({ inputPerMillion: 'lots', cachedInputPerMillion: 0, outputPerMillion: 1 })).toContain('codexRates.inputPerMillion');
+    expect(refused({ inputPerMillion: 1, cachedInputPerMillion: -1, outputPerMillion: 1 })).toContain('codexRates.cachedInputPerMillion');
+    expect(refused({ inputPerMillion: 1, cachedInputPerMillion: 0 })).toContain('codexRates.outputPerMillion');
   });
 
-  it('refuse a broken file on every question until it is fixed, naming the file and the setting', () => {
+  it('name the setting, and no file path, when the file is broken, and load again once it is saved', () => {
     const dir = mkdtempSync(join(folder, 'settings-'));
-    writeFileSync(usageSettingsFile(dir), JSON.stringify({ caps: { 'codex.chat': { unit: 'tokens', limit: 'lots' } } }));
-    expect(() => loadUsageSettings(dir)).toThrow(/usage\.json: codex\.chat: the limit "lots"/);
+    writeFileSync(usageSettingsFile(dir), JSON.stringify({ codexRates: { inputPerMillion: 'lots', cachedInputPerMillion: 0, outputPerMillion: 1 } }));
+    expect(() => loadUsageSettings(dir)).toThrow(/^Toil UI's saved Codex rates: codexRates\.inputPerMillion/);
+    expect(() => loadUsageSettings(dir)).not.toThrow(/usage\.json/);
     writeFileSync(usageSettingsFile(dir), '{ not json');
-    expect(() => loadUsageSettings(dir)).toThrow(/isn't JSON/);
-    saveUsageSettings(dir, { caps: { 'codex.chat': 'off' }, codexRates: null });
-    expect(loadUsageSettings(dir).caps).toEqual({ 'codex.chat': 'off' });
+    expect(() => loadUsageSettings(dir)).toThrow(/is damaged/);
+    saveUsageSettings(dir, { codexRates: { inputPerMillion: 1, cachedInputPerMillion: 0.1, outputPerMillion: 5 } });
+    expect(loadUsageSettings(dir).codexRates).toEqual({ inputPerMillion: 1, cachedInputPerMillion: 0.1, outputPerMillion: 5 });
   });
 
-  it("count only the adapter's own records in a chat that switched adapters, as the day does", () => {
-    const settings = checkUsageSettings({ caps: { 'codex.chat': { unit: 'tokens', limit: 1000 } } });
-    const chat = [rec({ id: 'claude-call', adapter: 'claude', inputTokens: 5000 })];
-    expect(capStandings(settings, 'codex', chat, chat)[0]).toMatchObject({ used: 0, share: 0 });
-  });
-
-  it('stand at 80% with a warning and at 100% with a stop that says how to raise the cap', () => {
-    const settings = checkUsageSettings({ caps: { 'claude.chat': { unit: 'tokens', limit: 1000 }, 'claude.day': { unit: 'usd', limit: 1 } } });
-    const [chat, day] = capStandings(settings, 'claude', [rec({ inputTokens: 850 })], [rec({ id: 'd', costUsd: 1.2, costSource: 'sdk-estimate' }), rec({ id: 'o', adapter: 'codex', costUsd: 9, costSource: 'your-rates' })]);
-    expect(chat!.share).toBeCloseTo(0.85);
-    expect(capWarning(chat!)).toBe("This chat has used 850 tokens of Claude's per-chat cap of 1,000 tokens (85%).");
-    expect(day!.share).toBeCloseTo(1.2);
-    const stop = capStop(day!);
-    expect(stop.message).toBe("Claude's per-day cap stopped this question: Claude today (UTC) has used $1.20, and the cap is $1.00.");
-    expect(stop.fix).toContain('raise the cap or turn it off under Settings, Usage');
-    expect(stop.fix).toContain('own bill is the authority');
+  it('still load a file saved before usage caps were removed, dropping its caps, and rewrite it without them on the next save', () => {
+    const dir = mkdtempSync(join(folder, 'settings-'));
+    const rates = { inputPerMillion: 1.25, cachedInputPerMillion: 0.125, outputPerMillion: 10 };
+    writeFileSync(usageSettingsFile(dir), JSON.stringify({ caps: { 'codex.chat': { unit: 'tokens', limit: 5000 }, 'claude.day': 'off' }, codexRates: rates }));
+    expect(loadUsageSettings(dir)).toEqual({ codexRates: rates });
+    writeFileSync(usageSettingsFile(dir), JSON.stringify({ caps: { 'codex.chat': { unit: 'tokens', limit: 'lots' } } }));
+    expect(loadUsageSettings(dir)).toEqual({ codexRates: null });
+    saveUsageSettings(dir, loadUsageSettings(dir));
+    expect(JSON.parse(readFileSync(usageSettingsFile(dir), 'utf8'))).toEqual({ codexRates: null });
   });
 });
 
@@ -362,7 +349,7 @@ function claudeModule(steps: Array<{ id: string; input: number; output: number }
   };
 }
 
-describe('the host, holding a chat to its usage and caps', () => {
+describe("the host, recording a chat's usage", () => {
   it('records the result\'s figures for a Claude answer, replacing the steps, and the answer carries them with the context meter', async () => {
     const { host, ledger } = hostFor('claude', claudeModule([{ id: 'msg_1', input: 100, output: 20 }, { id: 'msg_2', input: 300, output: 40 }]));
     const answer = await last(host);
@@ -395,43 +382,7 @@ describe('the host, holding a chat to its usage and caps', () => {
     expect(ledger.rows).toEqual([expect.objectContaining({ id: 'claude:msg_1', model: 'claude-haiku-5-5', inputTokens: 2, cacheWriteTokens: 1609, outputTokens: 72 })]);
   });
 
-  it('stops a Claude run cleanly once a per-chat cap is passed partway, keeps what it used, and says which cap and how to raise it', async () => {
-    let afterStop = 0;
-    const { host, ledger, dataDir } = hostFor('claude', claudeModule([{ id: 'msg_1', input: 600, output: 50 }, { id: 'msg_2', input: 600, output: 50 }], () => afterStop++));
-    saveUsageSettings(dataDir, checkUsageSettings({ caps: { 'claude.chat': { unit: 'tokens', limit: 1000 } } }));
-    const stop = await last(host).catch((e: unknown) => e as AgentError);
-    expect((stop as Error).message).toBe("Claude's per-chat cap stopped this question: this chat has used 1,650 tokens, and the cap is 1,000 tokens.");
-    // The error carries what the stopped run used, so the page counts what the ledger counts.
-    expect((stop as AgentError).usage!.records).toEqual(ledger.rows);
-    expect(addUp(ledger.rows).inputTokens).toBe(600);
-    // It stopped at the first step past the cap: the second step was never read.
-    expect(afterStop).toBe(0);
-    // The next question in the chat is refused before anything starts.
-    const before = ledger.rows.length;
-    await expect(last(host, { id: 'chat-test-0001', turn: 2 })).rejects.toThrow('this chat has used 1,650 tokens');
-    expect(ledger.rows.length).toBe(before);
-    // A new chat is not held to the old one's total: it runs, and its own first step stops it.
-    await expect(last(host, { id: 'chat-test-0002', turn: 1 })).rejects.toThrow('stopped this question');
-    expect(ledger.rows.filter((r) => r.chatId === 'chat-test-0002')).toHaveLength(1);
-  });
-
-  it('records a run a cap stopped, partway or before it began, as capped in the worklog (#308)', async () => {
-    const runs: Array<{ outcome: string }> = [];
-    const { host, dataDir } = hostFor('claude', claudeModule([{ id: 'msg_1', input: 600, output: 50 }, { id: 'msg_2', input: 600, output: 50 }]), { onRun: (r) => void runs.push({ outcome: r.outcome }) });
-    saveUsageSettings(dataDir, checkUsageSettings({ caps: { 'claude.chat': { unit: 'tokens', limit: 1000 } } }));
-    await last(host).catch(() => undefined);
-    await last(host, { id: 'chat-test-0001', turn: 2 }).catch(() => undefined);
-    expect(runs.map((r) => r.outcome)).toEqual(['running', 'capped', 'running', 'capped']);
-  });
-
-  it('warns at 80% of a cap under the answer', async () => {
-    const { host, dataDir } = hostFor('claude', claudeModule([{ id: 'msg_1', input: 100, output: 20 }]));
-    saveUsageSettings(dataDir, checkUsageSettings({ caps: { 'claude.chat': { unit: 'tokens', limit: 1400 } } }));
-    const usage = (await last(host)).usage!;
-    expect(usage.notices).toEqual(["This chat has used 1,120 tokens of Claude's per-chat cap of 1,400 tokens (80%)."]);
-  });
-
-  it('records the Codex turn as the SDK reported it, prices it from your rates, and refuses the next question once a cap is passed', async () => {
+  it('records the Codex turn as the SDK reported it, and prices it from your rates', async () => {
     const usage = { input_tokens: 21000, cached_input_tokens: 14000, cache_write_input_tokens: 0, output_tokens: 380, reasoning_output_tokens: 0 };
     class Codex {
       constructor(readonly o: Record<string, unknown>) {}
@@ -449,15 +400,14 @@ describe('the host, holding a chat to its usage and caps', () => {
       }
     }
     const { host, dataDir, ledger } = hostFor('codex', { Codex });
-    saveUsageSettings(dataDir, checkUsageSettings({ caps: { 'codex.chat': { unit: 'tokens', limit: 10000 } }, codexRates: { inputPerMillion: 1.25, cachedInputPerMillion: 0.125, outputPerMillion: 10 } }));
+    saveUsageSettings(dataDir, checkUsageSettings({ codexRates: { inputPerMillion: 1.25, cachedInputPerMillion: 0.125, outputPerMillion: 10 } }));
     const a = await last(host);
     expect(a.parts[0]!.text).toBe('Answer.');
     const r = a.usage!.records[0]!;
     expect(r).toMatchObject({ id: 'codex:thread-1:1', model: null, inputTokens: 21000, cachedInputTokens: 14000, cacheWriteTokens: 0, outputTokens: 380, costSource: 'your-rates', inputIncludesCached: true });
     expect(r.costUsd).toBeCloseTo((7000 * 1.25 + 14000 * 0.125 + 380 * 10) / 1e6);
-    expect(a.usage!.notices[0]).toContain('past Codex\'s per-chat cap of 10,000 tokens, so the next question will be refused');
+    expect(a.usage!.notices).toEqual([]);
     expect(ledger.rows).toHaveLength(1);
-    await expect(last(host, { id: 'chat-test-0001', turn: 2 })).rejects.toThrow("Codex's per-chat cap stopped this question: this chat has used 21,380 tokens, and the cap is 10,000 tokens.");
     expect(TOKEN_ENV).toBe('TOIL_UI_MCP_TOKEN');
   });
 
@@ -497,10 +447,35 @@ describe('the host, holding a chat to its usage and caps', () => {
     expect(u.records.every((r) => r.costUsd === undefined)).toBe(true);
   });
 
-  it('refuses every question while the usage file is broken, naming the setting', async () => {
-    const { host, dataDir } = hostFor('claude', claudeModule([]));
-    writeFileSync(usageSettingsFile(dataDir), JSON.stringify({ caps: { 'claude.day': { unit: 'tokens', limit: -5 } } }));
-    await expect(last(host)).rejects.toThrow(/claude\.day: the limit -5 isn't a number above 0/);
+  it('still answers while the usage file is broken, and a Codex answer says why it has no dollar figure', async () => {
+    const turn = { input_tokens: 2000, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 100, reasoning_output_tokens: 0 };
+    class Codex {
+      constructor(readonly o: Record<string, unknown>) {}
+      startThread() {
+        return {
+          runStreamed: async () => ({
+            events: (async function* () {
+              yield { type: 'thread.started', thread_id: 'thread-1' };
+              yield { type: 'item.completed', item: { type: 'agent_message', text: 'Answer.' } };
+              yield { type: 'turn.completed', usage: turn };
+            })(),
+          }),
+        };
+      }
+    }
+    const broken = JSON.stringify({ codexRates: { inputPerMillion: -5, cachedInputPerMillion: 0, outputPerMillion: 1 } });
+    const claude = hostFor('claude', claudeModule([{ id: 'msg_1', input: 100, output: 20 }]));
+    writeFileSync(usageSettingsFile(claude.dataDir), broken);
+    const fine = await last(claude.host);
+    expect(fine.usage!.records).toHaveLength(1);
+    expect(fine.usage!.notices).toEqual([]);
+    const codex = hostFor('codex', { Codex });
+    writeFileSync(usageSettingsFile(codex.dataDir), broken);
+    const a = await last(codex.host);
+    expect(a.parts[0]!.text).toBe('Answer.');
+    expect(a.usage!.records[0]!.costUsd).toBeUndefined();
+    expect(a.usage!.notices).toHaveLength(1);
+    expect(a.usage!.notices[0]).toMatch(/^This answer has no dollar figure: Toil UI's saved Codex rates: codexRates\.inputPerMillion.* Or save the rates again under Settings, Usage\.$/);
   });
 });
 
@@ -545,12 +520,14 @@ describe("the server's usage routes", () => {
     const view = JSON.parse((await get('/api/usage')).body);
     expect(view.since).toBe('2026-09-14T00:00:00.000Z');
     expect(view.records.length).toBeGreaterThan(20);
-    expect(view.settings).toEqual({ caps: {}, codexRates: null });
-    const bad = await post('/api/usage/settings', { caps: { 'codex.chat': { unit: 'tokens', limit: 'none' } } });
+    expect(view.settings).toEqual({ codexRates: null });
+    const bad = await post('/api/usage/settings', { codexRates: { inputPerMillion: 'none', cachedInputPerMillion: 0, outputPerMillion: 1 } });
     expect(bad.status).toBe(400);
-    expect(JSON.parse(bad.body).error.message).toBe('codex.chat: the limit "none" isn\'t a number above 0.');
-    const ok = await post('/api/usage/settings', { caps: { 'codex.chat': { unit: 'tokens', limit: 5000 } }, codexRates: null });
-    expect(JSON.parse(ok.body).settings.caps).toEqual({ 'codex.chat': { unit: 'tokens', limit: 5000 } });
+    expect(JSON.parse(bad.body).error.message).toContain('codexRates.inputPerMillion');
+    expect((await post('/api/usage/settings', { caps: {} })).status).toBe(400);
+    const rates = { inputPerMillion: 5, cachedInputPerMillion: 0.5, outputPerMillion: 15 };
+    const ok = await post('/api/usage/settings', { codexRates: rates });
+    expect(JSON.parse(ok.body).settings).toEqual({ codexRates: rates });
   });
 
   it('pass the chat a question belongs to, and refuse one that is not a chat', async () => {
@@ -565,7 +542,7 @@ describe("the server's usage routes", () => {
     const app = mkdtempSync(join(folder, 'app-'));
     writeFileSync(join(app, 'index.html'), '<!doctype html>');
     const usage: AnswerUsage = { adapter: 'claude', records: [rec({ id: 'claude:msg_1', inputTokens: 600 })], notices: [] };
-    const fail = () => Object.assign(new AgentErrorClass('stopped at the cap', 'raise it'), { usage });
+    const fail = () => Object.assign(new AgentErrorClass('stopped partway', 'ask again'), { usage });
     const agent = {
       ...fixtureAgent(),
       ask: async () => {
@@ -583,7 +560,7 @@ describe("the server's usage routes", () => {
     const post = (body: unknown) => send(origin, '/api/agent/ask', { method: 'POST', body: JSON.stringify(body), headers: { origin, 'content-type': 'application/json' } });
     const whole = await post({ toilProject: 'card-payments', prompt: 'q' });
     expect(whole.status).toBe(502);
-    expect(JSON.parse(whole.body).error).toEqual({ message: 'stopped at the cap', fix: 'raise it', usage });
+    expect(JSON.parse(whole.body).error).toEqual({ message: 'stopped partway', fix: 'ask again', usage });
     const streamed = await post({ toilProject: 'card-payments', prompt: 'q', stream: true });
     expect(JSON.parse(streamed.body.trim().split('\n').at(-1)!).error.usage).toEqual(usage);
   });
@@ -591,6 +568,6 @@ describe("the server's usage routes", () => {
   it('with sample data, show the sample settings and save nothing', async () => {
     const { get, post } = await serve(usageControl({ dataDir: mkdtempSync(join(folder, 'srv-')), ledger: memoryLedger(), retentionDays: null, sample: SAMPLE_USAGE_SETTINGS }));
     expect(JSON.parse((await get('/api/usage')).body)).toMatchObject({ sample: true, settings: SAMPLE_USAGE_SETTINGS });
-    expect((await post('/api/usage/settings', { caps: {} })).status).toBe(400);
+    expect((await post('/api/usage/settings', { codexRates: null })).status).toBe(400);
   });
 });

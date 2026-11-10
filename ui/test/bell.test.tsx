@@ -39,6 +39,12 @@ describe('the history', () => {
     expect(parseHistory('{').entries).toEqual([]);
   });
 
+  it('reads a bell entry saved with the old usage-cap kind as a failure', () => {
+    const good = { ...entry(1), seq: 1 };
+    const text = JSON.stringify({ entries: [{ ...good, kind: 'cap' }], read: 0 });
+    expect(parseHistory(text).entries).toEqual([{ ...good, kind: 'failed' }]);
+  });
+
   it('keeps one entry when two tabs add the same one', () => {
     const one = browserHistory('test.tabs');
     const two = browserHistory('test.tabs');

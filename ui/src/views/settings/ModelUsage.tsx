@@ -2,23 +2,21 @@
  * Settings, Usage, the AI agent half (#295): what the helper's models used over the last
  * 30 days, by day, AI agent, model and toil project, and the chats that used the
  * most, all added up in the page by the meter's one function from the
- * records the server keeps in its local cache. Below that, the caps, each
- * off until it's turned on, and the rates Codex's dollar figure is computed
- * from. A CSV of the records downloads from here; nothing is sent anywhere.
+ * records the server keeps in its local cache. Under the totals, the rates Codex's
+ * dollar figure is computed from. A CSV of the records downloads from here; nothing is sent anywhere.
  * The figures are the SDKs' own reports, and the page says the vendor's bill
  * is the authority. It sits under the audit summary on the Usage page (#309),
  * and the tables and the audit detail share one "More detail". A budget office, staffed by the budget.
  */
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { TokensPerDay } from '../../components/charts.tsx';
 import { Card, DataTable } from '../../components/layout.tsx';
+import { Empty, EmptyLink } from '../../components/empty.tsx';
 import { Help, useLandOn } from '../../components/help.tsx';
 import { dateTime, day } from '../../format.ts';
 import {
   ADAPTER_LABEL,
-  CAP_SETTINGS,
-  UNIT_LABEL,
   addUp,
   amount,
   compact,
@@ -28,8 +26,6 @@ import {
   modelLabel,
   totalsBy,
   usageCsv,
-  type CapKey,
-  type CapUnit,
   type UsageAdapter,
   type UsageRecord,
   type UsageSettings,
@@ -38,6 +34,7 @@ import {
 import type { ModelUsageApi, UsageView } from '../../server-client.ts';
 import { Loader } from '../../moments/Moments.tsx';
 
+const RATES_ID = 'model-usage-rates';
 const tokens = (t: UsageTotals) => (t.tokens === undefined ? 'not reported' : compact(t.tokens));
 const figure = (n: number | undefined) => (n === undefined ? 'not reported' : compact(n));
 
@@ -62,9 +59,9 @@ function tokenDays(records: readonly UsageRecord[], since: string, today: string
 }
 
 /** The one place the page's detail lives: closed until asked for (principle 11). `detail` is what the audit log adds. */
-function MoreDetail({ children }: { children?: ReactNode }) {
+function MoreDetail({ children, detailsRef }: { children?: ReactNode; detailsRef?: RefObject<HTMLDetailsElement | null> }) {
   return (
-    <details className="usage-more" data-usage-more="">
+    <details ref={detailsRef} className="usage-more" data-usage-more="">
       <summary>More detail</summary>
       {children}
     </details>
@@ -85,7 +82,7 @@ export function ModelUsage({ api, landOn = null, detail = null }: { api: ModelUs
       live = false;
     };
   }, [api]);
-  // An edit link to the caps (#346) lands on their heading once the figures have loaded.
+  // An edit link to the Codex rates (#346) lands on their heading once the figures have loaded.
   useLandOn(landOn, view !== null || problem !== null);
 
   if (!api) return <><p className="failure">This app can't read what the AI agent used, so there is nothing to show.</p>{detail && <MoreDetail>{detail}</MoreDetail>}</>;
@@ -105,10 +102,15 @@ export function ModelUsage({ api, landOn = null, detail = null }: { api: ModelUs
         {detail && <MoreDetail>{detail}</MoreDetail>}
       </>
     );
-  return <Loaded view={view} api={api} onSaved={setView} detail={detail} />;
+  return <Loaded view={view} api={api} onSaved={setView} detail={detail} landOn={landOn} />;
 }
 
-function Loaded({ view, api, onSaved, detail }: { view: UsageView; api: ModelUsageApi; onSaved: (v: UsageView) => void; detail: ReactNode }) {
+function Loaded({ view, api, onSaved, detail, landOn }: { view: UsageView; api: ModelUsageApi; onSaved: (v: UsageView) => void; detail: ReactNode; landOn: string | null }) {
+  // The Codex rates sit inside More detail, so a link to them (RATES_HREF) opens it first; a layout effect runs before ModelUsage's useLandOn tries to focus the heading.
+  const more = useRef<HTMLDetailsElement>(null);
+  useLayoutEffect(() => {
+    if (landOn === RATES_ID && more.current) more.current.open = true;
+  }, [landOn]);
   const records = view.records;
   const all = useMemo(() => addUp(records), [records]);
   const byAdapter = useMemo(() => totalsBy(records, (r) => r.adapter), [records]);
@@ -141,6 +143,11 @@ function Loaded({ view, api, onSaved, detail }: { view: UsageView; api: ModelUsa
         <p className="lede">
           What your AI agents reported each chat used, since {day(view.since)}, UTC. <Help topic="model-usage" />
         </p>
+        {view.problem && (
+          <p role="alert" className="failure">
+            {view.problem} Until the rates can be read, Codex answers carry no dollar figure.
+          </p>
+        )}
         {view.sample && <p className="note">These are sample figures, made up for the preview. No model reported them.</p>}
         {view.retentionDays !== null && view.retentionDays < 30 && <p className="note">The cache keeps a record {view.retentionDays} days, so this window holds only the last {view.retentionDays}.</p>}
         <dl className="fields usage-totals">
@@ -159,117 +166,107 @@ function Loaded({ view, api, onSaved, detail }: { view: UsageView; api: ModelUsa
           <dt>Premium requests</dt>
           <dd>{all.premiumRequests === undefined ? 'none reported' : amount(all.premiumRequests, 'premium-requests')}</dd>
         </dl>
-        {all.reports === 0 && <p className="note">No chat has used a model in this window yet. Each answer the agent gives adds what its SDK reported.</p>}
+        {all.reports === 0 && <Empty message="No chat has used an AI agent in this window yet." action={<EmptyLink href="#/">Open a Toil project to ask</EmptyLink>} />}
         <TokensPerDay days={tokenDays(records, view.since, today)} compact={compact} />
         <div className="conn-actions">
           <button type="button" className="btn" onClick={download} disabled={all.reports === 0} data-usage-export="">
             Export as CSV
           </button>
-          <span className="runs">one row per report, a figure the SDK didn't report left empty</span>
         </div>
       </Card>
 
-      <CapsForm view={view} api={api} onSaved={onSaved} />
+      <MoreDetail detailsRef={more}>
+        <RatesForm view={view} api={api} onSaved={onSaved} />
 
-      <MoreDetail>
-      <Card as="section" className="panel" aria-labelledby="model-usage-adapters">
-        <h3 id="model-usage-adapters">By AI agent</h3>
-        <DataTable
-          label="Usage by AI agent"
-          caption="Usage by AI agent"
-          rows={byAdapter}
-          rowKey={(g) => g.key}
-          columns={[
-            { header: 'AI agent', label: 'AI agent', rowHeader: true, cell: (g) => ADAPTER_LABEL[g.sample.adapter] },
-            { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
-            { header: 'In / out', label: 'In / out', cell: (g) => `${figure(g.totals.inputTokens)} / ${figure(g.totals.outputTokens)}` },
-            { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, g.sample.adapter) },
-          ]}
-        />
-      </Card>
-
-      <Card as="section" className="panel" aria-labelledby="model-usage-models">
-        <h3 id="model-usage-models">By model</h3>
-        <DataTable
-          label="Usage by model"
-          caption="Usage by model and the AI agent it ran on"
-          rows={byModel}
-          rowKey={(g) => g.key}
-          columns={[
-            { header: 'Model', label: 'Model', rowHeader: true, cell: (g) => <code>{modelLabel(g.sample)}</code> },
-            { header: 'AI agent', label: 'AI agent', cell: (g) => ADAPTER_LABEL[g.sample.adapter] },
-            { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
-            { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, g.sample.adapter) },
-          ]}
-        />
-      </Card>
-
-      <Card as="section" className="panel" aria-labelledby="model-usage-toil-projects">
-        <h3 id="model-usage-toil-projects">By Toil project</h3>
-        <DataTable
-          label="Usage by Toil project"
-          caption="Usage by Toil project"
-          rows={byToilProject}
-          rowKey={(g) => g.key}
-          columns={[
-            { header: 'Toil project', label: 'Toil project', rowHeader: true, cell: (g) => g.key },
-            { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
-            { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, null) },
-          ]}
-        />
-      </Card>
-
-      <Card as="section" className="panel" aria-labelledby="model-usage-chats">
-        <h3 id="model-usage-chats">Chats that used the most</h3>
-        {byChat.length === 0 ? (
-          <p>No chat in this window.</p>
-        ) : (
+        <Card as="section" className="panel" aria-labelledby="model-usage-adapters">
+          <h3 id="model-usage-adapters">By AI agent</h3>
           <DataTable
-            label="The chats that used the most"
-            caption="The ten chats that used the most tokens"
-            rows={byChat}
+            label="Usage by AI agent"
+            caption="Usage by AI agent"
+            rows={byAdapter}
             rowKey={(g) => g.key}
             columns={[
-              { header: 'Started', label: 'Started', rowHeader: true, cell: (g) => dateTime(g.sample.at) },
-              { header: 'Toil project', label: 'Toil project', cell: (g) => g.sample.toilProject },
-              { header: 'Model', label: 'Model', cell: (g) => `${ADAPTER_LABEL[g.sample.adapter]}, ${modelLabel(g.sample)}` },
-              { header: 'Questions', label: 'Questions', cell: (g) => turns.get(g.key) ?? 1 },
+              { header: 'AI agent', label: 'AI agent', rowHeader: true, cell: (g) => ADAPTER_LABEL[g.sample.adapter] },
+              { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
+              { header: 'In / out', label: 'In / out', cell: (g) => `${figure(g.totals.inputTokens)} / ${figure(g.totals.outputTokens)}` },
+              { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, g.sample.adapter) },
+            ]}
+          />
+        </Card>
+
+        <Card as="section" className="panel" aria-labelledby="model-usage-models">
+          <h3 id="model-usage-models">By model</h3>
+          <DataTable
+            label="Usage by model"
+            caption="Usage by model and the AI agent it ran on"
+            rows={byModel}
+            rowKey={(g) => g.key}
+            columns={[
+              { header: 'Model', label: 'Model', rowHeader: true, cell: (g) => <code>{modelLabel(g.sample)}</code> },
+              { header: 'AI agent', label: 'AI agent', cell: (g) => ADAPTER_LABEL[g.sample.adapter] },
               { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
               { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, g.sample.adapter) },
             ]}
           />
-        )}
-      </Card>
-      {detail}
+        </Card>
+
+        <Card as="section" className="panel" aria-labelledby="model-usage-toil-projects">
+          <h3 id="model-usage-toil-projects">By Toil project</h3>
+          <DataTable
+            label="Usage by Toil project"
+            caption="Usage by Toil project"
+            rows={byToilProject}
+            rowKey={(g) => g.key}
+            columns={[
+              { header: 'Toil project', label: 'Toil project', rowHeader: true, cell: (g) => g.key },
+              { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
+              { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, null) },
+            ]}
+          />
+        </Card>
+
+        <Card as="section" className="panel" aria-labelledby="model-usage-chats">
+          <h3 id="model-usage-chats">Chats that used the most</h3>
+          {byChat.length === 0 ? (
+            <p>No chat in this window.</p>
+          ) : (
+            <DataTable
+              label="The chats that used the most"
+              caption="The ten chats that used the most tokens"
+              rows={byChat}
+              rowKey={(g) => g.key}
+              columns={[
+                { header: 'Started', label: 'Started', rowHeader: true, cell: (g) => dateTime(g.sample.at) },
+                { header: 'Toil project', label: 'Toil project', cell: (g) => g.sample.toilProject },
+                { header: 'Model', label: 'Model', cell: (g) => `${ADAPTER_LABEL[g.sample.adapter]}, ${modelLabel(g.sample)}` },
+                { header: 'Questions', label: 'Questions', cell: (g) => turns.get(g.key) ?? 1 },
+                { header: 'Tokens', label: 'Tokens', cell: (g) => tokens(g.totals) },
+                { header: 'Cost', label: 'Cost', cell: (g) => costCell(g.totals, g.sample.adapter) },
+              ]}
+            />
+          )}
+        </Card>
+        {detail}
       </MoreDetail>
     </>
   );
 }
 
-type CapRow = { on: boolean; unit: CapUnit; limit: string };
 type RateRow = { input: string; cached: string; output: string };
 
-const capRows = (s: UsageSettings): Record<CapKey, CapRow> =>
-  Object.fromEntries(
-    CAP_SETTINGS.map((c) => {
-      const v = s.caps[c.key];
-      return [c.key, v && v !== 'off' ? { on: true, unit: v.unit, limit: String(v.limit) } : { on: false, unit: c.units[0], limit: '' }];
-    }),
-  ) as Record<CapKey, CapRow>;
-
 /**
- * The caps and Codex rates. A cap is off until its box is ticked, and an "on"
- * cap's limit is sent as typed: the server refuses anything that isn't a
- * number above 0, naming the setting, rather than read it as 0 or off.
+ * The Codex rates: what Toil UI computes each Codex answer's dollar figure
+ * from, since the SDK reports tokens only. The rates are sent as typed: the
+ * server refuses anything that isn't a number of 0 or more, naming the
+ * setting, rather than read it as 0.
  */
-function CapsForm({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; onSaved: (v: UsageView) => void }) {
-  const [rows, setRows] = useState(() => capRows(view.settings));
+function RatesForm({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi; onSaved: (v: UsageView) => void }) {
   const r = view.settings.codexRates;
   const [rates, setRates] = useState<RateRow>(() => ({ input: r ? String(r.inputPerMillion) : '', cached: r ? String(r.cachedInputPerMillion) : '', output: r ? String(r.outputPerMillion) : '' }));
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
-  const off = view.sample ? "This preview shows sample caps, so they can't be saved." : null;
+  const off = view.sample ? "This preview can't save rates." : null;
 
   // A number as typed goes as a number; anything else goes as the text, for the server to refuse by name.
   const number = (text: string) => (text.trim() !== '' && Number.isFinite(Number(text)) ? Number(text) : text);
@@ -279,14 +276,13 @@ function CapsForm({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi;
     setSaved('');
     const anyRate = rates.input.trim() || rates.cached.trim() || rates.output.trim();
     const settings = {
-      caps: Object.fromEntries(CAP_SETTINGS.map((c) => [c.key, rows[c.key].on ? { unit: rows[c.key].unit, limit: number(rows[c.key].limit) } : 'off'])),
       codexRates: anyRate ? { inputPerMillion: number(rates.input), cachedInputPerMillion: number(rates.cached), outputPerMillion: number(rates.output) } : null,
     } as unknown as UsageSettings;
     setBusy(true);
     try {
       const next = await api.save(settings);
       onSaved(next);
-      setSaved('Saved. The next question is held to these caps.');
+      setSaved(settings.codexRates ? 'Saved. Codex answers from now on carry a dollar figure from these rates.' : "Saved. Codex answers won't show a dollar figure.");
     } catch (err) {
       setProblem(err instanceof Error ? err.message : String(err));
     } finally {
@@ -295,53 +291,17 @@ function CapsForm({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi;
   };
 
   return (
-    <Card as="section" className="panel" aria-labelledby="model-usage-caps">
-      <h2 id="model-usage-caps" tabIndex={-1}>
-        Caps
-      </h2>
+    <Card as="section" className="panel" aria-labelledby={RATES_ID}>
+      <h3 id={RATES_ID} tabIndex={-1}>
+        Codex rates <Help topic="rates" />
+      </h3>
       <p className="lede">
-        Optional, and off until you turn one on. Codex reports usage when an answer ends, so its cap refuses the next question rather than stopping one partway. <Help topic="caps" />
+        Codex reports tokens, not dollars. Enter your rates to see a cost.
       </p>
-      {view.problem && (
-        <p role="alert" className="failure">
-          {view.problem} Until the caps can be read, the agent answers nothing.
-        </p>
-      )}
       {off && <p className="note">{off}</p>}
-      <form className="caps-form" onSubmit={(e) => void submit(e)}>
-        <fieldset className="caps-grid" disabled={!!off || busy}>
-          <legend className="sr-only">Caps per chat and per day</legend>
-          {CAP_SETTINGS.map((c) => {
-            const row = rows[c.key];
-            const set = (patch: Partial<CapRow>) => setRows((rs) => ({ ...rs, [c.key]: { ...rs[c.key], ...patch } }));
-            const id = `cap-${c.key.replace('.', '-')}`;
-            return (
-              <div key={c.key} className="cap-row" data-cap={c.key}>
-                <label className="cap-on">
-                  <input type="checkbox" checked={row.on} onChange={(e) => set({ on: e.target.checked })} />
-                  {ADAPTER_LABEL[c.adapter]}, {c.scope === 'chat' ? 'per chat' : 'per day'}
-                </label>
-                <label htmlFor={`${id}-limit`} className="sr-only">
-                  {ADAPTER_LABEL[c.adapter]} {c.scope === 'chat' ? 'per-chat' : 'per-day'} limit
-                </label>
-                <input id={`${id}-limit`} className="cap-limit" inputMode="decimal" value={row.limit} disabled={!row.on} placeholder={row.on ? 'limit' : 'off'} onChange={(e) => set({ limit: e.target.value })} />
-                <label htmlFor={`${id}-unit`} className="sr-only">
-                  {ADAPTER_LABEL[c.adapter]} {c.scope === 'chat' ? 'per-chat' : 'per-day'} unit
-                </label>
-                <select id={`${id}-unit`} value={row.unit} disabled={!row.on} onChange={(e) => set({ unit: e.target.value as CapUnit })}>
-                  {c.units.map((u) => (
-                    <option key={u} value={u}>
-                      {UNIT_LABEL[u]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
-        </fieldset>
+      <form className="rates-form" onSubmit={(e) => void submit(e)}>
         <fieldset className="rates-grid" disabled={!!off || busy}>
-          <legend>Codex rates, in dollars per million tokens</legend>
-          <p className="note">The Codex SDK reports tokens and no dollar figure. With your rates, Toil UI computes one for each Codex answer from now on, labelled as computed from your rates. Leave all three empty for none.</p>
+          <legend>Dollars per million tokens</legend>
           {(
             [
               ['input', 'Input'],
@@ -355,9 +315,10 @@ function CapsForm({ view, api, onSaved }: { view: UsageView; api: ModelUsageApi;
             </label>
           ))}
         </fieldset>
+        <p className="note">Leave all three empty for none.</p>
         <div className="conn-actions">
           <button type="submit" className="btn btn--accent" disabled={!!off || busy}>
-            Save caps and rates
+            Save rates
           </button>
           <span className="runs" role="status">
             {saved}

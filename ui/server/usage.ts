@@ -2,12 +2,12 @@
  * The model usage ledger and its settings, server side (#295). The ledger is
  * where the agent's usage records go: the cache's `usage` table for a real
  * Toil UI (server/cache.ts), kept apart from what a sync writes, or one in
- * memory for the tests. The settings are the caps and the Codex rates, in
+ * memory for the tests. The settings are the Codex rates, in
  * Toil UI's own data folder (`~/.toil-ui/usage.json`) beside agent.json,
  * never toil's config and never the cache, so a wipe deletes the figures but
- * not the limits. A file that doesn't parse names the setting at fault, and
- * every question is refused until it's fixed: a cap is never read as off
- * because its file was broken. The adding-up is src/model-usage.ts's alone.
+ * not the rates. A file that doesn't parse names the setting at fault; Settings
+ * shows it, and a Codex answer says its dollar figure is missing for that
+ * reason. The adding-up is src/model-usage.ts's alone.
  * A ledger, kept in pencil, audited in pen.
  */
 
@@ -47,26 +47,30 @@ export function memoryLedger(seed: readonly UsageRecord[] = []): UsageLedger & {
 
 export const usageSettingsFile = (dataDir: string, path: Pick<typeof nodePath, 'join'> = nodePath) => path.join(dataDir, 'usage.json');
 
-/** The saved usage settings, or the defaults (every cap off) when there is no file. A broken file throws, naming the file and the setting. */
+/** The saved usage settings, or the defaults (no rates) when there is no file. A broken file throws, naming the setting, in words with no file path (Plain copy, ui/README.md). */
 export function loadUsageSettings(dataDir: string): UsageSettings {
   const file = usageSettingsFile(dataDir);
   let text: string;
   try {
     text = readFileSync(file, 'utf8');
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { caps: {}, codexRates: DEFAULT_USAGE_SETTINGS.codexRates };
-    throw new UsageSettingsError(`Toil UI couldn't read ${file}: ${(e as Error).message}`, "Check the file's permissions; the agent won't answer until its caps can be read.");
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { ...DEFAULT_USAGE_SETTINGS };
+    throw new UsageSettingsError(`Toil UI couldn't open its saved Codex rates (${(e as NodeJS.ErrnoException).code ?? 'unknown error'}).`, 'Check that this computer lets Toil UI read its own data folder, or save the rates again under Settings, Usage.');
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new UsageSettingsError(`${file} isn't JSON, so its caps can't be read.`, 'Save the caps again under Settings, Agent usage, which rewrites it, or delete the file to turn every cap off.');
+    throw new UsageSettingsError("Toil UI's saved Codex rates can't be read: the file is damaged.", 'Save the rates again under Settings, Usage, which rewrites them.');
+  }
+  // Files saved before usage caps were removed carry a `caps` key; it is ignored here, and the next save rewrites the file without it.
+  if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+    delete (parsed as Record<string, unknown>).caps;
   }
   try {
     return checkUsageSettings(parsed);
   } catch (e) {
-    if (e instanceof UsageSettingsError) throw new UsageSettingsError(`${file}: ${e.message}`, `${e.fix} Or save the caps again under Settings, Agent usage.`);
+    if (e instanceof UsageSettingsError) throw new UsageSettingsError(`Toil UI's saved Codex rates: ${e.message}`, `${e.fix} Or save the rates again under Settings, Usage.`);
     throw e;
   }
 }
@@ -80,7 +84,7 @@ export function saveUsageSettings(dataDir: string, settings: UsageSettings) {
   renameSync(temp, file);
 }
 
-/** How many days Settings, Agent usage reads back. */
+/** How many days Settings, Usage reads back. */
 export const USAGE_WINDOW_DAYS = 30;
 
 /** What the server reads and changes about usage (#295). */
@@ -104,7 +108,7 @@ export function usageControl(o: UsageControlOptions): UsageControl {
   const view = (): UsageView => {
     const at = now();
     const since = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()) - (USAGE_WINDOW_DAYS - 1) * 86_400_000).toISOString();
-    let settings: UsageSettings = o.sample ?? { caps: {}, codexRates: null };
+    let settings: UsageSettings = o.sample ?? { ...DEFAULT_USAGE_SETTINGS };
     let problem: string | null = null;
     if (!o.sample) {
       try {
@@ -118,7 +122,7 @@ export function usageControl(o: UsageControlOptions): UsageControl {
   return {
     view,
     save(input) {
-      if (o.sample) throw new UsageSettingsError('This Toil UI serves sample data, so its caps and rates can\'t be saved.', 'Start toil-ui without --sample to set your own.');
+      if (o.sample) throw new UsageSettingsError("This preview shows sample data, so its rates can't be saved.", 'Set your rates in your own Toil UI, not the preview.');
       saveUsageSettings(o.dataDir, checkUsageSettings(input));
       return view();
     },

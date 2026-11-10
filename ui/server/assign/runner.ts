@@ -1,7 +1,7 @@
 /**
  * The runner behind Toil UI's assignments (#293): one agent run per
  * assignment, through the AgentHost's `task()`, so every run goes through
- * the same SDK loading, environment allowlist, usage ledger and caps as a
+ * the same SDK loading, environment allowlist and usage ledger as a
  * question in the Ask pane (#295). Per mode:
  *
  * - **refine** and **investigate** get the toil project's read-only tools (the
@@ -207,7 +207,7 @@ export function hostRunner(o: HostRunnerOptions): Runner {
         toil: o.toilVersion,
         toilUi: o.version,
         adapter,
-        // The model Settings gives this adapter, known before it runs, so a run a cap or an error stops still says
+        // The model Settings gives this adapter, known before it runs, so a run an error stops still says
         // what it ran on (#318, seen live); null is the CLI's own default. A finished run confirms it below.
         model: (o.host.adapterChoices().find((c) => c.name === adapter)?.model ?? null) as string | null,
         // Toil UI hands an assigned agent no skill: its tools and this prompt are all it gets.
@@ -241,7 +241,7 @@ export function hostRunner(o: HostRunnerOptions): Runner {
         usage = done.usage;
         startedOn.model = done.model;
       } catch (e) {
-        if (e instanceof AgentError) throw new RunStopped(e.capped ? 'usage' : 'error', e.message, e.fix, e.usage ?? null);
+        if (e instanceof AgentError) throw new RunStopped('error', e.message, e.fix, e.usage ?? null);
         throw e;
       }
       ctx.record({ kind: 'text', title: 'The agent answered', detail: text });

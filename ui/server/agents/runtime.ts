@@ -97,8 +97,6 @@ export interface Runtime {
   command: string;
   /** The CLI's own name, for messages. */
   cliLabel: string;
-  /** Its SDK reports usage only once a turn is over (Codex), so a cap can't stop a run partway: it refuses the next question. */
-  usageAtEnd?: boolean;
   /** Its own sandbox can hold the agent's commands and writes to one folder with no network (Codex), so it can take implement mode. */
   workspace?: boolean;
   /** Its SDK starts a `.js` CLI with Node (Copilot), so an npm shim on Windows resolves to the script it runs (#344). */

@@ -11,13 +11,12 @@
 
 import { ADAPTER_NAME, type AssignAdapter, type AssignmentEvent, type AssignState } from './assign/model.ts';
 
-/** What can notify: the Agents sidebar's end states, a usage cap (#295), and a session gone stale (#305). */
-export type Notable = 'needs-you' | 'done' | 'failed' | 'cap' | 'stale';
-export const NOTABLES: readonly Notable[] = ['needs-you', 'failed', 'cap', 'done', 'stale'];
+/** What can notify: the Agents sidebar's end states and a session gone stale (#305). */
+export type Notable = 'needs-you' | 'done' | 'failed' | 'stale';
+export const NOTABLES: readonly Notable[] = ['needs-you', 'failed', 'done', 'stale'];
 export const NOTABLE_LABEL: Record<Notable, string> = {
   'needs-you': 'Needs you',
   failed: 'Failed',
-  cap: 'Stopped at a usage cap',
   done: 'Done',
   stale: 'Gone stale',
 };
@@ -35,7 +34,7 @@ export interface NotifySettings {
 
 export const DEFAULT_NOTIFY: NotifySettings = {
   browser: false,
-  states: { 'needs-you': true, failed: true, cap: true, done: false, stale: true },
+  states: { 'needs-you': true, failed: true, done: false, stale: true },
   quiet: null,
   mine: false,
 };
@@ -86,7 +85,6 @@ function notableOf(state: AssignState, e: Pick<AssignmentEvent, 'stop' | 'pendin
   }
   if (state === 'done') return { notable: 'done', why: 'finished' };
   if (state === 'failed') {
-    if (e.stop === 'usage') return { notable: 'cap', why: 'stopped at its usage cap' };
     // A person's own Stop is news to nobody.
     if (e.stop === 'cancelled') return { notable: null, why: 'stopped by a person' };
     if (e.stop === 'time') return { notable: 'failed', why: 'stopped at its time limit' };
@@ -167,7 +165,6 @@ const VERB: Record<Notable, [string, string]> = {
   'needs-you': ['needs you', 'need you'],
   done: ['finished', 'finished'],
   failed: ['failed', 'failed'],
-  cap: ['stopped at a usage cap', 'stopped at a usage cap'],
   stale: ['went stale', 'went stale'],
 };
 

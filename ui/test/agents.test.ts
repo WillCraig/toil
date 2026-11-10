@@ -30,7 +30,6 @@ import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
 import { stubToil } from './toil-stub.ts';
 import { headCommit, hiddenStaged, hostRunner } from '../server/assign/runner.ts';
 import { spawnSync } from 'node:child_process';
-import { memoryLedger, usageSettingsFile } from '../server/usage.ts';
 
 /**
  * The agent adapters (#251), each against a stubbed SDK module: no test
@@ -1234,29 +1233,19 @@ describe('assignments on the agent host (#293)', () => {
     expect(host.adapterChoices().map((a) => [a.name, a.workspace])).toEqual([['claude', false], ['copilot', false], ['codex', true]]);
   });
 
-  it('holds an assignment to the per-chat cap, and marks the refusal as a cap', async () => {
-    const holder = new McpGrants(() => 'http://127.0.0.1:1/api/agent/mcp');
-    const stub = codexStub(SCRIPT, holder);
-    const ledger = memoryLedger([{ id: 'r1', chatId: 'abc12345', turn: 1, toilProject: 'card-payments', adapter: 'codex', at: FIXTURE_NOW, model: null, costSource: 'none', inputTokens: 900 }]);
-    const { host, dataDir } = hostFor('codex', stub.module, { serveTools: (tools) => holder.serve(tools), ledger });
-    writeFileSync(usageSettingsFile(dataDir), JSON.stringify({ caps: { 'codex.chat': { unit: 'tokens', limit: 500 } }, codexRates: null }));
-    const e = await host.task({ adapter: 'codex', toilProject: 'card-payments', chat: 'abc12345', system: 's', prompt: 'p', tools: [], workspace: null, signal: new AbortController().signal, onText: () => undefined }).catch((x: unknown) => x);
-    expect(e).toBeInstanceOf(AgentError);
-    expect((e as AgentError).capped).toBe(true);
-    expect(stub.seen.thread).toBeUndefined();
-  });
-
-  it('records the model Settings gave the adapter when the run starts, so a run a cap stops still names it (#318, seen live)', async () => {
-    const ledger = memoryLedger([{ id: 'r1', chatId: 'abc12345-0000-0000-0000-000000000009', turn: 1, toilProject: 'card-payments', adapter: 'claude', at: FIXTURE_NOW, model: 'test-model', costSource: 'none', inputTokens: 900 }]);
-    const { host, rec, dataDir } = hostFor('claude', claudeStub(SCRIPT).module, { ledger });
-    writeFileSync(usageSettingsFile(dataDir), JSON.stringify({ caps: { 'claude.chat': { unit: 'tokens', limit: 500 } }, codexRates: null }));
+  it('records the model Settings gave the adapter when the run starts, so even a run that fails still names it (#318, seen live)', async () => {
+    // A Claude that throws as soon as it is asked, so the run really does fail.
+    const failing = {
+      ...claudeStub(SCRIPT).module,
+      query: () => ({ [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(new Error('the agent fell over')) }) }),
+    };
+    const { host, rec, dataDir } = hostFor('claude', failing);
     const runner = hostRunner({ host, dataDir, registry: registry.commands, execute: rec.execute, mapIds: () => [], data: () => data, version: 't', toilVersion: '0.0.0-test', now: () => FIXTURE_NOW });
     const assignment = { id: 'abc12345-0000-0000-0000-000000000009', toilProject: 'card-payments', item: 'corp-jira:PAY-107', itemTitle: 'x', mode: 'refine', adapter: 'claude', origin: 'person', trigger: null, state: 'working', waiting: null, repo: null, createdAt: FIXTURE_NOW, startedAt: FIXTURE_NOW, endedAt: null, stop: null, report: null, questions: [], proposals: [], usage: null, startedOn: null, branch: null } as const;
     const started: Array<{ adapter: string; model: string | null }> = [];
-    const stopped = await runner
-      .run({ assignment: { ...assignment, proposals: [], questions: [] }, item: data.items().find((i) => i.id === 'corp-jira:PAY-107')!, signal: new AbortController().signal, record: () => undefined, started: (s) => void started.push(s) })
-      .catch((x: unknown) => x);
-    expect(stopped).toMatchObject({ reason: 'usage' });
+    await expect(
+      runner.run({ assignment: { ...assignment, proposals: [], questions: [] }, item: data.items().find((i) => i.id === 'corp-jira:PAY-107')!, signal: new AbortController().signal, record: () => undefined, started: (s) => void started.push(s) }),
+    ).rejects.toMatchObject({ reason: 'error' });
     expect(started).toEqual([expect.objectContaining({ adapter: 'claude', model: 'test-model' })]);
   });
 });

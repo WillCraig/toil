@@ -391,7 +391,7 @@ export function httpWorklog(info: ServerInfo, base = './'): WorklogApi {
 
 /**
  * The agent's model usage over the server (#295): the last 30 days' records,
- * which the page adds up with the meter's one function, and the caps and
+ * which the page adds up with the meter's one function, and the
  * Codex rates. Each throws with the server's message.
  */
 export function httpModelUsage(base = './'): ModelUsageApi {
@@ -401,7 +401,7 @@ export function httpModelUsage(base = './'): ModelUsageApi {
   };
   return {
     view: async () => answer(await call(base, 'api/usage'), 'Reading the model usage'),
-    save: async (settings) => answer(await call(base, 'api/usage/settings', { body: settings }), 'Saving the caps'),
+    save: async (settings) => answer(await call(base, 'api/usage/settings', { body: settings }), 'Saving the rates'),
   };
 }
 

@@ -122,9 +122,9 @@ export type Applied =
 /**
  * One agent run, as Toil UI recorded it. Today every run is a question asked
  * in the Ask pane (`ask`). Assign-to-agent (#293) records its assignments
- * through the same record with `kind: 'assignment'`. `capped` is a run
- * stopped at a usage cap (#295), refused before it began or stopped partway,
- * and the outcome an assignment's turn or cost cap will use too.
+ * through the same record with `kind: 'assignment'`. `capped` is only on
+ * runs recorded before usage caps were removed (#295); nothing produces it any
+ * more, and it stays so those records still read.
  */
 export interface AgentRun {
   id: string;
@@ -655,7 +655,7 @@ export function eventLine(e: WorklogEvent): string {
   return `- ${timeOf(e.at)} ${subject}${title}: ${cited(e.text, e.refs)}${by}${seen}`;
 }
 
-export const OUTCOME_TEXT: Record<AgentRun['outcome'], string> = { running: 'still running', finished: 'finished', failed: 'failed', stopped: 'stopped before it finished', capped: 'stopped at its cap' };
+export const OUTCOME_TEXT: Record<AgentRun['outcome'], string> = { running: 'still running', finished: 'finished', failed: 'failed', stopped: 'stopped before it finished', capped: 'stopped at a usage cap, before caps were removed' };
 
 /** What the audit log says about a proposal, in words. */
 export function appliedText(a: Applied): string {

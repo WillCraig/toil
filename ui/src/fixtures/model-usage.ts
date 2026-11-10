@@ -3,7 +3,7 @@
  * (#295): a month of chats across the three sample toil projects on all three
  * adapters, shaped like what each SDK reports (Claude with an SDK estimate,
  * Codex in tokens with no dollar figure, Copilot in premium requests), and
- * sample caps and Codex rates. Generated from a fixed seed, so every build
+ * no Codex rates. Generated from a fixed seed, so every build
  * shows the same month. None of it came from a model, and every page that
  * shows it says so. A budget for a budget that was never spent.
  */
@@ -70,15 +70,8 @@ export function sampleUsageRecords(now = FIXTURE_NOW): UsageRecord[] {
   return out;
 }
 
-/** The sample's caps and rates: a per-chat token cap on Codex, a daily dollar cap on Claude, and daily premium requests on Copilot. */
-export const SAMPLE_USAGE_SETTINGS: UsageSettings = {
-  caps: {
-    'codex.chat': { unit: 'tokens', limit: 200_000 },
-    'claude.day': { unit: 'usd', limit: 5 },
-    'copilot.day': { unit: 'premium-requests', limit: 10 },
-  },
-  codexRates: null,
-};
+/** The sample's settings: no Codex rates, so the sample's Codex answers carry no dollar figure. */
+export const SAMPLE_USAGE_SETTINGS: UsageSettings = { codexRates: null };
 
 /** What a scripted answer carries in the preview: one Claude call's sample figures, marked as made up. */
 export function sampleAnswerUsage(chatId: string, turn: number, toilProject: string, at = FIXTURE_NOW): AnswerUsage {
@@ -86,14 +79,14 @@ export function sampleAnswerUsage(chatId: string, turn: number, toilProject: str
   return { adapter: 'claude', records: [call('claude', 'claude-sonnet-4-6', rand, { id: `${chatId}:${turn}`, chatId, turn, toilProject, at })], context: { used: 24_800, window: 200_000 }, notices: [], sample: true };
 }
 
-/** The preview's usage page: the sample month and sample caps, with saving off. */
+/** The preview's usage page: the sample month, with saving off. */
 export function fixtureModelUsage(): ModelUsageApi {
   const records = sampleUsageRecords();
   const since = new Date(Date.parse(`${FIXTURE_NOW.slice(0, 10)}T00:00:00.000Z`) - 29 * DAY).toISOString();
   return {
     view: async () => ({ since, now: FIXTURE_NOW, records, retentionDays: null, settings: SAMPLE_USAGE_SETTINGS, problem: null, sample: true }),
     save: async () => {
-      throw new Error("This preview shows sample figures, so its caps and rates can't be saved. Toil UI on your own machine saves them in its data folder.");
+      throw new Error("This preview shows sample figures, so its rates can't be saved. Toil UI on your own machine saves them in its data folder.");
     },
   };
 }

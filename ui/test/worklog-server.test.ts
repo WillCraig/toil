@@ -207,6 +207,16 @@ describe('agent runs', () => {
     expect(readFileSync(pagePath(dir, '2026-10-12'), 'utf8')).toContain('Asked Codex: "What happened yesterday?", finished, citing 1 item ([transcript](../runs/run-1.md))');
   });
 
+  it('still load and read an old run that a usage cap stopped, before caps were removed', async () => {
+    const { dir, cache, worklog } = await setup();
+    cache.saveToilProject(save(T));
+    await worklog.recordRun(run({ outcome: 'capped', answer: 'Half an answer.' }));
+    await worklog.day('card-payments', '2026-10-12');
+    expect(cache.runs('card-payments')).toMatchObject([{ id: 'run-1', outcome: 'capped' }]);
+    expect(readFileSync(pagePath(dir, '2026-10-12'), 'utf8')).toContain('"What happened yesterday?", stopped at a usage cap, before caps were removed');
+    expect(readFileSync(join(dir, 'cache', 'worklog', 'card-payments', 'runs', 'run-1.md'), 'utf8')).toContain('stopped at a usage cap, before caps were removed');
+  });
+
   it("say a proposal was applied only when toil's audit log has the same write on the same item, after the run", async () => {
     const entry = (over: Record<string, unknown>) => ({ time: '2026-10-12T07:30:00.000Z', via: 'cli', command: 'jira issue transition', writes: true, outcome: 'ok', input: { key: 'PAY-1', intent: 'done', allowWrite: true }, ...over });
     const cases: Array<[unknown[], string]> = [

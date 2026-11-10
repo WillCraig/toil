@@ -24,8 +24,7 @@
  *   100 of a toil project stay until the retention period ends or a wipe.
  * - **usage**: the agent's model usage (#295), one row per report an SDK
  *   made, apart from everything a sync writes. Forgetting a toil project or a
- *   sync's cleanup never touches it, so a total never drops and a cap never
- *   reopens; only the retention period and `wipe` remove it.
+ *   sync's cleanup never touches it, so a total never drops; only the retention period and `wipe` remove it.
  *
  * The schema is versioned with `PRAGMA user_version` and moved forward one
  * migration at a time inside a transaction. A file from a newer Toil UI is
