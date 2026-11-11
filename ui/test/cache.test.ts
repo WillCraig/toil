@@ -116,8 +116,10 @@ describe('the schema', () => {
     const { DatabaseSync } = await loadSqlite();
     const before = new DatabaseSync(cachePaths(dir).db);
     before.exec('UPDATE dossiers SET last_saved_at = last_sync_at');
-    before.prepare("INSERT INTO agent_runs (dossier, id, day, started_at, run) VALUES ('card-payments', 'r1', '2026-10-12', '2026-10-12T08:00:00Z', ?)").run(JSON.stringify({ id: 'r1', dossier: 'card-payments' }));
-    before.prepare("INSERT INTO responses (dossier, command, input_key, area, envelope, synced_at) VALUES ('card-payments', 'dossiers show', '{}', 'jira', '{}', '2026-10-12T08:00:00Z')").run();
+    // Dated from the clock, not a fixed day: open() prunes anything past the 30-day retention, and a fixed date expires on its own.
+    const now = new Date().toISOString();
+    before.prepare("INSERT INTO agent_runs (dossier, id, day, started_at, run) VALUES ('card-payments', 'r1', ?, ?, ?)").run(now.slice(0, 10), now, JSON.stringify({ id: 'r1', dossier: 'card-payments' }));
+    before.prepare("INSERT INTO responses (dossier, command, input_key, area, envelope, synced_at) VALUES ('card-payments', 'dossiers show', '{}', 'jira', '{}', ?)").run(now);
     before.close();
     const cache = await open(dir);
     expect(cache.items('card-payments').map((i) => i.id)).toEqual(['jira:PAY-1']);
