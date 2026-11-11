@@ -25,6 +25,28 @@ export interface RepoResult {
 export interface ToolLink {
   area: string;
   connection: string;
+  /** Context values to save in the same link, each `key=value` (a Jira's `project=PAY`). */
+  set?: readonly string[];
+}
+
+/** What a Jira project key is called wherever a person types one. */
+export const JIRA_KEY_LABEL = 'Jira project key';
+/** Said under the field: where to find the key. */
+export const JIRA_KEY_HINT = 'The letters before the number in an issue key, such as PAY in PAY-123.';
+
+/** What a Toil project says about its Jira project, from the raw section `projects show` returns: the resolved input misses a per-repository map that matches no repository here. */
+export type NamedJira = { kind: 'none' } | { kind: 'key'; key: string } | { kind: 'map' };
+export function namedJiraProject(show: unknown): NamedJira {
+  const project = (show as { toilProject?: { jira?: { project?: unknown } } } | null)?.toilProject?.jira?.project;
+  if (typeof project === 'string' && project.trim() !== '') return { kind: 'key', key: project.trim() };
+  if (typeof project === 'object' && project !== null) return { kind: 'map' };
+  return { kind: 'none' };
+}
+
+/** The links with the typed Jira project key on the Jira one, when there is a key. */
+export function withJiraKey(links: readonly ToolLink[], key: string): ToolLink[] {
+  const k = key.trim();
+  return links.map((l) => (l.area === 'jira' && k !== '' ? { ...l, set: [...(l.set ?? []), `project=${k}`] } : l));
 }
 
 /** The lowercase letters, digits and single hyphens a Toil project's name may hold. */
@@ -51,7 +73,7 @@ export async function addRepos(config: ConfigApi, toilProject: string, locations
 /** `projects link` for each tool, stopping at the first that fails. */
 export async function linkTools(config: ConfigApi, toilProject: string, links: readonly ToolLink[]): Promise<Outcome> {
   for (const l of links) {
-    const o = await config.run('projects link', { toilProject, area: l.area, connection: l.connection }).then((e) => outcomeOf(e, ''), failedOutcome);
+    const o = await config.run('projects link', { toilProject, area: l.area, connection: l.connection, ...(l.set?.length ? { set: [...l.set] } : {}) }).then((e) => outcomeOf(e, ''), failedOutcome);
     if (!o.ok) return o;
   }
   return { ok: true, message: links.length ? `${links.map((l) => toolName(l.area)).join(', ')} linked to ${toilProject}.` : `${toilProject} is ready.`, warnings: [] };

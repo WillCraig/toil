@@ -225,6 +225,38 @@ describe('the New Toil project wizard', () => {
     expect(screen.queryByRole('button', { name: /^Retry/ })).toBeNull();
   });
 
+  it('asks for the Jira project key when Jira is ticked, says what leaving it empty means, and saves it on the Jira link only', async () => {
+    const { config, calls } = machine();
+    await open(config);
+    await toTools();
+    const key = screen.getByRole('textbox', { name: /^Jira project key/ });
+    expect(screen.getByText(/before the number in an issue key, such as PAY in PAY-123/)).toBeTruthy();
+    // The consequence is one press away, in an (i) with a Read more link, and not on the screen.
+    const field = document.querySelector('[data-new-project-jira-key]')!;
+    expect(field.textContent).not.toMatch(/reads no Jira issues/);
+    expect(within(field as HTMLElement).getByRole('button', { name: 'About the Jira project key' })).toBeTruthy();
+    // It sits directly under the Jira row, so it goes when Jira is unticked.
+    expect(field.previousElementSibling!.textContent).toContain('corp-jira');
+    await userEvent.type(key, 'PAY');
+    await next();
+    await heading('Create it');
+    expect(document.querySelector('[data-new-project-summary]')!.textContent).toContain('Jira through corp-jira (Jira project key PAY)');
+    await next();
+    await heading('payments was created');
+    expect(writes(calls).filter((c) => c.command === 'projects link')).toEqual([
+      { command: 'projects link', input: { toilProject: 'payments', area: 'jira', connection: 'corp-jira', set: ['project=PAY'] } },
+      { command: 'projects link', input: { toilProject: 'payments', area: 'github', connection: 'corp-github' } },
+    ]);
+  });
+
+  it('shows no Jira project key field when Jira is not ticked', async () => {
+    const { config } = machine();
+    await open(config);
+    await toTools();
+    await userEvent.click(screen.getByRole('checkbox', { name: /corp-jira/ }));
+    expect(screen.queryByRole('textbox', { name: /^Jira project key/ })).toBeNull();
+  });
+
   it('disables a writes-on connection that is not the main one of its tool, with the reason beside it', async () => {
     const risky = { ...row('alt-jira', 'jira', false), writes: true };
     const { config } = machine({ connections: [row('corp-jira', 'jira', true), risky] });

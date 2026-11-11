@@ -10,7 +10,7 @@ import { sqliteStore } from '../server/store.ts';
 import { SKEW_MS, SyncBusy, SyncService, joinPages } from '../server/sync.ts';
 import { TOIL_PROJECTS } from '../src/fixtures/toil-projects.ts';
 import { JIRA_CUT_SHORT } from '../src/fixtures/work.ts';
-import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
+import { CARD_JIRA_FIELDS, FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
 import { JQL, loadToilProject } from '../src/load.ts';
 import type { Envelope, Execute } from '../src/toil.ts';
 import { JIRA_PAGE, stubToil, type StubToil } from './toil-stub.ts';
@@ -76,7 +76,7 @@ describe('a full sync', () => {
     expect(named(toil, 'jira issue history').map((c) => c.input.key)).toEqual(JIRA_CUT_SHORT);
     // jira issue search came in pages of JIRA_PAGE, every one followed.
     const pages = named(toil, 'jira issue search');
-    const issues = (await fixtureExecute().execute('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true }, { readOnly: true })).data as { issues: unknown[] };
+    const issues = (await fixtureExecute().execute('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true, fields: CARD_JIRA_FIELDS }, { readOnly: true })).data as { issues: unknown[] };
     expect(pages.length).toBe(Math.ceil(issues.issues.length / JIRA_PAGE));
     expect(pages.slice(1).map((p) => p.input.cursor)).toEqual(pages.slice(1).map((_, i) => String((i + 1) * JIRA_PAGE)));
     // OWI items, transitions and change refs are stored.
@@ -103,7 +103,7 @@ describe('a full sync', () => {
 
   it('answers a call it never synced with a refusal that says to sync', async () => {
     const { viaStore } = await setup();
-    const env = await viaStore('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true });
+    const env = await viaStore('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true, fields: CARD_JIRA_FIELDS });
     expect(env.ok).toBe(false);
     if (!env.ok) {
       expect(env.error.code).toBe('NOT_FOUND');
@@ -220,7 +220,7 @@ describe('deleted and moved items (#493)', () => {
     advance(3_600_000);
     toil.reset();
     await sync.run(ctx);
-    expect(named(toil, 'jira issue search').map((c) => c.input.fields)).toEqual([undefined]);
+    expect(named(toil, 'jira issue search').map((c) => c.input.fields)).toEqual([CARD_JIRA_FIELDS]);
     expect(keys(cache.items('card-payments'))).toContain('PAY-104');
 
     // A day after the last whole listing: the delta, and then the ids alone, with no watermark.
@@ -228,7 +228,7 @@ describe('deleted and moved items (#493)', () => {
     toil.reset();
     const job = await sync.run(ctx);
     const searches = named(toil, 'jira issue search').filter((c) => c.input.cursor === undefined);
-    expect(searches.map((c) => [c.input.updatedSince !== undefined, c.input.fields])).toEqual([[true, undefined], [false, 'key']]);
+    expect(searches.map((c) => [c.input.updatedSince !== undefined, c.input.fields])).toEqual([[true, CARD_JIRA_FIELDS], [false, 'key']]);
     // The delta brings changelogs; the ids-only listing asks for none.
     expect(searches.map((c) => c.input.changelog)).toEqual([true, undefined]);
     expect(keys(cache.items('card-payments'))).not.toContain('PAY-104');
@@ -269,7 +269,7 @@ describe('deleted and moved items (#493)', () => {
     advance(60_000);
     toil.reset();
     await sync.run(ctx);
-    expect(named(toil, 'jira issue search').filter((c) => c.input.cursor === undefined).map((c) => c.input.fields)).toEqual([undefined, 'key']);
+    expect(named(toil, 'jira issue search').filter((c) => c.input.cursor === undefined).map((c) => c.input.fields)).toEqual([CARD_JIRA_FIELDS, 'key']);
   });
 });
 
@@ -302,7 +302,7 @@ describe('a whole listing that fails (#493)', () => {
     advance(60_000);
     toil.reset();
     await sync.run(ctx);
-    expect(named(toil, 'jira issue search').filter((c) => c.input.cursor === undefined).map((c) => c.input.fields)).toEqual([undefined, 'key']);
+    expect(named(toil, 'jira issue search').filter((c) => c.input.cursor === undefined).map((c) => c.input.fields)).toEqual([CARD_JIRA_FIELDS, 'key']);
     expect(cache.source('card-payments', 'jira')!.fullReadAt).not.toBe(firstWhole);
   });
 });
@@ -332,7 +332,7 @@ describe('a failing source', () => {
     const after = await loadToilProject(viaStore, 'card-payments', { mapOwi });
     expect(after.items).toEqual(good.items);
     expect(after.changes).toEqual(good.changes);
-    const search = (await viaStore('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true })) as Envelope & { ok: true };
+    const search = (await viaStore('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true, fields: CARD_JIRA_FIELDS })) as Envelope & { ok: true };
     expect(search.ok).toBe(true);
     expect(search.meta.warnings?.map((w) => w.code)).toContain('STALE');
     expect(cache.items('card-payments')).toHaveLength(good.items.length);
@@ -344,7 +344,7 @@ describe('a failing source', () => {
     await sync.run(ctx);
     expect(named(toil, 'jira issue search')[0]!.input.updatedSince).toBe(watermark);
     expect(cache.source('card-payments', 'jira')).toMatchObject({ status: 'ok', stale: false });
-    const fresh = (await viaStore('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true })) as Envelope & { ok: true };
+    const fresh = (await viaStore('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true, fields: CARD_JIRA_FIELDS })) as Envelope & { ok: true };
     expect(fresh.meta.warnings ?? []).toEqual([]);
   });
 

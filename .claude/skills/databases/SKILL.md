@@ -100,7 +100,7 @@ one they got.
 - **Adding an engine:** write `src/core/db/<engine>/` implementing `DbProvider`,
   add it to `providers` in `src/core/db/engines.ts`, add its connection keys
   (optional in the zod schema in `src/areas/db/index.ts`, listed in the provider's
-  `requires`, and secrets in the area's `secrets`), add a target to
+  `requires`, and secrets in the area's `secrets`; an engine that takes a `token`, or takes no `password`, gets its entry in the area's `appliesTo`, so Toil UI says "not needed" rather than "missing"), add a target to
   `test/db/targets.ts`, and add its section to `skills/toil/db.md` and its tile to
   the site's Databases group. An engine reached over HTTP sends through `call.fetch`
   and core's `restResponse`, never a fetch of its own, and sends what must go out

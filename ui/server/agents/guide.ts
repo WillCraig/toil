@@ -20,7 +20,7 @@ import type { Answer } from '../../src/agent.ts';
 import type { AreaInfo, ConnectionRow } from '../../src/config.ts';
 import { GUIDE_COMMANDS, deploymentWord, guideInputProblem, looksLikeSecret, STEP_NOW, type GuideState } from '../../src/guide.ts';
 import type { Proposal } from '../../src/proposal.ts';
-import { deploymentOf, STEP_TITLE, tokenState, TOKEN_WORD, toolName } from '../../src/setup.ts';
+import { deploymentOf, STEP_TITLE, tokenStateOf, TOKEN_WORD, toolName } from '../../src/setup.ts';
 import { partsOf } from './answer.ts';
 import { AgentError } from './cli.ts';
 import type { PromptStyle } from './prompts.ts';
@@ -67,10 +67,9 @@ const ONE = (list: readonly string[]) => (list.length ? list.join(', ') : 'none 
  * The context the prompt carries: where the person is, and what is true so
  * far, as non-secret facts. A connection is its name, tool, address, which
  * deployment, whether changes are on and where its token lives (saved, from an
- * environment variable, or missing): the same badge Settings shows, never a value.
+ * environment variable, missing, or not needed): the same badge Settings shows, never a value.
  */
 export function guideContext(state: GuideState, rows: readonly ConnectionRow[] | null, areas: readonly AreaInfo[]): string {
-  const secretKeys = (area: string) => areas.find((a) => a.name === area)?.connection.filter((f) => f.secret).map((f) => f.name) ?? [];
   const lines = [`The person is on the step "${STEP_TITLE[state.step]}", ${STEP_NOW[state.step]}.`, `Tools they ticked: ${ONE(state.areas.map(toolName))}.`];
   if (state.area) lines.push(`Linking now: ${toolName(state.area)}.`);
   if (state.deployment) lines.push(`Deployment chosen in the form: ${deploymentWord(state.deployment)}.`);
@@ -85,7 +84,7 @@ export function guideContext(state: GuideState, rows: readonly ConnectionRow[] |
     for (const row of rows) {
       const info = areas.find((a) => a.name === row.area);
       const where = [row.host, info ? deploymentOf(info, row) : null].filter(Boolean).join(', ');
-      lines.push(`- ${row.name}: ${toolName(row.area)}${where ? `, ${where}` : ''}, changes ${row.writes ? 'on' : 'off'}, token ${TOKEN_WORD[tokenState(row, secretKeys(row.area))]}`);
+      lines.push(`- ${row.name}: ${toolName(row.area)}${where ? `, ${where}` : ''}, changes ${row.writes ? 'on' : 'off'}, token ${TOKEN_WORD[tokenStateOf(info, row)]}`);
     }
   }
   return lines.join('\n');

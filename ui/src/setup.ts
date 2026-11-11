@@ -73,14 +73,40 @@ export function groupAreas(areas: AreaInfo[]): { common: AreaInfo[]; more: AreaI
 }
 
 /** Where a connection's token lives, from `connections list`'s per-key sources (never a value). `missing` is a real none; an unreadable list is the caller's dash. */
-export type TokenState = 'saved' | 'env' | 'missing';
-export const TOKEN_WORD: Record<TokenState, string> = { saved: 'saved', env: "set outside Toil UI", missing: 'missing' };
+export type TokenState = 'saved' | 'env' | 'missing' | 'none';
+/** `none` is a connection that takes no secret (a SQLite file), which is not a secret that went missing. */
+export const TOKEN_WORD: Record<TokenState, string> = { saved: 'saved', env: "set outside Toil UI", missing: 'missing', none: 'not needed' };
 
 export function tokenState(row: { values: Record<string, string> }, secretKeys: string[]): TokenState {
   const sources = secretKeys.map((k) => row.values[k]);
   if (sources.some((s) => s === 'store' || s === 'file')) return 'saved';
   if (sources.some((s) => s === 'env' || s === 'ci')) return 'env';
   return 'missing';
+}
+
+/**
+ * The secret keys this connection could use. `connections list` doesn't say
+ * which variant (a database's engine) a connection is, so it is read from the
+ * settings the connection holds: a variant is possible when every setting it
+ * requires (a field's `requiredFor`) is set. A secret that `appliesTo` names
+ * only other variants is left out. When the variant can't be told, every
+ * secret counts, so "not needed" is only said when it is certain.
+ */
+export function secretKeysFor(area: AreaInfo | undefined, row: { values: Record<string, string> }): string[] {
+  const secrets = area?.connection.filter((f) => f.secret) ?? [];
+  if (!area || !area.variantBy) return secrets.map((f) => f.name);
+  const variants = [...new Set(area.connection.flatMap((f) => f.requiredFor ?? []))];
+  const held = new Set(Object.keys(row.values));
+  const possible = variants.filter((v) => area.connection.filter((f) => f.requiredFor?.includes(v)).every((f) => held.has(f.name)));
+  return secrets.filter((f) => !f.appliesTo || possible.length === 0 || possible.some((v) => f.appliesTo!.includes(v))).map((f) => f.name);
+}
+
+/** A connection's token state, counting only the secrets it could use: `none` when there are none. */
+export function tokenStateOf(area: AreaInfo | undefined, row: { values: Record<string, string> }): TokenState {
+  // Without the area's description there is no telling what it needs, so nothing is "not needed".
+  if (!area) return tokenState(row, []);
+  const keys = secretKeysFor(area, row);
+  return keys.length === 0 ? 'none' : tokenState(row, keys);
 }
 
 /** Cloud or Data Center, read from the host the connection is on and the area's own host patterns; null when the area has no such choice. */

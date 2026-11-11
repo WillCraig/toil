@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { mapOwi } from '@imagile-dev/toil/api';
 import { describe, expect, it } from 'vitest';
-import { fixtureExecute } from '../src/fixtures/execute.ts';
+import { CARD_JIRA_FIELDS, fixtureExecute } from '../src/fixtures/execute.ts';
 import { JIRA_CHANGELOGS, JIRA_KEYS, JIRA_SEARCH } from '../src/fixtures/work.ts';
 import { splitChangelogs } from '../src/jira-changelog.ts';
 import { JQL } from '../src/load.ts';
@@ -16,7 +16,7 @@ import type { Envelope } from '../src/toil.ts';
 
 type Rec = Record<string, unknown>;
 const read = { readOnly: true, caller: 'toil-ui' };
-const searchEnvelope = async (): Promise<Envelope & { ok: true }> => (await fixtureExecute().execute('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true }, read)) as Envelope & { ok: true };
+const searchEnvelope = async (): Promise<Envelope & { ok: true }> => (await fixtureExecute().execute('jira issue search', { toilProject: 'card-payments', jql: JQL('PAY'), changelog: true, fields: CARD_JIRA_FIELDS }, read)) as Envelope & { ok: true };
 
 /** The search with every issue's changelog whole and inline, as Jira sends it for short histories. */
 const wholeInline = (search: Envelope & { ok: true }): Envelope => {

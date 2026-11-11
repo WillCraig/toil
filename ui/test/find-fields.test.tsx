@@ -27,7 +27,7 @@ interface Call {
 }
 
 /** A machine with a Jira connection and one Toil project; `failing` lines are refused until `heal()`. */
-function machine(failing: string[] = []) {
+function machine(failing: string[] = [], named: string | Record<string, string> | null = null) {
   const calls: Call[] = [];
   let broken = new Set(failing);
   const config: ConfigApi = {
@@ -38,7 +38,7 @@ function machine(failing: string[] = []) {
       calls.push({ command, input });
       if (command === 'connections list') return ok(command, { configFile: '/home/you/.toil/config.json', connections: [{ name: 'corp-jira', area: 'jira', isDefault: true, host: 'jira.imagile.dev', writes: false, values: {}, definedIn: 'file' }] });
       if (command === 'projects list') return ok(command, { toilProjects: [{ name: 'payments', description: null, source: 'user', file: '/home/you/.toil/projects/payments.json', shadowedBy: null, problems: 0 }], places: { user: '/home/you/.toil/projects' } });
-      if (command === 'projects show') return ok(command, { areas: {}, toilProject: {} });
+      if (command === 'projects show') return ok(command, { areas: typeof named === 'string' ? { jira: { inputs: { project: named } } } : {}, toilProject: named ? { jira: { project: named } } : {} });
       if (command === 'jira field discover') return ok(command, (input.project === 'NONE' || Array.isArray(input.issue)) ? { ...FIELD_DISCOVERY, issueTypes: [{ name: 'Story', sampled: ['NONE-1'], status: 'sampled', fields: [] }], fields: [], commands: [] } : FIELD_DISCOVERY);
       if (command === 'projects field') {
         const line = `${input.alias}`;
@@ -55,6 +55,7 @@ const connections = [{ name: 'corp-jira', area: 'jira' }];
 const mount = (config: ConfigApi, extra: Partial<Parameters<typeof FindFields>[0]> = {}) => render(<FindFields config={config} toilProjects={['payments']} toilProject="payments" connections={connections} connection="corp-jira" {...extra} />);
 const press = (name: string | RegExp) => userEvent.click(screen.getByRole('button', { name }));
 const reads = (calls: Call[]) => calls.filter((c) => c.command === 'jira field discover');
+const keySaves = (calls: Call[]) => calls.filter((c) => c.command === 'projects link').map((c) => c.input);
 const saves = (calls: Call[]) => calls.filter((c) => c.command === 'projects field').map((c) => `${c.input.alias}=${c.input.id}${c.input.replace ? ' --replace' : ''}`);
 
 async function read(project = 'PAY') {
@@ -92,7 +93,7 @@ describe('Find the fields', () => {
     expect(ticked(/Name Crew/)).toBe(false);
     expect(document.body.textContent).not.toContain('Runs ');
     await press('Name these fields');
-    await screen.findByText(/4 of 4 saved/);
+    await screen.findByText(/5 of 5 saved/);
     expect(saves(calls)).toEqual(['storyPointEstimate=customfield_10016', 'estimate=customfield_10016 --replace', 'sprint=customfield_10020', 'iteration=customfield_10020 --replace']);
     const done = document.querySelector('[data-find-done]')!.textContent!;
     expect(done).toContain('Nothing was changed in Jira.');
@@ -111,7 +112,7 @@ describe('Find the fields', () => {
     await userEvent.click(screen.getAllByRole('checkbox', { name: /Name Sprint in/ })[0]!);
     await userEvent.click(screen.getAllByRole('checkbox', { name: /Name Story point estimate/ })[0]!);
     await press('Name these fields');
-    await screen.findByText(/1 of 1 saved/);
+    await screen.findByText(/2 of 2 saved/);
     expect(saves(calls)).toEqual(['team=customfield_10200']);
   });
 
@@ -132,18 +133,76 @@ describe('Find the fields', () => {
     mount(config);
     await read();
     await press('Name these fields');
-    await screen.findByText(/3 of 4 saved/);
+    await screen.findByText(/4 of 5 saved/);
     const list = screen.getByRole('list', { name: 'What happened to each name' });
     const lines = within(list).getAllByRole('listitem').map((li) => li.textContent);
     expect(lines.filter((l) => l!.includes('failed'))).toHaveLength(1);
     expect(lines.find((l) => l!.includes('failed'))).toContain('"iteration" already names another field. Fix: Pass --replace.');
-    expect(lines.filter((l) => l!.includes(': saved'))).toHaveLength(3);
+    expect(lines.filter((l) => l!.includes(': saved'))).toHaveLength(4);
     const before = saves(calls).length;
     heal();
     await press('Try the failed ones again');
-    await screen.findByText(/4 of 4 saved/);
+    await screen.findByText(/5 of 5 saved/);
     expect(saves(calls).slice(before)).toEqual(['iteration=customfield_10020 --replace']);
     expect(screen.queryByRole('button', { name: 'Try the failed ones again' })).toBeNull();
+  });
+
+  it('saves the Jira project key it sampled from where the Toil project names none, as one more call, and never with --replace', async () => {
+    const { config, calls } = machine();
+    mount(config);
+    await read('PAY');
+    expect(document.querySelector('[data-find-key]')!.textContent).toMatch(/payments names no Jira project yet.*PAY/);
+    await press('Name these fields');
+    await screen.findByText(/5 of 5 saved/);
+    expect(keySaves(calls)).toEqual([{ toilProject: 'payments', area: 'jira', set: ['project=PAY'] }]);
+    // The key goes after the field names, and shows in the results by its own label.
+    expect(calls.filter((c) => c.command === 'projects field' || c.command === 'projects link').at(-1)!.command).toBe('projects link');
+    expect(screen.getByRole('list', { name: 'What happened to each name' }).textContent).toContain('Jira project key: saved');
+  });
+
+  it('saves the key the sample was read from, not one edited into the box after the read', async () => {
+    const { config, calls } = machine();
+    mount(config);
+    await read('PAY');
+    await userEvent.type(screen.getByLabelText(/^Jira project key/), 'X');
+    await press('Name these fields');
+    await screen.findByText(/5 of 5 saved/);
+    expect(keySaves(calls)).toEqual([{ toilProject: 'payments', area: 'jira', set: ['project=PAY'] }]);
+  });
+
+  it('leaves the key alone when the Toil project already names one, and says nothing about it', async () => {
+    const { config, calls } = machine([], 'PAY');
+    mount(config);
+    await waitFor(() => expect((screen.getByLabelText(/^Jira project key/) as HTMLInputElement).value).toBe('PAY'));
+    await press('Read the fields');
+    await screen.findByRole('heading', { level: 4, name: 'Story' });
+    expect(document.querySelector('[data-find-key]')).toBeNull();
+    await press('Name these fields');
+    await screen.findByText(/4 of 4 saved/);
+    expect(keySaves(calls)).toEqual([]);
+  });
+
+  it('treats a per-repository project map as naming one, though it resolves to nothing here: no save and no note', async () => {
+    const { config, calls } = machine([], { 'C:/Code/elsewhere': 'PAY' });
+    mount(config);
+    await read('PAY');
+    expect(document.querySelector('[data-find-key]')).toBeNull();
+    expect(document.body.textContent).not.toContain('names no Jira project yet');
+    await press('Name these fields');
+    await screen.findByText(/4 of 4 saved/);
+    expect(keySaves(calls)).toEqual([]);
+  });
+
+  it('does not save a key it could not compare with the Toil project (unknown is not none)', async () => {
+    const { config, calls } = machine();
+    const run = config.run;
+    config.run = async (command, input, extra) => (command === 'projects show' ? refused(command, 'Could not read it.') : run(command, input, extra));
+    mount(config);
+    await read('PAY');
+    expect(document.querySelector('[data-find-key]')).toBeNull();
+    await press('Name these fields');
+    await screen.findByText(/4 of 4 saved/);
+    expect(keySaves(calls)).toEqual([]);
   });
 
   it('reads issues the person names, and says a type with nothing set has no custom fields (not unknown)', async () => {

@@ -201,6 +201,84 @@ export function owiFields(fields: unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(fields).filter((e): e is [string, string] => (OVERRIDABLE as readonly string[]).includes(e[0]) && typeof e[1] === 'string'));
 }
 
+/**
+ * What `jira issue search` returns when it is given no `fields`
+ * (`STANDARD_SEARCH_FIELDS` in src/areas/jira/{cloud,server}/client.ts), which
+ * a search that names any field no longer adds on its own. ui/test holds this
+ * list to both of them, so a field toil starts returning is not lost here.
+ */
+export const JIRA_STANDARD_FIELDS = ['summary', 'status', 'priority', 'assignee', 'issuetype', 'project', 'created', 'updated', 'labels', 'reporter'];
+
+/**
+ * What `mapOwi` reads from a Jira issue (src/core/owi/jira.ts) by a standard
+ * field name and a search does not return by itself: the description (the
+ * readiness check reads it), how and when it was resolved, the due date, the
+ * original estimate (the hours fallback when no points field is registered),
+ * and the parent, sub-tasks and links that the Board, the Graph and the
+ * blockers are drawn from. The epic link is not here: it comes only from a
+ * registered field.
+ */
+export const JIRA_OWI_FIELDS = ['description', 'resolution', 'resolutiondate', 'duedate', 'timeoriginalestimate', 'parent', 'subtasks', 'issuelinks'];
+
+/** The OWI keys whose value is the name or id of a Jira field (the others are units, labels and day counts). */
+const JIRA_FIELD_KEYS = ['estimate', 'iteration', 'team', 'dueDate', 'priority', 'type'] as const;
+/** The section's `fields` the readiness check reads from the issue too: the field acceptance criteria are kept in. */
+const JIRA_READ_FIELDS = [...JIRA_FIELD_KEYS, 'acceptanceCriteria'] as const;
+
+/** A custom field a Jira connection registers, as `jira issue fields` lists it. */
+export interface RegisteredField {
+  id: string;
+  name: string;
+}
+
+/** The registered custom fields in a `jira issue fields` answer; anything that isn't an id and a name is left out. */
+export function registeredFields(data: unknown): RegisteredField[] {
+  return (Array.isArray(data) ? data : []).flatMap((f) => (isRec(f) && typeof f.id === 'string' && typeof f.name === 'string' ? [{ id: f.id, name: f.name }] : []));
+}
+
+/** The registered field an OWI override names, by its id or its name in any case. */
+const registeredBy = (registered: readonly RegisteredField[], value: string) => registered.find((f) => f.id === value) ?? registered.find((f) => f.name.toLowerCase() === value.toLowerCase());
+
+/**
+ * The `fields` a Jira search is asked for: the standard ones, what `mapOwi`
+ * reads, every custom field the connection registers, and the field each of
+ * the Toil project's `fields` name (an OWI override, or where acceptance
+ * criteria are kept), as the id search resolves it. A name that is neither
+ * registered nor one word could not be resolved (search refuses it, and with it
+ * the whole read), so it is left out and `mapOwi` says the field is missing.
+ */
+export function jiraSearchFields(registered: readonly RegisteredField[], section: Record<string, unknown>): string {
+  const named = JIRA_READ_FIELDS.flatMap((k) => {
+    const v = section[k];
+    if (typeof v !== 'string' || v.trim() === '') return [];
+    const def = registeredBy(registered, v.trim());
+    return def ? [def.id] : /\s/.test(v.trim()) ? [] : [v.trim()];
+  });
+  return [...new Set([...JIRA_STANDARD_FIELDS, ...JIRA_OWI_FIELDS, ...registered.map((f) => f.id), ...named])].join(',');
+}
+
+/**
+ * Jira search returns a registered custom field under the name the connection
+ * registers it as, but an OWI override (and the readiness check's acceptance
+ * criteria) may name it by id, which is what the Fields step writes. Each
+ * issue gets every registered field's value copied back under its id, so both
+ * spellings find it. The overrides themselves stay as written: the sprint
+ * history (`jiraHistory`) matches Jira's own label or the id, never the
+ * registered name. A field the search returned no value for is left alone, and
+ * a value already under its id is never replaced.
+ */
+export function withFieldIds(search: Envelope, registered: readonly RegisteredField[]): Envelope {
+  const data = search.data;
+  if (!search.ok || !registered.length || !isRec(data) || !Array.isArray(data.issues)) return search;
+  const issues = data.issues.map((issue) => {
+    if (!isRec(issue) || !isRec(issue.fields)) return issue;
+    const fields: Rec = { ...issue.fields };
+    for (const { id, name } of registered) if (fields[id] === undefined && fields[name] !== undefined) fields[id] = fields[name];
+    return { ...issue, fields };
+  });
+  return { ...search, data: { ...data, issues } } as Envelope;
+}
+
 /** How many pull requests that aren't open are still read in full (`pr get --include`): the newest ones, which the flow metrics measure. */
 export const CHECKED_CLOSED_PRS = 20;
 
@@ -345,6 +423,8 @@ export async function loadToilProject(execute: Execute, name: string, options: L
   const boardOf = new Map<string, { project: number; owner?: string }>();
   const work: Record<(typeof JIRA_AREAS)[number] | (typeof ADO_AREAS)[number] | 'github', unknown[]> = { jira: [], ado: [], github: [] };
   const tasks: Array<Promise<void>> = [];
+  /** The custom fields each Jira connection registers, read once before its searches, so they ask for the fields the Toil project names. */
+  const registered: Record<string, RegisteredField[]> = {};
   /** Each place a read went to (a GitHub repository, a Bitbucket repo, an Azure DevOps project) and whether its work items and pull requests came back, for the Pull requests view to say. */
   const readState = new Map<string, ReadTarget>();
   const track = (area: string, label: string): ReadTarget => {
@@ -366,14 +446,19 @@ export async function loadToilProject(execute: Execute, name: string, options: L
   // A Jira project is named in the JQL, so a per-repo `project` is one search per distinct project. Plain, it is the project `projects show` resolved.
   for (const jira of JIRA_AREAS.filter((a) => areas[a])) {
     const projects = [...new Set([areas[jira]!.inputs.project, ...valuesOf(section(jira), 'project')].filter((p): p is string => Boolean(p)))];
+    // `issue fields` lists what the connection holds and asks Jira nothing.
+    const listed = projects.length ? await run('work', `${jira} issue fields`, { ...base }) : null;
+    registered[jira] = registeredFields(listed?.data);
+    // A list that failed is unknown, not empty: the search is then asked for no `fields`, as before #573, and returns what it returns by itself.
+    const fields = listed ? jiraSearchFields(registered[jira], isRec(section(jira).fields) ? (section(jira).fields as Rec) : {}) : undefined;
     for (const project of projects) {
       tasks.push((async () => {
         const state = track(jira, projects.length > 1 ? project : '');
         // The search brings each issue's history with it (toil's --changelog); only an issue whose changelog came back short is read with a call of its own.
-        const asked = await run('work', `${jira} issue search`, { ...base, jql: JQL(project, options.windowDays), changelog: true });
+        const asked = await run('work', `${jira} issue search`, { ...base, jql: JQL(project, options.windowDays), changelog: true, ...(fields === undefined ? {} : { fields }) });
         if (!asked) return markUnread(state, 'work');
         const { search, histories: inline, incomplete } = splitChangelogs(asked, `${jira} issue history`);
-        work[jira].push(search);
+        work[jira].push(withFieldIds(search, registered[jira] ?? []));
         for (const { key, history } of inline) work[jira].push({ key, history });
         const histories = await runEach('work', `${jira} issue history`, incomplete.map((key) => ({ ...base, key })));
         histories.forEach((history, n) => {

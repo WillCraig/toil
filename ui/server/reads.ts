@@ -21,6 +21,7 @@ export const READ_COMMANDS: ReadonlySet<string> = new Set([
   'projects list',
   'projects show',
   'jira issue search',
+  'jira issue fields',
   'jira issue history',
   'ado work-item iterations',
   'ado work-item search',

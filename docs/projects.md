@@ -257,7 +257,7 @@ prompts. The names are used through **one fixed input**, never through generated
 - The Open Work Item keys (`estimate`, `estimateUnit`, `priority`, `type`, `team`,
   `dueDate`, `iteration`, and GitHub's `estimateLabel` and `iterationDays`) point OWI
   mapping at the team's own fields (`docs/owi/spec.md`, Pointing a field at your own).
-  Toil UI passes them to `mapOwi` for the section's area; nothing else reads them.
+  Toil UI passes them to `mapOwi` for the section's area, and its Jira sync asks search for the field each one names; nothing else reads them.
   Like every value in `fields` they are text, so a number is quoted:
   `"iterationDays": "14"`. An unquoted `14` fails `toil projects check`.
 - A code host's section (`github`, `bitbucket`, `ado`)

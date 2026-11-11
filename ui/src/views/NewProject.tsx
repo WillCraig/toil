@@ -20,7 +20,8 @@ import { Help } from '../components/help.tsx';
 import { Loader } from '../moments/Moments.tsx';
 import { toilProjectEditHref, toilProjectHref } from '../format.ts';
 import { locationKind, locationProblems, toolName } from '../setup.ts';
-import { addRepos, createProject, linkTools, nameProblem, type Created, type RepoResult, type ToolLink } from './project-create.ts';
+import { addRepos, createProject, JIRA_KEY_LABEL, linkTools, nameProblem, withJiraKey, type Created, type RepoResult, type ToolLink } from './project-create.ts';
+import { JiraKeyField } from './jira-key.tsx';
 import { OutcomeLine, TextField, type Outcome } from './settings/parts.tsx';
 import './setup.css';
 
@@ -44,6 +45,8 @@ export interface NewProjectProgress {
   /** The connections ticked, or null until the defaults were offered once. */
   picked: string[] | null;
   toolsLater: boolean;
+  /** The Jira project key typed on the tools page (absent in progress kept before it existed). */
+  jiraKey?: string;
 }
 
 export interface NewProjectProps {
@@ -77,6 +80,7 @@ export function NewProject({ config, keep }: NewProjectProps) {
   const [foldersLater, setFoldersLater] = useState(kept?.foldersLater ?? false);
   const [picked, setPicked] = useState<string[] | null>(kept?.picked ?? null);
   const [toolsLater, setToolsLater] = useState(kept?.toolsLater ?? false);
+  const [jiraKey, setJiraKey] = useState(kept?.jiraKey ?? '');
   const [connections, setConnections] = useState<ConnectionRow[]>([]);
   /** Whether `connections list` was read: an unreadable list is unknown, not empty. */
   const [listed, setListed] = useState<boolean | null>(null);
@@ -87,7 +91,7 @@ export function NewProject({ config, keep }: NewProjectProps) {
   const [retrying, setRetrying] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const save = keep?.save;
-  useEffect(() => save?.(result ? null : { step, name, description, rows, foldersLater, picked, toolsLater }), [save, result, step, name, description, rows, foldersLater, picked, toolsLater]);
+  useEffect(() => save?.(result ? null : { step, name, description, rows, foldersLater, picked, toolsLater, jiraKey }), [save, result, step, name, description, rows, foldersLater, picked, toolsLater, jiraKey]);
   useEffect(() => heading.current?.focus(), [step, result !== null]);
 
   useEffect(() => {
@@ -113,7 +117,9 @@ export function NewProject({ config, keep }: NewProjectProps) {
   const chosen = picked ?? [];
   const links: ToolLink[] = connections.filter((c) => chosen.includes(c.name)).map((c) => ({ area: c.area, connection: c.name }));
   const locations = foldersLater ? [] : filled;
-  const toolLinks = toolsLater ? [] : links;
+  const toolLinks = toolsLater ? [] : withJiraKey(links, jiraKey);
+  // The key is typed once, under the first ticked Jira row, and goes to every Jira link.
+  const firstJira = toolsLater ? undefined : connections.find((c) => c.area === 'jira' && chosen.includes(c.name))?.name;
   const problem = nameProblem(name, taken);
 
   const toggleTool = (c: ConnectionRow) => {
@@ -278,6 +284,7 @@ export function NewProject({ config, keep }: NewProjectProps) {
                               )}
                             </span>
                           </label>
+                          {c.name === firstJira && <JiraKeyField value={jiraKey} onChange={setJiraKey} attr="data-new-project-jira-key" />}
                         </li>
                       ))}
                     </ul>
@@ -294,7 +301,7 @@ export function NewProject({ config, keep }: NewProjectProps) {
                   </li>
                   <li>{description.trim() ? `What it is: ${description.trim()}.` : 'No description.'}</li>
                   <li>{locations.length ? `Folders and addresses: ${locations.join(', ')}.` : 'No folders or addresses yet.'}</li>
-                  <li>{toolLinks.length ? `Tools: ${toolLinks.map((l) => `${toolName(l.area)} through ${l.connection}`).join(', ')}.` : 'No tools linked yet.'}</li>
+                  <li>{toolLinks.length ? `Tools: ${toolLinks.map((l) => `${toolName(l.area)} through ${l.connection}${l.set?.length ? ` (${JIRA_KEY_LABEL} ${jiraKey.trim()})` : ''}`).join(', ')}.` : 'No tools linked yet.'}</li>
                 </ul>
                 <p className="note" data-new-project-writes="">
                   Creating it saves one small file of your own on this computer. Nothing is saved in any folder or repository you list, and each link keeps its own rule on whether it may make changes.

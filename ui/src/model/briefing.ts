@@ -52,8 +52,10 @@ export interface BriefingView {
   unknown: string[];
   /** What the page must say about the briefing itself: a block that didn't fit, ids its tools never returned. Shown, never folded. */
   problems: string[];
-  /** Lenses that couldn't test some items, or couldn't run, and why: one step in. */
-  unchecked: Array<{ label: string; note: string }>;
+  /** Lenses that did not run at all, and why (no limit set, a source missing): one step in. */
+  unchecked: Array<{ lens: string; label: string; note: string }>;
+  /** Lenses that ran but couldn't test some items, and which (three items with no assignee): one step in. Said apart from `unchecked`, since the rest of the lens was read. */
+  partlyChecked: Array<{ lens: string; label: string; note: string }>;
   /** The code's briefing, always: the drawer's facts and the lens notes come from it. */
   code: Brief;
 }
@@ -69,6 +71,32 @@ export interface BriefingInput {
 
 /** The code's lens labels, said the way a manager would: WIP is a developer's abbreviation. */
 const plainLabel = (label: string) => label.replace(/\bWIP\b/g, 'work-in-progress');
+/** A command the core's note points at, in parentheses ("(toil projects wip-limit)", "(map pr get --include checks)"): not for a screen. */
+const COMMAND_IN_PARENS = /\s*\((?:toil )?[a-z][a-z-]*(?: [a-z][a-z-]*)+\)|\s*\([^)]*--[^)]*\)/g;
+
+/**
+ * What a lens's note says on a screen. The core's text (`brief.ts`) names
+ * commands for the CLI's readers, so each note it writes is put in plain words
+ * here, by lens and by what the lens could not test; a note not recognised
+ * keeps the core's words with any parenthesised command taken out.
+ */
+export function plainNote(lens: Brief['lenses'][number]): string {
+  const n = lens.untested;
+  const inProgress = (many: string, one: string) => `${n} ${n === 1 ? `item in progress ${one}` : `items in progress ${many}`}.`;
+  if (!lens.checked) {
+    if (lens.id === 'ready') return "Readiness isn't worked out in this summary.";
+    if (lens.id === 'load') return 'No work-in-progress limit is set.';
+    if (lens.id === 'sprint' && lens.note && /points estimate/.test(lens.note)) return 'No item in the sprint has a points estimate.';
+    if (lens.id === 'sprint') return 'No item is in a sprint running now.';
+  } else if (n > 0) {
+    if (lens.id === 'failing') return 'Some code reviews have no checks read.';
+    if (lens.id === 'waiting') return 'Some code reviews have no reviews read.';
+    if (lens.id === 'load') return inProgress('have nobody assigned', 'has nobody assigned');
+    if (lens.id === 'stale') return inProgress('have no last-updated time', 'has no last-updated time');
+  }
+  return (lens.note ?? '').replace(COMMAND_IN_PARENS, '');
+}
+
 const severityOf =(lens: string): Severity => (lens === 'failing' || lens === 'blocked' ? 'danger' : 'warn');
 const knownLens = (lens: string): lens is LensId => ['failing', 'blocked', 'waiting', 'sprint', 'stale', 'load', 'drift', 'ready'].includes(lens);
 
@@ -81,7 +109,9 @@ export function briefingOf(input: BriefingInput): BriefingView {
   const latest = input.analyses[0] ?? null;
   const usable = latest?.briefing && isCurrent(latest, input.now) ? latest : null;
   const onTrackByCode = `${code.onTrack.open} open and ${code.onTrack.done} done are on track.`;
-  const unchecked = code.lenses.filter((l) => l.on && l.note).map((l) => ({ label: plainLabel(l.label), note: l.note! }));
+  const noted = (ran: boolean) => code.lenses.filter((l) => l.on && l.note && l.checked === ran).map((l) => ({ lens: l.id, label: plainLabel(l.label), note: plainNote(l) }));
+  const unchecked = noted(false);
+  const partlyChecked = noted(true);
   if (!usable) {
     const stale = !latest ? null : !isCurrent(latest, input.now) ? 'The latest Analyze is older than the data.' : 'The latest Analyze has no briefing block, so it is shown as it came on its own page.';
     return {
@@ -97,6 +127,7 @@ export function briefingOf(input: BriefingInput): BriefingView {
       unknown: [],
       problems: [],
       unchecked,
+      partlyChecked,
       code,
     };
   }
@@ -117,6 +148,7 @@ export function briefingOf(input: BriefingInput): BriefingView {
     unknown: [...named, ...left].filter((id) => !ids.has(id)),
     problems: [...usable.briefingProblems, ...(usable.unverified ? [`Analyze named ${usable.unverified === 1 ? 'an item' : `${usable.unverified} items`} its tools never returned; the analysis marks ${usable.unverified === 1 ? 'it' : 'them'}.`] : [])],
     unchecked,
+    partlyChecked,
     code,
   };
 }

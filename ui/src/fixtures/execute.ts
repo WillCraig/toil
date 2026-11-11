@@ -15,7 +15,7 @@
  */
 
 import { ADO_FEED_FIELDS } from '../ado-revisions.ts';
-import { CODEOWNERS_PATHS, JQL, PR_INCLUDE, WIQL } from '../load.ts';
+import { CODEOWNERS_PATHS, JQL, jiraSearchFields, PR_INCLUDE, WIQL } from '../load.ts';
 import type { Call, Envelope, Execute, ExecuteOptions } from '../toil.ts';
 import { ADO_CI_RUNS, ADO_DEPLOY_RUNS, ADO_PR_GETS, ADO_PRS, BITBUCKET_CLOUD_PR_GETS, BITBUCKET_CLOUD_PRS, BITBUCKET_PR_GETS, BITBUCKET_PRS, GITHUB_CODEOWNERS, GITHUB_PR_GETS, GITHUB_PRS, JENKINS_RUNS, OPENSHIFT } from './delivery.ts';
 import { TOIL_PROJECTS, archivedListData, fileOf, listData, showData, type ToilProjectFile } from './toil-projects.ts';
@@ -41,6 +41,15 @@ export interface Canned {
 }
 
 
+/** The custom fields `corp-jira` registers: `jira issue fields`'s data in the sample. */
+export const JIRA_REGISTERED = [
+  { id: 'customfield_10016', name: 'Story Points', type: 'number' },
+  { id: 'customfield_10020', name: 'Sprint', type: 'sprint' },
+];
+
+/** The `fields` the loader asks card-payments' Jira search for: what that connection registers, and the field its section keeps acceptance criteria in. */
+export const CARD_JIRA_FIELDS = jiraSearchFields(JIRA_REGISTERED, { acceptanceCriteria: 'customfield_10500' });
+
 const card = 'card-payments';
 const settle = 'settlement';
 const checkout = 'checkout-web';
@@ -58,7 +67,9 @@ export const CANNED: Canned[] = [
 
   // card-payments
   // The search carries each issue's history (toil's --changelog); the sample cuts one short, and that issue is read with its own call.
-  { command: 'jira issue search', input: { toilProject: card, jql: JQL('PAY'), changelog: true }, data: JIRA_SEARCH_WITH_CHANGELOGS, ...at(card, 'jira') },
+  // The connection registers the two fields the sample's sprint and points are read from, so the search asks for them by id and gets them back by name.
+  { command: 'jira issue fields', input: { toilProject: card }, data: JIRA_REGISTERED, ...at(card, 'jira') },
+  { command: 'jira issue search', input: { toilProject: card, jql: JQL('PAY'), changelog: true, fields: CARD_JIRA_FIELDS }, data: JIRA_SEARCH_WITH_CHANGELOGS, ...at(card, 'jira') },
   ...JIRA_CUT_SHORT.map((key) => ({ command: 'jira issue history', input: { toilProject: card, key }, data: JIRA_CHANGELOGS[key], ...at(card, 'jira') })),
   // The readiness gate's one live read (#307), made only when a person presses for it on an item's page.
   ...Object.entries(JIRA_TRANSITIONS).map(([key, data]) => ({ command: 'jira issue transitions', input: { toilProject: card, key }, data, ...at(card, 'jira') })),

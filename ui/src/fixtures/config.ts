@@ -178,7 +178,7 @@ function fixtureConfigAnswer(answers: Map<string, Answer>, reads: Set<string>, c
     return { ok: false, data: null, error: { code: 'INVALID_INPUT', message: `Toil UI doesn't change ${command} from the page.`, fix: `Run toil ${command} on the CLI, where toil's own rules apply.` }, meta: meta(command) };
   }
   if (!reads.has(command) && !answersLikeARead(command, input)) {
-    return { ok: false, data: null, error: { code: 'WRITE_DISABLED', message: `The preview changes nothing, so toil ${command} didn't run.`, fix: 'Run Toil UI on your own machine to change your configuration.' }, meta: meta(command) };
+    return { ok: false, data: null, error: { code: 'WRITE_DISABLED', message: `The preview changes nothing, so it wasn't saved.`, fix: 'Run Toil UI on your own machine to change your configuration.' }, meta: meta(command) };
   }
   const hit = answers.get(callKey(command, answerInput(command, input)));
   if (!hit) {

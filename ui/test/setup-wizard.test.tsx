@@ -31,7 +31,7 @@ interface Call {
 }
 
 /** A config that answers like an empty machine, records every call, and allows changes. */
-function emptyMachine(existing: unknown[] = []) {
+function emptyMachine(existing: unknown[] = [], payments?: { show: 'fails' | Record<string, unknown> }) {
   const calls: Call[] = [];
   const base = fixtureConfig();
   const ok = (command: string, data: unknown): Envelope => ({ ok: true, data, error: null, meta: { command, durationMs: 0, version: 'test', contractVersion: 1 } }) as Envelope;
@@ -42,7 +42,8 @@ function emptyMachine(existing: unknown[] = []) {
     run: async (command, input, extra) => {
       calls.push({ command, input, extra });
       if (command === 'connections list') return ok(command, { configFile: '/home/you/.toil/config.json', connections: existing });
-      if (command === 'projects list') return ok(command, { toilProjects: [], places: { user: '/home/you/.toil/projects' } });
+      if (command === 'projects list') return ok(command, { toilProjects: payments ? [{ name: 'payments', description: null, source: 'user', file: '/home/you/.toil/projects/payments.json', shadowedBy: null, problems: 0 }] : [], places: { user: '/home/you/.toil/projects' } });
+      if (command === 'projects show' && payments) return payments.show === 'fails' ? ({ ok: false, data: null, error: { code: 'NOT_FOUND', message: 'No such Toil project.', fix: 'Check the name.' }, meta: { command, durationMs: 0, version: 'test', contractVersion: 1 } } as Envelope) : ok(command, { name: 'payments', areas: {}, toilProject: payments.show });
       if (command === 'connections add') return ok(command, { name: input.name, area: input.area, secrets: { token: 'store' }, writes: false });
       if (command === 'connections test') return ok(command, { name: input.name, area: 'github', host: 'github.imagile.dev', live: true, authenticated: true, request: 'GET /user' });
       return ok(command, {});
@@ -98,6 +99,91 @@ describe('the setup wizard', () => {
     const boxes = screen.getAllByRole('checkbox').map((b) => b.getAttribute('data-setup-tool'));
     expect(boxes.slice(0, 4)).toEqual(['github', 'jira', 'ado', 'bitbucket']);
     expect(document.querySelector('[data-setup-more] summary')!.textContent).toBe('More tools (2)');
+  });
+
+  it('asks for the Jira project key on the Toil project step and saves it on the Jira link', async () => {
+    const jira = { name: 'corp-jira', area: 'jira', isDefault: true, host: 'jira.imagile.dev', writes: false, values: { baseUrl: 'file', apiToken: 'store' }, definedIn: 'file' };
+    const { config, calls } = emptyMachine([jira]);
+    await open(config);
+    await press('Start');
+    await screen.findByRole('heading', { level: 1, name: 'An AI agent (optional)' });
+    await notNow();
+    await press('Next');
+    // A tool that is already linked starts ticked.
+    expect(((await screen.findByRole('checkbox', { name: /Jira/ })) as HTMLInputElement).checked).toBe(true);
+    await press('Next');
+    await screen.findByRole('heading', { level: 1, name: 'Link Jira' });
+    await press('Next');
+    await screen.findByRole('heading', { level: 1, name: 'Your Toil project' });
+    const field = document.querySelector('[data-setup-jira-key]')!;
+    expect(field.textContent).toContain('Jira project key (optional)');
+    expect(field.textContent).toMatch(/such as PAY in PAY-123/);
+    // The consequence is in the (i), not on the screen; the field sits inside the create panel, after the folders.
+    expect(field.textContent).not.toMatch(/reads no Jira issues/);
+    expect(field.closest('form')).not.toBeNull();
+    expect(field.previousElementSibling!.getAttribute('data-setup-repos')).toBe('');
+    await userEvent.type(screen.getByLabelText(/^Jira project key/), 'PAY');
+    await userEvent.type(screen.getByLabelText(/^Name/), 'payments');
+    await userEvent.click(screen.getByRole('button', { name: 'Create this Toil project' }));
+    await screen.findByText(/payments was created. Jira linked to payments./);
+    expect(calls.find((c) => c.command === 'projects link')!.input).toEqual({ toilProject: 'payments', area: 'jira', connection: 'corp-jira', set: ['project=PAY'] });
+  });
+
+  describe('with a Toil project that exists', () => {
+    const jira = { name: 'corp-jira', area: 'jira', isDefault: true, host: 'jira.imagile.dev', writes: false, values: { baseUrl: 'file', apiToken: 'store' }, definedIn: 'file' };
+    async function toProjectStep(config: ConfigApi) {
+      await open(config);
+      await press('Start');
+      await screen.findByRole('heading', { level: 1, name: 'An AI agent (optional)' });
+      await notNow();
+      await press('Next');
+      await screen.findByRole('checkbox', { name: /Jira/ });
+      await press('Next');
+      await screen.findByRole('heading', { level: 1, name: 'Link Jira' });
+      await press('Next');
+      await screen.findByRole('heading', { level: 1, name: 'Your Toil project' });
+    }
+    const links = (calls: Call[]) => calls.filter((c) => c.command === 'projects link').map((c) => c.input);
+
+    it('shows a quiet line, and no field, when it already names a Jira project, and sends no key', async () => {
+      const { config, calls } = emptyMachine([jira], { show: { jira: { project: 'PAY' } } });
+      await toProjectStep(config);
+      expect((await screen.findByText('Reads Jira project PAY.')).getAttribute('data-jira-named')).toBe('');
+      expect(document.querySelector('[data-setup-jira-key]')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Link Jira to payments' }));
+      await screen.findByText(/Jira linked to payments/);
+      expect(links(calls)).toEqual([{ toilProject: 'payments', area: 'jira', connection: 'corp-jira' }]);
+    });
+
+    it('says a per-repository map reads a project per repository, with no field and no warning', async () => {
+      const { config } = emptyMachine([jira], { show: { jira: { project: { 'C:/Code/pay': 'PAY' } } } });
+      await toProjectStep(config);
+      await screen.findByText('Reads a Jira project per repository.');
+      expect(document.querySelector('[data-setup-jira-key]')).toBeNull();
+      expect(document.querySelector('[role="alert"]')).toBeNull();
+    });
+
+    it('asks for the key above the Link button when it names none, and sends it with the connection', async () => {
+      const { config, calls } = emptyMachine([jira], { show: { jira: {} } });
+      await toProjectStep(config);
+      const field = (await waitFor(() => document.querySelector('[data-setup-jira-key]')!)) as HTMLElement;
+      const link = screen.getByRole('button', { name: 'Link Jira to payments' });
+      expect(field.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      await userEvent.type(screen.getByLabelText(/^Jira project key/), 'PAY');
+      await userEvent.click(link);
+      await screen.findByText(/Jira linked to payments/);
+      expect(links(calls)).toEqual([{ toilProject: 'payments', area: 'jira', connection: 'corp-jira', set: ['project=PAY'] }]);
+    });
+
+    it('shows no field and sends no key when what it names could not be read (unknown is not none)', async () => {
+      const { config, calls } = emptyMachine([jira], { show: 'fails' });
+      await toProjectStep(config);
+      await userEvent.click(screen.getByRole('button', { name: 'Link Jira to payments' }));
+      await screen.findByText(/Jira linked to payments/);
+      expect(document.querySelector('[data-setup-jira-key]')).toBeNull();
+      expect(document.querySelector('[data-jira-named]')).toBeNull();
+      expect(links(calls)).toEqual([{ toilProject: 'payments', area: 'jira', connection: 'corp-jira' }]);
+    });
   });
 
   it('walks every step, sending the secret only as the call\'s secrets and leaving writes off', async () => {

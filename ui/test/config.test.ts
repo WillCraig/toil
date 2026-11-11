@@ -10,7 +10,13 @@ import { fakeStore } from '../../test/harness/fake-store.ts';
 import { clearConnectionEnv } from '../../test/harness/hermetic-env.ts';
 import { DEFAULT_TIMEOUT_MS as TOIL_DEFAULT_TIMEOUT_MS } from '../../src/core/run.ts';
 import { areas as toilAreas } from '../../src/registry.ts';
-import { CONFIG_CHANGES, CONFIG_COMMANDS, CONFIG_READS, DEFAULT_TIMEOUT_MS, connectionEnvVar } from '../src/config.ts';
+import { STANDARD_SEARCH_FIELDS as CLOUD_STANDARD } from '../../src/areas/jira/cloud/client.ts';
+import { STANDARD_SEARCH_FIELDS as SERVER_STANDARD } from '../../src/areas/jira/server/client.ts';
+import { CONFIG_CHANGES, CONFIG_COMMANDS, CONFIG_READS, DEFAULT_TIMEOUT_MS, connectionEnvVar, type ConnectionRow } from '../src/config.ts';
+import { guideStateOf } from '../src/guide.ts';
+import { JIRA_STANDARD_FIELDS } from '../src/load.ts';
+import { tokenStateOf } from '../src/setup.ts';
+import { guideContext } from '../server/agents/guide.ts';
 import { connectionEnvName } from '../../src/core/config.ts';
 import { CONFIG_CANNED, FIXTURE_AREAS, FIXTURE_CONNECTIONS, PROBES } from '../src/fixtures/config.ts';
 import { noAgent } from '../server/agent.ts';
@@ -470,5 +476,32 @@ describe('connectionEnvVar', () => {
     for (const [name, key] of [['corp-jira', 'apiToken'], ['ocp-lab', 'token'], ['db-1', 'baseURL'], ['x', 'apiKey2']] as const) {
       expect(connectionEnvVar(name, key)).toBe(connectionEnvName(name, key));
     }
+  });
+});
+
+describe('what Toil UI reads from toil for the setup fixes (#573)', () => {
+  const areas = areasFrom(registry);
+  const row = (area: string, values: Record<string, string>): ConnectionRow => ({ name: 'local-db', area, isDefault: true, host: null, writes: false, values: values as ConnectionRow['values'] });
+
+  it('holds the standard Jira search fields to what toil searches without a list, on both deployments', () => {
+    expect(CLOUD_STANDARD).toEqual(SERVER_STANDARD);
+    expect([...JIRA_STANDARD_FIELDS].sort()).toEqual([...CLOUD_STANDARD].sort());
+  });
+
+  it('says a SQLite connection needs no secret, and an engine that signs in still does', () => {
+    const db = areas.find((a) => a.name === 'db')!;
+    expect(tokenStateOf(db, row('db', { engine: 'file', path: 'file' }))).toBe('none');
+    expect(tokenStateOf(db, row('db', { engine: 'file', host: 'file', database: 'file', user: 'file' }))).toBe('missing');
+    expect(tokenStateOf(db, row('db', { engine: 'file', host: 'file', database: 'file', user: 'file', password: 'store' }))).toBe('saved');
+    expect(tokenStateOf(db, row('db', { engine: 'file', baseUrl: 'file', system: 'file', token: 'store' }))).toBe('saved');
+    expect(tokenStateOf(areas.find((a) => a.name === 'jira')!, row('jira', { baseUrl: 'file' }))).toBe('missing');
+  });
+
+  it('tells the setup guide no sign-in is needed, never that a password is missing', () => {
+    const state = guideStateOf({ step: 'connect', areas: ['db'], area: 'db' });
+    const context = guideContext(state, [row('db', { engine: 'file', path: 'file' })], areas);
+    expect(context).toContain('local-db: Database');
+    expect(context).toContain('token not needed');
+    expect(context).not.toContain('token missing');
   });
 });

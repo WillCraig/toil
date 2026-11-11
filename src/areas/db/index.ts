@@ -14,9 +14,11 @@ import type { SupportedVersion } from '../../core/supported.js';
 /**
  * The `db` area: one set of commands for every database engine. Each
  * connection names its `engine`, and the command hands the call to that
- * engine's provider in src/core/db/. Nothing here knows SQLite from Oracle,
+ * engine's provider in src/core/db/. Almost nothing here knows SQLite from Oracle,
  * which is the point; the commands were written once and the engines queue
- * up behind them like forms behind a single stamp.
+ * up behind them like forms behind a single stamp. The one footnote is the
+ * `appliesTo` line below: SQLite never queued for a password, so Toil UI
+ * must not ask for one.
  *
  * Reads run read-only at the engine, or, where the engine has no read-only
  * mode (SQL Server, Teradata), in a transaction that is always rolled back. The one command that writes, `execute`,
@@ -52,6 +54,8 @@ export const area = defineArea({
       for (const issue of [...tlsIssues(conn, provider, providers), ...(provider?.check?.(conn) ?? [])]) check.addIssue({ code: 'custom', path: [issue.key], message: issue.message });
     }),
   secrets: { password: 'password', token: 'token' },
+  // SQLite signs in with a file path, so it has no password to be missing; Toil UI reads this to say "not needed" rather than "missing".
+  appliesTo: { password: providers.filter((p) => p.engine !== 'sqlite').map((p) => p.engine), token: ['teradata'] },
   // Each engine names the keys its connections need; core checks them.
   variants: { by: 'engine', of: Object.fromEntries(providers.map((p) => [p.engine, { label: p.label, requires: [...p.requires] }])) },
 });

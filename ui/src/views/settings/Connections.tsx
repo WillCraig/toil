@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { testSentence, type ConnectionTestData } from '../../connection-test.ts';
-import { areaLabel, toolName } from '../../setup.ts';
+import { areaLabel, secretKeysFor, toolName } from '../../setup.ts';
 import { connectionEnvVar, envOnly, type AreaInfo, type ConfigApi, type ConnectionRow, type ConnectionsData } from '../../config.ts';
 import type { Envelope } from '../../toil.ts';
 import { Card, CardGrid } from '../../components/layout.tsx';
@@ -103,7 +103,10 @@ function ConnectionCard({ connection: c, areas, config, siblings, onChanged }: {
   const [testing, setTesting] = useState(false);
   const readOnly = envOnly(c);
   const titleId = `conn-${c.name}`;
-  const secretFields = areas.find((a) => a.name === c.area)?.connection.filter((f) => f.secret) ?? [];
+  // Only the secrets this connection could use: a SQLite file takes none, so it offers no sign-in, as the setup wizard says "not needed".
+  const area = areas.find((a) => a.name === c.area);
+  const usable = new Set(secretKeysFor(area, c));
+  const secretFields = (area?.connection ?? []).filter((f) => f.secret && usable.has(f.name));
   /** Where each of the login's own keys comes from, so the card says so in one line and the rest sits one step in. */
   const secrets = Object.entries(c.values).filter(([k]) => secretFields.some((f) => f.name === k));
   // What Test does: the Test button's hover, not a line repeated on every card.

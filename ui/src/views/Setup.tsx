@@ -30,12 +30,13 @@ import type { AdapterStatus, AgentStatus } from '../server-client.ts';
 import { Card } from '../components/layout.tsx';
 import { Help } from '../components/help.tsx';
 import { Loader } from '../moments/Moments.tsx';
-import { deploymentOf, freeName, groupAreas, GUIDED_STEPS, locationKind, locationProblems, SETUP_STEPS, STEP_SHORT, STEP_TITLE, toolName, TOKEN_WORD, tokenState, type SetupProgress, type SetupStep } from '../setup.ts';
+import { deploymentOf, freeName, groupAreas, GUIDED_STEPS, locationKind, locationProblems, SETUP_STEPS, STEP_SHORT, STEP_TITLE, toolName, TOKEN_WORD, tokenStateOf, type SetupProgress, type SetupStep } from '../setup.ts';
 import { LoginForm, NewConnectionForm } from './settings/Connections.tsx';
 import { FieldsStep } from './settings/FindFields.tsx';
 import { testSentence, type ConnectionTestData } from '../connection-test.ts';
 import { ChangeForm, ChoiceRadios, OutcomeLine, SelectField, TextField, failedOutcome, outcomeOf, type Outcome } from './settings/parts.tsx';
-import { addRepos, linkTools, type RepoResult } from './project-create.ts';
+import { addRepos, linkTools, withJiraKey, type RepoResult } from './project-create.ts';
+import { JiraKeyField, NamedJiraLine, useNamedJira } from './jira-key.tsx';
 import './setup.css';
 
 /** Where the wizard lives, and what opens it from the first run, the palette and Settings. */
@@ -305,7 +306,7 @@ type Mode = 'use' | 'replace' | 'add';
 function ConnectOne({ config, areas, area, rows, known, allNames, made, onMade, onDraft, onDone, onBusy }: { config: ConfigApi; areas: AreaInfo[]; area: string; rows: ConnectionRow[]; known: boolean; allNames: string[]; made: string | null; onMade: (name: string) => Promise<void>; onDraft: (settings: Record<string, string>) => void; onDone: (done: boolean) => void; onBusy: (busy: boolean) => void }) {
   const info = areas.find((a) => a.name === area);
   const secretFields = info?.connection.filter((f) => f.secret) ?? [];
-  const states = rows.map((r) => ({ row: r, token: tokenState(r, secretFields.map((f) => f.name)) }));
+  const states = rows.map((r) => ({ row: r, token: tokenStateOf(info, r) }));
   const good = states.filter((s) => s.token !== 'missing');
   const [target, setTarget] = useState((rows.find((r) => r.isDefault) ?? rows[0])?.name ?? '');
   const [mode, setMode] = useState<Mode | null>(rows.length === 0 ? 'add' : good.length === 1 ? 'use' : null);
@@ -337,7 +338,7 @@ function ConnectOne({ config, areas, area, rows, known, allNames, made, onMade, 
       setTesting(false);
     }
   };
-  const canReplace = current !== undefined && !envOnly(current) && secretFields.length > 0;
+  const canReplace = current !== undefined && !envOnly(current) && states.find((s) => s.row === current)?.token !== 'none';
   const modes = [
     ...(current ? [{ key: 'use', label: `Use ${current.name} (already set up)`, note: 'Keeps everything as it is and goes on to test it.' }] : []),
     ...(canReplace ? [{ key: 'replace', label: `Replace the saved token for ${current.name}`, note: 'Overwrites the token in the secure store on this computer. You confirm before anything is saved.' }] : []),
@@ -440,7 +441,7 @@ function ConnectOne({ config, areas, area, rows, known, allNames, made, onMade, 
  * repository, and the wizard never passes `--shared`: that would write into a
  * repository, and it is a decision for a team, made on the Toil project page.
  */
-function NewProject({ config, link, onChosen, reload, onCreated }: { config: ConfigApi; link: (name: string) => Promise<Outcome>; onChosen: (n: string | null) => void; reload: () => Promise<void>; onCreated: () => void }) {
+function NewProject({ config, link, onChosen, reload, onCreated, jiraKey }: { config: ConfigApi; link: (name: string) => Promise<Outcome>; onChosen: (n: string | null) => void; reload: () => Promise<void>; onCreated: () => void; jiraKey: { value: string; onChange: (v: string) => void } | null }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [rows, setRows] = useState<string[]>(['']);
@@ -506,6 +507,7 @@ function NewProject({ config, link, onChosen, reload, onCreated }: { config: Con
             Lets Toil work out which project you are in from the folder you are working in. Nothing is written to that folder.
           </p>
         </fieldset>
+        {jiraKey && <JiraKeyField value={jiraKey.value} onChange={jiraKey.onChange} attr="data-setup-jira-key" />}
         <p className="note" data-setup-writes="">
           Creating it saves one small file of your own on this computer. Nothing is saved in any folder or repository you list; Toil only remembers where they are.
         </p>
@@ -544,12 +546,18 @@ function ProjectStep({ config, projects, made, existing, picked, chosen, onChose
   const [created, setCreated] = useState(false);
   // A Toil project chosen on an earlier visit to this step is already linked as far as this page knows.
   const [before] = useState(chosen);
+  const [jiraKey, setJiraKey] = useState('');
   // The connection each picked area would use: the one made here, else the first the person already had.
   const links = picked.flatMap((a) => {
     const c = made[a] ?? existing.find((e) => e.area === a)?.name;
     return c ? [{ area: a, connection: c }] : [];
   });
-  const linkAll = (toilProject: string): Promise<Outcome> => linkTools(config, toilProject, links);
+  const hasJira = links.some((l) => l.area === 'jira');
+  // A Toil project that is already there is asked what it names: a key is typed only where it names none (`projects link` refuses a different one without --replace, and the refusal would drop the connection too), and a read that failed sends none.
+  const existingMode = mode !== '+new' && mode !== '+later';
+  const named = useNamedJira(config, existingMode && hasJira && before !== mode ? mode : null);
+  const keyToSend = mode === '+new' ? jiraKey : named?.kind === 'none' ? jiraKey : '';
+  const linkAll = (toilProject: string): Promise<Outcome> => linkTools(config, toilProject, withJiraKey(links, keyToSend));
   useEffect(() => {
     if (mode === '+later') onChosen(null);
     else if (mode !== '+new') onChosen(mode);
@@ -588,9 +596,11 @@ function ProjectStep({ config, projects, made, existing, picked, chosen, onChose
         </Radio>
       </RadioGroup>
       {mode === '+later' ? null : mode === '+new' ? (
-        <NewProject config={config} link={linkAll} onChosen={onChosen} reload={reload} onCreated={() => setCreated(true)} />
+        <NewProject config={config} link={linkAll} onChosen={onChosen} reload={reload} onCreated={() => setCreated(true)} jiraKey={hasJira ? { value: jiraKey, onChange: setJiraKey } : null} />
       ) : (
         <>
+          {named?.kind === 'none' && <JiraKeyField value={jiraKey} onChange={(v) => (setJiraKey(v), setLinked(null))} attr="data-setup-jira-key" />}
+          {named && <NamedJiraLine named={named} />}
           {links.length > 0 && (
             <div className="setup__actions">
               <button type="button" className="btn" data-setup-link="" onClick={async () => {

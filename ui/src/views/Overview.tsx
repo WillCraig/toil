@@ -23,7 +23,7 @@ import { parseRoute } from '../App.tsx';
 import { Help } from '../components/help.tsx';
 import { Cited, PrLink } from '../components/items.tsx';
 import { useData, useDerived } from '../data.ts';
-import { analysesHref, analysisHref, boardHref, dependenciesHref, itemHref, peekHref, peopleHref, personText, prsHref, shortKey, sourceLabel, standupHref, worklogHref } from '../format.ts';
+import { analysesHref, analysisHref, boardHref, dependenciesHref, itemHref, peekHref, peopleHref, personText, prsHref, shortKey, sourceLabel, standupHref, toilProjectEditHref, worklogHref } from '../format.ts';
 import { Empty, TrackerAction } from '../components/empty.tsx';
 import { burnup } from '../model/burnup.ts';
 import { aging, cycleTimes, throughput } from '../model/flow.ts';
@@ -87,7 +87,7 @@ export function Overview() {
       )}
       <NeedsAttention cards={cards} />
       {/* What principle 4 keeps on screen when the fold is closed: a red reason no card covers, and what couldn't be read. */}
-      {(alerts.length > 0 || view.unchecked.length > 0) && (
+      {(alerts.length > 0 || view.unchecked.length > 0 || view.partlyChecked.length > 0) && (
         <div className="reasons briefing__alerts" data-alerts="">
           {alerts.map((r) => (
             <p key={r.lens} className="reason reason--line" data-alert={r.lens}>
@@ -99,22 +99,37 @@ export function Overview() {
               </button>
             </p>
           ))}
-          {view.unchecked.length > 0 && (
-            <details className="reason" data-unchecked="">
-              <summary>
-                <span className="reason__dot" aria-hidden="true" />
-                <span className="reason__title">
-                  <b>Couldn't check.</b> <span>{view.unchecked.map((u) => u.label).join(', ')}</span>
-                </span>
-              </summary>
-              <div className="reason__body">
-                {view.unchecked.map((u) => (
-                  <p key={u.label}>
-                    {u.label}: {u.note}
-                  </p>
-                ))}
-              </div>
-            </details>
+          {/* A lens that didn't run and one that ran with items it couldn't test are different news, so each has its own line. */}
+          {(
+            [
+              ['unchecked', "Couldn't check.", view.unchecked],
+              ['partly-checked', 'Partly checked.', view.partlyChecked],
+            ] as const
+          ).map(
+            ([id, heading, list]) =>
+              list.length > 0 && (
+                <details key={id} className="reason" data-unchecked={id === 'unchecked' ? '' : undefined} data-partly-checked={id === 'partly-checked' ? '' : undefined}>
+                  <summary>
+                    <span className="reason__dot" aria-hidden="true" />
+                    <span className="reason__title">
+                      <b>{heading}</b> <span>{list.map((u) => u.label).join(', ')}</span>
+                    </span>
+                  </summary>
+                  <div className="reason__body">
+                    {list.map((u) => (
+                      <p key={u.label}>
+                        {u.label}: {u.note}
+                        {id === 'unchecked' && u.lens === 'load' && (
+                          <>
+                            {' '}
+                            <a href={toilProjectEditHref(toilProject.name, 'wip')}>Set one in the Toil project's settings</a>.
+                          </>
+                        )}
+                      </p>
+                    ))}
+                  </div>
+                </details>
+              ),
           )}
         </div>
       )}
