@@ -18,6 +18,7 @@
 //     theme's full row fits on the sample data (#387; `headerFits`, off for
 //     real data, whose toil project names and links may genuinely fill the row);
 //   - an open modal whose backdrop doesn't dim the page;
+//   - a layout still changing 3 seconds after the view opens, resizes, opens its <details>, or opens or undoes a state;
 //   - and, in the strict themes (Plain and Crate, light and dark), any axe
 //     violation at WCAG 2.2 AA. The other themes' axe findings are reported,
 //     never failed (the maintainer's bar, AGENT_DECISIONS.md, #267).
@@ -260,13 +261,53 @@ function covered() {
   return findings;
 }
 
-/** Waits until the view has its heading and nothing is still loading. */
+/**
+ * Resolves true once the layout has held still, or false after `ms`. Held still means two frames in a row with the same
+ * signature and no animation that has an end still running, and, when `quiet` is set, no change to the signature for that
+ * many milliseconds as well. The signature costs a few microseconds a frame: how many elements the page has (a menu opening,
+ * a drawer mounting or leaving, a route rendering all change it), the document's and <main>'s size (a resize reflowing, a
+ * <details> opening), and how many finite animations are running (a dialog fading in or out). It stands in for the fixed
+ * sleeps that used to guess how long all of that takes, the way a change advisory board guesses how long a change will
+ * take: generously, and the same every time. An animation loop (a drifting grid, a loader's motif) is left running on purpose.
+ *
+ * Two frames of stillness is enough after a route opens, a resize or a <details>, which reflow at once. After a state opens
+ * or is undone, a placeholder that is waiting on an answer is just as still, so each state's setup waits for its own end
+ * condition (`afterClick`, `untilThen`) and `quiet` (STATE_QUIET) is the backstop for what a setup missed.
+ */
+const STABLE = (ms = 3000, quiet = 0) => `(async () => {
+  const sig = () => {
+    const m = document.querySelector('main')?.getBoundingClientRect();
+    const de = document.documentElement;
+    const running = document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity).length;
+    return [document.body.getElementsByTagName('*').length, de.scrollWidth, de.scrollHeight, m ? Math.round(m.width) + 'x' + Math.round(m.height) : '', running].join('|');
+  };
+  // A frame, or 100ms if the page isn't painting (a hidden tab pauses rAF), so the deadline is always reached.
+  const frame = () => new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 100); });
+  const deadline = Date.now() + ${ms};
+  let last = sig();
+  let same = 0;
+  let changed = Date.now();
+  while (Date.now() < deadline) {
+    await frame();
+    const now = sig();
+    if (now !== last) changed = Date.now();
+    same = now === last ? same + 1 : 0;
+    last = now;
+    if (same >= 2 && now.endsWith('|0') && Date.now() - changed >= ${quiet}) return true;
+  }
+  return false;
+})()`;
+
+/** How long a state's layout must have been quiet before it is checked: the backstop behind each setup's own end condition. */
+const STATE_QUIET = 150;
+
+/** Waits until the view has its heading and nothing is still loading, its fonts are in, and its layout has settled. */
 const SETTLED = `new Promise((resolve) => {
   const started = Date.now();
   const done = () => document.querySelector('main h1') && !document.querySelector('main .skin-loading, main [data-loading]') && !/Drawing the graph|Reading /.test(document.querySelector('main')?.textContent ?? '');
-  const tick = () => (done() || Date.now() - started > 15000 ? document.fonts.ready.then(() => setTimeout(resolve, 250)) : setTimeout(tick, 100));
+  const tick = () => (done() || Date.now() - started > 15000 ? document.fonts.ready.then(() => resolve()) : setTimeout(tick, 50));
   tick();
-})`;
+}).then(() => ${STABLE()})`;
 
 /**
  * Clicks every shown element matching the selector (and text, a regex
@@ -287,6 +328,30 @@ const clickAll = (selector, text, wait = 5000) => `(async () => {
 })()`;
 
 /**
+ * Clicks like `clickAll`, then waits for what the click opens to be there and finished loading: the element `selector`
+ * names exists and shows no loading placeholder (a skin's loading screen, `data-loading`, or "Reading …" / "Drawing the
+ * graph" text). Without it a dialog that fetches on open is checked as its placeholder. Resolves with the click count, 0
+ * when nothing was clicked, or a sentence when the click worked and the thing never finished.
+ */
+const afterClick = (click, selector, ms = 5000) => `(async () => {
+  const n = await ${click};
+  if (!n) return n;
+  const loaded = () => { const e = document.querySelector(${JSON.stringify(selector)}); return !!e && !e.querySelector('.skin-loading, [data-loading]') && !/Drawing the graph|Reading /.test(e.textContent ?? ''); };
+  const deadline = Date.now() + ${ms};
+  while (!loaded() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
+  return loaded() ? n : 'clicked, but ${selector} was not there and loaded within ${ms / 1000}s';
+})()`;
+
+/** Clicks like `clickAll`, then waits until `condition` (an expression in the page) holds: the end of what the click started. Resolves with the click count, or a sentence naming `what` when it never held. */
+const clickUntil = (click, condition, what, ms = 5000) => `(async () => {
+  const n = await ${click};
+  if (!n) return n;
+  const deadline = Date.now() + ${ms};
+  while (!(${condition}) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
+  return (${condition}) ? n : '${what} was still not done after ${ms / 1000}s';
+})()`;
+
+/**
  * Opens the compact header's Menu unless the item is already showing, then
  * clicks the item once it shows. -1 when there is no Menu button to press.
  */
@@ -300,7 +365,7 @@ const inMenu = (selector) => `(async () => {
  * Resolves once every animation with an end has ended (up to 2s), so a check with motion on never reads a
  * colour or a box halfway through a fade (#419). Loops (a drifting grid, a loader's motif) are left running.
  */
-const ANIMATIONS_DONE = `Promise.race([Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))), new Promise((r) => setTimeout(r, 2000))])`;
+const ANIMATIONS_DONE = `Promise.race([Promise.all(document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))), new Promise((r) => setTimeout(r, 2000))])`;
 
 /** Polls `expression` in the page every 50ms until it is truthy or `ms` pass; resolves with its last value. */
 const until = (page, expression, ms = 5000) =>
@@ -329,9 +394,9 @@ function states(route, width, sample = true) {
   const out = [];
   // The app's own breakpoint (COMPACT_HEADER in src/App.tsx): below it, the header is the Menu button.
   const compact = width < 1024;
-  if (compact) out.push({ name: 'menu', setup: clickAll('[data-menu-button]'), undo: 'Escape' });
+  if (compact) out.push({ name: 'menu', setup: afterClick(clickAll('[data-menu-button]'), '.nav-menu__dialog'), undo: 'Escape' });
   // Feedback is in the header, or in its Menu when the header folds, which it does below 1024px or when its row is full.
-  if (route === '#/') out.push({ name: 'feedback', setup: inMenu('button.feedback-open'), undo: 'Escape' });
+  if (route === '#/') out.push({ name: 'feedback', setup: afterClick(inMenu('button.feedback-open'), '.feedback-dialog'), undo: 'Escape' });
   // The command palette and the shortcuts sheet (#416): open, with an item search typed, and the sheet. Ctrl+K and ? are
   // dispatched, with Meta too, so the same press opens it on a Mac; a second Ctrl+K closes the palette if Escape only cleared it.
   // The checklist itself, in place of the empty view: three steps, and the sample-data command beside them.
@@ -373,9 +438,9 @@ function states(route, width, sample = true) {
     const openFold = `(async () => { const f = document.querySelector('[data-guide-fold] summary'); if (f && !f.parentElement.open) f.click(); return 1; })()`;
     const back = `(async () => { await ${clickAll('[data-setup-back]')}; await ${clickAll('[data-setup-back]')}; return 1; })()`;
     out.push({ name: 'guide', setup: `(async () => { const n = await ${toTools}; if (n !== 1) return n; await ${openFold}; return n; })()`, undoJs: back });
-    out.push({ name: 'guide-answered', setup: `(async () => { const n = await ${toTools}; if (n !== 1) return n; await ${openFold}; await ${clickAll('[data-guide-starter]', null, 5000)}; const deadline = Date.now() + 5000; while (!document.querySelector('[data-guide-log] .guide__turn p:not(.guide__question):not([role=status])') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('[data-guide-log] .guide__turn') ? 1 : 'the guide showed no answer'; })()`, undoJs: back });
+    out.push({ name: 'guide-answered', setup: `(async () => { const n = await ${toTools}; if (n !== 1) return n; await ${openFold}; await ${clickAll('[data-guide-starter]', null, 5000)}; const deadline = Date.now() + 5000; while (!(document.querySelector('[data-guide-log] .guide__turn p:not(.guide__question):not([role=status])') && !document.querySelector('[data-guide-log] .guide__turn [role=status]')) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('[data-guide-log] .guide__turn') ? 1 : 'the guide showed no answer'; })()`, undoJs: back });
     const token = ['gh', 'p_', '0'.repeat(34), 'AB'].join('');
-    out.push({ name: 'guide-refused', setup: `(async () => { const n = await ${toTools}; if (n !== 1) return n; await ${openFold}; const t = document.querySelector('[data-guide-input]'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, 'my token is ${token}'); t.dispatchEvent(new Event('input', { bubbles: true })); await new Promise((r) => setTimeout(r, 100)); await ${clickAll('.guide__ask button[type=submit]')}; return document.querySelector('[data-guide-refused]') ? 1 : 'no refusal notice'; })()`, undoJs: back });
+    out.push({ name: 'guide-refused', setup: `(async () => { const n = await ${toTools}; if (n !== 1) return n; await ${openFold}; const t = document.querySelector('[data-guide-input]'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, 'my token is ${token}'); t.dispatchEvent(new Event('input', { bubbles: true })); await ${clickAll('.guide__ask button[type=submit]:not([disabled])')}; return document.querySelector('[data-guide-refused]') ? 1 : 'no refusal notice'; })()`, undoJs: back });
   }
   // Show and Hide are items in each card's menu now, not buttons on the card.
   const menuItem = (label) => `(async () => { const deadline = Date.now() + 5000; let n = 0; for (const t of [...document.querySelectorAll('.conn-card .card-menu__trigger')].filter((b) => b.getClientRects().length)) { t.click(); let item; while (!(item = [...document.querySelectorAll('[role="menuitem"]')].find((i) => (i.textContent ?? '').trim() === ${JSON.stringify(label)})) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (item) { item.click(); n++; } else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); while (document.querySelector('[role="menu"]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); } return n; })()`;
@@ -383,7 +448,8 @@ function states(route, width, sample = true) {
   // Set up this repo (#333): the sample's plan, with its table, check problems and the form for the missing connection.
   if (route === '#/settings/projects') {
     const plan = `document.querySelector('[aria-labelledby="repo-setup"] .shown')`;
-    out.push({ name: 'repo-setup', setup: `(async () => { const n = await ${clickAll('form.change button', '/^Check this repo$/')}; await new Promise((r) => setTimeout(r, 300)); ${plan}?.scrollIntoView({ block: 'start' }); return n; })()`, undoJs: 'window.scrollTo(0, 0)' });
+    // The form's button is aria-busy, and says Checking…, until the plan or the failure is in.
+    out.push({ name: 'repo-setup', setup: `(async () => { const n = await ${clickUntil(clickAll('form.change button', '/^Check this repo$/'), "!document.querySelector('form.change button[aria-busy]')", 'the repo check')}; ${plan}?.scrollIntoView({ block: 'start' }); return n; })()`, undoJs: 'window.scrollTo(0, 0)' });
   }
   // The focused Ask view (#343), opened from the bar, and the two popovers in its strip: the (i) (#283) and the
   // agent switcher (#344). Each is closed with Escape, then the view with its Close button.
@@ -394,13 +460,13 @@ function states(route, width, sample = true) {
     // for: then its questions are the Suggestions button instead of the guided start.
     const ready = `document.querySelector('.ask-focus [data-guided-start], .ask-focus [data-ask-suggestions]')`;
     out.push({ name: 'ask-open', setup: `(async () => { ${openAsk} const deadline = Date.now() + 5000; while (!${ready} && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return ${ready} ? 1 : 0; })()`, undoJs: closeAsk });
-    out.push({ name: 'ask-info', setup: `(async () => { ${openAsk} return await ${clickAll('[data-ask-info]')}; })()`, undo: 'Escape', undoJs: closeAsk });
-    out.push({ name: 'ask-switcher', setup: `(async () => { ${openAsk} return await ${clickAll('[data-agent-switch]')}; })()`, undo: 'Escape', undoJs: closeAsk });
+    out.push({ name: 'ask-info', setup: `(async () => { ${openAsk} return await ${afterClick(clickAll('[data-ask-info]'), '.ask-info__dialog')}; })()`, undo: 'Escape', undoJs: closeAsk });
+    out.push({ name: 'ask-switcher', setup: `(async () => { ${openAsk} return await ${afterClick(clickAll('[data-agent-switch]'), '.agent-switch__dialog')}; })()`, undo: 'Escape', undoJs: closeAsk });
   }
   // The readiness gate (#307): an item's workflow read live, and the Command Center's verdict filter open. Only
   // the sample's Jira and Azure DevOps items are pressed: a GitHub issue has no read to make, and a done item none either.
-  if (/\/item\/corp-(jira|ado)%3A/.test(route)) out.push({ name: 'workflow-live', setup: `(async () => { const n = ${clickAll('.readiness-live button', '/Check the workflow live|Read the workflow again/')}; await new Promise((r) => setTimeout(r, 300)); return n; })()` });
-  if (/\/command-center$/.test(route)) out.push({ name: 'verdict-filter', setup: clickAll('.readiness-filters > div.choice:first-of-type .choice-button'), undo: 'Escape' });
+  if (/\/item\/corp-(jira|ado)%3A/.test(route)) out.push({ name: 'workflow-live', setup: clickUntil(clickAll('.readiness-live button', '/Check the workflow live|Read the workflow again/'), "(() => { const b = document.querySelector('.readiness-live button'); return b && !b.disabled && !/Reading the workflow/.test(b.textContent ?? ''); })()", 'the live workflow read') });
+  if (/\/command-center$/.test(route)) out.push({ name: 'verdict-filter', setup: afterClick(clickAll('.readiness-filters > div.choice:first-of-type .choice-button'), '[role="listbox"]'), undo: 'Escape' });
   // An answered question (#295): its usage footer, and the chat's running total and context meter in the pane's head.
   // Then, once a question has its answer, the Suggestions menu the starters fold into (#343).
   // Analyze (#343) on the next toil project: its pulse check, pressed in the bar, in the focused view.
@@ -418,7 +484,7 @@ function states(route, width, sample = true) {
   // Escape alone can leave it open on a slow runner (focus not yet inside it), which then holds focus through every
   // state at the next width; its own Cancel or Close closes it for certain.
   const closeAssign = clickAll('[role="dialog"] button', '/^(Cancel|Close)$/', 0);
-  if (route.includes('/item/')) out.push({ name: 'assign-open', setup: clickAll('[data-assign-open]'), undo: 'Escape', undoJs: closeAssign });
+  if (route.includes('/item/')) out.push({ name: 'assign-open', setup: afterClick(clickAll('[data-assign-open]'), '.assign-form'), undo: 'Escape', undoJs: closeAssign });
   // The Agents panel (#394, #552) is closed at every width until its button is pressed: a drawer below 1200px (SIDEBAR_WIDE in
   // src/views/ToilProjectShell.tsx), a column beside the view from there up, which the same button closes again.
   const sidebarWide = width >= 1200;
@@ -428,11 +494,11 @@ function states(route, width, sample = true) {
     out.push({ name: 'inbox-start', setup: start, undo: 'Escape', undoJs: `(async () => { await ${closeAssign}; await ${closeDrawer}; })()` });
   }
   // The toil project's frame (#394): the Agents drawer open below 1200px, the toil project switcher, and a metric's full chart from the Overview.
-  if (/^#\/project\/[^/]+$/.test(route)) out.push({ name: sidebarWide ? 'agents-panel' : 'agents-drawer', setup: clickAll('[data-agents-open]'), undo: 'Escape', undoJs: closeDrawer });
+  if (/^#\/project\/[^/]+$/.test(route)) out.push({ name: sidebarWide ? 'agents-panel' : 'agents-drawer', setup: afterClick(clickAll('[data-agents-open]'), sidebarWide ? '[data-agents-open][aria-expanded="true"]' : '.agents-drawer__dialog'), undo: 'Escape', undoJs: closeDrawer });
   // The switcher is in the header beside the brand (src/components/project-switcher.tsx), from 1024px; below it the same list is links inside the header's Menu, which the menu state opens.
   if (route === '#/project/card-payments') {
-    if (!compact) out.push({ name: 'toil-project-switch', setup: clickAll('[data-toil-project-switch]'), undo: 'Escape' });
-    for (const m of ['burnup', 'pr-wait']) out.push({ name: `chart-${m}`, setup: clickAll(`[data-metric="${m}"]`), undo: 'Escape', undoJs: clickAll('[data-chart-close]', null, 0) });
+    if (!compact) out.push({ name: 'toil-project-switch', setup: afterClick(clickAll('[data-toil-project-switch]'), '[role="menu"]'), undo: 'Escape' });
+    for (const m of ['burnup', 'pr-wait']) out.push({ name: `chart-${m}`, setup: afterClick(clickAll(`[data-metric="${m}"]`), '.chart-dialog'), undo: 'Escape', undoJs: clickAll('[data-chart-close]', null, 0) });
   }
   // The history (#395), set open rather than clicked, since the check has already opened every <details> once: an entry's what-changed opened; an analysis with its evidence unfolded, and a citation chip's detail as a keyboard user who tabbed to it sees it.
   if (/\/analyses$/.test(route)) out.push({ name: 'what-changed', undoJs: 'window.scrollTo(0, 0)', setup: `(() => { const d = [...document.querySelectorAll('details.analysis__changes')]; for (const x of d) x.open = true; d[0]?.scrollIntoView({ block: 'start' }); return d.length; })()` });
@@ -445,13 +511,18 @@ function states(route, width, sample = true) {
   if (route === '#/project/card-payments/board') out.push({ name: 'attention-only', setup: clickAll('[data-attention-only]'), undoJs: clickAll('[data-attention-only]') });
   // A failing command's recent audit lines, opened under it on the Usage page (#309).
   // Real data may genuinely have no failed command, and a state that opens nothing is a problem, so only the sample (which always has some) is held to it.
-  if (sample && route === '#/settings/usage') out.push({ name: 'audit-lines', setup: `(async () => { const n = ${clickAll('[data-usage-lines]', '/Show recent failures/')}; await new Promise((r) => setTimeout(r, 300)); return n; })()`, undoJs: clickAll('[data-usage-lines]', '/Hide recent failures/') });
+  if (sample && route === '#/settings/usage') out.push({ name: 'audit-lines', setup: clickUntil(clickAll('[data-usage-lines]', '/Show recent failures/'), "!document.querySelector('main .skin-loading, main [data-loading]')", 'the recent failures read'), undoJs: clickAll('[data-usage-lines]', '/Hide recent failures/') });
   // The person's instructions are on the Agent page as it opens; the full prompt opens under them (#283).
   // The worklog (#308): a day rebuilt, which says how it compared, and an earlier month in the calendar.
-  if (/\/worklog\/\d{4}-\d{2}-\d{2}$/.test(route)) out.push({ name: 'rebuilt', setup: `(async () => { const n = ${clickAll('[data-worklog-rebuild]')}; await new Promise((r) => setTimeout(r, 300)); return n; })()` });
+  if (/\/worklog\/\d{4}-\d{2}-\d{2}$/.test(route)) out.push({ name: 'rebuilt', setup: clickUntil(clickAll('[data-worklog-rebuild]'), "!document.querySelector('[data-worklog-rebuild]')?.disabled", 'the rebuild') });
   // The stand-up (#345): the agent's write-up shown, with the fact lines it names marked in the report.
-  if (/\/worklog\/standup/.test(route)) out.push({ name: 'written-up', setup: `(async () => { const n = ${clickAll('[data-standup-writeup]')}; await new Promise((r) => setTimeout(r, 300)); return n; })()` });
-  if (/\/worklog$/.test(route)) out.push({ name: 'previous-month', setup: clickAll('.calendar-nav button', '/Previous month/'), undoJs: clickAll('.calendar-nav button', '/Next month/') });
+  if (/\/worklog\/standup/.test(route)) out.push({ name: 'written-up', setup: clickUntil(clickAll('[data-standup-writeup]'), "!document.querySelector('[data-standup-writeup]')?.disabled", 'the write-up') });
+  // Changing the month reads the calendar again, so its buttons are gone until the read is back: each click waits for the
+  // calendar, or the next width's state looks for a button on a "Reading the calendar" placeholder (slow on real data).
+  if (/\/worklog$/.test(route)) {
+    const calendarBack = "document.querySelector('.calendar-nav') && !document.querySelector('main .skin-loading, main [data-loading]')";
+    out.push({ name: 'previous-month', setup: clickUntil(clickAll('.calendar-nav button', '/Previous month/'), calendarBack, 'the earlier month'), undoJs: clickUntil(clickAll('.calendar-nav button', '/Next month/'), calendarBack, 'the later month') });
+  }
   // Every Toil project card's menu says Edit, which opens its name and description as a form in the card (#561, EditDetails); all of them are opened at once, for the longest the cards get.
   // The project page has no inline form (its Edit is a link to Settings), and the sources page it names is a view of its own.
   if (route === '#/') out.push({ name: 'editing', setup: `(async () => { const shown = () => [...document.querySelectorAll('[data-card-menu]')].filter((b) => b.getClientRects().length); const deadline = Date.now() + 5000; while (!shown().length && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); let n = 0; for (const t of shown()) { t.click(); let edit; while (!(edit = [...document.querySelectorAll('[role="menuitem"]')].find((i) => (i.textContent ?? '').trim() === 'Edit')) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); if (!edit) break; edit.click(); while (document.querySelector('[role="menu"]') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); n++; } return n; })()`, undoJs: "document.querySelectorAll('.edit-field').forEach((i) => i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))" });
@@ -468,7 +539,7 @@ function states(route, width, sample = true) {
     out.push({ name: 'splash', setup: played('splash', '.splash'), undo: 'Escape' });
     out.push({ name: 'sprint-recap', setup: played('sprint-ended', '[data-moment="sprint-ended"]'), undo: 'Escape' });
   }
-  if (route === '#/settings/agent') out.push({ name: 'full-prompt', setup: clickAll('[data-full-prompt]', '/Show the full prompt/'), undoJs: clickAll('[data-full-prompt]', '/Hide the full prompt/') });
+  if (route === '#/settings/agent') out.push({ name: 'full-prompt', setup: clickUntil(clickAll('[data-full-prompt]', '/Show the full prompt/'), "document.querySelector('.full-prompt__text')", 'the full prompt'), undoJs: clickAll('[data-full-prompt]', '/Hide the full prompt/') });
   // Install (#344): the dialog with the exact npm command, before anything runs, for the first SDK missing. On a
   // machine with every SDK installed there is no Install to press, which counts only when the status card says so.
   if (route === '#/settings/agent') out.push({ name: 'install-dialog', setup: `(async () => { const rows = () => document.querySelectorAll('.adapter-status__row, .helper-row[data-adapter]'); const deadline = Date.now() + 5000; while (!rows().length && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); const press = document.querySelector('[data-install]'); if (!press) return rows().length > 0 && [...rows()].every((r) => r.dataset.state === 'ready') ? 1 : 0; press.click(); while (!document.querySelector('.install-command') && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50)); return document.querySelector('.install-command') ? 1 : 0; })()`, undo: 'Escape' });
@@ -602,7 +673,13 @@ async function axeRun(page, source) {
   return page.evaluate(`axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] }, rules: { 'label-content-name-mismatch': { enabled: true } }, resultTypes: ['violations'] }).then((r) => r.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.map((n) => n.target.join(' ')) })))`);
 }
 
-/** How many theme schemes run at once, each in its own Chrome: LAYOUT_WORKERS, or one per core. */
+/**
+ * How many theme schemes run at once, each in its own Chrome: LAYOUT_WORKERS, or one per core. One per core stays the
+ * default on purpose. With the fixed sleeps gone (STABLE) a scheme is CPU-bound, not waiting, and oversubscribing
+ * does not pay: eight schemes on a 4-core affinity ran 8 workers in 122s against 149s for 4, but starved the
+ * "answered" state's 15s wait for a streamed answer in every scheme, which is a failed run. Faster and red is
+ * what a status report calls "on time, off scope". Set LAYOUT_WORKERS to try other numbers.
+ */
 export function layoutWorkers(runs) {
   const asked = Number(process.env.LAYOUT_WORKERS);
   const want = Number.isInteger(asked) && asked > 0 ? asked : availableParallelism();
@@ -619,11 +696,12 @@ export function layoutWorkers(runs) {
  * Each scheme's findings are kept apart and joined in scheme order, so the
  * report reads the same however many workers ran.
  *
+ * `shotsFor(run)` says which schemes are shot into `shots` (all, unless set), so a caller can mix strict and other schemes in one call.
  * `sample` (on unless set false) says the data is the sample's, whose states always have something to open; real data may not (see `states`).
  * `headerFits` (on unless set false) fails a header folded into its Menu at
  * 1440px or wider; it's for the sample data, whose rows are known to fit.
  */
-export async function checkLayout({ urlFor, runs = themeRuns(), routes = ROUTES, widths = WIDTHS, shots = null, motion = 'reduce', log = () => {}, workers = layoutWorkers(runs), headerFits = true, sample = true }) {
+export async function checkLayout({ urlFor, runs = themeRuns(), routes = ROUTES, widths = WIDTHS, shots = null, shotsFor = () => true, motion = 'reduce', log = () => {}, workers = layoutWorkers(runs), headerFits = true, sample = true }) {
   const chrome = findChrome();
   if (!chrome) throw new Error('The layout check needs Chrome, Edge or Chromium, and found none. Install one, or set CHROME_PATH to it.');
   const axeSource = readFileSync(createRequire(join(ui, 'package.json')).resolve('axe-core/axe.min.js'), 'utf8');
@@ -640,7 +718,7 @@ export async function checkLayout({ urlFor, runs = themeRuns(), routes = ROUTES,
       await browser.page.media([{ name: 'prefers-reduced-motion', value: motion }]);
       while (!failed && next < runs.length) {
         const i = next++;
-        results[i] = await checkRun({ page: browser.page, run: runs[i], urlFor, routes, widths, shots, axeSource, log, headerFits, sample });
+        results[i] = await checkRun({ page: browser.page, run: runs[i], urlFor, routes, widths, shots: shotsFor(runs[i]) ? shots : null, axeSource, log, headerFits, sample });
       }
     } catch (e) {
       failed ??= e;
@@ -667,14 +745,15 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
   for (const route of routes) {
     await page.size(widths[0]);
     await page.goto(urlFor(run.theme, run.scheme, route));
-    await page.evaluate(SETTLED);
+    if (!(await page.evaluate(SETTLED))) problems.push(`${label} ${route}: the layout was still changing 3s after the view had its heading`);
     const applied = await page.evaluate('document.documentElement.dataset.theme');
     if (applied !== run.theme) problems.push(`${label} ${route}: the page showed the ${applied} theme instead`);
     for (const width of widths) {
       await page.size(width);
-      await page.evaluate(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 150))))`);
-      await page.evaluate(ANIMATIONS_DONE);
       const where = `${label} ${route} at ${width}px`;
+      // The resize has reflowed, and whatever the app does on a resize has rendered, once the layout holds still.
+      if (!(await page.evaluate(STABLE()))) problems.push(`${where}: the layout was still changing 3s after the window was resized`);
+      await page.evaluate(ANIMATIONS_DONE);
       const slug = `${run.theme}-${run.scheme}__${route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home'}__${width}`;
       const record = (state, findings) => {
         for (const f of findings) problems.push(`${where}${state ? ` (${state})` : ''}: ${f.kind} at ${f.at}: ${f.detail}`);
@@ -682,7 +761,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
       await shoot(slug);
       // Every <details> open, since long values hide inside them.
       await page.evaluate(`document.querySelectorAll('details').forEach((d) => (d.open = true))`);
-      await page.evaluate(`new Promise((r) => setTimeout(r, 100))`);
+      if (!(await page.evaluate(STABLE()))) problems.push(`${where}: the layout was still changing 3s after every <details> was opened`);
       record('', await page.evaluate(`(${inspect})(${JSON.stringify(CARDS)}, ${headerFits})`));
       record('', await page.evaluate(`(${covered})()`));
       checked++;
@@ -716,7 +795,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
         else if (!opened) problems.push(`${where} (${state.name}): nothing to open; no element matching the selector showed within 5s`);
         // A state may say why it opened nothing, as text, rather than leave the generic line.
         else if (typeof opened === 'string') problems.push(`${where} (${state.name}): ${opened}`);
-        await page.evaluate(`new Promise((r) => setTimeout(r, 300))`);
+        if (!(await page.evaluate(STABLE(3000, STATE_QUIET)))) problems.push(`${where} (${state.name}): the layout was still changing 3s after the state opened`);
         await page.evaluate(ANIMATIONS_DONE);
         await shoot(`${slug}__${state.name}`);
         record(state.name, await page.evaluate(`(${inspect})(${JSON.stringify(CARDS)}, ${headerFits})`));
@@ -727,7 +806,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
         checked++;
         if (state.undo) await page.key(state.undo);
         if (state.undoJs) await page.evaluate(state.undoJs);
-        await page.evaluate(`new Promise((r) => setTimeout(r, 200))`);
+        if (!(await page.evaluate(STABLE(3000, STATE_QUIET)))) problems.push(`${where} (${state.name}): the layout was still changing 3s after the state was undone`);
       }
       if (page.errors.length) problems.push(`${where}: the page threw ${page.errors.splice(0).join('; ')}`);
     }

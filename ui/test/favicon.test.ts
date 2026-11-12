@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { faviconFor, showFavicon } from '../src/favicon.ts';
 import { THEMES } from '../src/themes.ts';

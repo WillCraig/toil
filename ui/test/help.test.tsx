@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, render, screen, waitFor, within } from '@testing-library/react';

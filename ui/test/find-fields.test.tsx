@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
@@ -20,6 +21,10 @@ import { FindFields } from '../src/views/settings/FindFields.tsx';
 const meta = (command: string) => ({ command, durationMs: 0, version: 'test', contractVersion: 1 });
 const ok = (command: string, data: unknown): Envelope => ({ ok: true, data, error: null, meta: meta(command) }) as Envelope;
 const refused = (command: string, message: string): Envelope => ({ ok: false, data: null, error: { code: 'INVALID_INPUT', message, fix: 'Pass --replace.' }, meta: meta(command) }) as Envelope;
+
+/** The names the sample's own commands save, and that count plus the Jira project key, which a read from `PAY` saves too. */
+const NAMED = FIELD_DISCOVERY.commands.length;
+const WITH_KEY = NAMED + 1;
 
 interface Call {
   command: string;
@@ -73,7 +78,7 @@ describe('Find the fields', () => {
     expect(reads(calls).map((c) => c.input)).toEqual([{ connection: 'corp-jira', project: 'PAY', perType: 1 }]);
     expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Story', 'Bug', 'Epic']);
     const story = screen.getByRole('table', { name: /Custom fields that hold a value on Story/ });
-    expect(within(story).getAllByRole('row')).toHaveLength(4);
+    expect(within(story).getAllByRole('row')).toHaveLength(1 + FIELD_DISCOVERY.fields.filter((f) => f.issueTypes.includes('Story')).length);
     expect(story.textContent).toContain('Sprint 7 (active)');
     expect(story.textContent).toContain('Story points, sure');
     expect(story.textContent).toContain('Sprint, sure');
@@ -93,7 +98,7 @@ describe('Find the fields', () => {
     expect(ticked(/Name Crew/)).toBe(false);
     expect(document.body.textContent).not.toContain('Runs ');
     await press('Name these fields');
-    await screen.findByText(/5 of 5 saved/);
+    await screen.findByText(new RegExp(`${WITH_KEY} of ${WITH_KEY} saved`));
     expect(saves(calls)).toEqual(['storyPointEstimate=customfield_10016', 'estimate=customfield_10016 --replace', 'sprint=customfield_10020', 'iteration=customfield_10020 --replace']);
     const done = document.querySelector('[data-find-done]')!.textContent!;
     expect(done).toContain('Nothing was changed in Jira.');
@@ -133,16 +138,16 @@ describe('Find the fields', () => {
     mount(config);
     await read();
     await press('Name these fields');
-    await screen.findByText(/4 of 5 saved/);
+    await screen.findByText(new RegExp(`${WITH_KEY - 1} of ${WITH_KEY} saved`));
     const list = screen.getByRole('list', { name: 'What happened to each name' });
     const lines = within(list).getAllByRole('listitem').map((li) => li.textContent);
     expect(lines.filter((l) => l!.includes('failed'))).toHaveLength(1);
     expect(lines.find((l) => l!.includes('failed'))).toContain('"iteration" already names another field. Fix: Pass --replace.');
-    expect(lines.filter((l) => l!.includes(': saved'))).toHaveLength(4);
+    expect(lines.filter((l) => l!.includes(': saved'))).toHaveLength(WITH_KEY - 1);
     const before = saves(calls).length;
     heal();
     await press('Try the failed ones again');
-    await screen.findByText(/5 of 5 saved/);
+    await screen.findByText(new RegExp(`${WITH_KEY} of ${WITH_KEY} saved`));
     expect(saves(calls).slice(before)).toEqual(['iteration=customfield_10020 --replace']);
     expect(screen.queryByRole('button', { name: 'Try the failed ones again' })).toBeNull();
   });
@@ -153,7 +158,7 @@ describe('Find the fields', () => {
     await read('PAY');
     expect(document.querySelector('[data-find-key]')!.textContent).toMatch(/payments names no Jira project yet.*PAY/);
     await press('Name these fields');
-    await screen.findByText(/5 of 5 saved/);
+    await screen.findByText(new RegExp(`${WITH_KEY} of ${WITH_KEY} saved`));
     expect(keySaves(calls)).toEqual([{ toilProject: 'payments', area: 'jira', set: ['project=PAY'] }]);
     // The key goes after the field names, and shows in the results by its own label.
     expect(calls.filter((c) => c.command === 'projects field' || c.command === 'projects link').at(-1)!.command).toBe('projects link');
@@ -166,7 +171,7 @@ describe('Find the fields', () => {
     await read('PAY');
     await userEvent.type(screen.getByLabelText(/^Jira project key/), 'X');
     await press('Name these fields');
-    await screen.findByText(/5 of 5 saved/);
+    await screen.findByText(new RegExp(`${WITH_KEY} of ${WITH_KEY} saved`));
     expect(keySaves(calls)).toEqual([{ toilProject: 'payments', area: 'jira', set: ['project=PAY'] }]);
   });
 
@@ -178,7 +183,7 @@ describe('Find the fields', () => {
     await screen.findByRole('heading', { level: 4, name: 'Story' });
     expect(document.querySelector('[data-find-key]')).toBeNull();
     await press('Name these fields');
-    await screen.findByText(/4 of 4 saved/);
+    await screen.findByText(new RegExp(`${NAMED} of ${NAMED} saved`));
     expect(keySaves(calls)).toEqual([]);
   });
 
@@ -189,7 +194,7 @@ describe('Find the fields', () => {
     expect(document.querySelector('[data-find-key]')).toBeNull();
     expect(document.body.textContent).not.toContain('names no Jira project yet');
     await press('Name these fields');
-    await screen.findByText(/4 of 4 saved/);
+    await screen.findByText(new RegExp(`${NAMED} of ${NAMED} saved`));
     expect(keySaves(calls)).toEqual([]);
   });
 
@@ -201,7 +206,7 @@ describe('Find the fields', () => {
     await read('PAY');
     expect(document.querySelector('[data-find-key]')).toBeNull();
     await press('Name these fields');
-    await screen.findByText(/4 of 4 saved/);
+    await screen.findByText(new RegExp(`${NAMED} of ${NAMED} saved`));
     expect(keySaves(calls)).toEqual([]);
   });
 
@@ -290,7 +295,7 @@ describe('the wizard step', () => {
     await press('Read the fields');
     await screen.findByRole('heading', { level: 4, name: 'Story' });
     await press('Name these fields');
-    await waitFor(() => expect(saves(calls)).toHaveLength(4));
+    await waitFor(() => expect(saves(calls)).toHaveLength(NAMED));
     expect(calls.find((c) => c.command === 'projects field')!.input).toMatchObject({ toilProject: 'payments', area: 'jira' });
     expect(reads(calls)[0]!.input).toMatchObject({ connection: 'corp-jira' });
   }, 30_000);

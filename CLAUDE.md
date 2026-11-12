@@ -1025,7 +1025,7 @@ Repository hygiene has its own suite, `test/repo-hygiene.test.ts` (see Delivery)
 - **Canned responses are shaped like the real API**, captured from a live instance
   where possible and sanitized to placeholders (see **Placeholders**). A response
   invented from the docs is labelled as such in the fixture.
-- **The CLI and MCP stay 1:1 because `test/parity.test.ts` proves it.** It walks
+- **The CLI and MCP stay 1:1 because `test/parity/` proves it.** It walks
   every registered command, one suite per area, and checks:
   - one tool per command, with an identical, strict JSON Schema
   - every input field reachable from the CLI and vice versa, and set by at least
@@ -1048,7 +1048,15 @@ Repository hygiene has its own suite, `test/repo-hygiene.test.ts` (see Delivery)
   New commands are covered on registration; never add a command without examples,
   and never exempt one from this suite. The only exclusion is `cli-only` commands,
   which aren't MCP tools; the suite finds them by their `kind` and proves MCP never
-  serves them. Every alias is run against its command's MCP tool too. When changing the harness, prove the suite
+  serves them. Every alias is run against its command's MCP tool too. Core's own
+  machinery, `--select` and `--output-format toon` with `--summary-file`, is the same
+  for every command, so each area runs those once, on its first command, and on every
+  command that dispatches another (`toil wait`), which takes its own path through
+  core (the maintainer's call on #579, 2026-11-12). The suite is
+  `test/parity/suite.ts`, cut into eight files (`shard-0.test.ts` … `shard-7.test.ts`)
+  that Vitest runs on different workers: each shard claims every unit of work whose
+  count modulo eight is its own, so no list of areas or commands exists and a new one
+  lands in a shard by existing. When changing the harness, prove the suite
   still bites: break the mapping on purpose and watch it fail.
 - **Each area has a fixture**, `test/fixtures/<area>.fixture.ts`, exporting
   `defineFixture({ area, routes, config })`: canned responses for every request its

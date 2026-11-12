@@ -14,8 +14,8 @@ import { connectMcp } from './harness/mcp.js';
  * `--output-format` and `--summary-file` on their own terms: one fixture per
  * summary rule, the 5,000-row case the issue sets, and the edges (a file
  * already there, a read-only call, a write whose file can't be written).
- * test/parity.test.ts runs both through both front doors for every
- * registered command.
+ * test/parity/suite.ts runs both through both front doors once for
+ * every area (its first command).
  */
 
 /** `n` uniform rows, shaped like a search result's issues. */

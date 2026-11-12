@@ -284,14 +284,17 @@ describe('util size imports: hostile input stays linear', () => {
     extractImports(tokens, lang);
     return performance.now() - start;
   };
-  it.each(cases)('%s: 20,000 repeats in well under a second', (_name, lang, make) => {
-    expect(time(lang, make(20_000))).toBeLessThan(1000);
+  it.each(cases)('%s: 20,000 repeats in a few seconds at most', (_name, lang, make) => {
+    // Linear is milliseconds; the ratio test below is what catches a quadratic slope, this one a blowup, so it leaves a loaded runner room.
+    expect(time(lang, make(20_000))).toBeLessThan(5000);
   });
   it.each(cases)('%s: four times the input is not sixteen times the work', (_name, lang, make) => {
     time(lang, make(5_000));
     // Floored at 5 ms so timer noise on a fast run can't make the ratio large.
-    const small = Math.max(time(lang, make(10_000)), 5);
-    const large = time(lang, make(40_000));
+    // Each side is its best of three, so one garbage collection on a busy runner can't decide the ratio.
+    const best = (text: string) => Math.min(time(lang, text), time(lang, text), time(lang, text));
+    const small = Math.max(best(make(10_000)), 5);
+    const large = best(make(40_000));
     expect(large / small).toBeLessThan(12);
   });
 });

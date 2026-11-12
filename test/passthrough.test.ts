@@ -16,7 +16,7 @@ import { connectMcp, type McpSession } from './harness/mcp.js';
  * `<area> api`, through `jira api`: the request it sends comes from the
  * area's own hook, the method decides the write gate, DELETE stays off MCP,
  * the path stays on the connection's host, and a body that isn't JSON comes
- * back as text. test/parity.test.ts covers its examples through both doors.
+ * back as text. test/parity/suite.ts covers its examples through both doors.
  */
 
 const api = jiraCommands.find((def) => commandName(def) === 'jira api')!;

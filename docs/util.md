@@ -11,7 +11,7 @@ machine and talk to nothing else. Each one follows the same rules, which are on 
   `npm run check:pure` passes. A dependency is pure JavaScript or WebAssembly, and it
   loads only when its command runs (**Lazy loading**, below).
 - **CLI and MCP stay 1:1.** The command is a standalone `defineCommand` under
-  `['util', …]`, and the parity suite (`test/parity.test.ts`) proves both front doors
+  `['util', …]`, and the parity suite (`test/parity/`) proves both front doors
   agree. Every example in `examples` must run against `test/fixtures/util.fixture.ts`,
   so add the files it reads there.
 - **Self-verifying.** The command checks its own result wherever a check is possible,

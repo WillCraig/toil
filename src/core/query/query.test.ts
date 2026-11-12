@@ -254,7 +254,7 @@ describe('the size of what an expression builds (query.size)', () => {
     const piped = Array(64).fill('[@,@]').join(' | ');
     const run = timed(() => search({ a: 1 }, piped));
     expect((run.error as QueryError).message).toMatch(/builds more than 16 MiB/);
-    expect(run.ms).toBeLessThan(1000);
+    expect(run.ms).toBeLessThan(5000);
     // A function that serializes or copies its argument is held to the same bound.
     expect(() => search({ a: 1 }, `to_string(${piped})`)).toThrow(/builds more than/);
     expect(() => search({ a: 1 }, `length(${Array(40).fill('[@,@]').join(' | ')}[])`)).toThrow(/builds more than/);

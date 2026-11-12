@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Notifications on agent state changes (#306): which changes notify and in
  * what words, the window that coalesces them and drops a change undone

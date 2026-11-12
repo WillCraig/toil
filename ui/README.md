@@ -1362,6 +1362,9 @@ One command checks Toil UI the way a reviewer would, and writes what it found to
 `ui/.verify/report.md` with screenshots beside it (git ignores the folder). Run it
 from the root or from `ui/`, and paste the report's table into the PR.
 
+Toil UI's unit tests run in Node by default; a test file that renders needs
+`// @vitest-environment jsdom` as its first line.
+
 ```bash
 npm run verify:ui                 # build, sample data, real data
 npm run verify:ui -- --ask        # and one Codex question
@@ -1383,7 +1386,13 @@ npm run verify:ui -- --no-build --starter standup
   1440px. On each Toil project's dashboard it also drags a board card to the next column
   with real input, a mouse and at 375px a finger, and fails when the card doesn't
   follow the pointer or the dropped move doesn't show in the target column. It needs
-  only a browser, so it runs anywhere, CI included.
+  only a browser, so it runs anywhere, CI included. It never waits on a fixed sleep: it
+  waits for each view's heading and fonts, then for the layout to hold still with no
+  finite animation running, and each state it opens waits for its own end (its dialog
+  shown with no loading placeholder, a busy button free again). A layout still changing
+  3s after a step fails the run, naming the step. Theme schemes
+  run side by side, one Chrome per core; `LAYOUT_WORKERS` changes that, though more than
+  the core count starves the states that wait on a streamed answer.
 - **First run:** `toil-ui` on an empty home, with no connections, no Toil projects and no
   `TOIL_*` variable from your shell, through the same check: its Toil projects view must
   show the three-step checklist, and the palette and the shortcuts sheet open over it.
@@ -1410,7 +1419,8 @@ npm run verify:ui -- --no-build --starter standup
   skipped), and `--model <id>` sets its model and fails the run when an answer or a
   usage record names another one, so a cheap-model run can't quietly use a dear one. Each adapter's full live run, every agent feature on the sandbox, is
   recorded in `ui/docs/live-runs/`.
-- **What fails it:** any layout problem in any theme, and any axe violation at WCAG
+- **What fails it:** any layout problem in any theme, a layout still changing 3s after
+  a step, and any axe violation at WCAG
   2.2 AA in Plain and Crate. Axe findings in the other themes are listed in the report
   and never fail it. Screenshots are of Plain and Crate.
 - **It stops** every server and browser it started, and exits 1 on any problem.

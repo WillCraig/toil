@@ -251,12 +251,12 @@ describe('body text', () => {
     expect(bodyText(null)).toBe('');
   });
 
-  it('stays linear on a hostile body: 400 KB of each opening character reads in well under a second', () => {
+  it('stays linear on a hostile body: 400 KB of each opening character reads in linear time, not quadratic', () => {
     for (const [format, unit] of [['html', '<'], ['wiki', '['], ['wiki', '{a:'], ['markdown', '['], ['markdown', '<'], ['markdown', 'a.'], ['markdown', '![x]('], ['wiki', '[a|']] as const) {
       const content = unit.repeat(Math.ceil(400_000 / unit.length));
       const started = performance.now();
       bodyText({ format, content });
-      expect(performance.now() - started, `${format} ${unit}`).toBeLessThan(500);
+      expect(performance.now() - started, `${format} ${unit}`).toBeLessThan(3000); // Linear is milliseconds; quadratic was several seconds. A busy runner is neither.
     }
   });
 

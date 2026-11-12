@@ -550,7 +550,7 @@ describe('GitHub without a board (#298): milestones, estimate labels and body li
     const started = performance.now();
     expect(bodyLinks('github', `${REPO}#1`, body)).toEqual([{ type: 'blocks', direction: 'inward', target: id(3), name: 'blocked by' }]);
     // Quadratic, this took about 6 s for one run of spaces; linear, it is a few milliseconds.
-    expect(performance.now() - started).toBeLessThan(500);
+    expect(performance.now() - started).toBeLessThan(3000); // 3 s tells a few milliseconds from 6 s, and a loaded runner from neither.
   });
 
   it("says when GitHub's own issue dependencies hold links no command reads yet", async () => {

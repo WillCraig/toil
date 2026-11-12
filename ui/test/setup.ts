@@ -1,7 +1,7 @@
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
-// The server's tests run in Node's environment (no window); the views' in jsdom.
+// Every test file runs in Node's environment (no window) unless its first line is `// @vitest-environment jsdom`, as the views' are (#579).
 afterEach(() => {
   if (typeof window === 'undefined') return;
   cleanup();

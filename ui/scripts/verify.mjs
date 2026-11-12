@@ -189,13 +189,15 @@ async function layout(part, pageUrl, routes) {
   const headerFits = part !== 'real';
   // The analyses part reads the real toil project, whose Analyze answers are a real agent's: states that need the sample's content are not held to it.
   const sample = part !== 'real' && part !== 'analyses';
-  const strict = await checkLayout({ urlFor, routes, runs: runs.filter((r) => r.strict), shots: join(out, 'shots', part), log, headerFits, sample });
-  const other = await checkLayout({ urlFor, routes, runs: runs.filter((r) => !r.strict), log, headerFits, sample });
-  const found = [...strict.problems, ...other.problems];
+  // One call, so the strict and the other schemes share the workers' queue and the pass takes one scheme-length of
+  // wall time per worker, not two in a row. Only the strict schemes are shot. Only they fail the run on axe: checkLayout
+  // files the others' axe findings under `reported` per scheme, the same split the two calls made.
+  const all = await checkLayout({ urlFor, routes, runs, shots: join(out, 'shots', part), shotsFor: (r) => r.strict, log, headerFits, sample });
+  const found = all.problems;
   problems.push(...found.map((p) => `${part}: ${p}`));
-  reported.push(...[...strict.reported, ...other.reported].map((p) => `${part}: ${p}`));
-  const checked = strict.checked + other.checked;
-  step(`Layout and axe, ${part}`, found.length ? 'fail' : 'pass', `${checked} views and states, ${routes.length} routes in ${runs.length} theme schemes at ${WIDTHS.join(', ')}px: ${found.length} problem(s), ${strict.reported.length + other.reported.length} report-only axe finding(s) outside Plain and Crate`);
+  reported.push(...all.reported.map((p) => `${part}: ${p}`));
+  const checked = all.checked;
+  step(`Layout and axe, ${part}`, found.length ? 'fail' : 'pass', `${checked} views and states, ${routes.length} routes in ${runs.length} theme schemes at ${WIDTHS.join(', ')}px: ${found.length} problem(s), ${all.reported.length} report-only axe finding(s) outside Plain and Crate`);
 }
 
 /** The toil project page's first work item, as a route, read from the page itself. */

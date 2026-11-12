@@ -1,8 +1,9 @@
+// @vitest-environment jsdom
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { openChat } from './chat.ts';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import type { SyncClient, SyncStatus } from '../src/server-client.ts';
@@ -17,9 +18,10 @@ import { THEMES, themeNamed } from '../src/themes.ts';
  * The bar every theme is held to (#206, #277), run the same way for each: the
  * same click targets as Plain on every view, so a theme changes how a view
  * looks and never what can be done on it, and axe at WCAG 2.2 AA. Plain and
- * Crate are strict, with no violations; Harvest, Starship, Realm, Sprawl and Frontier may
- * deviate for style, so their findings are reported, never failed (the
- * maintainer's bar, AGENT_DECISIONS.md, #267). Contrast is checked on the
+ * Crate are strict, with no violations; the decorative themes may deviate for
+ * style, so axe can never fail them (the maintainer's bar, AGENT_DECISIONS.md,
+ * #267) and is not run on them here (#579). The click-target comparison, which
+ * enforces principle 11, still runs on every theme. Contrast is checked on the
  * tokens (themes.test.ts) and in a real browser (scripts/layout-check.mjs),
  * since jsdom can't compute it.
  */
@@ -28,9 +30,8 @@ const item = (toilProject: string, id: string) => `#/project/${toilProject}/item
 const ROUTES = ['#/', '#/project/card-payments', '#/project/settlement', '#/project/checkout-web', item('card-payments', 'corp-jira:PAY-100'), item('settlement', 'corp-ado:2304'), '#/settings'];
 const SCHEMES = THEMES.flatMap((t) => Object.keys(t.schemes).map((scheme) => [t.name, scheme] as const));
 const STRICT = new Set(['plain', 'crate']);
-/** Each case renders a whole view and runs axe over it, which takes a few seconds on a slow CI runner (macOS on Node 24.14). */
+/** Each case renders a whole view and, in Plain and Crate, runs axe over it, which takes a few seconds on a slow CI runner (macOS on Node 24.14). */
 const SLOW = 30_000;
-const reported: string[] = [];
 
 async function open(hash: string, theme: string, scheme: string) {
   localStorage.setItem('toil-ui.theme', JSON.stringify({ theme, scheme, wording: true, voice: true }));
@@ -69,11 +70,7 @@ beforeEach(() => {
 describe('every theme', { timeout: SLOW }, () => {
   const plainTargets = new Map<string, string[]>();
 
-  afterAll(() => {
-    if (reported.length) console.info(['Report-only axe findings in the decorative themes:', ...reported].join('\n'));
-  });
-
-  it.each(ROUTES.flatMap((r) => SCHEMES.map(([t, s]) => [r, t, s] as const)))('%s in %s (%s) meets its axe bar and has the same click targets as Plain', async (hash, theme, scheme) => {
+  it.each(ROUTES.flatMap((r) => SCHEMES.map(([t, s]) => [r, t, s] as const)))('%s in %s (%s) has the same click targets as Plain, and meets the axe bar where it is strict', async (hash, theme, scheme) => {
     if (!plainTargets.has(hash)) {
       const { unmount } = await open(hash, 'plain', 'light');
       plainTargets.set(hash, targets());
@@ -81,13 +78,11 @@ describe('every theme', { timeout: SLOW }, () => {
     }
     const { container } = await open(hash, theme, scheme);
     expect(document.documentElement.dataset.theme).toBe(theme);
-    const found = await violations(container);
-    if (STRICT.has(theme)) expect(found).toEqual([]);
-    else reported.push(...found.map((f) => `${theme} ${hash}: ${f}`));
+    if (STRICT.has(theme)) expect(await violations(container)).toEqual([]);
     expect(targets()).toEqual(plainTargets.get(hash));
   });
 
-  it('is listed in the theme picker, all seven of them', async () => {
+  it('is listed in the theme picker, every theme once', async () => {
     await open('#/', 'plain', 'light');
     screen.getByRole('button', { name: /Theme/ }).click();
     const options = await screen.findAllByRole('option');
@@ -332,7 +327,7 @@ describe('the local app\'s sync panel', { timeout: SLOW }, () => {
   };
   const client: SyncClient = { status: async () => status, start: async () => status, wipe: async () => status };
 
-  it.each(SCHEMES)('in %s (%s) shows a stale source and the wipe confirmation with no axe violations', async (theme, scheme) => {
+  it.each(SCHEMES)('in %s (%s) shows a stale source and the wipe confirmation, with no axe violations where the theme is strict', async (theme, scheme) => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.scheme = scheme;
     // The wipe is under Settings, General, Advanced now, so its confirmation is checked beside the bar.
@@ -343,14 +338,10 @@ describe('the local app\'s sync panel', { timeout: SLOW }, () => {
       </>,
     );
     expect(await screen.findByText(/Showing the last good copy/)).toBeTruthy();
-    const bar = async () => {
-      const found = await violations(container);
-      if (STRICT.has(theme)) expect(found).toEqual([]);
-      else reported.push(...found.map((f) => `${theme} sync panel: ${f}`));
-    };
-    await bar();
+    const strict = STRICT.has(theme);
+    if (strict) expect(await violations(container)).toEqual([]);
     await userEvent.click(screen.getByRole('button', { name: /Wipe/ }));
-    await bar();
+    if (strict) expect(await violations(container)).toEqual([]);
   });
 });
 

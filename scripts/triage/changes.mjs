@@ -97,7 +97,7 @@ const CORE_SAFETY_FILES = new Set([
   'src/core/token-shapes.mjs', 'src/core/token-shapes.d.mts',
 ]);
 export const SAFETY_ELSEWHERE_CORE = new Set([
-  'src/api.ts', 'src/node-context.ts', 'src/program.ts', 'docs/bounds.md', 'test/bounds.test.ts', 'test/parity.test.ts',
+  'src/api.ts', 'src/node-context.ts', 'src/program.ts', 'docs/bounds.md', 'test/bounds.test.ts',
   'src/core/time-limit.test.ts', 'src/welcome/rogue/save.ts', 'src/core/db/tls.ts',
   // The contract, and the suites that guard it, triage's own rules and the repository's hygiene.
   'docs/command-contract.json', 'docs/command-contract.md', 'test/contract.test.ts', 'test/triage.test.ts', 'test/triage-steps.test.ts',
@@ -105,6 +105,8 @@ export const SAFETY_ELSEWHERE_CORE = new Set([
 ]);
 export const SAFETY_CORE_FOLDERS = [
   'src/os/', 'src/shims/', 'src/mcp/', 'src/core/query/', 'src/connections/', 'src/skills/', 'src/setup/', 'src/feedback/', 'src/projects/',
+  // The CLI-to-MCP parity suite and its shards: what keeps the two front doors 1:1.
+  'test/parity/',
   // The shipped skill: every page ships to users' agents as instructions, and most say how a write gate works.
   'skills/toil/',
 ];

@@ -8,8 +8,8 @@ import { runCli } from './harness/cli.js';
 import { connectMcp } from './harness/mcp.js';
 
 /**
- * `--select` on its own terms; test/parity.test.ts runs it through both front
- * doors for every registered command.
+ * `--select` on its own terms; test/parity/suite.ts runs it through both front
+ * doors once for every area (its first command).
  */
 
 const listing = defineCommand({

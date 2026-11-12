@@ -83,7 +83,12 @@ export default defineConfig(({ mode }) => ({
     // does, so a change to toil's commands and the UI's use of it land in one PR
     // and are tested together. The published pin is bumped when toil releases.
     alias: { '@imagile-dev/toil/api': fileURLToPath(new URL('../src/api.ts', import.meta.url)) },
-    environment: 'jsdom',
+    // Node by default: a test file that needs a DOM says so on its first line
+    // (`// @vitest-environment jsdom`), so the ones that don't skip jsdom's startup (#579).
+    environment: 'node',
+    // Half the cores: at 16 workers on a 16-thread machine the jsdom files starve
+    // each other and the slowest cases time out at 5 s; half is faster and green.
+    maxWorkers: '50%',
     include: ['src/**/*.test.{ts,tsx}', 'test/**/*.test.{ts,tsx}'],
     setupFiles: ['test/setup.ts'],
   },
