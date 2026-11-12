@@ -219,7 +219,7 @@ describe("toil's ado commands on a Services connection, on the seeded board", ()
     await seed(board);
     vi.stubGlobal('fetch', board.fetch);
     board.writes.length = 0;
-    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi });
+    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi, now: () => new Date(after()) });
     expect(data.calls.work.filter((c) => !c.ok)).toEqual([]);
     expect(data.calls.work.map((c) => c.command)).toEqual(expect.arrayContaining(['ado work-item iterations', 'ado work-item search', 'ado work-item get-many', 'ado work-item history']));
     // One feed call (read in several batches) stood in for most histories; the items it doesn't hold whole were read one by one, and the result is the same board.
@@ -255,7 +255,7 @@ describe("toil's ado commands on a Services connection, on the seeded board", ()
     const file = join(process.env.HOME!, '.toil', 'projects', 'ado-board.json');
     writeFileSync(file, JSON.stringify({ name: 'ado-board', repos: [], ado: { connection: 'imagile-ado', project: PROJECT, repo: 'payments-core' } }));
     vi.stubGlobal('fetch', board.fetch);
-    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi });
+    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi, now: () => new Date(after()) });
     expect(data.calls.prs.map((c) => [c.command, c.ok])).toEqual([['ado pr list', true], ['ado pr get', true]]);
     expect(data.pullRequests.map((c) => [c.id, c.state, c.workItems, c.checks])).toEqual([[`imagile-ado:${PROJECT}/payments-core#7`, 'MERGED', [`imagile-ado:${id}`], 'NONE']]);
     expect(READ_COMMANDS.has('ado pr list')).toBe(true);
@@ -267,7 +267,7 @@ describe("toil's ado commands on a Services connection, on the seeded board", ()
     const file = join(process.env.HOME!, '.toil', 'projects', 'ado-board.json');
     writeFileSync(file, JSON.stringify({ name: 'ado-board', repos: [], ado: { connection: 'imagile-ado', project: PROJECT, builds: ['ci'], deployments: ['deploy'] } }));
     vi.stubGlobal('fetch', board.fetch);
-    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi });
+    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi, now: () => new Date(after()) });
     expect(data.items).toEqual([]);
     const commands = Object.values(data.calls).flat().map((c) => c.command);
     expect(commands).not.toContain('ado pr list');
@@ -278,7 +278,7 @@ describe("toil's ado commands on a Services connection, on the seeded board", ()
     const board = adoBoard();
     await seed(board);
     vi.stubGlobal('fetch', board.fetch);
-    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi });
+    const data = await loadToilProject(execute as unknown as Execute, 'ado-board', { mapOwi, now: () => new Date(after()) });
     const item = data.items.find((i) => i.status === 'New' && i.type === 'STORY') as WorkItem;
     expect(proposeMove(item, 'IN_PROGRESS', data.items, 'ado-board')).toMatchObject({ command: 'ado work-item transition', input: { toilProject: 'ado-board', id: Number(item.source.key), state: 'Committed' } });
   });

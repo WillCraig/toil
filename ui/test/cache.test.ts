@@ -155,7 +155,7 @@ describe('the schema', () => {
 
   it('commits to a write-ahead log, which closing folds back into the one file (#328)', async () => {
     const dir = folder();
-    const cache = await open(dir);
+    const cache = await open(dir, { now: () => new Date(T0) });
     cache.saveToilProject(save(T0));
     expect(readdirSync(cachePaths(dir).dir).sort()).toEqual(['toil-ui.db', 'toil-ui.db-shm', 'toil-ui.db-wal']);
     cache.close();
@@ -171,7 +171,7 @@ describe('the schema', () => {
   });
 
   it('leaves updatedSince out of the revision feed key only: a pull request list asked since a date is not the whole list', async () => {
-    const cache = await open(folder());
+    const cache = await open(folder(), { now: () => new Date(T0) });
     const feed = { toilProject: 'card-payments' };
     const prs = { toilProject: 'card-payments', state: 'all' };
     cache.saveToilProject(save(T0, {
@@ -187,7 +187,7 @@ describe('the schema', () => {
   });
 
   it('lists every stored envelope of a command, whatever its input', async () => {
-    const cache = await open(folder());
+    const cache = await open(folder(), { now: () => new Date(T0) });
     const many = (ids: number[]) => envelope('ado work-item get-many', { value: ids.map((id) => ({ id })) });
     cache.saveToilProject(save(T0, {
       responses: [
