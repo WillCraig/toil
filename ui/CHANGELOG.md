@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.1.0-beta.6](https://github.com/imagile-dev/toil/compare/toil-ui-v0.1.0-beta.5...toil-ui-v0.1.0-beta.6) (2026-11-12)
+
+
+### Features
+
+* **ui:** show usage without caps ([#572](https://github.com/imagile-dev/toil/issues/572)) ([321d59b](https://github.com/imagile-dev/toil/commit/321d59b2d08650453c79b25f8f5d42a9fca26ca3))
+
+
+### Bug Fixes
+
+* **ui:** date the cache migration test's seeded rows from the clock ([#575](https://github.com/imagile-dev/toil/issues/575)) ([6871d0b](https://github.com/imagile-dev/toil/commit/6871d0b798c2fe39951416c35cbc3e20524c2c73)), closes [#574](https://github.com/imagile-dev/toil/issues/574)
+* **ui:** pin the clock in tests that seed fixed dates ([#578](https://github.com/imagile-dev/toil/issues/578)) ([3f871b5](https://github.com/imagile-dev/toil/commit/3f871b50223eeb39f1c1276432f089146d2343dd)), closes [#577](https://github.com/imagile-dev/toil/issues/577)
+* **ui:** the install dialog no longer widens its overlay past a 375px screen ([#569](https://github.com/imagile-dev/toil/issues/569)) ([a317a22](https://github.com/imagile-dev/toil/commit/a317a22f57709b8733fb4f19d1974477ba69d2e2))
+* **ui:** the setup wizard sets Jira up fully, and two screens report honestly ([#576](https://github.com/imagile-dev/toil/issues/576)) ([111b710](https://github.com/imagile-dev/toil/commit/111b7108dda5b53c1b5277f71aeaf576aaebb2a1))
+
+
+### Performance Improvements
+
+* tests and CI run faster without dropping a check ([#581](https://github.com/imagile-dev/toil/issues/581)) ([eff76f1](https://github.com/imagile-dev/toil/commit/eff76f1f005daed8a933eede0c0fc96d7ab6f8ae))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @imagile-dev/toil bumped from 0.1.0-beta.5 to 0.1.0-beta.6
+
 ## [0.1.0-beta.5](https://github.com/imagile-dev/toil/compare/toil-ui-v0.1.0-beta.4...toil-ui-v0.1.0-beta.5) (2026-11-09)
 
 

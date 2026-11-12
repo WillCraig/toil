@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.0-beta.6](https://github.com/imagile-dev/toil/compare/v0.1.0-beta.5...v0.1.0-beta.6) (2026-11-12)
+
+
+### Features
+
+* **ui:** show usage without caps ([#572](https://github.com/imagile-dev/toil/issues/572)) ([321d59b](https://github.com/imagile-dev/toil/commit/321d59b2d08650453c79b25f8f5d42a9fca26ca3))
+
+
+### Bug Fixes
+
+* **ui:** the setup wizard sets Jira up fully, and two screens report honestly ([#576](https://github.com/imagile-dev/toil/issues/576)) ([111b710](https://github.com/imagile-dev/toil/commit/111b7108dda5b53c1b5277f71aeaf576aaebb2a1))
+
+
+### Performance Improvements
+
+* tests and CI run faster without dropping a check ([#581](https://github.com/imagile-dev/toil/issues/581)) ([eff76f1](https://github.com/imagile-dev/toil/commit/eff76f1f005daed8a933eede0c0fc96d7ab6f8ae))
+
 ## [0.1.0-beta.5](https://github.com/imagile-dev/toil/compare/v0.1.0-beta.4...v0.1.0-beta.5) (2026-11-09)
 
 
