@@ -23,8 +23,10 @@ import { buildScanData, scanFiles, type Package, type ScanOptions } from './mani
  * The local utilities, end to end through execute() and the real CLI, plus
  * the parsers on their own. Behaviour that looks wrong is pinned, not fixed
  * (#91 items 8 to 20, 24 and 25 for deps). jwt's #75 was checked on crafted
- * tokens: items 1 to 3 are fixed, item 4 is kept, and each test says so. A
- * test that passes for the wrong reason is still, technically, compliant.
+ * tokens: items 1 to 3 are fixed, item 4 is partly confirmed (the error names
+ * a Bearer prefix or surrounding whitespace, and the token is still refused),
+ * and each test says so. A test that passes for the wrong reason is still,
+ * technically, compliant.
  */
 
 const REPO = { root: '/work', branch: 'main', remotes: [] };
@@ -43,7 +45,8 @@ describe('util jwt decode', () => {
     const payload = b64('{"a":"??>"}');
     expect(payload).toMatch(/[-_]/);
     expect(decodeJwt(`${header}.${payload}.`)).toEqual({ header: { alg: 'none' }, payload: { a: '??>' }, signature: '' });
-    for (const text of ['{"a":1}', '{"ab":1}', '{"abc":1}']) expect(decodeJwt(`${b64(text)}.${b64(text)}.s`).payload).toEqual(JSON.parse(text));
+    // "sig" is three characters, a legal base64url length. One character is not.
+    for (const text of ['{"a":1}', '{"ab":1}', '{"abc":1}']) expect(decodeJwt(`${b64(text)}.${b64(text)}.sig`).payload).toEqual(JSON.parse(text));
     // RFC 7515 appendix C allows padding. A real U+FFFD is valid UTF-8 and stays.
     const padded = Buffer.from('{"alg":"none"}').toString('base64');
     expect(padded.endsWith('=')).toBe(true);
@@ -60,17 +63,31 @@ describe('util jwt decode', () => {
     ['a payload that is a JSON array', 'e30.WzEsMl0.x', 'Invalid JWT: payload is not a JSON object'],
     ['a header outside base64url', 'eyJh!!bGciOiJIUzI1NiJ9.e30.x', 'Invalid JWT: header is not valid base64url'],
     ['a payload that is not UTF-8', 'e30.eyJhIjoi_yJ9.x', 'Invalid JWT: payload is not valid UTF-8'],
+    ['a signature outside base64url', `${b64('{}')}.${b64('{}')}.ab+c`, 'Invalid JWT: signature is not valid base64url'],
+    ['a Bearer prefix', `Bearer ${EXAMPLE_TOKEN}`, "Invalid JWT: remove the 'Bearer ' prefix"],
+    ['a lowercase bearer prefix', `bearer ${EXAMPLE_TOKEN}`, "Invalid JWT: remove the 'Bearer ' prefix"],
+    ['leading whitespace', ` ${EXAMPLE_TOKEN}`, 'Invalid JWT: token has surrounding whitespace'],
+    ['a trailing newline', `${EXAMPLE_TOKEN}\n`, 'Invalid JWT: token has surrounding whitespace'],
   ])('refuses %s with INVALID_INPUT, exit 1, without repeating the token', async (_name, token, message) => {
     const run = await runCli(['util', 'jwt', 'decode', token], { commands, context: testContext().context });
     expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message });
     expect(run.envelope?.error?.fix).toContain('header.payload.signature');
     expect(run.exitCode).toBe(1);
     expect(run.stdout + run.stderr).not.toContain(token);
+    // The prefix and whitespace tokens contain the example signature. The message must not.
+    if (token.includes('c2lnbmF0dXJl')) expect(run.stdout + run.stderr).not.toContain('c2lnbmF0dXJl');
   });
 
   it('reads the token from stdin with -, dropping one trailing line ending', async () => {
     const run = await runCli(['util', 'jwt', 'decode', '-'], { commands, context: testContext({ stdin: `${EXAMPLE_TOKEN}\r\n` }).context });
     expect(run.envelope?.data).toMatchObject({ signature: 'c2lnbmF0dXJlLW5vdC1jaGVja2Vk' });
+    // One line ending is dropped, then the same prefix and whitespace checks run.
+    const bearer = await runCli(['util', 'jwt', 'decode', '-'], { commands, context: testContext({ stdin: `bearer ${EXAMPLE_TOKEN}\n` }).context });
+    expect(bearer.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: "Invalid JWT: remove the 'Bearer ' prefix" });
+    expect(bearer.stdout + bearer.stderr).not.toContain('c2lnbmF0dXJl');
+    const padded = await runCli(['util', 'jwt', 'decode', '-'], { commands, context: testContext({ stdin: `${EXAMPLE_TOKEN} \n` }).context });
+    expect(padded.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: 'Invalid JWT: token has surrounding whitespace' });
+    expect(padded.stdout + padded.stderr).not.toContain('c2lnbmF0dXJl');
   });
 
   it('refuses - over MCP, where stdin is the protocol', async () => {
@@ -123,6 +140,14 @@ describe('util jwt decode', () => {
       ]) {
         expect(() => decodeJwt(token), token).toThrow(/Invalid JWT: (header|payload) is not valid base64url/);
       }
+      // The signature gets the same alphabet and length check. An empty one is
+      // valid base64url, which is how alg none is written, and it comes back as text.
+      const none = `${b64('{"alg":"none"}')}.${b64('{}')}`;
+      expect(decodeJwt(`${none}.`)).toMatchObject({ header: { alg: 'none' }, signature: '' });
+      expect(decodeJwt(`${none}.YQ==`).signature).toBe('YQ==');
+      for (const signature of ['!!', 'ab+c', 'ab/c', 'ab=cd', 's', 'abc\ndef', 'YQ=']) {
+        expect(() => decodeJwt(`${none}.${signature}`), JSON.stringify(signature)).toThrow('Invalid JWT: signature is not valid base64url');
+      }
     });
 
     it('item 3: invalid UTF-8 is refused (it used to become U+FFFD)', () => {
@@ -130,17 +155,35 @@ describe('util jwt decode', () => {
       expect(() => decodeJwt(`${b64('{"a":"ok"}')}.${Buffer.from([0x7b, 0x22, 0x61, 0x22, 0x3a, 0x22, 0xff, 0x22, 0x7d]).toString('base64url')}.x`)).toThrow('Invalid JWT: payload is not valid UTF-8');
     });
 
-    it('item 4, checked and kept: a Bearer prefix is still refused, and trailing whitespace stays in the signature', () => {
-      // Stripping "Bearer " or the surrounding whitespace was the suggested fix,
-      // and the local check refuted it. RFC 7519 §7.2 rejects extra characters
-      // rather than dropping them, the error's fix already says to omit the
-      // prefix, and the signature is the third segment as passed. stdin ("-")
-      // still drops one trailing line ending. The prefix and a leading space
-      // fail the base64url check (item 2) instead of the old JSON error.
-      expect(() => decodeJwt(`Bearer ${EXAMPLE_TOKEN}`)).toThrow('Invalid JWT: header is not valid base64url');
-      expect(() => decodeJwt(` ${EXAMPLE_TOKEN}`)).toThrow('Invalid JWT: header is not valid base64url');
-      expect(decodeJwt(`${EXAMPLE_TOKEN}\n`).signature).toBe('c2lnbmF0dXJlLW5vdC1jaGVja2Vk\n');
-      expect(decodeJwt(`${EXAMPLE_TOKEN} `).signature).toBe('c2lnbmF0dXJlLW5vdC1jaGVja2Vk ');
+    it('item 4, partly confirmed: a Bearer prefix or surrounding whitespace is named, and the token is still refused', () => {
+      // Stripping the prefix or the whitespace would make the decode succeed.
+      // RFC 7519 §7.2 rejects extra characters, so the token stays refused.
+      // The issue's other fix is an error that names the prefix. The message
+      // does not include the token. stdin ("-") still drops one trailing line
+      // ending before this check. A newline that is not at either end of the
+      // token fails the signature check in item 2.
+      const prefix = "Invalid JWT: remove the 'Bearer ' prefix";
+      const space = 'Invalid JWT: token has surrounding whitespace';
+      const refuse = (token: string, message: string) => {
+        let caught: unknown;
+        try {
+          decodeJwt(token);
+        } catch (err) {
+          caught = err;
+        }
+        expect(caught, JSON.stringify(token)).toBeInstanceOf(ToilError);
+        const err = caught as ToilError;
+        expect(err.code).toBe('INVALID_INPUT');
+        expect(err.message).toBe(message);
+        expect(err.message).not.toContain('c2lnbmF0dXJl');
+        expect(err.message).not.toContain(EXAMPLE_TOKEN);
+      };
+      for (const token of [`Bearer ${EXAMPLE_TOKEN}`, `bearer ${EXAMPLE_TOKEN}`, `BEARER ${EXAMPLE_TOKEN}`, `BeArEr ${EXAMPLE_TOKEN}`]) refuse(token, prefix);
+      for (const token of [` ${EXAMPLE_TOKEN}`, `${EXAMPLE_TOKEN} `, `${EXAMPLE_TOKEN}\n`, `${EXAMPLE_TOKEN}\t`, `\t${EXAMPLE_TOKEN}`, `${EXAMPLE_TOKEN}\r\n`]) refuse(token, space);
+      // A prefix wins over a trailing newline, and a leading space wins over a prefix behind it.
+      refuse(`Bearer ${EXAMPLE_TOKEN}\n`, prefix);
+      refuse(` ${EXAMPLE_TOKEN}`, space);
+      refuse(` bearer ${EXAMPLE_TOKEN}`, space);
     });
   });
 });
