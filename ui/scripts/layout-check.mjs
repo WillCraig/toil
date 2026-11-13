@@ -393,8 +393,9 @@ async function closeOverlays(page) {
 function states(route, width, sample = true) {
   const out = [];
   // The app's own breakpoint (COMPACT_HEADER in src/App.tsx): below it, the header is the Menu button.
+  // The button toggles, so this state first closes any overlay an earlier width left open: its own click would close a leftover Menu, not open it (#486).
   const compact = width < 1024;
-  if (compact) out.push({ name: 'menu', setup: afterClick(clickAll('[data-menu-button]'), '.nav-menu__dialog'), undo: 'Escape' });
+  if (compact) out.push({ name: 'menu', clearOverlays: true, setup: afterClick(clickAll('[data-menu-button]'), '.nav-menu__dialog'), undo: 'Escape' });
   // Feedback is in the header, or in its Menu when the header folds, which it does below 1024px or when its row is full.
   if (route === '#/') out.push({ name: 'feedback', setup: afterClick(inMenu('button.feedback-open'), '.feedback-dialog'), undo: 'Escape' });
   // The command palette and the shortcuts sheet (#416): open, with an item search typed, and the sheet. Ctrl+K and ? are
