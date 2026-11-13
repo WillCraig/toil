@@ -37,7 +37,7 @@ changes or drops is a divergence.
 |------|----------|-------|
 | Every integration (`jira`, `bitbucket`, `github`, `confluence`, `sonar`, `sde`, `ado`, `jenkins`, `artifactory`, `checkmarx`, `contrast`, `sonatypeiq`, `openshift`, `dynatrace`, `logscale`, `elasticsearch`, `kibana`, `splitio`, `figma`, `alation`, `saucelabs`) | Yes | Exact match |
 | `git` | Yes | Exact match, apart from the divergences in `docs/divergences/git.json`. Repository facts (root, branch, remotes) are read from `.git` in pure JS; `status`, `diff`, `log`, `branch` and `report` run the git on PATH, the one program besides the OS credential store toil may run (#68 decision 1), and return `GIT_NOT_FOUND` without it |
-| `jwt` | Yes | Built as `util jwt decode`, a local utility; `jwt decode` is its alias. One divergence, in `docs/divergences/jwt.json` |
+| `jwt` | Yes | Built as `util jwt decode`, a local utility; `jwt decode` is its alias. Divergences are in `docs/divergences/jwt.json` |
 | `deps` | Yes | `scan` and `diff` are built as `util deps scan` and `util deps diff`, local utilities, with the contract's paths as aliases; `frisk`, `outdated` and `license-check` are aliases of the source commands that own them. Divergences in `docs/divergences/deps.json` |
 | `config` | No | Built around the OS credential store. `config import` reads a global config file in the shape the contract records, once. |
 | `skills` | Yes | Marketplace add, list, plugins, remove, sync, enable and disable, and `skills status`, matched. The rest aren't built yet, or are gone for good (`skills git-auth`); each is a divergence in `docs/divergences/skills.json` |

@@ -22,7 +22,8 @@ import { buildScanData, scanFiles, type Package, type ScanOptions } from './mani
 /**
  * The local utilities, end to end through execute() and the real CLI, plus
  * the parsers on their own. Behaviour that looks wrong is pinned, not fixed
- * (#75 for jwt, #91 items 8 to 20, 24 and 25 for deps); each pin says so. A
+ * (#91 items 8 to 20, 24 and 25 for deps). jwt's #75 was checked on crafted
+ * tokens: items 1 to 3 are fixed, item 4 is kept, and each test says so. A
  * test that passes for the wrong reason is still, technically, compliant.
  */
 
@@ -43,6 +44,10 @@ describe('util jwt decode', () => {
     expect(payload).toMatch(/[-_]/);
     expect(decodeJwt(`${header}.${payload}.`)).toEqual({ header: { alg: 'none' }, payload: { a: '??>' }, signature: '' });
     for (const text of ['{"a":1}', '{"ab":1}', '{"abc":1}']) expect(decodeJwt(`${b64(text)}.${b64(text)}.s`).payload).toEqual(JSON.parse(text));
+    // RFC 7515 appendix C allows padding. A real U+FFFD is valid UTF-8 and stays.
+    const padded = Buffer.from('{"alg":"none"}').toString('base64');
+    expect(padded.endsWith('=')).toBe(true);
+    expect(decodeJwt(`${padded}.${b64('{"a":"�"}')}.`).payload).toEqual({ a: '�' });
   });
 
   it.each([
@@ -51,6 +56,10 @@ describe('util jwt decode', () => {
     ['a header that is not JSON', `${b64('nope')}.${b64('{}')}.s`, 'Invalid JWT: header is not valid JSON'],
     ['a payload that is not JSON', `${b64('{}')}.${b64('nope')}.s`, 'Invalid JWT: payload is not valid JSON'],
     ['an empty header', `.${b64('{}')}.s`, 'Invalid JWT: header is not valid JSON'],
+    ['a header that is JSON but not an object', 'bnVsbA.e30.x', 'Invalid JWT: header is not a JSON object'],
+    ['a payload that is a JSON array', 'e30.WzEsMl0.x', 'Invalid JWT: payload is not a JSON object'],
+    ['a header outside base64url', 'eyJh!!bGciOiJIUzI1NiJ9.e30.x', 'Invalid JWT: header is not valid base64url'],
+    ['a payload that is not UTF-8', 'e30.eyJhIjoi_yJ9.x', 'Invalid JWT: payload is not valid UTF-8'],
   ])('refuses %s with INVALID_INPUT, exit 1, without repeating the token', async (_name, token, message) => {
     const run = await runCli(['util', 'jwt', 'decode', token], { commands, context: testContext().context });
     expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message });
@@ -86,24 +95,52 @@ describe('util jwt decode', () => {
     }
   });
 
-  describe('suspected bugs, pinned (#75)', () => {
-    it('item 1: a header or payload that is JSON but not an object is accepted', () => {
-      expect(decodeJwt('bnVsbA.bnVsbA.x')).toEqual({ header: null, payload: null, signature: 'x' });
-      expect(decodeJwt('WzEsMl0.e30.x')).toEqual({ header: [1, 2], payload: {}, signature: 'x' });
+  describe('#75, checked on crafted tokens', () => {
+    it('item 1: a header or payload that is JSON but not an object is refused (was accepted)', () => {
+      for (const [token, message] of [
+        ['bnVsbA.bnVsbA.x', 'Invalid JWT: header is not a JSON object'],
+        ['WzEsMl0.e30.x', 'Invalid JWT: header is not a JSON object'],
+        ['e30.InRleHQi.x', 'Invalid JWT: payload is not a JSON object'],
+        ['MTIz.e30.x', 'Invalid JWT: header is not a JSON object'],
+        ['dHJ1ZQ.e30.x', 'Invalid JWT: header is not a JSON object'],
+      ] as const) {
+        expect(() => decodeJwt(token), token).toThrow(message);
+      }
     });
 
-    it('item 2: characters outside base64url are skipped, and standard base64 is accepted', () => {
-      expect(decodeJwt('eyJh!!bGciOiJIUzI1NiJ9.e30.x').header).toEqual({ alg: 'HS256' });
-      expect(decodeJwt(`${Buffer.from('{"a":"??>"}').toString('base64')}.e30.x`).header).toEqual({ a: '??>' });
+    it('item 2: characters outside base64url, standard base64, and a length of 1 mod 4 are refused (they used to decode)', () => {
+      const standard = Buffer.from('{"a":"??>"}').toString('base64');
+      expect(standard).toMatch(/[+/]/);
+      const parts = EXAMPLE_TOKEN.split('.');
+      expect(parts[1]!.length % 4).toBe(0);
+      for (const token of [
+        'eyJh!!bGciOiJIUzI1NiJ9.e30.x',
+        `${standard}.e30.x`,
+        'eyJhbGciOiJIUzI1NiJ9x.e30.x',
+        `${parts[0]}.${parts[1]}A.${parts[2]}`,
+        `${parts[0]}.${parts[1]!.slice(0, 4)}!!${parts[1]!.slice(4)}.${parts[2]}`,
+        'eyJhbGciOiJub25lIn0=x.e30.x',
+      ]) {
+        expect(() => decodeJwt(token), token).toThrow(/Invalid JWT: (header|payload) is not valid base64url/);
+      }
     });
 
-    it('item 3: invalid UTF-8 becomes U+FFFD', () => {
-      expect(decodeJwt('e30.eyJhIjoi_yJ9.x').payload).toEqual({ a: '�' });
+    it('item 3: invalid UTF-8 is refused (it used to become U+FFFD)', () => {
+      expect(() => decodeJwt('e30.eyJhIjoi_yJ9.x')).toThrow('Invalid JWT: payload is not valid UTF-8');
+      expect(() => decodeJwt(`${b64('{"a":"ok"}')}.${Buffer.from([0x7b, 0x22, 0x61, 0x22, 0x3a, 0x22, 0xff, 0x22, 0x7d]).toString('base64url')}.x`)).toThrow('Invalid JWT: payload is not valid UTF-8');
     });
 
-    it('item 4: a Bearer prefix fails as a header error, and trailing whitespace stays in the signature', () => {
-      expect(() => decodeJwt(`Bearer ${EXAMPLE_TOKEN}`)).toThrow('Invalid JWT: header is not valid JSON');
+    it('item 4, checked and kept: a Bearer prefix is still refused, and trailing whitespace stays in the signature', () => {
+      // Stripping "Bearer " or the surrounding whitespace was the suggested fix,
+      // and the local check refuted it. RFC 7519 §7.2 rejects extra characters
+      // rather than dropping them, the error's fix already says to omit the
+      // prefix, and the signature is the third segment as passed. stdin ("-")
+      // still drops one trailing line ending. The prefix and a leading space
+      // fail the base64url check (item 2) instead of the old JSON error.
+      expect(() => decodeJwt(`Bearer ${EXAMPLE_TOKEN}`)).toThrow('Invalid JWT: header is not valid base64url');
+      expect(() => decodeJwt(` ${EXAMPLE_TOKEN}`)).toThrow('Invalid JWT: header is not valid base64url');
       expect(decodeJwt(`${EXAMPLE_TOKEN}\n`).signature).toBe('c2lnbmF0dXJlLW5vdC1jaGVja2Vk\n');
+      expect(decodeJwt(`${EXAMPLE_TOKEN} `).signature).toBe('c2lnbmF0dXJlLW5vdC1jaGVja2Vk ');
     });
   });
 });
