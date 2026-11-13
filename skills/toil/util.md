@@ -111,16 +111,25 @@ echo "$TOKEN" | toil util jwt decode -
 | `<token>` | The token, `header.payload.signature`. `-` reads it from stdin, which keeps it out of the process list and your shell history; one trailing line ending is dropped |
 
 Output: `{ header, payload, signature }`, the header and claims as parsed JSON and
-the signature segment as the text it is.
+the signature segment as the text it is, once that segment has passed the base64url check.
 
 - A token that isn't three dot-separated parts (an encrypted 5-part JWE, say) fails
   with `INVALID_INPUT`, `Invalid JWT: expected 3 dot-separated parts`.
-- A header or payload that doesn't decode to JSON fails with `Invalid JWT: header is
-  not valid JSON` (or `payload`). A `Bearer ` prefix gives this error too, so strip it.
-- The decoding is lenient, as it has always been. A segment that is JSON but not an
-  object (`null`, a number) comes back as it is. Characters outside base64url are
-  skipped. Invalid UTF-8 shows as `�`. Whitespace in a token passed as an argument
-  is kept, so a trailing newline ends up in `signature`.
+- A header, payload or signature that isn't base64url fails with `Invalid JWT: header is not
+  valid base64url` (or `payload`, or `signature`). Letters, digits, `-` and `_` only. `=` is accepted
+  as padding at the end. `+`, `/`, whitespace and any other character are rejected,
+  and so is a segment whose length can't be whole bytes. An empty signature is allowed,
+  which is how `alg: none` is written. A signature that passes comes back as the text it is.
+- One that isn't UTF-8 fails with `Invalid JWT: header is not valid UTF-8` (or
+  `payload`). A real U+FFFD character, which is valid UTF-8, still decodes. The signature
+  is not read as UTF-8.
+- One that isn't JSON fails with `Invalid JWT: header is not valid JSON` (or
+  `payload`). One that is JSON but not an object (`null`, a number, a string, a
+  list) fails with `Invalid JWT: header is not a JSON object` (or `payload`).
+- A token that starts with `Bearer `, in any case, fails with `Invalid JWT: remove the 'Bearer ' prefix`.
+  The prefix stays in place. The message does not include the token.
+- A token with leading or trailing whitespace fails with `Invalid JWT: token has surrounding whitespace`.
+  Reading with `-` still drops one trailing line ending before that check.
 
 The token goes nowhere but the decoder. toil doesn't log it, and no error message
 repeats it.
