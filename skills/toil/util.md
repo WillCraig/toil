@@ -115,12 +115,20 @@ the signature segment as the text it is.
 
 - A token that isn't three dot-separated parts (an encrypted 5-part JWE, say) fails
   with `INVALID_INPUT`, `Invalid JWT: expected 3 dot-separated parts`.
-- A header or payload that doesn't decode to JSON fails with `Invalid JWT: header is
-  not valid JSON` (or `payload`). A `Bearer ` prefix gives this error too, so strip it.
-- The decoding is lenient, as it has always been. A segment that is JSON but not an
-  object (`null`, a number) comes back as it is. Characters outside base64url are
-  skipped. Invalid UTF-8 shows as `�`. Whitespace in a token passed as an argument
-  is kept, so a trailing newline ends up in `signature`.
+- A header or payload that isn't base64url fails with `Invalid JWT: header is not
+  valid base64url` (or `payload`). Letters, digits, `-` and `_` only. `=` is accepted
+  as padding at the end. `+`, `/`, whitespace and any other character are rejected,
+  and so is a segment whose length can't be whole bytes.
+- One that isn't UTF-8 fails with `Invalid JWT: header is not valid UTF-8` (or
+  `payload`). A real U+FFFD character, which is valid UTF-8, still decodes.
+- One that isn't JSON fails with `Invalid JWT: header is not valid JSON` (or
+  `payload`). One that is JSON but not an object (`null`, a number, a string, a
+  list) fails with `Invalid JWT: header is not a JSON object` (or `payload`).
+- A `Bearer ` prefix is not removed. The header segment then isn't base64url, and
+  the fix says to pass the token without that prefix.
+- The signature is the third segment as given, not decoded. Whitespace in an
+  argument stays in `signature`. Reading with `-` still drops one trailing line
+  ending.
 
 The token goes nowhere but the decoder. toil doesn't log it, and no error message
 repeats it.

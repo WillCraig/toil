@@ -7,6 +7,27 @@
       "toil": "- reads the token from stdin on the CLI, dropping one trailing line ending (echo $TOKEN | toil util jwt decode -), so the token stays out of the process list and shell history. Over MCP, - is INVALID_INPUT, since stdin is the protocol there",
       "why": "A JWT is a credential, and argv is visible to every process on the machine; stdin is how toil takes one.",
       "principle": "decision"
+    },
+    {
+      "allows": [],
+      "old": "jwt decode accepting a header or payload that is JSON but not an object, so bnVsbA.bnVsbA.x comes back as { header: null, payload: null } and WzEsMl0.e30.x as a header of [1, 2] (#75 item 1)",
+      "toil": "A header or payload that decodes to null, a boolean, a number, a string or an array is INVALID_INPUT: \"Invalid JWT: header is not a JSON object\", or the same for the payload. A JSON object decodes as before",
+      "why": "RFC 7519 section 7.2 says to reject a JWT whose JOSE header or claims set is not a JSON object. A local run of decodeJwt on those tokens confirmed the old result (#75 item 1).",
+      "principle": "4"
+    },
+    {
+      "allows": [],
+      "old": "jwt decode handing each segment to Node's base64 decoder, which skips characters outside the alphabet, accepts standard base64 + and /, and drops a leftover character when the length is 1 mod 4, so a damaged header such as eyJh!!bGciOiJIUzI1NiJ9 still decodes to {\"alg\":\"HS256\"} (#75 item 2)",
+      "toil": "The header and payload must be base64url: letters, digits, - and _, with = only as one or two padding characters at the end, and a length that can be whole bytes. Anything else is INVALID_INPUT: \"Invalid JWT: header is not valid base64url\", or the same for the payload. Whitespace in either segment is rejected, not skipped. The signature segment is still returned as the text it is, unchecked, since the command does not decode or verify it",
+      "why": "RFC 7515 section 2 and appendix C, and RFC 4648 section 3.3, require the base64url alphabet and say to reject anything outside it. A skipped character hides a damaged token. Trailing = stays accepted because that appendix allows padding. Checked locally (#75 item 2).",
+      "principle": "4"
+    },
+    {
+      "allows": [],
+      "old": "jwt decode turning bytes that are not UTF-8 into U+FFFD, so a payload whose bytes are {\"a\":\"<0xff>\"} (segment eyJhIjoi_yJ9) decodes to { \"a\": \"\\uFFFD\" } (#75 item 3)",
+      "toil": "A header or payload that is not valid UTF-8 is INVALID_INPUT: \"Invalid JWT: header is not valid UTF-8\", or the same for the payload. Valid UTF-8, including a real U+FFFD character, still decodes",
+      "why": "RFC 7519 section 7.2 requires the header and claims set to be UTF-8. The bytes a signature covers are the ones in the segment, and a replacement character would show a different claim. Checked locally (#75 item 3).",
+      "principle": "4"
     }
   ]
 }
