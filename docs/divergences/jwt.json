@@ -17,9 +17,9 @@
     },
     {
       "allows": [],
-      "old": "jwt decode handing each segment to Node's base64 decoder, which skips characters outside the alphabet, accepts standard base64 + and /, and drops a leftover character when the length is 1 mod 4, so a damaged header such as eyJh!!bGciOiJIUzI1NiJ9 still decodes to {\"alg\":\"HS256\"} (#75 item 2)",
-      "toil": "The header and payload must be base64url: letters, digits, - and _, with = only as one or two padding characters at the end, and a length that can be whole bytes. Anything else is INVALID_INPUT: \"Invalid JWT: header is not valid base64url\", or the same for the payload. Whitespace in either segment is rejected, not skipped. The signature segment is still returned as the text it is, unchecked, since the command does not decode or verify it",
-      "why": "RFC 7515 section 2 and appendix C, and RFC 4648 section 3.3, require the base64url alphabet and say to reject anything outside it. A skipped character hides a damaged token. Trailing = stays accepted because that appendix allows padding. Checked locally (#75 item 2).",
+      "old": "jwt decode handing each segment to Node's base64 decoder, which skips characters outside the alphabet, accepts standard base64 + and /, and drops a leftover character when the length is 1 mod 4, so a damaged header such as eyJh!!bGciOiJIUzI1NiJ9 still decodes to {\"alg\":\"HS256\"}. The signature segment was returned as whatever text it was, including one with a newline in it (#75 item 2)",
+      "toil": "The header, payload and signature must be base64url: letters, digits, - and _, with = only as one or two padding characters at the end, and a length that can be whole bytes. Anything else is INVALID_INPUT: \"Invalid JWT: header is not valid base64url\", or the same for the payload or the signature. Whitespace in a segment is rejected, not skipped. An empty signature is valid base64url and is still accepted, which is how alg none is written. A signature that passes is returned as the text it is: it is not decoded and not verified",
+      "why": "RFC 7515 section 2 and appendix C, and RFC 4648 section 3.3, require the base64url alphabet and say to reject anything outside it. A skipped character hides a damaged token. Trailing = stays accepted because that appendix allows padding. The signature is the third segment of the same encoding, so it gets the same alphabet check. Checked locally (#75 item 2).",
       "principle": "4"
     },
     {
@@ -27,6 +27,13 @@
       "old": "jwt decode turning bytes that are not UTF-8 into U+FFFD, so a payload whose bytes are {\"a\":\"<0xff>\"} (segment eyJhIjoi_yJ9) decodes to { \"a\": \"\\uFFFD\" } (#75 item 3)",
       "toil": "A header or payload that is not valid UTF-8 is INVALID_INPUT: \"Invalid JWT: header is not valid UTF-8\", or the same for the payload. Valid UTF-8, including a real U+FFFD character, still decodes",
       "why": "RFC 7519 section 7.2 requires the header and claims set to be UTF-8. The bytes a signature covers are the ones in the segment, and a replacement character would show a different claim. Checked locally (#75 item 3).",
+      "principle": "4"
+    },
+    {
+      "allows": [],
+      "old": "jwt decode reporting a Bearer prefix as \"Invalid JWT: header is not valid JSON\", keeping a trailing newline in data.signature, and accepting a leading space because the base64 decoder skipped it (#75 item 4)",
+      "toil": "The token is still refused. A prefix is not stripped and surrounding whitespace is not trimmed. A token that starts with \"Bearer \" (any case) is INVALID_INPUT: \"Invalid JWT: remove the 'Bearer ' prefix\". One with leading or trailing whitespace is INVALID_INPUT: \"Invalid JWT: token has surrounding whitespace\". Neither message repeats the token. jwt decode - still drops one trailing line ending before that check",
+      "why": "RFC 7519 section 7.2 says to reject extra characters. The issue's other fix is an error that names the prefix, so a paste from an Authorization header is not reported as a bad header. Checked locally (#75 item 4, partly confirmed).",
       "principle": "4"
     }
   ]
