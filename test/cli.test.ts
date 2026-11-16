@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { EXAMPLE_TOKEN } from '../src/areas/util/jwt.js';
 import { defineCommand } from '../src/core/command.js';
 import { argvFor } from '../src/program.js';
 import { commands } from '../src/registry.js';
@@ -92,6 +93,40 @@ describe('toil CLI', () => {
     expect(run.exitCode).toBe(1);
     expect(run.stdout).toContain('\n  "ok": false');
     expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', fix: expect.stringContaining('--help') });
+  });
+
+  // Fork issue #3: commander quotes what was typed in its "too many
+  // arguments" list and in an unknown `--flag=value`, so a credential passed
+  // as an argument (a JWT for `util jwt decode`) was repeated in the envelope
+  // and on stderr. Neither stream may carry the token or its signature.
+  it('keeps argument values out of a too-many-arguments usage error, on stdout and stderr', async () => {
+    const { context } = testContext();
+    const signature = EXAMPLE_TOKEN.split('.')[2]!;
+    const run = await runCli(['util', 'jwt', 'decode', EXAMPLE_TOKEN, 'extra'], { commands, context });
+    expect(run.exitCode).toBe(1);
+    expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('Too many arguments') });
+    expect(run.stdout + run.stderr).not.toContain(EXAMPLE_TOKEN);
+    expect(run.stdout + run.stderr).not.toContain(signature);
+  });
+
+  it('keeps the value of an unknown --flag=<value> out of its usage error, on stdout and stderr', async () => {
+    const { context } = testContext();
+    const signature = EXAMPLE_TOKEN.split('.')[2]!;
+    const run = await runCli(['util', 'jwt', 'decode', `--token=${EXAMPLE_TOKEN}`], { commands, context });
+    expect(run.exitCode).toBe(1);
+    expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: "Unknown option '--token'" });
+    expect(run.stdout + run.stderr).not.toContain(EXAMPLE_TOKEN);
+    expect(run.stdout + run.stderr).not.toContain(signature);
+  });
+
+  it('keeps argument values out of a toil wait parse error, its fix included', async () => {
+    const { context } = testContext();
+    const signature = EXAMPLE_TOKEN.split('.')[2]!;
+    const run = await runCli(['wait', '--until', 'x', '--', 'util', 'jwt', 'decode', EXAMPLE_TOKEN, 'extra'], { commands, context });
+    expect(run.exitCode).toBe(1);
+    expect(run.envelope?.error?.code).toBe('INVALID_INPUT');
+    expect(run.stdout + run.stderr).not.toContain(EXAMPLE_TOKEN);
+    expect(run.stdout + run.stderr).not.toContain(signature);
   });
 
   it('answers a missing argument with an envelope written to --output-file', async () => {

@@ -82,7 +82,7 @@ export function groupSummary(key: string, commands: readonly AnyCommand[]): stri
 export function buildProgram(options: ProgramOptions): { program: Command; result: { exitCode: number } } {
   const { io } = options;
   const result = { exitCode: 0 };
-  const quiet = (cmd: Command): Command => cmd.exitOverride().configureOutput({ writeOut: io.stdout, writeErr: io.stderr });
+  const quiet = (cmd: Command): Command => cmd.exitOverride().configureOutput({ writeOut: io.stdout, writeErr: io.stderr, outputError: (str, write) => write(scrubUsageMessage(str)) });
 
   const program = quiet(
     new Command('toil')
@@ -410,7 +410,6 @@ async function parseCommandLine(options: ProgramOptions, words: string[]): Promi
   let captured: { def: AnyCommand; input: Record<string, unknown>; globals: GlobalOptions } | undefined;
   // The envelope carries a parse error; the help commander prints after one would only repeat it on stderr.
   const { program } = buildProgram({ ...options, io: { ...options.io, stderr: () => {} }, capture: (call) => (captured = call) });
-  const line = `toil ${words.join(' ')}`;
   // Said plainly before parsing, in MCP's words, rather than as an unknown command whose fix names one that works.
   const named = commandFromArgv(words, options.commands);
   if (options.commands.some((def) => def.dispatches && commandName(def) === named)) {
@@ -421,18 +420,33 @@ async function parseCommandLine(options: ProgramOptions, words: string[]): Promi
   } catch (err) {
     if (!(err instanceof CommanderError)) throw err;
     if (INFORMATIONAL.has(err.code)) return { help: true };
-    const message = err.message.replace(/^error:\s*/, '');
-    return { error: new ToilError('INVALID_INPUT', `The command after toil wait -- didn't parse: ${message}`, { fix: `Check that it runs on its own first: ${line}.` }) };
+    const message = scrubUsageMessage(err.message.replace(/^error:\s*/, ''));
+    // The failed line itself is never rebuilt here: its arguments and flag values may hold a credential.
+    return { error: new ToilError('INVALID_INPUT', `The command after toil wait -- didn't parse: ${message}`, { fix: 'Check that the command after -- runs on its own first.' }) };
   }
   const call = captured as { def: AnyCommand; input: Record<string, unknown>; globals: GlobalOptions } | undefined;
   if (!call) {
-    return { error: new ToilError('INVALID_INPUT', `${line} isn't a command toil wait can repeat.`, { fix: 'Name a read command after --, for example toil wait --until "result != null" -- jenkins run get <job> <n>.' }) };
+    return { error: new ToilError('INVALID_INPUT', `toil ${named} isn't a command toil wait can repeat.`, { fix: 'Name a read command after --, for example toil wait --until "result != null" -- jenkins run get <job> <n>.' }) };
   }
   const outer = OUTER_GLOBALS.find(([key]) => call.globals[key] !== undefined && call.globals[key] !== false);
   if (outer) {
     return { error: new ToilError('INVALID_INPUT', `${outer[1]} goes before wait, not in the command after --.`, { fix: `Run toil ${outer[1]} ... wait --until <expression> -- <command>.` }) };
   }
   return { def: call.def, input: call.input };
+}
+
+/**
+ * Takes typed values out of the two commander usage errors that quote them:
+ * the argument list after "too many arguments" and the `=value` of an unknown
+ * option. An argument can be a credential — a JWT handed to `util jwt decode`
+ * — and error output is what gets pasted into issues and CI logs, so neither
+ * stderr nor the envelope may repeat it. The counts and the flag name stay;
+ * they are all the fix needs.
+ */
+function scrubUsageMessage(message: string): string {
+  return message
+    .replace(/(too many arguments(?: for '[^']*')?\. Expected \d+ arguments? but got \d+):[^\n]*/gi, '$1.')
+    .replace(/(unknown option ')(-{1,2}[^'=\s]+)=[^'\n]*(')/gi, '$1$2$3');
 }
 
 /** Commander exits these ways on purpose; they are output, not errors. */
@@ -470,7 +484,7 @@ export async function runProgram(options: ProgramOptions, argv: string[], from: 
     const userArgs = from === 'node' ? argv.slice(2) : argv;
     const globals = globalsFromArgv(userArgs);
     const command = commandFromArgv(userArgs, options.commands);
-    const message = err.message.replace(/^error:\s*/, '');
+    const message = scrubUsageMessage(err.message.replace(/^error:\s*/, ''));
     // A path under an area that was folded into another: say where it went, not just that it's unknown.
     const gone = err.code === 'commander.unknownCommand' ? renamedArea(commandWords(userArgs)[0] ?? '') && commandWords(userArgs)[0] : undefined;
     if (gone) {
