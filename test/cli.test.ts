@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { defineCommand } from '../src/core/command.js';
+import { allowWriteField } from '../src/core/run.js';
 import { argvFor } from '../src/program.js';
 import { commands } from '../src/registry.js';
-import { demoCommands, demoRoutes } from './fixtures/demo-commands.js';
+import { demoArea, demoCommands, demoRoutes } from './fixtures/demo-commands.js';
 import { runCli } from './harness/cli.js';
 import { TEST_VERSION, testContext } from './harness/context.js';
 
@@ -126,6 +127,28 @@ describe('toil CLI', () => {
     }
     const compact = await runCli(['util', 'jwt', 'decode', token], { commands, context });
     expect(compact.stdout.trim().split('\n')).toHaveLength(1);
+  });
+
+  it('prints a failure envelope when the result is circular, and says a write may already have been applied', async () => {
+    const circular = () => {
+      const value: Record<string, unknown> = { name: 'loop' };
+      value['self'] = value;
+      return value;
+    };
+    const readCircular = defineCommand({ path: ['read-circular'], description: 'read returning a circular result', input: z.object({}), writes: false, examples: [{}], run: async () => circular() });
+    const writeCircular = demoArea.command({ path: ['demo', 'write-circular'], description: 'write returning a circular result', input: z.object({ ...allowWriteField }), writes: true, examples: [{ allowWrite: true }], run: async () => circular() });
+    const { context } = testContext();
+    const read = await runCli(['read-circular'], { commands: [readCircular], context });
+    expect(read.exitCode).toBe(1);
+    expect(read.envelope).toMatchObject({ ok: false, data: null, error: { code: 'INTERNAL', message: expect.stringContaining("couldn't be printed as JSON") } });
+    expect(read.stdout.trim().split('\n')).toHaveLength(1);
+    const write = await runCli(['demo', 'write-circular', '--allow-write'], { commands: [writeCircular], context: testContext({ config: { demo: { token: 't', writes: true } }, routes: demoRoutes }).context });
+    expect(write.exitCode).toBe(1);
+    expect(write.envelope).toMatchObject({
+      ok: false,
+      data: null,
+      error: { code: 'INTERNAL', message: expect.stringContaining('may already have been applied'), fix: expect.stringContaining('Check whether the change was made before retrying') },
+    });
   });
 
   it('honours --output-file=path on a usage error too', async () => {
