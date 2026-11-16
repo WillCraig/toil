@@ -580,3 +580,186 @@ describe('work-item feed (the reporting feed)', () => {
     expect(t.http.calls).toHaveLength(1);
   });
 });
+
+describe('the writes demo seeding needed (#618)', () => {
+  const PATCH_JSON = { 'content-type': 'application/json-patch+json' };
+
+  it('repo create reads the project for its id and sends it beside the name', async () => {
+    const { calls, envelope } = await run('repo create', { ...at, name: 'imagile-new', ...write });
+    expect(envelope.ok).toBe(true);
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([`GET ${ORG_URL}/_apis/projects/Imagile?api-version=7.1`, `POST ${P}/_apis/git/repositories?api-version=7.1`]);
+    expect(body(calls[1]!)).toEqual({ name: 'imagile-new', project: { id: 'abc12345-0000-0000-0000-000000000070' } });
+  });
+
+  it('work-item assign patches System.AssignedTo and needs no project', async () => {
+    const { calls } = await run('work-item assign', { id: 42, assignee: 'you@example.com', ...write });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ method: 'PATCH', url: `${ORG_URL}/_apis/wit/workitems/42?api-version=7.1`, headers: PATCH_JSON });
+    expect(body(calls[0]!)).toEqual([{ op: 'add', path: '/fields/System.AssignedTo', value: 'you@example.com' }]);
+  });
+
+  it('work-item link --target adds a work item relation by the organization URL', async () => {
+    const { calls } = await run('work-item link', { id: 42, target: '8', type: 'child', ...write });
+    expect(body(calls[0]!)).toEqual([{ op: 'add', path: '/relations/-', value: { rel: 'System.LinkTypes.Hierarchy-Forward', url: `${ORG_URL}/_apis/wit/workItems/8` } }]);
+  });
+
+  it('work-item link --pr reads the repository for its ids and adds an artifact link', async () => {
+    const { calls } = await run('work-item link', { ...inRepo, id: 42, pr: 44, ...write });
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([`GET ${R}?api-version=7.1`, `PATCH ${ORG_URL}/_apis/wit/workitems/42?api-version=7.1`]);
+    expect(body(calls[1]!)).toEqual([
+      { op: 'add', path: '/relations/-', value: { rel: 'ArtifactLink', url: 'vstfs:///Git/PullRequestId/abc12345-0000-0000-0000-000000000070%2Fabc12345-0000-0000-0000-000000000003%2F44', attributes: { name: 'Pull Request' } } },
+    ]);
+  });
+
+  it('work-item link refuses both or neither of --target and --pr, --type with --pr, and a --pr without a repo, before anything is sent', async () => {
+    const both = await run('work-item link', { ...inRepo, id: 42, target: '7', pr: 44, ...write });
+    const neither = await run('work-item link', { id: 42, ...write });
+    const typed = await run('work-item link', { ...inRepo, id: 42, pr: 44, type: 'child', ...write });
+    const noRepo = await run('work-item link', { id: 42, pr: 44, ...write });
+    const notId = await run('work-item link', { id: 42, target: 'seven', ...write });
+    for (const r of [both, neither, typed, noRepo, notId]) {
+      expect(r.envelope.error?.code).toBe('INVALID_INPUT');
+      expect(r.calls).toHaveLength(0);
+    }
+  });
+
+  it('pr create --work-item sends workItemRefs', async () => {
+    const { calls } = await run('pr create', { ...inRepo, title: 'Add retries', source: 'feature/retries', workItem: [42, 7], ...write });
+    expect(body(calls[0]!)).toMatchObject({ workItemRefs: [{ id: '42' }, { id: '7' }] });
+  });
+
+  it('work-item delete-comment sends DELETE at the comments preview version and is never an MCP tool', async () => {
+    const { calls, data } = await run('work-item delete-comment', { ...at, id: 42, commentId: 4, ...write });
+    expect(calls).toEqual([{ method: 'DELETE', url: `${P}/_apis/wit/workItems/42/comments/4?api-version=7.1-preview.4`, headers: GET_HEADERS, body: undefined }]);
+    expect(data).toEqual({ deleted: true });
+    expect(cmd('work-item delete-comment').mcp).toBe(false);
+  });
+
+  describe('sprint update', () => {
+    const NODE = `${P}/_apis/wit/classificationnodes/iterations`;
+
+    it('finds the sprint by name in the iteration tree and patches its dates as midnight UTC days', async () => {
+      const { calls, envelope } = await run('sprint update', { ...at, sprint: 'Sprint 1', start: '2026-11-16', end: '2026-11-27T17:00:00-05:00', ...write });
+      expect(envelope.ok).toBe(true);
+      expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([`GET ${NODE}?api-version=7.1&%24depth=10`, `PATCH ${NODE}/Sprint%201?api-version=7.1`]);
+      expect(body(calls[1]!)).toEqual({ attributes: { startDate: '2026-11-16T00:00:00Z', finishDate: '2026-11-27T00:00:00Z' } });
+      expect(envelope.meta.warnings).toEqual([{ code: 'ADO_SPRINT_DAY', message: expect.stringContaining('--end 2026-11-27T17:00:00-05:00 was sent as 2026-11-27') }]);
+    });
+
+    it('takes the id or the team iteration path, renames, and keeps the date not given', async () => {
+      const byId = await run('sprint update', { ...at, sprint: 'abc12345-0000-0000-0000-000000000102', name: 'Sprint 1b', end: '2026-11-28', ...write });
+      expect(body(byId.calls[1]!)).toEqual({ name: 'Sprint 1b', attributes: { startDate: '2026-10-01T00:00:00Z', finishDate: '2026-11-28T00:00:00Z' } });
+      const byPath = await run('sprint update', { ...at, sprint: 'Imagile\\Sprint 1', name: 'Sprint 1c', ...write });
+      expect(byPath.calls[1]!.url).toBe(`${NODE}/Sprint%201?api-version=7.1`);
+      expect(body(byPath.calls[1]!)).toEqual({ name: 'Sprint 1c' });
+    });
+
+    it('takes the node path form, refuses a name two sprints share, and refuses an end before the start', async () => {
+      const node = await run('sprint update', { ...at, sprint: '\\Imagile\\Iteration\\Sprint 1', name: 'Sprint 1d', ...write });
+      expect(node.calls[1]!.url).toBe(`${NODE}/Sprint%201?api-version=7.1`);
+      const twin = { name: 'Sprint 1', path: '\\Imagile\\Iteration\\Release 1\\Sprint 1' };
+      const tree: Route[] = [{ path: '/imagile/Imagile/_apis/wit/classificationnodes/iterations', respond: { json: { name: 'Imagile', path: '\\Imagile\\Iteration', children: [{ name: 'Release 1', children: [twin] }, { name: 'Release 2', children: [{ name: 'Sprint 1' }] }] } } }];
+      const shared = await run('sprint update', { ...at, sprint: 'Sprint 1', start: '2026-11-16', end: '2026-11-27', ...write }, tree);
+      expect(shared.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('Release 1\\Sprint 1') });
+      expect(shared.calls).toHaveLength(1);
+      const undated = await run('sprint update', { ...at, sprint: 'Release 1\\Sprint 1', start: '2026-11-16', ...write }, tree);
+      expect(undated.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('no end date') });
+      const backwards = await run('sprint update', { ...at, sprint: 'Sprint 1', start: '2026-11-27', end: '2026-11-16', ...write });
+      expect(backwards.envelope.error?.code).toBe('INVALID_INPUT');
+      expect(backwards.calls).toHaveLength(1);
+    });
+
+    it('refuses a date with trailing words or a day that does not exist', async () => {
+      for (const start of ['2026-11-16 junk', '2026-02-30', '2026-11-16T09:00']) {
+        const r = await run('sprint update', { ...at, sprint: 'Sprint 1', start, ...write });
+        expect(r.envelope.error?.code).toBe('INVALID_INPUT');
+        expect(r.calls).toHaveLength(0);
+      }
+    });
+
+    it('refuses nothing to change and a bad date before anything is sent, and an unknown sprint after reading the tree', async () => {
+      const nothing = await run('sprint update', { ...at, sprint: 'Sprint 1', ...write });
+      const badDate = await run('sprint update', { ...at, sprint: 'Sprint 1', start: 'next monday', ...write });
+      expect([nothing.envelope.error?.code, badDate.envelope.error?.code]).toEqual(['INVALID_INPUT', 'INVALID_INPUT']);
+      expect(nothing.calls.length + badDate.calls.length).toBe(0);
+      const unknown = await run('sprint update', { ...at, sprint: 'Sprint 9', start: '2026-11-16', ...write });
+      expect(unknown.envelope.error?.code).toBe('NOT_FOUND');
+      expect(unknown.calls).toHaveLength(1);
+    });
+  });
+
+  describe('commit create', () => {
+    const ZERO = '0000000000000000000000000000000000000000';
+    const b64 = (text: string) => Buffer.from(text).toString('base64');
+
+    it('moves an existing branch from its head, editing a path the base has and adding one it has not', async () => {
+      const { calls, envelope } = await run('commit create', { ...inRepo, branch: 'main', message: 'Update', file: ['README.md', 'src/retry.js'], ...write });
+      expect(envelope.ok).toBe(true);
+      expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+        `GET ${R}?api-version=7.1`,
+        `GET ${R}/refs?api-version=7.1&filter=heads%2Fmain`,
+        `GET ${R}/items?api-version=7.1&scopePath=%2F&recursionLevel=Full&versionDescriptor.version=${SHA}&versionDescriptor.versionType=commit`,
+        `POST ${R}/pushes?api-version=7.1`,
+      ]);
+      expect(body(calls[3]!)).toEqual({
+        refUpdates: [{ name: 'refs/heads/main', oldObjectId: SHA }],
+        commits: [
+          {
+            comment: 'Update',
+            changes: [
+              { changeType: 'edit', item: { path: '/README.md' }, newContent: { content: b64('# imagile-api\n'), contentType: 'base64encoded' } },
+              { changeType: 'add', item: { path: '/src/retry.js' }, newContent: { content: b64('export const retries = 3;\n'), contentType: 'base64encoded' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('starts a new branch from --from', async () => {
+      const { calls } = await run('commit create', { ...inRepo, branch: 'feature/retries', from: 'main', message: 'Add retries', file: ['src/retry.js'], ...write });
+      expect(calls[1]!.url).toBe(`${R}/refs?api-version=7.1&filter=heads%2Ffeature%2Fretries`);
+      expect(calls[2]!.url).toBe(`${R}/refs?api-version=7.1&filter=heads%2Fmain`);
+      expect((body(calls[4]!) as { refUpdates: unknown }).refUpdates).toEqual([{ name: 'refs/heads/feature/retries', oldObjectId: SHA }]);
+    });
+
+    it("starts a new branch with no --from at the repository's default branch, and lists only the folder the files share", async () => {
+      const { calls } = await run('commit create', { ...inRepo, branch: 'feature/retries', message: 'Add retries', file: ['src/retry.js'], ...write });
+      expect(calls[2]!.url).toBe(`${R}/refs?api-version=7.1&filter=heads%2Fmain`);
+      expect(calls[3]!.url).toContain('scopePath=%2Fsrc&');
+      expect((body(calls[4]!) as { refUpdates: unknown }).refUpdates).toEqual([{ name: 'refs/heads/feature/retries', oldObjectId: SHA }]);
+    });
+
+    it('commits into a folder the base does not have yet, every file an add, when its listing answers 404', async () => {
+      const missing: Route[] = [{ path: '/imagile/Imagile/_apis/git/repositories/imagile-api/items', respond: { status: 404, json: { message: 'TF401174: The item \'/newdir\' could not be found.' } } }];
+      const { calls, envelope } = await run('commit create', { ...inRepo, branch: 'main', message: 'New', file: ['src/retry.js'], ...write }, missing);
+      expect(envelope.ok).toBe(true);
+      expect((body(calls[3]!) as { commits: Array<{ changes: Array<{ changeType: string }> }> }).commits[0]!.changes.map((c) => c.changeType)).toEqual(['add']);
+    });
+
+    it('makes the first commit of an empty repository from the zero object id, every file an add', async () => {
+      const empty: Route[] = [
+        { path: `/imagile/Imagile/_apis/git/repositories/imagile-api`, respond: { json: { id: 'abc12345-0000-0000-0000-000000000003', name: 'imagile-api' } } },
+        { path: `/imagile/Imagile/_apis/git/repositories/imagile-api/refs`, respond: { json: { count: 0, value: [] } } },
+      ];
+      const { calls } = await run('commit create', { ...inRepo, branch: 'main', message: 'First', file: ['README.md'], ...write }, empty);
+      expect(calls.map((c) => c.method)).toEqual(['GET', 'GET', 'POST']);
+      const sent = body(calls[2]!) as { refUpdates: unknown; commits: Array<{ changes: Array<{ changeType: string }> }> };
+      expect(sent.refUpdates).toEqual([{ name: 'refs/heads/main', oldObjectId: ZERO }]);
+      expect(sent.commits[0]!.changes.map((c) => c.changeType)).toEqual(['add']);
+    });
+
+    it('refuses a path outside the workspace, a file named twice, a missing file and a missing --from before pushing', async () => {
+      for (const file of [['../secret.txt'], ['/etc/hosts'], ['README.md', './README.md']]) {
+        const r = await run('commit create', { ...inRepo, branch: 'main', message: 'x', file, ...write });
+        expect(r.envelope.error?.code).toBe('INVALID_INPUT');
+        expect(r.calls).toHaveLength(0);
+      }
+      const missing = await run('commit create', { ...inRepo, branch: 'main', message: 'x', file: ['nope.txt'], ...write });
+      expect(missing.envelope.ok).toBe(false);
+      expect(missing.calls).toHaveLength(0);
+      const noBase = await run('commit create', { ...inRepo, branch: 'feature/x', from: 'develop', message: 'x', file: ['README.md'], ...write });
+      expect(noBase.envelope.error?.code).toBe('NOT_FOUND');
+      expect(noBase.calls.some((c) => c.method === 'POST')).toBe(false);
+    });
+  });
+});

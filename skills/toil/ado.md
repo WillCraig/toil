@@ -13,7 +13,8 @@ older `https://<organization>.visualstudio.com`), through the REST API with
 to the deployment of the connection it resolves. Verification level: `unit` for both.
 Server's behavior is the one the command contract records; Services was built from
 Microsoft's REST API reference. Its work item reads and the team settings commands
-(sprints, backlogs, boards, work item type states) have been run against one live Scrum
+(sprints, backlogs, boards, work item type states), `sprint update`, `work-item assign`,
+`work-item delete-comment` and `commit create` have been run against one live Scrum
 organization; its pull request commands have not.
 
 **Supported versions:** Azure DevOps Server 2022.1 or later (REST API 7.1). Requests
@@ -45,7 +46,9 @@ default) or `cloud` for Azure DevOps Services. The two keep separate API code, a
 | `pr update` | `--reviewers` | `--target` |
 | `pr merge` | | `--message`; reads the pull request first |
 | `pr resolve` | marks it fixed | `--status` |
-| Only here | `connection-data`, `collection list`, `work-item assign link tag untag attachments attach download types fields schema`, `repo create`, `repo default-reviewers`, `commit status`, `pr files diff builds delete-comment`, `pipeline` and `run` commands, `check-toil-project` | `pr threads`, `sprint`, `backlog` and `board` commands, `api` |
+| `pr create` | | `--work-item` |
+| `work-item link` | `--target` | `--target` or `--pr` |
+| Only here | `connection-data`, `collection list`, `work-item tag untag attachments attach download types fields schema`, `repo default-reviewers`, `commit status`, `pr files diff builds delete-comment`, `pipeline` and `run` commands, `check-toil-project` | `pr threads`, `sprint`, `backlog` and `board` commands, `commit create`, `work-item delete-comment`, `api` |
 
 A call the connection's deployment can't serve fails **before any request** with
 `UNSUPPORTED`, saying which deployment and what to do: `ado pipeline list` or
@@ -183,12 +186,14 @@ the git remote isn't read: toil uses a toil project, then the connection's `proj
 and `team`.
 
 - A work item belongs to the organization, so `work-item get`, `work-item update`,
-  `work-item transition`, `work-item history` and `work-item get-many` need neither a
-  project nor a repo.
+  `work-item transition`, `work-item assign`, `work-item link --target`,
+  `work-item history` and `work-item get-many` need neither a project nor a repo.
 - `work-item create`, `work-item search`, `work-item comments`, `work-item comment`,
-  `work-item areas`, `work-item iterations`, `work-item states` and `repo list` need a project.
-- `repo get` and every `pr` command need a project and a repo.
-- Every `sprint`, `backlog` and `board` command needs a project and acts for one
+  `work-item delete-comment`, `work-item areas`, `work-item iterations`,
+  `work-item states`, `repo list`, `repo create` and `sprint update` need a project.
+- `repo get`, `commit create`, `work-item link --pr` and every `pr` command need a
+  project and a repo.
+- Every other `sprint` command, and every `backlog` and `board` command, needs a project and acts for one
   team: `--team <name or id>` on the command (not the group; `team` over MCP), else a
   toil project's or the connection's `team`, else the project's default team, which toil
   reads from the project first (one extra request) and names in an
@@ -232,9 +237,14 @@ Work items (`<id>` is the work item id):
 - `work-item transition <id>`: Set `--state`, or `--to <intent-or-status>` (`start`,
   `review`, `done`, `reopen` or a state name), resolved against the states the item's
   own type has (`core.md`, **Moving work items by intent**).
-- `work-item assign <id>` (Server): Assign to `--assignee`, a display name or email.
-- `work-item link <id>` (Server): Link it to `--target <id>`, `--type related`
+- `work-item assign <id>`: Assign to `--assignee`, a display name or email.
+- `work-item link <id>`: Link it to `--target <id>`, `--type related`
   (default), `parent`, `child`, `duplicate`, `duplicate-of`, or a raw relation name.
+  On Services, `--pr <id>` links a pull request in `--repo` instead (an `ArtifactLink`,
+  as the web UI's Development section adds); give `--target` or `--pr`, not both
+  (`--type` doesn't apply to `--pr`).
+- `work-item delete-comment <id> <comment-id>` (Services): Returns
+  `{ "deleted": true }`. CLI only: deletes are never exposed through MCP.
 - `work-item search`: Run `--wiql`; returns the matching ids and urls, not their
   fields. `--updated-since <iso>` keeps only items changed at or after that instant: a
   date (`2026-10-01`, UTC midnight) or a date-time with its zone
@@ -323,7 +333,14 @@ starting with `@` is read from that file. Flags win over the file, with an
 
 Repositories:
 
-- `repo list`, `repo get`: Repositories in the project. `repo create` (Server, `--name`).
+- `repo list`, `repo get`: Repositories in the project. `repo create --name <name>`
+  makes an empty one.
+- `commit create` (Services): Commit workspace files to `--branch` in one commit, with
+  `--message`, needing no git. Each `--file <path>` (repeatable) is relative to the
+  workspace and is committed at the same path in the repository, replacing a file
+  already there. A branch that doesn't exist is created from `--from <branch>` (the
+  repository's default branch without it), or, in an empty repository, as its first
+  commit. Returns the push (`pushId`, `commits`, `refUpdates`).
 - `repo default-reviewers` (Server): Required reviewers policies covering the repository.
 - `commit status <commit>` (Server): Statuses posted to a commit.
 
@@ -348,7 +365,8 @@ Pull requests (`<id>` is the pull request id):
   Each list costs one or more extra requests; an unknown name is refused before any
   request.
 - `pr create`: `--title`, `--source`, `--target` (default `main`), `--description`,
-  `--reviewers <id,id>` (identity ids), `--draft`. Give branch names without
+  `--reviewers <id,id>` (identity ids), `--draft`, and on Services `--work-item <id>`
+  (repeatable), linked to it as it opens. Give branch names without
   `refs/heads/`, which toil adds. On Server a full ref gets it twice; on Services a full
   ref (`refs/heads/x`, `refs/tags/x`) is sent as given.
 - `pr update <id>`: `--title`, `--description`, `--draft true|false`, in one PATCH; on
@@ -399,7 +417,7 @@ Pipelines and runs (Server):
 - `run logs <id>`: The run's logs; with `--log-id`, that log's text as
   `{ "log": "..." }`.
 
-Sprints, backlogs and boards (Services): these read a team's settings, which is where
+Sprints, backlogs and boards (Services): all but `sprint update` read a team's settings, which is where
 Azure DevOps keeps what its boards are built from. Each returns the server's own JSON (a
 list's `value`, or the whole body).
 
@@ -410,6 +428,11 @@ list's `value`, or the whole body).
   (`work-item iterations`) carries dates only where someone set them. `--state current`
   (or a comma-separated list of `past`, `current`, `future`) keeps only those; anything
   else is `INVALID_INPUT`.
+- `sprint update <sprint>`: Change a sprint's `--name`, `--start` or `--end` (ISO 8601
+  dates, kept as days at midnight UTC; a date-time keeps only its calendar date, with an `ADO_SPRINT_DAY` warning) and return the iteration. `<sprint>` is its `id`,
+  `path` or `name` from `sprint list`; a name two sprints share is refused. Azure DevOps
+  sets a start and an end together, so given one, the other is kept from the sprint. It
+  changes the project's iteration tree, so every team that selected the sprint sees it.
 - `sprint items <id>`: Takes a sprint's `id` from `sprint list` and returns
   `workItemRelations`: each `{ rel, source, target: { id, url } }`, with `rel` and
   `source` null for a top-level item and `System.LinkTypes.Hierarchy-Forward` with the
@@ -453,6 +476,9 @@ toil ado run logs 101 --log-id 3
 toil ado --project Imagile work-item update 42 --field state=Active --rev 3 --allow-write --connection imagile-ado
 toil ado --project Imagile --repo imagile-api pr merge 42 --strategy squash --delete-source --allow-write --connection imagile-ado
 toil ado --project Imagile sprint list --state current --connection imagile-ado
+toil ado --project Imagile sprint update "Sprint 1" --start 2026-11-16 --end 2026-11-27 --allow-write --connection imagile-ado
+toil ado --project Imagile --repo imagile-api commit create --branch fix/retries --from main --message "Add retries" --file src/retry.js --allow-write --connection imagile-ado
+toil ado --project Imagile --repo imagile-api work-item link 42 --pr 44 --allow-write --connection imagile-ado
 toil ado --project Imagile board get "Backlog items" --team "Imagile Team" --connection imagile-ado
 ```
 
@@ -578,8 +604,8 @@ match (nothing is written), create a sub-task under it, or create a new ticket. 
 Server connection a sub-task is
 `toil ado work-item create --type Task --parent 42 --title "<text>" --allow-write`. On a
 Services connection `work-item create` takes no parent, so a sub-task is created with
-`toil ado work-item create --type Task --title "<text>" --allow-write` and linked to its
-parent on the board. A new ticket takes the project from the toil project. Both are writes,
+`toil ado work-item create --type Task --title "<text>" --allow-write`, then linked with
+`toil ado work-item link <new id> --target 42 --type parent --allow-write`. A new ticket takes the project from the toil project. Both are writes,
 made only on the person's yes.
 
 ## Checking a toil project
@@ -593,8 +619,8 @@ made only on the person's yes.
   data, which names the token's own user, on Services.
 - A 429 is retried after the delay Azure DevOps asks for, as in every area.
 - Not covered on Services yet: pipelines and builds, attachments, work item types and
-  fields, areas, links, tags, team capacity and settings changes, and PR files and
-  diffs. `ado api` reaches all of them.
+  fields, links to anything but a work item or pull request, tags, team capacity and
+  settings changes, and PR files and diffs. `ado api` reaches all of them.
 
 ## Moving from `ado-cloud`
 

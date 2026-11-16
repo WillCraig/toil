@@ -2,6 +2,7 @@ import { commandName, type AnyCommand } from '../../core/command.js';
 import { apiCommand } from '../../core/passthrough.js';
 import { adoArea, adoSupported } from './area.js';
 import { workCategorizeCommand as cloudCategorize } from './cloud/categorize.js';
+import { commitCreateCommand as cloudCommit } from './cloud/commit.js';
 import { commentCommands as cloudComments } from './cloud/comments.js';
 import { pullRequestCommands as cloudPullRequests } from './cloud/pull-requests.js';
 import { repoCommands as cloudRepos } from './cloud/repos.js';
@@ -42,7 +43,7 @@ export const commands = [
   ...adoArea.byDeployment(
     {
       server: [...serverCommands, ...serverWork, serverCategorize, ...serverWorkMeta.filter((d) => !isSchema(d)), ...serverRepos, ...serverComments, ...serverPipelines, serverCheckToilProject],
-      cloud: [...cloudRepos, ...cloudWork, cloudCategorize, ...cloudPullRequests, ...cloudComments, ...cloudTeam, adoApi],
+      cloud: [...cloudRepos, cloudCommit, ...cloudWork, cloudCategorize, ...cloudPullRequests, ...cloudComments, ...cloudTeam, adoApi],
     },
     { overrides },
   ),

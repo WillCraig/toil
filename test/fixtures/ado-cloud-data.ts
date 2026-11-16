@@ -305,11 +305,46 @@ const continued = (first: unknown[], second: unknown[]) => (r: RecordedRequest) 
 /** A list paged by $top and $skip: the first page holds `first`, any later page is empty. */
 const skipped = (first: unknown[]) => (r: RecordedRequest) => ({ json: new URL(r.url).searchParams.get('$skip') === '0' ? { count: first.length, value: first } : { count: 0, value: [] } });
 
+// Shaped from the vendor's documentation (Git - Refs - List, Items - List, Pushes - Create, Classification Nodes -
+// Update, REST API 7.1), not captured from a live instance. main exists and feature/retries doesn't, so the second
+// commit example starts a branch; the base holds README.md, so committing it is an edit and anything else an add.
+export const NEW_REPO = { ...repo, id: 'abc12345-0000-0000-0000-000000000004', name: 'imagile-new', url: `${ORG_URL}/Imagile/_apis/git/repositories/abc12345-0000-0000-0000-000000000004`, remoteUrl: `${HOST}/imagile/Imagile/_git/imagile-new`, size: 0, defaultBranch: undefined };
+// refs?filter= is a prefix match, so main's answer leads with main-old, which a command must not take for main.
+export const gitRefs = (filter: string | null) => (filter === 'heads/main' ? [{ name: 'refs/heads/main-old', objectId: 'def67890abc12345def67890abc12345def67890' }, { name: 'refs/heads/main', objectId: SHA, url: `${ORG_URL}/Imagile/_apis/git/repositories/${repo.id}/refs?filter=heads%2Fmain` }] : []);
+export const gitItems = [
+  { objectId: SHA, gitObjectType: 'tree', commitId: SHA, path: '/', isFolder: true },
+  { objectId: 'def67890abc12345def67890abc12345def67890', gitObjectType: 'blob', commitId: SHA, path: '/README.md' },
+  { objectId: SHA, gitObjectType: 'tree', commitId: SHA, path: '/src', isFolder: true },
+];
+export const push = (refName: string) => ({
+  pushId: 12,
+  date: '2026-11-16T12:00:00Z',
+  pushedBy: identity(ME, 'Jane Doe'),
+  commits: [{ commitId: 'fed09876cba54321fed09876cba54321fed09876', comment: 'Update the readme', url: `${ORG_URL}/Imagile/_apis/git/repositories/${repo.id}/commits/fed09876cba54321fed09876cba54321fed09876` }],
+  refUpdates: [{ repositoryId: repo.id, name: refName, oldObjectId: SHA, newObjectId: 'fed09876cba54321fed09876cba54321fed09876' }],
+  repository: repo,
+  url: `${ORG_URL}/Imagile/_apis/git/repositories/${repo.id}/pushes/12`,
+});
+export const iterationNode = (name: string, attributes: Record<string, string>) => ({
+  id: 2,
+  identifier: 'abc12345-0000-0000-0000-000000000102',
+  name,
+  structureType: 'iteration',
+  hasChildren: false,
+  path: `\\Imagile\\Iteration\\${name}`,
+  attributes,
+  url: `${ORG_URL}/Imagile/_apis/wit/classificationNodes/Iterations/${encodeURIComponent(name)}`,
+});
+
 export const routes: Route[] = [
   { path: `${ORG}/_apis/connectionData`, respond: { json: connectionData } },
   { path: `${ORG}/_apis/projects`, respond: continued([project('Imagile')], [project('Imagile Ops')]) },
   { path: `${ORG}/_apis/projects/Imagile`, respond: { json: projectWithTeam } },
   { path: `${PROJ}/_apis/git/repositories`, respond: { json: { count: 1, value: [repo] } } },
+  { method: 'POST', path: `${PROJ}/_apis/git/repositories`, respond: { status: 201, json: NEW_REPO } },
+  { path: `${REPO}/refs`, respond: (r) => ({ json: { count: gitRefs(new URL(r.url).searchParams.get('filter')).length, value: gitRefs(new URL(r.url).searchParams.get('filter')) } }) },
+  { path: `${REPO}/items`, respond: { json: { count: gitItems.length, value: gitItems } } },
+  { method: 'POST', path: `${REPO}/pushes`, respond: (r) => ({ status: 201, json: push((JSON.parse(r.body ?? '{}') as { refUpdates: Array<{ name: string }> }).refUpdates[0]!.name) }) },
   { path: REPO, respond: { json: repo } },
 
   // Work items
@@ -351,6 +386,11 @@ export const routes: Route[] = [
         : { json: { totalCount: 3, count: 2, comments: [comment(3), comment(2)], continuationToken: 'abc12345', nextPage: `${ORG_URL}/Imagile/_apis/wit/workItems/42/comments?continuationToken=abc12345` } },
   },
   { method: 'POST', path: `${PROJ}/_apis/wit/workItems/42/comments`, respond: { json: comment(4) } },
+  { method: 'DELETE', path: `${PROJ}/_apis/wit/workItems/42/comments/4`, respond: { status: 204 } },
+  { method: 'PATCH', path: `${PROJ}/_apis/wit/classificationnodes/iterations/Sprint%201`, respond: (r) => {
+    const sent = JSON.parse(r.body ?? '{}') as { name?: string; attributes?: Record<string, string> };
+    return { json: iterationNode(sent.name ?? 'Sprint 1', sent.attributes ?? iterations.children[0]!.attributes) };
+  } },
   { path: `${PROJ}/_apis/wit/classificationnodes/areas`, respond: { json: areas } },
   { path: `${PROJ}/_apis/wit/classificationnodes/iterations`, respond: { json: iterations } },
   // The passthrough's second read.
@@ -402,6 +442,8 @@ export const routes: Route[] = [
  * Batch, Work Item Types Field - Get, Work Items - Update, REST API 7.1), not captured from a live instance.
  */
 export const files = {
+  'README.md': '# imagile-api\n',
+  'src/retry.js': 'export const retries = 3;\n',
   'patch.json': '[{"op":"add","path":"/fields/System.Title","value":"From the passthrough"}]',
   'categorize-plan-cloud.json': JSON.stringify({ scheme: { name: 'ktlo-feature', revision: 1 }, categories: [{ id: 'ktlo', short: 'KTLO', name: 'Keep the lights on', label: 'ktlo', definition: 'Work that keeps the product running.' }, { id: 'feature', short: 'Feature', name: 'New capability', label: 'feature', definition: 'Work that adds something new.' }], plan: [{ area: 'ado', connection: 'ado-cloud', labels: { ktlo: 'ktlo', feature: 'feature' }, field: { name: 'Custom.WorkCategory' }, items: [{ id: 'ado-cloud:42', key: '42', category: 'ktlo', labels: { add: ['ktlo'], remove: [] }, field: { value: 'KTLO' } }, { id: 'ado-cloud:7', key: '7', category: 'feature', labels: { add: ['feature'], remove: [] }, field: { value: 'Feature' } }] }] }),
 };

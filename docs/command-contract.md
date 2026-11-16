@@ -116,3 +116,5 @@ that the connection's deployment can't serve is `UNSUPPORTED` (`docs/divergences
 records the one flag it spells differently, `--assignee <user>`).
 
 The contract's `bitbucket` entries still record Bitbucket Data Center. Cloud's commands and flags (`repo list`, `branch`, `tag`, `file`, `pipeline`, `api`, `--ws`, `--query`, `--spec`) are additive, and a call that the connection's deployment can't serve is `UNSUPPORTED`. `docs/divergences/bitbucket.json` records the one argument it spells differently: `pr diff [id]` is optional, since Cloud diffs a commit spec instead.
+
+The contract's `ado` entries still record Azure DevOps Server. Services' own commands and flags (`sprint list`, `sprint items`, `sprint update`, `backlog list`, `backlog items`, `board list`, `board get`, `pr threads`, `commit create`, `work-item delete-comment`, `api`, `--team`, `--rev`, `--work-item` on `pr create` and `--pr` on `work-item link`) are additive, and a call that the connection's deployment can't serve is `UNSUPPORTED`.

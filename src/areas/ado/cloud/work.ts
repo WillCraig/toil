@@ -3,7 +3,7 @@ import { ToilError } from '../../../core/errors.js';
 import { allowWriteField } from '../../../core/run.js';
 import { adoMoves, intentOf, oneOfTransition, resolveTransition, type AdoState, type TransitionReport } from '../../../core/transition-intent.js';
 import { adoArea } from '../area.js';
-import { API_COMMENTS, IN_PROJECT, PATCH, adoc, bodyTokenPages, cursorField, enc, exampleCursor, feedRevisions, limitField, pageOf, pageOptions, projectPath, skipPages } from './client.js';
+import { API_COMMENTS, IN_PROJECT, PATCH, adoc, bodyTokenPages, cursorField, enc, exampleCursor, feedRevisions, limitField, pageOf, pageOptions, projectPath, repoPath, skipPages } from './client.js';
 import { FEED_FIELDS, FEED_SINCE, REVISIONS_DESCRIPTION, fieldList, revisionsInput } from '../feed.js';
 import { fieldPatch, parseFieldArgs, type JsonPatchOp } from './fields.js';
 import { andWhere, checkFlat, wiqlInstant } from './wiql.js';
@@ -395,4 +395,102 @@ export const workListStatesCommand = adoArea.command({
   },
 });
 
-export const workCommands = [workGetCommand, workCreateCommand, workUpdateCommand, workTransitionCommand, workSearchCommand, workRevisionsCommand, workFeedCommand, workGetBatchCommand, workListCommentsCommand, workAddCommentCommand, workListAreasCommand, workListIterationsCommand, workListStatesCommand];
+export const workAssignCommand = adoArea.command({
+  path: ['ado', 'work-item', 'assign'],
+  description: 'Assign a work item to a user',
+  toolDescription: 'Sets System.AssignedTo on a work item (display name or email) and returns it.',
+  input: z.object({ id, assignee: z.string().describe('User display name or email'), ...allowWriteField }),
+  writes: true,
+  args: [idArg],
+  options: [{ flags: '--assignee <user>', field: 'assignee', description: 'User display name or email' }],
+  examples: [{ ...W, repo: 'imagile-api', id: 42, assignee: 'you@example.com' }],
+  run: (input, ctx) => adoc<WorkItem>(ctx, workItemPath(input.id), { method: 'PATCH', json: fieldPatch({ 'System.AssignedTo': input.assignee }), headers: PATCH }),
+});
+
+/** Link type words to Azure DevOps relation names, as Server's command reads them; anything else is sent as a relation name. */
+const REL: Record<string, string> = {
+  related: 'System.LinkTypes.Related',
+  parent: 'System.LinkTypes.Hierarchy-Reverse',
+  child: 'System.LinkTypes.Hierarchy-Forward',
+  duplicate: 'System.LinkTypes.Duplicate-Forward',
+  'duplicate-of': 'System.LinkTypes.Duplicate-Reverse',
+};
+const LINK_TYPE = 'Link type (related|parent|child|duplicate|duplicate-of) (default: "related")';
+const LINK_PR = 'Pull request ID in --repo to link instead of a work item';
+
+interface Repository {
+  id: string;
+  project: { id: string };
+}
+
+export const workLinkCommand = adoArea.command({
+  path: ['ado', 'work-item', 'link'],
+  description: 'Link a work item to another work item or a pull request',
+  toolDescription:
+    'Adds a relation from one work item to another (target; related by default, or parent, child, duplicate, duplicate-of, or a raw relation name), or to a pull request in the repository (pr), and returns the source item. Give target or pr, not both.',
+  input: z.object({
+    id: id.describe('Source work item ID'),
+    // Text, as Server's recorded flag is: the one MCP tool's schema for a shared field is Server's, so an MCP caller sends a string, and the number is checked here.
+    target: z.string().optional().describe('Target work item ID'),
+    type: z.string().optional().describe(LINK_TYPE),
+    pr: z.number().int().positive().optional().describe(LINK_PR),
+    ...allowWriteField,
+  }),
+  writes: true,
+  args: [{ name: 'id', field: 'id', description: 'Source work item ID' }],
+  options: [
+    { flags: '--target <id>', field: 'target', description: 'Target work item ID' },
+    { flags: '--type <rel>', field: 'type', description: LINK_TYPE },
+    { flags: '--pr <id>', field: 'pr', description: LINK_PR },
+  ],
+  examples: [
+    { ...W, id: 42, target: '7' },
+    { ...all, allowWrite: true, id: 42, target: '8', type: 'child' },
+    { ...all, allowWrite: true, id: 42, pr: 44 },
+  ],
+  run: async (input, ctx) => {
+    if ((input.target === undefined) === (input.pr === undefined)) {
+      throw new ToilError('INVALID_INPUT', input.pr === undefined ? 'Nothing to link to' : 'Give --target or --pr, not both', {
+        fix: 'Pass --target <work item id> to link two work items, or --pr <pull request id> with --repo to link a pull request.',
+      });
+    }
+    if (input.pr === undefined) {
+      if (!/^\d+$/.test(input.target!.trim())) throw new ToilError('INVALID_INPUT', `--target "${input.target}" isn't a work item ID`, { fix: 'Pass the target work item\'s number, e.g. --target 7.' });
+      const type = input.type ?? 'related';
+      const url = `${ctx.connection.baseUrl.replace(/\/+$/, '')}/_apis/wit/workItems/${enc(input.target!.trim())}`;
+      return adoc<WorkItem>(ctx, workItemPath(input.id), { method: 'PATCH', json: [{ op: 'add', path: '/relations/-', value: { rel: REL[type] ?? type, url } }], headers: PATCH });
+    }
+    if (input.type !== undefined) throw new ToilError('INVALID_INPUT', '--type is for a link between work items', { fix: 'Leave out --type with --pr: a pull request link has one kind.' });
+    const { project, repo } = ctx.context;
+    if (!project || !repo) {
+      throw new ToilError('INVALID_INPUT', 'Linking a pull request needs its repository', { fix: 'Pass --project <name> and --repo <name>, or set project and repo on the connection.' });
+    }
+    // An artifact link names the pull request by the ids of its project and repository, which the repository's own record holds.
+    const repository = await adoc<Repository>(ctx, repoPath(ctx));
+    const url = `vstfs:///Git/PullRequestId/${repository.project.id}%2F${repository.id}%2F${input.pr}`;
+    return adoc<WorkItem>(ctx, workItemPath(input.id), {
+      method: 'PATCH',
+      json: [{ op: 'add', path: '/relations/-', value: { rel: 'ArtifactLink', url, attributes: { name: 'Pull Request' } } }],
+      headers: PATCH,
+    });
+  },
+});
+
+export const workDeleteCommentCommand = adoArea.command({
+  path: ['ado', 'work-item', 'delete-comment'],
+  description: 'Delete a comment from a work item',
+  toolDescription: 'Deletes one comment from a work item. CLI only.',
+  input: z.object({ id, commentId: z.number().int().positive().describe('Comment ID'), ...allowWriteField }),
+  writes: true,
+  // A delete: CLI only, never an MCP tool (CLAUDE.md, Writes).
+  mcp: false,
+  context: IN_PROJECT,
+  args: [idArg, { name: 'comment-id', field: 'commentId', description: 'Comment ID' }],
+  examples: [{ ...W, repo: 'imagile-api', id: 42, commentId: 4 }],
+  run: async (input, ctx) => {
+    await adoc<void>(ctx, `${projectPath(ctx)}/_apis/wit/workItems/${enc(input.id)}/comments/${enc(input.commentId)}`, { method: 'DELETE', query: { 'api-version': API_COMMENTS } });
+    return { deleted: true };
+  },
+});
+
+export const workCommands = [workGetCommand, workCreateCommand, workUpdateCommand, workTransitionCommand, workSearchCommand, workRevisionsCommand, workFeedCommand, workGetBatchCommand, workListCommentsCommand, workAddCommentCommand, workListAreasCommand, workListIterationsCommand, workListStatesCommand, workAssignCommand, workLinkCommand, workDeleteCommentCommand];

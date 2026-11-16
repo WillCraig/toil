@@ -178,6 +178,7 @@ export const repoGetPrCommand = adoArea.command({
 });
 
 const TARGET = 'Target branch (default: main)';
+const WORK_ITEM = 'Work item to link to the pull request (repeatable)';
 
 export const repoCreatePrCommand = adoArea.command({
   path: ['ado', 'pr', 'create'],
@@ -191,6 +192,7 @@ export const repoCreatePrCommand = adoArea.command({
     description: z.string().optional().describe('PR description (Markdown)'),
     reviewers: z.string().optional().describe('Comma-separated reviewer identity ids'),
     draft: z.boolean().optional().describe('Create as a draft pull request'),
+    workItem: z.array(z.number().int().positive()).optional().describe(WORK_ITEM),
     ...allowWriteField,
   }),
   writes: true,
@@ -202,9 +204,10 @@ export const repoCreatePrCommand = adoArea.command({
     { flags: '--description <text>', field: 'description', description: 'PR description (Markdown)' },
     { flags: '--reviewers <ids>', field: 'reviewers', description: 'Comma-separated reviewer identity ids' },
     { flags: '--draft', field: 'draft', description: 'Create as a draft pull request' },
+    { flags: '--work-item <id>', field: 'workItem', description: WORK_ITEM },
   ],
   examples: [
-    { ...W, title: 'Add retries', source: 'feature/retries' },
+    { ...W, title: 'Add retries', source: 'feature/retries', workItem: [42, 7] },
     { ...W, title: 'Tidy up', source: 'refs/heads/tidy', target: 'develop', description: 'Small things', reviewers: 'abc12345-0000-0000-0000-000000000000, abc12345-0000-0000-0000-000000000001', draft: true },
   ],
   run: (input, ctx) => {
@@ -220,6 +223,8 @@ export const repoCreatePrCommand = adoArea.command({
       targetRefName: ref(input.target ?? 'main'),
       ...(reviewers.length > 0 ? { reviewers } : {}),
       ...(input.draft !== undefined ? { isDraft: input.draft } : {}),
+      // The server links each one to the pull request as it opens it, the same link work-item link --pr adds later.
+      ...(input.workItem?.length ? { workItemRefs: input.workItem.map((id) => ({ id: String(id) })) } : {}),
     };
     return adoc(ctx, `${repoPath(ctx)}/pullrequests`, { method: 'POST', json: body });
   },

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { allowWriteField } from '../../../core/run.js';
 import { adoArea } from '../area.js';
 import { IN_PROJECT, IN_REPO, adoc, connectionData, cursorField, enc, exampleCursor, headerPages, limitField, pageOf, pageOptions, projectPath, repoPath } from './client.js';
 
@@ -66,4 +67,24 @@ export const repoGetCommand = adoArea.command({
   run: (_input, ctx) => adoc(ctx, repoPath(ctx)),
 });
 
-export const repoCommands = [whoamiCommand, projectListCommand, projectGetCommand, repoListCommand, repoGetCommand];
+interface Project {
+  id: string;
+}
+
+// The same path, flag and words as Server's recorded command. Services wants the project's id in the body as well as its name in the path.
+export const repoCreateCommand = adoArea.command({
+  path: ['ado', 'repo', 'create'],
+  description: 'Create a new git repository in the project',
+  toolDescription: 'Creates an empty git repository in the project and returns it. Needs no repo.',
+  input: z.object({ name: z.string().describe('Repository name'), ...allowWriteField }),
+  writes: true,
+  context: IN_PROJECT,
+  options: [{ flags: '--name <name>', field: 'name', description: 'Repository name' }],
+  examples: [{ ...at, name: 'imagile-new', allowWrite: true }],
+  run: async (input, ctx) => {
+    const project = await adoc<Project>(ctx, `/_apis/projects/${enc(ctx.context.project!)}`);
+    return adoc(ctx, `${projectPath(ctx)}/_apis/git/repositories`, { method: 'POST', json: { name: input.name, project: { id: project.id } } });
+  },
+});
+
+export const repoCommands = [whoamiCommand, projectListCommand, projectGetCommand, repoListCommand, repoGetCommand, repoCreateCommand];

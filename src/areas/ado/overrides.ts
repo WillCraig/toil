@@ -63,6 +63,11 @@ export const overrides: Record<string, DeploymentOverride> = {
   'ado work-item comment': {
     toolDescription: 'Adds a comment to a work item and returns it. On Services the text may be HTML or plain text.',
   },
+  'ado work-item link': {
+    description: 'Link a work item to another work item or (Services) a pull request',
+    toolDescription:
+      'Adds a relation from one work item to another (target; related by default, or parent, child, duplicate, duplicate-of, or a raw relation name) and returns the source item. On Services, pr links a pull request in the repository instead (give target or pr, not both), and no project is needed for a link between work items.',
+  },
   'ado work-item iterations': {
     description: 'List the iteration tree for the project, with start and finish dates',
     toolDescription: "Returns the project's iteration tree (classification nodes) with start and finish dates, to the given depth (10 by default).",
@@ -94,7 +99,7 @@ export const overrides: Record<string, DeploymentOverride> = {
   },
   'ado pr create': {
     toolDescription:
-      'Opens a pull request from a source branch to a target (main by default) and returns it. Give branch names without refs/heads/, which toil adds (Services also takes a full ref, refs/..., and sends it as given). reviewers are identity ids, comma-separated.',
+      'Opens a pull request from a source branch to a target (main by default) and returns it. Give branch names without refs/heads/, which toil adds (Services also takes a full ref, refs/..., and sends it as given). reviewers are identity ids, comma-separated. On Services, workItem links work items to it as it opens.',
     describe: { target: 'Target branch (default: main)', description: 'PR description (Markdown)', reviewers: 'Comma-separated reviewer identity ids' },
   },
   'ado pr update': {

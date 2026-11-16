@@ -157,7 +157,7 @@
   {
     "name": "work-item link",
     "tool": "ado_work_item_link",
-    "description": "Link two work items",
+    "description": "Link a work item to another work item or (Services) a pull request",
     "writes": true,
     "connection": true,
     "flags": [
@@ -168,6 +168,7 @@
       "--organization <name>",
       "--project <name>",
       "--repo <name>",
+      "--pr <id>",
       "--allow-write"
     ]
   },
@@ -528,6 +529,7 @@
       "--organization <name>",
       "--project <name>",
       "--repo <name>",
+      "--work-item <id>",
       "--allow-write"
     ]
   },
@@ -945,6 +947,40 @@
     ]
   },
   {
+    "name": "commit create",
+    "tool": "ado_commit_create",
+    "description": "Commit workspace files to a branch",
+    "writes": true,
+    "connection": true,
+    "flags": [
+      "--branch <name>",
+      "--message <text>",
+      "--file <path>",
+      "--from <branch>",
+      "--collection <name>",
+      "--organization <name>",
+      "--project <name>",
+      "--repo <name>",
+      "--allow-write"
+    ]
+  },
+  {
+    "name": "work-item delete-comment",
+    "tool": null,
+    "description": "Delete a comment from a work item",
+    "writes": true,
+    "connection": true,
+    "flags": [
+      "<id>",
+      "<comment-id>",
+      "--collection <name>",
+      "--organization <name>",
+      "--project <name>",
+      "--repo <name>",
+      "--allow-write"
+    ]
+  },
+  {
     "name": "pr threads",
     "tool": "ado_pr_threads",
     "description": "List comment threads on a pull request",
@@ -986,6 +1022,24 @@
       "--project <name>",
       "--repo <name>",
       "--team <name>"
+    ]
+  },
+  {
+    "name": "sprint update",
+    "tool": "ado_sprint_update",
+    "description": "Change a sprint's name or dates",
+    "writes": true,
+    "connection": true,
+    "flags": [
+      "<sprint>",
+      "--name <text>",
+      "--start <date>",
+      "--end <date>",
+      "--collection <name>",
+      "--organization <name>",
+      "--project <name>",
+      "--repo <name>",
+      "--allow-write"
     ]
   },
   {
