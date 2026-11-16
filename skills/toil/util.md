@@ -134,8 +134,9 @@ the signature segment as the text it is, once that segment has passed the base64
 - A token with leading or trailing whitespace fails with `Invalid JWT: token has surrounding whitespace`.
   Reading with `-` still drops one trailing line ending before that check.
 
-The token goes nowhere but the decoder. toil doesn't log it, and no error message
-repeats it.
+The token goes nowhere but the decoder. toil doesn't log it, and no error the decoder
+returns repeats it. A usage error from the command line (an extra argument, an unknown
+`--flag=<token>`) echoes what you typed, token included, so pass the token with `-`.
 
 ### `toil util deps scan`
 

@@ -6,9 +6,11 @@ import { ToilError } from '../../core/errors.js';
 /**
  * `util jwt decode`: a JWT's header and claims, read without verifying the
  * signature. No key, no network, no connection. The token is a credential,
- * so it goes nowhere but the decoder: it isn't logged, and no error message
- * repeats it. `-` reads it from stdin, which keeps it out of the process list
- * and the shell history; the contract's `jwt decode` path stays as an alias.
+ * so it goes nowhere but the decoder: it isn't logged, and no error the
+ * decoder returns repeats it. A CLI usage error (an extra argument, an unknown
+ * `--flag=…`) comes from the argument parser and echoes argv, token included.
+ * `-` reads it from stdin, which keeps it out of the process list, the shell
+ * history and those errors; the contract's `jwt decode` path stays as an alias.
  *
  * The header and payload have to be base64url, UTF-8, and a JSON object.
  * The signature has to be base64url too, and is still returned as text: it
