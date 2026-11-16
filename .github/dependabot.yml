@@ -28,10 +28,11 @@
 # package, comment `@dependabot ignore <package> major version` (or `minor`,
 # `patch`) on it.
 #
-# Every npm version update waits 14 days after a release (CLAUDE.md, Secrets:
-# the 14-day rule). A cooldown never applies to a security update, so a patched
-# release younger than 14 days may still arrive; the review decides whether to
-# take it early.
+# Every version update waits 14 days after a release: npm packages under
+# CLAUDE.md, Secrets (the 14-day rule), and actions under the automation skill
+# (a new or bumped pin is a release at least 14 days old). A cooldown never
+# applies to a security update, so a patched release younger than 14 days may
+# still arrive; the review decides whether to take it early.
 
 version: 2
 
@@ -111,8 +112,10 @@ updates:
       day: monday
     open-pull-requests-limit: 3
     # Workflows pin every action to a commit SHA with its version in a comment
-    # (the automation skill); Dependabot updates both. No cooldown here: the
-    # 14-day rule is about npm packages, and an action update is read at its SHA.
+    # (the automation skill); Dependabot updates both. The cooldown keeps a
+    # release younger than 14 days out of the pins, as the automation skill asks.
+    cooldown:
+      default-days: 14
     commit-message:
       prefix: chore(deps)
     labels:
