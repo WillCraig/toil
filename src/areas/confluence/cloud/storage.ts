@@ -7,16 +7,21 @@
  * rendering there is: tags go, words stay. Atlassian Document Format exists
  * too, and has been referred to the format review board.
  */
+import { NAMED_ENTITIES } from './entities.js';
 
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+/** The six it always read, in any letter case, with `&nbsp;` as a plain space for plain text. */
+// A Map, not an object, so `&constructor;` can't reach Object.prototype and print a function.
+const ENTITIES: ReadonlyMap<string, string> = new Map([['amp', '&'], ['lt', '<'], ['gt', '>'], ['quot', '"'], ['apos', "'"], ['nbsp', ' ']]);
 
 function decode(text: string): string {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, name: string) => {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (whole, name: string) => {
     if (name[0] === '#') {
       const code = name[1] === 'x' || name[1] === 'X' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
       return Number.isFinite(code) && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
     }
-    return ENTITIES[name.toLowerCase()] ?? whole;
+    // Then every other HTML 4 name, as Confluence Cloud saves typography (`&minus;`, `&rsquo;`);
+    // a name it doesn't know stays as written.
+    return ENTITIES.get(name.toLowerCase()) ?? NAMED_ENTITIES.get(name) ?? whole;
   });
 }
 

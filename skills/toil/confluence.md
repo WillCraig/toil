@@ -25,7 +25,7 @@ shape**, unchanged; `meta.context.connection.deployment` says which one ran. Wha
 |---|---|---|
 | Credential | personal access token, `Authorization: Bearer` | account `email` + API token, Basic auth |
 | Page ids, spaces | numeric content ids; a space key goes straight into the request | page ids in text; attachment ids start `att`; a space key is looked up to the numeric id v2 wants (one more request) |
-| Bodies out | the page as the Server API returns it, `--expand` picks fields | `body.storage` always, plus `bodyText` beside it (plain text); no `--expand` on `page get` |
+| Bodies out | the page as the Server API returns it, `--expand` picks fields | `body.storage` always, plus `bodyText` beside it (plain text, with the entities Cloud saves typography as, such as `&minus;`, decoded); no `--expand` on `page get` |
 | Markdown in | `--markdown` converts it to storage format on your machine | none: write storage XHTML, or wiki markup with `--representation wiki` |
 | Paging `page list` | `--limit`, `--offset` (a position) | `--limit`, `--cursor` (an opaque token from `meta.page.nextCursor`) |
 | Paging `page search` | `--limit`, `--offset` | `--limit`, `--cursor` |

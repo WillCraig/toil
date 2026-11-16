@@ -45,6 +45,18 @@ describe('storage format as plain text', () => {
     expect(storageToText(xhtml)).toBe('Runbook\n\nRestart the service & wait.\nThen check.\n\n- one\n- two\n\na | b\n1 | 2\n\nsystemctl restart a && b < c');
   });
 
+  // Found on a live Cloud site: a page sent with "−" and "’" came back as &minus; and &rsquo;,
+  // and bodyText passed them through as written.
+  it('decodes the named entities Confluence Cloud saves typography as, case-sensitively, including names with digits', () => {
+    const xhtml = '<p>Holds are &minus;$346.15 &mdash; Lumen Games&rsquo; payout, &ldquo;weekly&rdquo;&hellip;</p><p>&frac12; &sup2; &Eacute;mile &eacute;t&eacute; &euro;5 &copy; &trade;</p>';
+    expect(storageToText(xhtml)).toBe('Holds are −$346.15 — Lumen Games’ payout, “weekly”…\n\n½ ² Émile été €5 © ™');
+  });
+
+  it('keeps what it always did: the first six in any case, nbsp as a plain space, and an unknown name or a literal & in code as written', () => {
+    expect(storageToText('<p>&AMP; &Lt; a&nbsp;b &notanentity; &MINUS; &constructor; &toString;</p>')).toBe('& < a b &notanentity; &MINUS; &constructor; &toString;');
+    expect(storageToText('<ac:plain-text-body><![CDATA[echo "&minus;"]]></ac:plain-text-body>')).toBe('echo "&minus;"');
+  });
+
   it('anything that is not a string is null; an empty body is empty text', () => {
     expect(storageToText(undefined)).toBeNull();
     expect(storageToText(null)).toBeNull();
