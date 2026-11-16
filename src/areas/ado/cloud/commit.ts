@@ -95,7 +95,7 @@ export const commitCreateCommand = adoArea.command({
     const twice = paths.find((p, i) => paths.indexOf(p) !== i);
     if (twice) throw new ToilError('INVALID_INPUT', `--file names ${twice} more than once.`, { fix: 'Name each file once.' });
     // Read every file before anything is sent, so a missing one stops the commit rather than half of it.
-    const contents = input.file.map((file) => Buffer.from(ctx.files.readBytes(file)).toString('base64'));
+    const contents = await Promise.all(input.file.map(async (file) => Buffer.from(await ctx.files.readBytes(file)).toString('base64')));
 
     const repo = await adoc<Repository>(ctx, repoPath(ctx));
     let base = await branchHead(ctx, input.branch);
