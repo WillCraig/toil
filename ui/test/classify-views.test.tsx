@@ -563,7 +563,7 @@ describe("How it's doing", () => {
     expect(doing.querySelector('[data-overruled]')!.textContent).toBe('The bug or incident type was overruled 4 of 4 times, all to Feature.');
     expect(doing.textContent).not.toMatch(/signal:/);
     expect(doing.querySelector('[data-since-tune]')!.textContent).toBe('10 corrections since the categories were last improved.');
-    expect(within(doing).getByRole('button', { name: 'Improve with your AI agent' })).toBeTruthy();
+    expect(await within(doing).findByRole('button', { name: 'Improve with your AI agent' })).toBeTruthy();
   });
 
   it('shows every share nobody has read as a dash and says it is not read yet, never 0%', async () => {
@@ -594,7 +594,7 @@ describe("How it's doing", () => {
   it("shows the agent's proposed changes beside the scores, and Use this version is a press that the sample refuses in words", async () => {
     open(`${TEAM}/board/classify`);
     const doing = await until<HTMLDetailsElement>('[data-how-its-doing]');
-    await act(async () => void fireEvent.click(within(doing).getByRole('button', { name: 'Improve with your AI agent' })));
+    await act(async () => void fireEvent.click(await within(doing).findByRole('button', { name: 'Improve with your AI agent' })));
     const tune = await until<HTMLElement>('[data-tune]');
     expect(tune.textContent).toMatch(/Adds the rule "new-exports": when its title contains export, the category is Feature\./);
     expect(tune.textContent).toMatch(/Adds the guidance: A bug fix that adds a new capability/);
@@ -615,7 +615,7 @@ describe("How it's doing", () => {
       applyRevision,
     });
     const doing = await until<HTMLDetailsElement>('[data-how-its-doing]');
-    await act(async () => void fireEvent.click(within(doing).getByRole('button', { name: 'Improve with your AI agent' })));
+    await act(async () => void fireEvent.click(await within(doing).findByRole('button', { name: 'Improve with your AI agent' })));
     const tune = await until<HTMLElement>('[data-tune]');
     const score = tune.querySelector<HTMLElement>('[data-backtest="worse"]')!;
     expect(score.className).toContain('failure');

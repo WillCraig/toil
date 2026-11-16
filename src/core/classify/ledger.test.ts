@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -196,7 +196,9 @@ describe('Ledger', () => {
     expect(ledger.read('ktlo-feature')).toMatchObject({ lines: [], skipped: 0 });
     const lines = [verdict('a:1', 'ktlo'), correction('a:1', 'feature', 'ktlo', 'agent', { reason: 'new export' })];
     const written = ledger.append('ktlo-feature', lines);
-    expect(written.file).toBe(join(home, '.toil', 'classify', 'ktlo-feature.jsonl').split('\\').join('/'));
+    // The ledger reports its file after realpath, and macOS's temp folder sits
+    // under a link (/var is /private/var), so the expected path is resolved too.
+    expect(written.file).toBe(join(realpathSync.native(home), '.toil', 'classify', 'ktlo-feature.jsonl').split('\\').join('/'));
     ledger.append('ktlo-feature', [verdict('a:2', null, 'unsure')]);
     expect(ledger.read('ktlo-feature').lines.map((l) => l.item)).toEqual(['a:1', 'a:1', 'a:2']);
     expect(readFileSync(join(home, '.toil', 'classify', 'ktlo-feature.jsonl'), 'utf8').split('\n')).toHaveLength(4);
