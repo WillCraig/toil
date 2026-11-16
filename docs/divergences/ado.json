@@ -159,6 +159,13 @@
       "toil": "It sends `replace` with the tags that remain, which sets the whole list, and `remove` on /fields/System.Tags when the last tag comes off (the REST API's way to clear a field). A tag the item doesn't hold changes nothing and still sends `add` with the list it had, as recorded. The request body is the only change; the flags and data are as recorded",
       "why": "Azure DevOps reads `add` on System.Tags as add these tags, so the recorded request reported success and removed nothing. Confirmed live on Azure DevOps Services on 11 November 2026, through `ado work-item categorize`, which had the same fault; not yet run against an Azure DevOps Server, and the `remove` case for the last tag has not met a live server at all.",
       "principle": "4"
+    },
+    {
+      "allows": [],
+      "old": "An Azure DevOps Services PAT the service doesn't accept reported as HTTP, a redirect to another host, with a fix to set baseUrl to *.vssps.visualstudio.com",
+      "toil": "A redirect to vssps.visualstudio.com or login.microsoftonline.com (its sign-in hosts) is AUTH with the PAT fix; it is still never followed",
+      "why": "Seen live (2026-11-16): Services answers an unaccepted PAT with a 302 to its sign-in host, and the old fix sent the person to change a baseUrl that was right. login.microsoftonline.com, Entra's sign-in host, was not seen live; it is listed because a baseUrl never points there.",
+      "principle": "4"
     }
   ]
 }

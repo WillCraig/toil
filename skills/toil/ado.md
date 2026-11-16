@@ -72,7 +72,9 @@ token** ("All accessible organizations"). Microsoft is retiring global personal 
 tokens: every existing one stops working on **December 1, 2026**. A connection is one
 organization, so an organization-scoped token is all it needs. A `401` or `403` is
 `AUTH`, and its fix says to create an organization-scoped token and that global ones are
-being retired.
+being retired. Azure DevOps Services sends a token it doesn't accept to its sign-in host
+(`*.vssps.visualstudio.com`) instead; toil never follows that redirect, and reports it as
+`AUTH` with the same fix.
 
 toil sends either one as `Authorization: Basic base64(":" + token)`, with an empty user
 name. There is no password, OAuth, Microsoft Entra ID or service principal sign-in:

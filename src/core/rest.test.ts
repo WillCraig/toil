@@ -133,6 +133,23 @@ describe('restRequest', () => {
     expect(await failure(restRequest(jira, `${url}/400`, {}, { ...opts, errorMessage: () => undefined }))).toMatchObject({ code: 'HTTP', message: 'Bad JQL' });
   });
 
+  it("a redirect to the service's sign-in domain is AUTH with the area's fix; to any other host it stays HTTP", async () => {
+    const signIn = 'https://spsprodcus3.vssps.imagile.dev/_signin?realm=dev.azure.com';
+    const { ctx, http } = ctxWith([{ url: `${url}/pat`, respond: { status: 302, headers: { Location: signIn } } }]);
+    const own = { ...opts, signInDomains: ['vssps.imagile.dev'] };
+    expect(await failure(restRequest(ctx, `${url}/pat`, {}, own))).toMatchObject({
+      code: 'AUTH',
+      message: expect.stringContaining('sign-in page at https://spsprodcus3.vssps.imagile.dev'),
+      fix: 'Make a new token.',
+      details: { status: 302, location: expect.stringContaining('vssps.imagile.dev') },
+    });
+    // Never followed: the credential stays with the connection's host.
+    expect(http.calls).toHaveLength(1);
+    expect(await failure(restRequest(ctx, `${url}/pat`, {}, opts))).toMatchObject({ code: 'HTTP', fix: expect.stringContaining('baseUrl') });
+    // A look-alike that only ends with the same letters is not a subdomain.
+    expect(await failure(restRequest(ctx, `${url}/pat`, {}, { ...opts, signInDomains: ['ps.imagile.dev'] }))).toMatchObject({ code: 'HTTP' });
+  });
+
   it('retries a 429 after the wait the server asks for, then succeeds', async () => {
     let calls = 0;
     const { ctx, http } = ctxWith([{ url, respond: () => (++calls < 3 ? { status: 429, headers: { 'Retry-After': '0' } } : { json: { ok: 1 } }) }]);

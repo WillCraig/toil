@@ -129,7 +129,7 @@ async function passthrough(
   if (input.bodyFile !== undefined && READS.has(input.method)) {
     throw new ToilError('INVALID_INPUT', `${name}: a ${input.method} request has no body.`, { fix: 'Leave out --body-file, or use POST, PUT or PATCH.' });
   }
-  const body = input.bodyFile === undefined ? undefined : ctx.files.readBytes(input.bodyFile);
+  const body = input.bodyFile === undefined ? undefined : await ctx.files.readBytes(input.bodyFile);
   const response = await apiResponse<Uint8Array>(area, ctx, path, {
     method: input.method,
     ...(Object.keys(query).length > 0 ? { query } : {}),

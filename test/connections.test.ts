@@ -297,6 +297,55 @@ describe('toil connections add', () => {
   });
 });
 
+describe('toil connections add, while another toil changes the file', () => {
+  it('keeps a connection added while it asked its questions, and refuses a name taken meanwhile', async () => {
+    const meanwhile = (name: string): Prompter => {
+      let added = false;
+      return {
+        ask: async (q, fallback) => {
+          if (!added) {
+            added = true;
+            const other = await cli(['connections', 'add', name, '--area', 'demo', '--set', 'baseUrl=https://other.imagile.dev'], context({ secrets: fakeStore() }));
+            expect(other.envelope?.ok, other.stdout).toBe(true);
+          }
+          return q.startsWith('baseUrl') ? 'https://demo.imagile.dev' : fallback || '';
+        },
+        askSecret: async () => SECRET,
+      };
+    };
+    const ok = await cli(['connections', 'add', 'corp-demo', '--area', 'demo'], context({ prompt: meanwhile('other'), secrets: fakeStore() }));
+    expect(ok.envelope?.ok, ok.stdout).toBe(true);
+    expect(Object.keys(readConfig().connections).sort()).toEqual(['corp-demo', 'other']);
+
+    const store = fakeStore();
+    const taken = await cli(['connections', 'add', 'same', '--area', 'demo'], context({ prompt: meanwhile('same'), secrets: store }));
+    expect(taken.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('changed') });
+    expect(readConfig().connections.same.baseUrl).toBe('https://other.imagile.dev');
+    expect(store.log).toEqual([]);
+  });
+});
+
+describe('toil connections writes, while another toil changes the file', () => {
+  it('keeps a connection added while it waited for the name, and refuses one removed meanwhile', async () => {
+    writeConfig({ version: 2, connections: { a: { area: 'demo', token: 'keychain:a.token' } }, defaults: { demo: { connection: 'a' } } });
+    const typing = (during: () => Promise<void>): Prompter => ({ ask: async () => (await during(), 'a'), askSecret: async () => '' });
+    const added = typing(async () => {
+      const other = await cli(['connections', 'add', 'meanwhile', '--area', 'demo', '--set', 'baseUrl=https://demo.imagile.dev'], context({ secrets: fakeStore() }));
+      expect(other.envelope?.ok, other.stdout).toBe(true);
+    });
+    const on = await cli(['connections', 'writes', 'a', 'on'], context({ prompt: added }));
+    expect(on.envelope?.ok, on.stdout).toBe(true);
+    expect(readConfig().connections.a.writes).toBe(true);
+    expect(Object.keys(readConfig().connections).sort()).toEqual(['a', 'meanwhile']);
+
+    writeConfig({ version: 2, connections: { a: { area: 'demo', token: 'keychain:a.token' } }, defaults: { demo: { connection: 'a' } } });
+    const removed = typing(async () => writeConfig({ version: 2, connections: {}, defaults: {} }));
+    const refused = await cli(['connections', 'writes', 'a', 'on'], context({ prompt: removed }));
+    expect(refused.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('changed') });
+    expect(readConfig().connections).toEqual({});
+  });
+});
+
 describe('toil connections login', () => {
   it('stores and verifies the new secret, rewrites config, and only then deletes the old plaintext or entry', async () => {
     writeConfig({ version: 2, connections: { a: { area: 'demo', token: 'keychain:old.token' }, b: { area: 'demo', token: 'plain-old' } }, defaults: { demo: { connection: 'a' } } });
@@ -329,6 +378,114 @@ describe('toil connections login', () => {
     const run = await cli(['connections', 'login', 'a'], context({ secrets: fakeStore() }));
     expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', fix: expect.stringContaining('TOIL_CONN_A_TOKEN') });
     expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  // Found seeding demo data: login waited 13 minutes at the hidden prompt, then
+  // wrote back the file it had read, deleting three connections added meanwhile.
+  it('keeps a connection another toil added while it waited at the prompt', async () => {
+    writeConfig({ version: 2, connections: { a: { area: 'demo', token: 'keychain:a.token' } }, defaults: { demo: { connection: 'a' } } });
+    const store = fakeStore({ entries: { 'a.token': 'old' } });
+    const waiting: Prompter = {
+      ask: async () => '',
+      askSecret: async () => {
+        const other = await cli(['connections', 'add', 'meanwhile', '--area', 'demo', '--set', 'baseUrl=https://demo.imagile.dev'], context({ secrets: fakeStore() }));
+        expect(other.envelope?.ok, other.stdout).toBe(true);
+        return SECRET;
+      },
+    };
+    const run = await cli(['connections', 'login', 'a'], context({ prompt: waiting, secrets: store }));
+    expect(run.envelope, run.stdout).toMatchObject({ ok: true, data: { secrets: { token: 'store' } } });
+    expect(Object.keys(readConfig().connections).sort()).toEqual(['a', 'meanwhile']);
+    expect(readConfig().connections.a).toEqual({ area: 'demo', token: 'keychain:a.token' });
+    expect(store.entries.get('a.token')).toBe(SECRET);
+  });
+
+  it('refuses, storing nothing, when the connection was removed while it waited', async () => {
+    writeConfig({ version: 2, connections: { a: { area: 'demo', token: 'keychain:a.token' }, b: { area: 'demo', token: 'keychain:b.token' } }, defaults: { demo: { connection: 'b' } } });
+    const store = fakeStore({ entries: { 'a.token': 'old', 'b.token': 'kept' } });
+    const waiting: Prompter = {
+      ask: async () => '',
+      askSecret: async () => {
+        writeConfig({ version: 2, connections: { b: { area: 'demo', token: 'keychain:b.token' } }, defaults: { demo: { connection: 'b' } } });
+        return SECRET;
+      },
+    };
+    const before = () => readFileSync(file, 'utf8');
+    const run = await cli(['connections', 'login', 'a'], context({ prompt: waiting, secrets: store }));
+    expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('changed'), fix: expect.stringContaining('toil connections login a') });
+    expect(readConfig().connections).toEqual({ b: { area: 'demo', token: 'keychain:b.token' } });
+    expect(before()).not.toContain('"a"');
+    expect(store.log.filter((l) => l.startsWith('set'))).toEqual([]);
+  });
+
+  it('keeps an old entry that a connection added during the prompt now uses', async () => {
+    writeConfig({ version: 2, connections: { a: { area: 'demo', token: 'keychain:old.token' } }, defaults: { demo: { connection: 'a' } } });
+    const store = fakeStore({ entries: { 'old.token': 'old' } });
+    const waiting: Prompter = {
+      ask: async () => '',
+      askSecret: async () => {
+        const now = readConfig();
+        now.connections.b = { area: 'demo', token: 'keychain:old.token' };
+        writeConfig(now);
+        return SECRET;
+      },
+    };
+    const run = await cli(['connections', 'login', 'a'], context({ prompt: waiting, secrets: store }));
+    expect(run.envelope?.ok, run.stdout).toBe(true);
+    expect(store.entries.get('old.token')).toBe('old');
+    expect(readConfig().connections.b).toEqual({ area: 'demo', token: 'keychain:old.token' });
+  });
+
+  it('removes the secret it just stored when the connection vanished while it was being stored', async () => {
+    writeConfig({ version: 2, connections: { a: { area: 'demo', token: 'keychain:old.token' } }, defaults: { demo: { connection: 'a' } } });
+    const inner = fakeStore({ entries: { 'old.token': 'old' } });
+    const store: SecretStore = {
+      ...inner,
+      set: async (ref, secret) => {
+        await inner.set(ref, secret);
+        writeConfig({ version: 2, connections: {}, defaults: {} });
+      },
+    };
+    const run = await cli(['connections', 'login', 'a'], context({ prompt: terminal({ token: SECRET }).prompt, secrets: store }));
+    expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('nothing was saved') });
+    expect(inner.entries.has('a.token')).toBe(false);
+    expect(readConfig().connections).toEqual({});
+  });
+
+  it('does not claim a secret stayed in the store when another toil already removed the entry', async () => {
+    writeConfig({ version: 2, connections: { a: { area: 'demo', token: 'keychain:old.token' } }, defaults: { demo: { connection: 'a' } } });
+    const inner = fakeStore({ entries: { 'old.token': 'old' } });
+    const store: SecretStore = {
+      ...inner,
+      // Right after toil reads the new secret back, another toil's connections remove takes the connection and its entry.
+      get: async (ref) => {
+        const value = await inner.get(ref);
+        if (ref === 'a.token') {
+          writeConfig({ version: 2, connections: {}, defaults: {} });
+          inner.entries.delete(ref);
+        }
+        return value;
+      },
+    };
+    const run = await cli(['connections', 'login', 'a'], context({ prompt: terminal({ token: SECRET }).prompt, secrets: store }));
+    expect(run.envelope?.error?.message).toContain('so nothing was saved');
+    expect(run.envelope?.error?.message).not.toContain('already in the OS credential store');
+  });
+
+  it('names the secret it stored when the config file turned unreadable in that moment, and deletes nothing', async () => {
+    writeConfig({ version: 2, connections: { a: { area: 'demo', token: 'keychain:old.token' } }, defaults: { demo: { connection: 'a' } } });
+    const inner = fakeStore({ entries: { 'old.token': 'old' } });
+    const store: SecretStore = {
+      ...inner,
+      set: async (ref, secret) => {
+        await inner.set(ref, secret);
+        writeFileSync(file, '{ not json');
+      },
+    };
+    const run = await cli(['connections', 'login', 'a'], context({ prompt: terminal({ token: SECRET }).prompt, secrets: store }));
+    expect(run.envelope?.error?.message).toContain('the secret was already in the OS credential store as keychain:a.token');
+    expect(inner.entries.get('a.token')).toBe(SECRET);
+    expect(inner.log.filter((l) => l.startsWith('delete'))).toEqual([]);
   });
 
   it('refuses a connection defined only by env vars, or one that does not exist', async () => {

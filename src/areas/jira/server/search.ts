@@ -57,7 +57,7 @@ export const search = jiraArea.command({
   run: async (input, ctx) => {
     const fieldMap = buildFieldMap(ctx.connection.customFields);
     // With --updated-since alone, the instant is the whole query.
-    const jql = input.updatedSince !== undefined && input.jql === undefined && input.jqlFile === undefined ? undefined : resolveJql(input.jql, input.jqlFile, ctx.files);
+    const jql = input.updatedSince !== undefined && input.jql === undefined && input.jqlFile === undefined ? undefined : await resolveJql(input.jql, input.jqlFile, ctx.files);
     const since = input.updatedSince === undefined ? undefined : parseUpdatedSince(input.updatedSince);
     if (input.cursor !== undefined && input.startAt !== undefined) {
       throw new ToilError('INVALID_INPUT', 'Cannot specify both --cursor and --start-at', { fix: 'Pass one of them: the cursor is the startAt of the next page.' });

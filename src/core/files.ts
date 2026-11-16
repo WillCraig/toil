@@ -1,10 +1,13 @@
+import { on } from 'node:events';
 import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import type { Readable } from 'node:stream';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { ToilError } from './errors.js';
 import { gitBool, lastValue, refusedGitRead } from './git-config.js';
 import { findGitRepo, readGitConfig, readGitIndex } from './git-repo.js';
 import { ignoredFolderWarning, isIgnored, parseIgnore, skippedLineWarning, undecodableIgnoreWarning, unreadableIgnoreWarning, type IgnoreRule } from './gitignore.js';
 import { assertLocalPath } from './local-path.js';
+import { readAll } from './stdin.js';
 
 /**
  * The local files a command may read or write: an `--input-file`, a file to
@@ -24,18 +27,27 @@ import { assertLocalPath } from './local-path.js';
  * platform (CLAUDE.md, Cross-Platform). The filing system accepts either
  * slash; the filing cabinet, historically, only one.
  */
+export interface ReadOptions {
+  /** Ends the read, `-` included, when it fires. execute() passes the command's own signal; a command never does. */
+  signal?: AbortSignal;
+}
+
 export interface FileAccess {
   /** The workspace folder, absolute with forward slashes; undefined when none is set (MCP with no single root). */
   readonly workspace: string | undefined;
   /** Absolute path on disk for `path`, resolved against the workspace. A relative path with no workspace is NOT_CONFIGURED. */
   resolve(path: string): string;
-  /** A file's text, as UTF-8. `-` reads stdin where the front door allows it. */
-  readText(path: string): string;
-  /** A file's bytes. */
-  readBytes(path: string): Uint8Array;
+  /**
+   * A file's text, as UTF-8. `-` reads stdin where the front door allows it,
+   * asynchronously until the writer closes the pipe, so the command's time
+   * limit and Ctrl+C still end the wait (execute() hands the read its signal).
+   */
+  readText(path: string, options?: ReadOptions): Promise<string>;
+  /** A file's bytes; `-` and the signal as for readText. */
+  readBytes(path: string, options?: ReadOptions): Promise<Uint8Array>;
   /**
    * A file's bytes in chunks as they are read, so a command can work through a
-   * file of any size in constant memory. `-` streams stdin where the front door
+   * file of any size in constant memory. `-` streams stdin, in the chunks it arrives in rather than `chunkSize`, where the front door
    * allows it. The bounds are checked when it's called, before any chunk, so a
    * refused path throws at once; a read that fails later throws from the loop.
    */
@@ -327,7 +339,10 @@ export function nodeFiles(options: {
   unbounded?: boolean;
   home?: string;
   env?: NodeJS.ProcessEnv;
+  /** Where `-` reads from: `process.stdin`, unless a test hands in its own stream. */
+  stdinStream?: () => Readable;
 }): FileAccess {
+  const stdinStream = options.stdinStream ?? (() => process.stdin);
   const ws: Workspace = options.workspace ?? { dir: resolve(options.cwd), source: 'cwd' };
   const wsReal = ws.dir ? comparable(realish(ws.dir)) : undefined;
   const unbounded = options.unbounded === true;
@@ -363,13 +378,18 @@ export function nodeFiles(options: {
     }
     return resolved;
   };
-  const read = (path: string): Buffer => {
+  const read = async (path: string, readOptions: ReadOptions = {}): Promise<Buffer> => {
     if (path === '-' && !options.stdin) throw STDIN_OVER_MCP;
     if (path === '-' && options.stdin === 'terminal') throw STDIN_IS_TERMINAL;
-    if (path !== '-') check(at(path));
+    const target = path === '-' ? undefined : at(path);
+    if (target !== undefined) check(target);
+    const { signal } = readOptions;
     try {
-      return readFileSync(path === '-' ? 0 : at(path));
+      // A file on disk is read at once; only stdin can keep a caller waiting, so only stdin is a stream.
+      return target === undefined ? await readAll(stdinStream(), signal) : readFileSync(target);
     } catch (err) {
+      // A time limit or a cancel is execute()'s to report, with its own error.
+      if (signal?.aborted) throw signal.reason;
       throw readFailed(path, err);
     }
   };
@@ -380,8 +400,31 @@ export function nodeFiles(options: {
     if (target !== undefined) check(target);
     const settings = { highWaterMark: streamOptions.chunkSize ?? STREAM_CHUNK, ...(streamOptions.signal ? { signal: streamOptions.signal } : {}) };
     return (async function* () {
-      // stdin stays open after the read: it belongs to the process, not to this command.
-      const stream = target === undefined ? createReadStream('', { ...settings, fd: 0, autoClose: false }) : createReadStream(target, settings);
+      if (target === undefined) {
+        // stdin as the process's own stream, never a second reader on fd 0 (which
+        // fails with EAGAIN on a non-blocking pipe), in the chunks it arrives in.
+        // It stays open afterwards: it belongs to the process, not to this command.
+        const stdin = stdinStream();
+        if (stdin.readableEnded || stdin.destroyed) return;
+        try {
+          // highWaterMark: on() pauses stdin while this many chunks wait unread and resumes
+          // it as they drain, so a slow consumer holds a bounded amount however much is piped.
+          const chunks = on(stdin, 'data', { close: ['end'], highWaterMark: 16, ...(streamOptions.signal ? { signal: streamOptions.signal } : {}) });
+          // A data listener starts a paused stream only the first time; after any pause
+          // (an earlier read's finally) it must be resumed, or this waits forever.
+          stdin.resume();
+          for await (const [chunk] of chunks) {
+            yield new Uint8Array(typeof chunk === 'string' ? Buffer.from(chunk) : (chunk as Buffer));
+          }
+        } catch (err) {
+          if ((err as Error).name === 'AbortError') throw err;
+          throw readFailed(path, err);
+        } finally {
+          stdin.pause();
+        }
+        return;
+      }
+      const stream = createReadStream(target, settings);
       try {
         for await (const chunk of stream) yield new Uint8Array(chunk as Buffer);
       } catch (err) {
@@ -411,8 +454,8 @@ export function nodeFiles(options: {
   return {
     workspace: ws.dir ? forwardSlashes(ws.dir) : undefined,
     resolve: at,
-    readText: (path) => read(path).toString('utf8'),
-    readBytes: (path) => new Uint8Array(read(path)),
+    readText: async (path, readOptions) => (await read(path, readOptions)).toString('utf8'),
+    readBytes: async (path, readOptions) => new Uint8Array(await read(path, readOptions)),
     readStream,
     writeBytes,
     exists: (path) => existsSync(check(at(path))),

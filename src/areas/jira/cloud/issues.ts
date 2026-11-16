@@ -45,8 +45,8 @@ export function withDescriptionText(issue: client.JiraCloudIssue): client.JiraCl
 export const withBodyText = (comment: Record<string, unknown>) => ({ ...comment, bodyText: adfToText(comment.body) });
 
 /** The --input-file, parsed and taken at its word; undefined when not given. */
-function readIssueFile(path: string | undefined, ctx: client.JiraCloudContext): IssueJsonInput | undefined {
-  return path ? (readJsonInputFile(path, ctx.files) as IssueJsonInput) : undefined;
+async function readIssueFile(path: string | undefined, ctx: client.JiraCloudContext): Promise<IssueJsonInput | undefined> {
+  return path ? ((await readJsonInputFile(path, ctx.files)) as IssueJsonInput) : undefined;
 }
 
 /**
@@ -62,17 +62,17 @@ function projectFor(ctx: client.JiraCloudContext, json: IssueJsonInput | undefin
 }
 
 /** Built-in and custom field values from --input-file, --fields-file and --field, flags winning and reported. */
-function gatherFields(
+async function gatherFields(
   ctx: client.JiraCloudContext,
   input: { inputFile?: string | undefined; fieldsFile?: string | undefined; field?: string[] | undefined },
   flagBuiltin: Record<string, unknown>,
   fieldMap: ReturnType<typeof buildFieldMap>,
 ) {
-  const json = readIssueFile(input.inputFile, ctx);
-  const fromJson = json?.fields ? splitFieldsDictionary(json.fields, fieldMap, ctx.files) : { builtin: {}, custom: {} };
+  const json = await readIssueFile(input.inputFile, ctx);
+  const fromJson = json?.fields ? await splitFieldsDictionary(json.fields, fieldMap, ctx.files) : { builtin: {}, custom: {} };
   const builtin = mergeWithOverrides(fromJson.builtin, flagBuiltin);
-  const fileFields = input.fieldsFile ? parseFieldsFile(input.fieldsFile, fieldMap, ctx.files) : {};
-  const custom = mergeWithOverrides(fromJson.custom, { ...fileFields, ...parseFieldArgs(input.field ?? [], fieldMap, ctx.files) });
+  const fileFields = input.fieldsFile ? await parseFieldsFile(input.fieldsFile, fieldMap, ctx.files) : {};
+  const custom = mergeWithOverrides(fromJson.custom, { ...fileFields, ...(await parseFieldArgs(input.field ?? [], fieldMap, ctx.files)) });
   const overrides = [...builtin.overrides, ...custom.overrides];
   if (overrides.length > 0) ctx.warn({ code: 'JIRA_CLOUD_INPUT_OVERRIDDEN', message: `--input-file value(s) overridden by flags: ${overrides.join(', ')}` });
   return { json, builtin: builtin.merged, custom: custom.merged };
@@ -195,7 +195,7 @@ export const createIssue = jiraArea.command({
     const fieldMap = withAliases(buildFieldMap(ctx.connection.customFields), input.field?.length ? ctx.toilProjectFields() : {});
     try {
       const flags = defined({ summary: input.summary, description: input.description, priority: input.priority, assignee: input.assignee, labels: input.labels, parent: input.parent });
-      const { json, builtin, custom } = gatherFields(ctx, input, flags, fieldMap);
+      const { json, builtin, custom } = await gatherFields(ctx, input, flags, fieldMap);
       const project = projectFor(ctx, json);
       if (!project) {
         throw new ToilError('INVALID_INPUT', 'No project for issue create.', {
@@ -262,7 +262,7 @@ export const updateIssue = jiraArea.command({
     const fieldMap = withAliases(buildFieldMap(ctx.connection.customFields), input.field?.length ? ctx.toilProjectFields() : {});
     try {
       const flags = defined({ summary: input.summary, description: input.description, priority: input.priority, assignee: input.assignee, labels: input.labels });
-      const { builtin, custom } = gatherFields(ctx, input, flags, fieldMap);
+      const { builtin, custom } = await gatherFields(ctx, input, flags, fieldMap);
       const fields = client.issueFields({
         summary: text('fields.summary', builtin.summary),
         description: description(builtin.description),

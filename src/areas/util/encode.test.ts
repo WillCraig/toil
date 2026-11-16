@@ -290,7 +290,7 @@ describe('util encode: the self-checks catch a broken input or result', () => {
 
   it('a file that does not hold what was written fails the output check', async () => {
     const c = ctx();
-    c.ctx.files.readBytes = () => PIXEL_PNG.subarray(0, 10);
+    c.ctx.files.readBytes = async () => PIXEL_PNG.subarray(0, 10);
     const result = (await runEncode({ scheme: 'base64', decode: true, text: PIXEL_B64, out: 'p.png' }, c.ctx)) as unknown as Data;
     expect(check(result, 'output.file')).toMatchObject({ status: 'failed' });
     expect(c.warnings).toContainEqual(expect.objectContaining({ code: 'ENCODE_OUTPUT_MISMATCH', message: expect.stringContaining('/work/p.png') }));

@@ -116,7 +116,10 @@ versions.
   `as: 'text' | 'ndjson' | 'bytes'`, `apiResponse` for headers, `accept` for a
   non-OK status that's an answer, `multipart` and raw uploads, `apiGraphql`, `paginate`
   (`src/core/paginate.ts`), `poll` (`src/core/poll.ts`), a per-request `timeoutMs`
-  and a command's `timeLimitMs` above the 120 s default.
+  and a command's `timeLimitMs` above the 120 s default. A service that refuses a
+  credential with something other than a 401 or 403 says so on the request hook, so
+  it's still `AUTH`: `authStatuses` for another status, `signInDomains` for a redirect
+  to its sign-in page, `refusedWhen` for a success answered as anonymous.
 - A command that needs no connection at all (`jira issue schema`) is `area.command({
   kind: 'area-local', ... })`; it works with no config.
 - Files through `ctx.files`, never `node:fs`. Numbers, booleans, enums, JSON objects
@@ -202,10 +205,12 @@ versions.
   argument, so it accepts only a remote on the connection's own host
   (`connection.baseUrl`). An input that `selectsConnection` is read before there is a
   connection, and gets `undefined`.
-- **Reading stdin** (`ctx.files.readText('-')`, or an inventory read with no
+- **Reading stdin** (`await ctx.files.readText('-')`, or an inventory read with no
   `--from`) needs nothing more: on an interactive terminal core refuses at once with
   `INVALID_INPUT` ("Nothing was piped in"), and over MCP `-` refuses too. Never wait
-  on a terminal.
+  on a terminal. Every `ctx.files` read is asynchronous, so a slow writer is waited
+  for and the command's time limit and Ctrl+C still end the wait; never read fd 0
+  or `process.stdin` yourself.
 - **A required key whose value is the same for everyone** (Figma's `baseUrl`,
   `https://api.figma.com`) gets `defineArea({ examples: { baseUrl: '…' } })`. The
   not-configured and missing-key fixes then say `Set TOIL_FIGMA_BASE_URL (e.g.

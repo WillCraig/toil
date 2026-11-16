@@ -158,7 +158,7 @@ async function typeField(wire: AdoWire, project: string, type: string, ref: stri
 type Outcome = { changed: CategorizeChange } | { unchanged: true } | { failed: string };
 
 export async function categorize(ctx: CategorizeContext, input: { from?: string | undefined }, wire: AdoWire): Promise<CategorizeResult> {
-  const plan = readPlanFrom(ctx, input.from);
+  const plan = await readPlanFrom(ctx, input.from);
   const connection = ctx.connection.name;
   const { group, skipped } = planFor(plan, 'ado', connection);
   if (!group) {

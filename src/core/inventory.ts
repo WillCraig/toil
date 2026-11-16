@@ -52,11 +52,11 @@ export interface InventoryOptions {
  * non-JSON, a missing list or a package without a name, version or ecosystem
  * is INVALID_INPUT saying which.
  */
-export function readInventory(ctx: { files: FileAccess }, from: string | undefined, options: InventoryOptions = {}): InventoryPackage[] {
+export async function readInventory(ctx: { files: FileAccess }, from: string | undefined, options: InventoryOptions = {}): Promise<InventoryPackage[]> {
   const where = from === undefined || from === '-' ? 'stdin' : `"${from}"`;
   let text: string;
   try {
-    text = ctx.files.readText(from ?? '-');
+    text = await ctx.files.readText(from ?? '-');
   } catch (err) {
     if (err === STDIN_OVER_MCP && from === undefined) {
       throw new ToilError('INVALID_INPUT', `No inventory to ${options.verb ?? 'check'}: pass from, ${options.holds ?? 'a file holding toil deps scan output'}. Over MCP there is no stdin to read it from.`, {

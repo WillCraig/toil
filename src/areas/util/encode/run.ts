@@ -232,9 +232,9 @@ export type EncodeResult =
   | { operation: 'hash'; scheme: HashScheme; inputBytes: number; hex: string; base64: string; verified: Verified };
 
 /** Writes `data` to `out` (a new file in the workspace) and reads it back to check every byte landed. */
-function writeChecked(ctx: InputContext, v: Verifier, out: string, data: Uint8Array): string {
+async function writeChecked(ctx: InputContext, v: Verifier, out: string, data: Uint8Array): Promise<string> {
   const file = ctx.files.writeBytes(out, data);
-  const back = ctx.files.readBytes(file);
+  const back = await ctx.files.readBytes(file);
   const at = firstByteDifference(data, back);
   v.expect('output.file', at === -1, { at: file, expected: `${data.length} bytes`, actual: `${back.length} bytes` }, { code: 'ENCODE_OUTPUT_MISMATCH', message: `The file written, ${file}, doesn't hold what was written: they first differ at byte ${at}.` });
   return file;
@@ -267,7 +267,7 @@ export async function runEncode(input: EncodeInput, ctx: InputContext, codecs: R
     checkEncode(v, codec, scheme, bytes, output);
     const base = { operation: 'encode' as const, scheme, inputBytes: bytes.length, outputBytes: output.length };
     if (input.out !== undefined) {
-      const file = writeChecked(ctx, v, input.out, new TextEncoder().encode(output));
+      const file = await writeChecked(ctx, v, input.out, new TextEncoder().encode(output));
       return { ...base, file, verified: v.done() };
     }
     return { ...base, output, verified: v.done() };
@@ -282,7 +282,7 @@ export async function runEncode(input: EncodeInput, ctx: InputContext, codecs: R
   const utf8 = isUtf8(bytes);
   const base = { operation: 'decode' as const, scheme, inputBytes: src.bytesRead, outputBytes: bytes.length, utf8 };
   if (input.out !== undefined) {
-    const file = writeChecked(ctx, v, input.out, bytes);
+    const file = await writeChecked(ctx, v, input.out, bytes);
     return { ...base, file, verified: v.done() };
   }
   if (!utf8) {

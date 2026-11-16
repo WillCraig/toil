@@ -40,6 +40,10 @@ export interface AreaEndpoint {
   errorMessage?: (body: string) => string | undefined;
   /** Statuses besides 401 and 403 that mean the credential was refused (see RestOptions). */
   authStatuses?: readonly number[];
+  /** Domains of the service's sign-in pages, where a redirect means the credential was refused (see RestOptions). */
+  signInDomains?: readonly string[];
+  /** Headers that say a successful-looking answer refused the credential (see RestOptions). */
+  refusedWhen?: (headers: Headers) => boolean;
 }
 
 export interface AreaToken {
@@ -189,6 +193,8 @@ async function send<T>(area: AnyArea, ctx: ApiContext, path: string, req: ApiReq
         ...(req.retryRateLimit === false ? { retryRateLimit: false as const } : {}),
         ...(endpoint.errorMessage ? { errorMessage: endpoint.errorMessage } : {}),
         ...(endpoint.authStatuses ? { authStatuses: endpoint.authStatuses } : {}),
+        ...(endpoint.signInDomains ? { signInDomains: endpoint.signInDomains } : {}),
+        ...(endpoint.refusedWhen ? { refusedWhen: endpoint.refusedWhen } : {}),
         // So a network error names the setting the host came from, whatever it's called.
         urlKey: urlKeyOf(ctx.connection, origin),
       };

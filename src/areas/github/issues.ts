@@ -79,7 +79,7 @@ export const createIssueCommand = githubArea.command({
   ],
   run: async (input, ctx) => {
     const { owner, repo } = target(ctx);
-    const body = bodyOf(ctx, input.body, input.bodyFile);
+    const body = await bodyOf(ctx, input.body, input.bodyFile);
     return github(ctx, apiPath`/repos/${owner}/${repo}/issues`, {
       method: 'POST',
       json: {

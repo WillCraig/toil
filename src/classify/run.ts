@@ -290,7 +290,7 @@ export function classifyRunCommands(): AnyCommand[] {
         if (input.verdicts === '-') {
           throw new ToilError('INVALID_INPUT', '--verdicts - would read stdin, which carries the work items.', { fix: 'Put the verdicts in a file inside the workspace and pass its path.' });
         }
-        verdicts = readVerdicts(ctx.files.readText(input.verdicts), input.verdicts, p.scheme, new Set(p.items.map((i) => i.id)));
+        verdicts = readVerdicts(await ctx.files.readText(input.verdicts), input.verdicts, p.scheme, new Set(p.items.map((i) => i.id)));
       }
       // The prompt never plans, so only `run` holds back an unadopted toil project's fields.
       const fieldAreas = CLASSIFY_AREAS.filter((area) => p.targets[area]?.field !== undefined);

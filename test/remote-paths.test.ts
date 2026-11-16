@@ -64,12 +64,12 @@ const REMOTE = [
 ];
 
 describe('remotePathKind and assertLocalPath, from text alone', () => {
-  it('tells network, device and ordinary paths apart', () => {
+  it('tells network, device and ordinary paths apart', async () => {
     expect(REMOTE.map(remotePathKind)).toEqual(['unc', 'unc', 'unc', 'unc', 'device', 'device', 'device', 'device', 'device']);
     for (const p of ['C:\\work\\x.md', 'C:/work/x.md', '/home/me/x.md', 'x.md', '.\\x.md', '\\work\\x.md', '/work//x.md', '-']) expect(remotePathKind(p), p).toBeUndefined();
   });
 
-  it('refuses each with INVALID_INPUT and a fix, and allows a network path only inside a workspace on that share', () => {
+  it('refuses each with INVALID_INPUT and a fix, and allows a network path only inside a workspace on that share', async () => {
     for (const p of REMOTE) expect(() => assertLocalPath(p, 'C:\\work'), p).toThrow(expect.objectContaining({ code: 'INVALID_INPUT', fix: expect.any(String) }));
     expect(() => assertLocalPath('\\\\host\\share\\ws\\a.md', '\\\\host\\share\\ws')).not.toThrow();
     expect(() => assertLocalPath('//HOST/Share/ws/sub/a.md', '\\\\host\\share\\ws')).not.toThrow();
@@ -96,29 +96,37 @@ describe('the file service touches nothing for a network or device path', () => 
   const bounded = nodeFiles({ cwd, stdin: true, home, env: {}, protect: [join(home, '.toil')] });
   const unbounded = nodeFiles({ cwd, stdin: true, unbounded: true, home, env: {}, protect: [join(home, '.toil')] });
 
-  it.each(entryPoints)('%s refuses every spelling, bounded or not, before any fs call', (_name, call) => {
+  it.each(entryPoints)('%s refuses every spelling, bounded or not, before any fs call', async (_name, call) => {
     for (const files of [bounded, unbounded]) {
       for (const p of REMOTE) {
-        expect(() => call(files, p), p).toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: expect.stringMatching(/network \(UNC\) path|device path/) }));
+        // The reads are asynchronous, so their refusal is a rejection; the rest throw.
+        let refusal: unknown;
+        try {
+          const result = call(files, p);
+          if (result instanceof Promise) await result;
+        } catch (err) {
+          refusal = err;
+        }
+        expect(refusal, p).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringMatching(/network \(UNC\) path|device path/) });
       }
     }
     expect(touched).toEqual([]);
   });
 
-  it('works inside a workspace that is itself on a share, and still refuses another share', () => {
+  it('works inside a workspace that is itself on a share, and still refuses another share', async () => {
     SHARE.dir = mkdtempSync(join(root, 'share-'));
     mkdirSync(join(SHARE.dir, 'ws', 'docs'), { recursive: true });
     writeFileSync(join(SHARE.dir, 'ws', 'docs', 'a.md'), '# on the share\n');
     const ws = process.platform === 'win32' ? '\\\\toilhost\\share\\ws' : '//toilhost/share/ws';
     const files = nodeFiles({ cwd, stdin: true, workspace: { dir: ws, source: 'flag' }, home, env: {} });
-    expect(files.readText('docs/a.md')).toBe('# on the share\n');
-    expect(files.readText(`${ws}/docs/a.md`)).toBe('# on the share\n');
+    expect((await files.readText('docs/a.md'))).toBe('# on the share\n');
+    expect((await files.readText(`${ws}/docs/a.md`))).toBe('# on the share\n');
     expect(files.exists('docs/a.md')).toBe(true);
     expect(files.stat('docs').type).toBe('directory');
     expect(files.list('docs')).toEqual(['a.md']);
     expect(files.writeBytes('docs/b.md', new TextEncoder().encode('b'))).toMatch(/\/docs\/b\.md$/);
-    expect(() => files.readText(`//${PROBE}/share/ws/docs/a.md`)).toThrow(/network \(UNC\) path/);
-    expect(() => files.readText('../../other/a.md')).toThrow();
+    await expect(files.readText(`//${PROBE}/share/ws/docs/a.md`)).rejects.toThrow(/network \(UNC\) path/);
+    await expect(files.readText('../../other/a.md')).rejects.toThrow();
     expect(touched).toEqual([]);
   });
 });

@@ -133,13 +133,13 @@ const representationOption = { flags: '--representation <format>', field: 'repre
  * `--body` or the text of `--body-file` (`-` is stdin on the CLI), or
  * undefined for neither; both is refused. The file is read as it is.
  */
-export function bodyOf(files: FileAccess, body: string | undefined, bodyFile: string | undefined): string | undefined {
+export async function bodyOf(files: FileAccess, body: string | undefined, bodyFile: string | undefined): Promise<string | undefined> {
   if (body !== undefined && bodyFile !== undefined) {
     throw new ToilError('INVALID_INPUT', 'Cannot specify both --body and --body-file', { fix: 'Pass one of them.' });
   }
   if (bodyFile === undefined) return body;
   try {
-    return files.readText(bodyFile);
+    return await files.readText(bodyFile);
   } catch (err) {
     const source = bodyFile === '-' ? 'stdin' : `file "${bodyFile}"`;
     const inner = err instanceof ToilError ? err : undefined;
@@ -176,7 +176,7 @@ export const createPage = confluenceArea.command({
     { space: 'DOCS', title: 'Wiki page', body: 'h1. Heading', representation: 'wiki', allowWrite: true },
   ],
   run: async (input, ctx) => {
-    const body = bodyOf(ctx.files, input.body, input.bodyFile);
+    const body = await bodyOf(ctx.files, input.body, input.bodyFile);
     if (body === undefined) throw new ToilError('INVALID_INPUT', 'Must specify --body or --body-file', { fix: 'Pass the page body with --body, or a file with --body-file.' });
     const found = await client.getSpace(ctx, input.space);
     const page = await client.createPage(ctx, { spaceId: found.id, title: input.title, body, parentId: input.parentId, representation: input.representation ?? 'storage' });
@@ -214,7 +214,7 @@ export const updatePage = confluenceArea.command({
     { id: '12345', body: 'h1. Heading', representation: 'wiki', allowWrite: true },
   ],
   run: async (input, ctx) => {
-    const body = bodyOf(ctx.files, input.body, input.bodyFile);
+    const body = await bodyOf(ctx.files, input.body, input.bodyFile);
     if (body === undefined && input.representation !== undefined) {
       throw new ToilError('INVALID_INPUT', '--representation needs --body or --body-file', { fix: 'Pass the new body, or leave out --representation.' });
     }

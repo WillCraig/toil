@@ -39,7 +39,7 @@ const readProbe = defineCommand({
   writes: false,
   args: [{ name: 'file', field: 'file', description: 'file' }],
   examples: [{ file: 'a.txt' }],
-  run: async (input, ctx) => ({ text: ctx.files.readText(input.file), workspace: ctx.files.workspace }),
+  run: async (input, ctx) => ({ text: (await ctx.files.readText(input.file)), workspace: ctx.files.workspace }),
 });
 const probes: AnyCommand[] = [gitProbe, readProbe];
 
@@ -245,7 +245,7 @@ describe('a refused git include during a listing', () => {
 describe('--output-file', () => {
   const write = (path: string) => writeOutputFile({ path, content: '{}\n', cwd, home, config: join(home, 'custom.json') });
 
-  it('may write outside the workspace, but never over a file, into toil\'s own files, or the --config file', () => {
+  it('may write outside the workspace, but never over a file, into toil\'s own files, or the --config file', async () => {
     const target = join(root, 'elsewhere', 'out.json');
     write(target);
     expect(readFileSync(target, 'utf8')).toBe('{}\n');

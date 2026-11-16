@@ -396,6 +396,9 @@ export async function execute(def: AnyCommand, rawInput: unknown, ctx: Context, 
       files: {
         ...ctx.files,
         list: (dir, options) => ctx.files.list(dir, { ...options, warn: options?.warn ?? ((w) => warnings.push(w)) }),
+        // Every read carries the command's signal, so a wait on stdin ends at the time limit or on Ctrl+C like a request.
+        readText: (path: string) => ctx.files.readText(path, { signal: controller.signal }),
+        readBytes: (path: string) => ctx.files.readBytes(path, { signal: controller.signal }),
         // Read-only means nothing local changes either. A command that writes a
         // file declares it (`writesLocal`) and is refused before it runs; this
         // catches one that didn't, loudly, before a byte lands.

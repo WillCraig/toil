@@ -114,6 +114,19 @@ describe('where a command acts, per deployment', () => {
   });
 });
 
+describe('a refused PAT on Services', () => {
+  // Found live: Services answers an unaccepted PAT with a 302 to its sign-in
+  // host, which read as HTTP with a fix to point baseUrl there.
+  it('is AUTH with the PAT fix when Services redirects to its sign-in host, and the redirect is not followed', async () => {
+    const signIn = { method: 'GET', url: /\/_apis\/projects/, respond: { status: 302, headers: { Location: 'https://spsprodcus3.vssps.visualstudio.com/_signin?realm=dev.azure.com' } } } as const;
+    const t = testContext({ config: fixture.config, routes: [signIn, ...(fixture.routes ?? [])], files: fixture.files });
+    const refused = await runCli(['ado', 'api', 'GET', '/_apis/projects', '--connection', 'ado-cloud'], { commands, context: t.context });
+    expect(refused.envelope?.error).toMatchObject({ code: 'AUTH', fix: expect.stringContaining('personal access token on connection "ado-cloud"') });
+    expect(refused.envelope?.error?.fix).not.toContain('baseUrl');
+    expect(t.http.calls.map((c) => new URL(c.url).host)).toEqual(['ado-cloud.imagile.dev']);
+  });
+});
+
 describe('the retired Services names fail with the new form', () => {
   it('toil ado-cloud … is INVALID_INPUT naming toil ado and the deployment', async () => {
     const result = await runCli(['ado-cloud', 'work-item', 'get', '42'], { commands, context: testContext().context });

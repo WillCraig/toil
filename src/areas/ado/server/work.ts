@@ -95,8 +95,8 @@ export const workCreateCommand = adoArea.command({
   ],
   run: async (input, ctx) => {
     const { collection, project } = where(ctx);
-    const json = input.inputFile !== undefined ? readJsonInputFile(input.inputFile, ctx.files) : undefined;
-    const { builtin: jsonBuiltin, custom: jsonCustom } = json?.fields ? splitWorkFieldsDictionary(json.fields, ctx.files) : { builtin: {}, custom: {} };
+    const json = input.inputFile !== undefined ? await readJsonInputFile(input.inputFile, ctx.files) : undefined;
+    const { builtin: jsonBuiltin, custom: jsonCustom } = json?.fields ? await splitWorkFieldsDictionary(json.fields, ctx.files) : { builtin: {}, custom: {} };
 
     const type = input.type ?? json?.type;
     if (!type) throw new ToilError('INVALID_INPUT', '--type required (or "type" in --input-file)', { fix: 'Pass --type Bug (or Task, User Story, ...). toil ado work-item types lists them.' });
@@ -160,8 +160,10 @@ export const workUpdateCommand = adoArea.command({
   ],
   run: async (input, ctx) => {
     const { collection } = where(ctx);
-    const json = input.inputFile !== undefined ? readJsonInputFile(input.inputFile, ctx.files) : undefined;
-    const jsonFields = json?.fields ? Object.fromEntries(Object.entries(json.fields).map(([k, v]) => [k, resolveAtFileRef(v, ctx.files)])) : {};
+    const json = input.inputFile !== undefined ? await readJsonInputFile(input.inputFile, ctx.files) : undefined;
+    // One file at a time, in the order written, as the synchronous reads were.
+    const jsonFields: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(json?.fields ?? {})) jsonFields[k] = await resolveAtFileRef(v, ctx.files);
     const { merged, overrides } = mergeWithOverrides(jsonFields, parseFieldArgs(input.field ?? []));
     reportOverrides(ctx, overrides);
     return updateWorkItem(ctx, collection, toInt(input.id), buildFieldPatch(merged, ctx.connection.fieldAliases));

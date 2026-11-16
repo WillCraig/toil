@@ -65,7 +65,7 @@ export function setupCommands(host: () => SetupHost = nodeSetupHost): AnyCommand
       fromClone(h.bundle);
       const block = aliasBlock(shell, h.bundle);
       let change: 'added' | 'updated' | 'unchanged' = 'unchanged';
-      const edited = editProfile({ path: profile, cwd: h.cwd, protect }, (text, path) => {
+      const edited = await editProfile({ path: profile, cwd: h.cwd, protect }, (text, path) => {
         const result = withBlock(text, block, path);
         change = result.change;
         return result;
@@ -93,7 +93,7 @@ export function setupCommands(host: () => SetupHost = nodeSetupHost): AnyCommand
     run: async (input, ctx) => {
       const { shell, profile, protect, h } = target(input, ctx);
       let removed = false;
-      const edited = editProfile({ path: profile, cwd: h.cwd, protect }, (text, path) => {
+      const edited = await editProfile({ path: profile, cwd: h.cwd, protect }, (text, path) => {
         const result = withoutBlock(text, path);
         removed = result.removed;
         return result;

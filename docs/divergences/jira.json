@@ -85,6 +85,13 @@
       "toil": "The flag is --assignee <user>, and its help says a Data Center connection takes a username and a Cloud connection an accountId. Data Center still takes and sends a username, exactly as recorded",
       "why": "Jira Data Center and Jira Cloud are one area now (#495), so one idea has one flag. The value placeholder names no kind of person because it names two; the behavior on Data Center is the contract's.",
       "principle": "10"
+    },
+    {
+      "allows": [],
+      "old": "A Jira Cloud call whose email or API token was wrong succeeding as an anonymous read: no projects, an empty search, an issue NOT_FOUND",
+      "toil": "Any Jira Cloud response carrying X-Seraph-LoginReason: AUTHENTICATED_FAILED is AUTH with the API token fix, whatever its status",
+      "why": "Seen live on a Cloud site (2026-11-16): a wrong token answers 200 as anonymous and says so only in that header, which a call with no credential never gets. An empty list that means 'not signed in' is an unknown passed off as zero (principle 12), and a failure that hides is what principle 4 forbids.",
+      "principle": "4"
     }
   ]
 }

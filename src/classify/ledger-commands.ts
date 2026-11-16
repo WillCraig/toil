@@ -202,7 +202,7 @@ export function classifyLedgerCommands(): AnyCommand[] {
         work = records.items.map(complete);
       }
       const known = new Set([...heldIds, ...(work?.map((i) => i.id) ?? [])]);
-      const verdicts: AgentVerdict[] = readVerdicts(ctx.files.readText(input.backtest), input.backtest, revised.scheme, known);
+      const verdicts: AgentVerdict[] = readVerdicts(await ctx.files.readText(input.backtest), input.backtest, revised.scheme, known);
       const said = new Map(verdicts.map((v) => [v.id, v.category === UNSURE ? null : v.category]));
 
       // The revised scheme's rules run by code over the items given, as they would on a fresh read: a label already on an item

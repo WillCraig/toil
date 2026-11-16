@@ -84,6 +84,10 @@ try {
   // `@imagile-dev/toil/api` from the install, the way a program depending on the package uses it.
   const apiStep = await apiConsumer(prefix, bin);
 
+  // `-` from a real pipe: a slow writer is waited for, and a writer that never
+  // closes the pipe is still ended by the time limit and by Ctrl+C (#617).
+  const stdinStep = await pipedStdin(bin);
+
   // Every call above, through every front door, left one line in the audit log.
   const auditDir = join(home, '.toil', 'audit');
   const lines = readdirSync(auditDir).flatMap((f) => readFileSync(join(auditDir, f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)));
@@ -94,7 +98,7 @@ try {
 
   const cloneStep = await fromClone(envelope.data.version);
 
-  if (!process.exitCode) console.log(`smoke ok: installed ${envelope.data.version} with scripts off; CLI, connections and MCP all answered, ${apiStep}, ${lines.length} audit lines written, on Node ${process.versions.node} (${process.platform}); ${workerStep}; ${gitStep}; ${cloneStep}.`);
+  if (!process.exitCode) console.log(`smoke ok: installed ${envelope.data.version} with scripts off; CLI, connections and MCP all answered, ${apiStep}, ${lines.length} audit lines written, on Node ${process.versions.node} (${process.platform}); ${stdinStep}; ${workerStep}; ${gitStep}; ${cloneStep}.`);
 } catch (err) {
   fail(err.message);
 } finally {
@@ -292,6 +296,52 @@ async function fromClone(installedVersion) {
   }
   if (!shells.length) fail('no shell was found to run the alias in');
   return `a clone ran dist/toil.js with no npm install (CLI and MCP), and ${shells.join(', ')} ran toil through setup alias`;
+}
+
+/**
+ * `toil util jwt decode -`, which reads stdin, from the installed bin through
+ * a real pipe this process holds: written after a second, then held open with
+ * nothing written and TOIL_TIMEOUT_MS at 1.5 s, then held open and sent
+ * SIGINT. The writer is this process, outside any shell pipeline, so Ctrl+C
+ * reaching toil alone is the case being proved. Windows has no real SIGINT to
+ * send a child (kill ends it outright), so the Ctrl+C check runs everywhere but
+ * there, and says so.
+ */
+function pipedStdin(bin) {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const token = `${b64({ alg: 'none' })}.${b64({ sub: 'smoke' })}.`;
+  const run = ({ write, extraEnv = {}, sigintAfter }) =>
+    new Promise((resolve) => {
+      const child = spawn(process.execPath, [bin, 'util', 'jwt', 'decode', '-'], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...env, ...extraEnv } });
+      let out = '';
+      child.stdout.on('data', (d) => (out += d));
+      const started = Date.now();
+      const hung = setTimeout(() => child.kill('SIGKILL'), 15000);
+      if (write) setTimeout(() => child.stdin.end(write), 1000);
+      if (sigintAfter) setTimeout(() => child.kill('SIGINT'), sigintAfter);
+      child.on('close', (status, signal) => {
+        clearTimeout(hung);
+        let envelope;
+        try {
+          envelope = JSON.parse(out);
+        } catch {
+          envelope = undefined;
+        }
+        resolve({ status, signal, envelope, ms: Date.now() - started });
+      });
+    });
+  return (async () => {
+    const slow = await run({ write: `${token}\n` });
+    if (slow.envelope?.data?.payload?.sub !== 'smoke' || slow.status !== 0 || slow.ms < 1000) fail(`util jwt decode - with a slow writer returned ${JSON.stringify(slow)}`);
+    const limited = await run({ extraEnv: { TOIL_TIMEOUT_MS: '1500' } });
+    if (limited.envelope?.error?.code !== 'TIMEOUT' || limited.ms > 10000) fail(`util jwt decode - on a pipe held open with a 1.5 s limit returned ${JSON.stringify(limited)}`);
+    if (process.platform === 'win32') return 'stdin from a slow writer was read, and a pipe held open stopped at the time limit (Ctrl+C not checked: Windows has no SIGINT to send a child)';
+    // Three seconds, so the bin is surely up and listening for SIGINT before it comes,
+    // even on a slow runner; a SIGINT before then would end Node with no envelope.
+    const cancelled = await run({ sigintAfter: 3000 });
+    if (cancelled.envelope?.error?.code !== 'CANCELLED' || cancelled.status !== 130 || cancelled.ms > 12000) fail(`util jwt decode - on a pipe held open, sent SIGINT, returned ${JSON.stringify(cancelled)}`);
+    return `stdin from a slow writer was read, and a pipe held open stopped at the time limit in ${limited.ms} ms and on SIGINT in ${cancelled.ms} ms`;
+  })();
 }
 
 /**

@@ -54,9 +54,11 @@ account → Security → API tokens → Create API token). toil sends
 There is no password, OAuth app or browser login. The token acts with the account's own
 permissions, so a read sees what that account can see.
 
-If the email and token don't match, Jira Cloud may treat the call as anonymous rather than
-refuse it: a 401 is `AUTH`, but a missing issue can also surface as `NOT_FOUND`, and a
-search as no results. When a call that should work finds nothing, check `email` first.
+If Jira Cloud doesn't accept the email and token, it often answers as an anonymous user
+rather than refuse the call, and marks the response with `X-Seraph-LoginReason:
+AUTHENTICATED_FAILED`. toil reports that as `AUTH`, with the API token fix, whatever the
+status, so a wrong token doesn't show up as no projects or a `NOT_FOUND`. Check `email`
+first: it must be the address of the Atlassian account that made the token.
 
 ## Configuration
 

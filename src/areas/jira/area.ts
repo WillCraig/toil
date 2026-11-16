@@ -112,6 +112,10 @@ export const jiraArea = defineArea({
         // for scripts: https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/
         headers: { Authorization: `Basic ${Buffer.from(`${connection.email}:${connection.apiToken}`).toString('base64')}`, Accept: 'application/json' },
         service: 'Jira Cloud',
+        // A wrong token isn't a 401 on most reads: Jira Cloud answers as an
+        // anonymous user (no projects, an issue "not found") and says so only
+        // in this header, which it never sends to a caller that sent nothing.
+        refusedWhen: (headers) => headers.get('x-seraph-loginreason') === 'AUTHENTICATED_FAILED',
         authFix: `Jira Cloud rejected the email and API token on connection "${connection.name}". Check that email (${area.envName('email')}) is the Atlassian account's address, create a new API token at https://id.atlassian.com/manage-profile/security/api-tokens, then set apiToken (${area.envName('apiToken')} for the default connection).`,
       };
     }

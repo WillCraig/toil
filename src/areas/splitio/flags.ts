@@ -112,7 +112,7 @@ export const flagsUpdateCommand = splitioArea.command({
   examples: [{ ...CR, flag: 'new_checkout', environment: 'env-abc12345', inputFile: 'definition.json' }],
   run: async (input, ctx) => {
     if (!input.inputFile) throw new ToilError('INVALID_INPUT', '--input-file is required for flag update', { fix: 'Pass --input-file <path> with the flag definition as JSON; get the current one with toil splitio flag get <flag> --environment <id>.' });
-    const definition = parseJson(ctx.files.readText(input.inputFile), '--input-file', 'The file holds one JSON object: the flag definition, as flag get --environment returns it.');
+    const definition = parseJson(await ctx.files.readText(input.inputFile), '--input-file', 'The file holds one JSON object: the flag definition, as flag get --environment returns it.');
     if (typeof definition !== 'object' || definition === null || Array.isArray(definition)) {
       throw new ToilError('INVALID_INPUT', '--input-file must hold a JSON object: the flag definition.', { fix: 'Start from the output of toil splitio flag get <flag> --environment <id>.' });
     }
@@ -246,7 +246,7 @@ export const flagsBatchToggleCommand = splitioArea.command({
   examples: [{ ...CR, environment: 'env-abc12345', inputFile: 'toggles.json' }],
   run: async (input, ctx) => {
     if (!input.inputFile) throw new ToilError('INVALID_INPUT', '--input-file is required for flag toggle-many', { fix: 'Pass --input-file <path> holding a JSON array such as [{"flag":"new_checkout","enabled":false}].' });
-    const entries = parseJson(ctx.files.readText(input.inputFile), '--input-file', 'The file holds a JSON array of {flag, enabled} objects.') as BatchEntry[];
+    const entries = parseJson(await ctx.files.readText(input.inputFile), '--input-file', 'The file holds a JSON array of {flag, enabled} objects.') as BatchEntry[];
     if (!Array.isArray(entries)) throw new ToilError('INVALID_INPUT', 'Input file must be a JSON array of {flag, enabled} objects', { fix: 'Wrap the entries in [ ].' });
     // Every entry is checked before the first request, so a bad one can't leave half the batch filed.
     const bad = entries.findIndex((e: unknown) => typeof e !== 'object' || e === null || typeof (e as BatchEntry).flag !== 'string' || !(e as BatchEntry).flag);

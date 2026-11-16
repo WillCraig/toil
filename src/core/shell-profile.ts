@@ -116,14 +116,14 @@ export function fromClone(bundle: string): void {
  * file is written in place, after realpath, so a profile that is a symlink
  * into a dotfiles repository stays one.
  */
-export function editProfile(
+export async function editProfile(
   o: { path: string; cwd: string; protect: string[] },
   change: (text: string, path: string) => { text: string },
-): { path: string; text: string; written: boolean } {
+): Promise<{ path: string; text: string; written: boolean }> {
   const files = nodeFiles({ cwd: o.cwd, stdin: false, unbounded: true, protect: o.protect });
   const path = files.resolve(o.path);
   const exists = files.exists(path);
-  const bytes = exists ? files.readBytes(path) : new Uint8Array();
+  const bytes = exists ? await files.readBytes(path) : new Uint8Array();
   if ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff)) {
     throw new ToilError('INVALID_INPUT', `${forwardSlashes(path)} is saved as UTF-16, which toil doesn't edit.`, {
       fix: 'Save it as UTF-8 (in PowerShell: (Get-Content $PROFILE) | Set-Content -Encoding utf8 $PROFILE), then run the command again.',

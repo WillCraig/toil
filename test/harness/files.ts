@@ -40,8 +40,8 @@ export function memoryFiles(initial: Record<string, string | Uint8Array> = {}, o
     written,
     workspace: cwd,
     resolve: at,
-    readText: (path) => new TextDecoder().decode(read(path)),
-    readBytes: read,
+    readText: async (path) => new TextDecoder().decode(read(path)),
+    readBytes: async (path) => read(path),
     readStream: (path, streamOptions = {}) => {
       const bytes = read(path);
       const size = streamOptions.chunkSize ?? STREAM_CHUNK;

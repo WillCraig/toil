@@ -45,30 +45,33 @@ export const DOCUMENT_INPUT_FILE_EXAMPLE = {
 };
 
 /** A string starting with `@` becomes that file's contents; anything else is returned as is. */
-export function resolveAtFileRef(value: unknown, files: FileAccess): unknown {
+export async function resolveAtFileRef(value: unknown, files: FileAccess): Promise<unknown> {
   if (typeof value !== 'string' || !value.startsWith('@')) return value;
-  return files.readText(value.slice(1));
+  return await files.readText(value.slice(1));
 }
 
 /**
  * An `--input-file` `fields` dictionary as Alation's custom_fields array.
  * Keys are numeric field IDs; values pass through as written, `@file` read.
  */
-export function toCustomFields(fields: unknown, files: FileAccess): CustomField[] {
+export async function toCustomFields(fields: unknown, files: FileAccess): Promise<CustomField[]> {
   if (fields === undefined) return [];
   if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) {
     throw new ToilError('INVALID_INPUT', '--input-file "fields" must be an object keyed by Alation custom field ID', { fix: 'Write it as { "10001": "value" }. Run toil alation document schema for an example.' });
   }
-  return Object.entries(fields as Record<string, unknown>).map(([key, value]) => {
+  // One key at a time, in the order written, so a bad key stops it before any later file is read.
+  const result: CustomField[] = [];
+  for (const [key, value] of Object.entries(fields as Record<string, unknown>)) {
     if (!/^\d+$/.test(key)) {
       throw new ToilError('INVALID_INPUT', `--input-file "fields" key "${key}" is not a numeric Alation field_id`, { fix: 'Key each custom field by its numeric field_id, e.g. "10001".' });
     }
-    return { field_id: Number(key), value: resolveAtFileRef(value, files) };
-  });
+    result.push({ field_id: Number(key), value: await resolveAtFileRef(value, files) });
+  }
+  return result;
 }
 
-function readJsonInputFile(path: string, files: FileAccess): unknown {
-  const raw = files.readText(path);
+async function readJsonInputFile(path: string, files: FileAccess): Promise<unknown> {
+  const raw = await files.readText(path);
   try {
     return JSON.parse(raw) as unknown;
   } catch (err) {
@@ -104,10 +107,10 @@ const idFlag = (value: number | string | undefined, flag: string) => (value !== 
  * The payload create and update share. Suspected bug (#77 item 7): values from
  * the file (`hub`, `folder`, `navLinkFolders`, ...) pass through unchecked.
  */
-export function buildDocumentPayload(flags: DocumentFlags, files: FileAccess, warn: (warning: Warning) => void): { payload: Record<string, unknown>; overrides: string[] } {
+export async function buildDocumentPayload(flags: DocumentFlags, files: FileAccess, warn: (warning: Warning) => void): Promise<{ payload: Record<string, unknown>; overrides: string[] }> {
   const fromJson: Record<string, unknown> = {};
   if (flags.inputFile) {
-    const parsed = readJsonInputFile(flags.inputFile, files);
+    const parsed = await readJsonInputFile(flags.inputFile, files);
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
       throw new ToilError('INVALID_INPUT', '--input-file must contain a JSON object. Run: toil alation document schema', { fix: 'Run toil alation document schema for the expected shape and a runnable example.' });
     }
@@ -126,13 +129,13 @@ export function buildDocumentPayload(flags: DocumentFlags, files: FileAccess, wa
 
   const payload: Record<string, unknown> = {};
   if (merged.title !== undefined) payload.title = merged.title;
-  if (merged.description !== undefined) payload.description = resolveAtFileRef(merged.description, files);
+  if (merged.description !== undefined) payload.description = await resolveAtFileRef(merged.description, files);
   if (merged.hub !== undefined) payload.document_hub_id = merged.hub;
   if (merged.folder !== undefined) payload.parent_folder_id = merged.folder;
   if (merged.template !== undefined) payload.template_id = merged.template;
   if (merged.parentDocument !== undefined) payload.parent_document_id = merged.parentDocument;
   if (merged.navLinkFolders !== undefined) payload.nav_link_folder_ids = merged.navLinkFolders;
-  const customFields = toCustomFields(merged.fields, files);
+  const customFields = await toCustomFields(merged.fields, files);
   if (customFields.length) {
     if (payload.template_id === undefined) {
       throw new ToilError('INVALID_INPUT', 'Alation requires template_id whenever custom fields are set. Pass --template <id> or "template" in --input-file.', {

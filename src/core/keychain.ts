@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { userInfo } from 'node:os';
 import { connectionEnvName } from './config.js';
 import { ToilError } from './errors.js';
 
@@ -44,15 +45,15 @@ export interface SpawnResult {
  * blocks the event loop: the command's time limit and cancel still fire, and
  * `toil mcp` keeps answering other clients meanwhile.
  */
-export type Spawner = (command: string, args: string[], input: string, signal?: AbortSignal) => Promise<SpawnResult>;
+export type Spawner = (command: string, args: string[], input: string, signal?: AbortSignal, env?: Record<string, string>) => Promise<SpawnResult>;
 
 /**
  * The real spawner. Deliberately not exported: the only way to spawn from
  * toil is a store from createSecretStore, which runs a fixed program.
  */
-const spawnProgram: Spawner = (command, args, input, signal) =>
+const spawnProgram: Spawner = (command, args, input, signal, env) =>
   new Promise((resolve) => {
-    const child = spawn(command, args, { shell: false, windowsHide: true, timeout: 30_000, ...(signal ? { signal } : {}) });
+    const child = spawn(command, args, { shell: false, windowsHide: true, timeout: 30_000, ...(signal ? { signal } : {}), ...(env ? { env: { ...process.env, ...env } } : {}) });
     let stdout = '';
     let stderr = '';
     let error: Error | undefined;
@@ -122,13 +123,32 @@ function checkSecret(secret: string): void {
   }
 }
 
-function macos(run: Spawner): SecretStore {
+/**
+ * `security` finds the login keychain, and the keychain search list, under
+ * `$HOME/Library`. With HOME pointed elsewhere (an isolated home for Toil UI,
+ * a sandboxed shell) it finds no keychain at all and reports every entry as
+ * not found. So it runs with HOME set to the account's own home directory,
+ * read from the user database rather than the environment: the keychain
+ * belongs to the person, not to whichever folder is pretending to be home this
+ * afternoon. Undefined, when that can't be read, leaves HOME as it is.
+ */
+function accountHome(): Record<string, string> | undefined {
+  try {
+    const home = userInfo().homedir;
+    return home ? { HOME: home } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function macos(run: Spawner, home: Record<string, string> | undefined): SecretStore {
   const name = 'macOS Keychain';
+  const security = (args: string[], input: string, signal?: AbortSignal) => run('security', args, input, signal, home);
   return {
     name,
     async get(ref, signal) {
       checkRef(ref);
-      const r = await run('security', ['find-generic-password', '-s', SERVICE, '-a', ref, '-w'], '', signal);
+      const r = await security(['find-generic-password', '-s', SERVICE, '-a', ref, '-w'], '', signal);
       if (r.status === 44) return undefined; // errSecItemNotFound
       if (r.error || r.status !== 0) throw failed(name, 'read', ref, r);
       return r.stdout.replace(/\r?\n$/, '');
@@ -139,12 +159,12 @@ function macos(run: Spawner): SecretStore {
       // `security -i` reads its command from stdin, so the secret stays off
       // argv. Hex (-X) means no quoting rules apply to what's inside it.
       const hex = Buffer.from(secret, 'utf8').toString('hex');
-      const r = await run('security', ['-i'], `add-generic-password -U -s ${SERVICE} -a ${ref} -l "toil ${ref}" -X ${hex}\n`, signal);
+      const r = await security(['-i'], `add-generic-password -U -s ${SERVICE} -a ${ref} -l "toil ${ref}" -X ${hex}\n`, signal);
       if (r.error || r.status !== 0 || /error/i.test(r.stderr)) throw failed(name, 'store', ref, r);
     },
     async delete(ref, signal) {
       checkRef(ref);
-      const r = await run('security', ['delete-generic-password', '-s', SERVICE, '-a', ref], '', signal);
+      const r = await security(['delete-generic-password', '-s', SERVICE, '-a', ref], '', signal);
       if (r.status === 44) return false;
       if (r.error || r.status !== 0) throw failed(name, 'delete', ref, r);
       return true;
@@ -313,14 +333,16 @@ export interface SecretStoreOptions {
    * platform's own store.
    */
   testOnlyProgram?: { command: string; args: string[] };
+  /** The account's home directory for macOS `security`; defaults to the user database's, never $HOME. Tests set it. */
+  accountHome?: string;
 }
 
 export function createSecretStore(options: SecretStoreOptions = {}): SecretStore {
   const platform = options.platform ?? process.platform;
   const wrap = options.testOnlyProgram;
   const run: Spawner =
-    options.spawn ?? (wrap ? (command, args, input, signal) => spawnProgram(wrap.command, [...wrap.args, command, ...args], input, signal) : spawnProgram);
-  if (platform === 'darwin') return macos(run);
+    options.spawn ?? (wrap ? (command, args, input, signal, env) => spawnProgram(wrap.command, [...wrap.args, command, ...args], input, signal, env) : spawnProgram);
+  if (platform === 'darwin') return macos(run, options.accountHome !== undefined ? { HOME: options.accountHome } : accountHome());
   if (platform === 'win32') return windows(run);
   if (platform === 'linux') return linux(run);
   return none(platform);

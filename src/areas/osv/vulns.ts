@@ -172,7 +172,7 @@ export const vulnsCommand = osvArea.command({
   options: inventoryOptions,
   examples: [{ from: 'inventory.json' }, { from: 'inventory.json', ecosystem: 'npm', directOnly: true, includeDev: true }],
   run: async (input, ctx) => {
-    const packages = selectPackages(readInventory(ctx, input.from, 'osv vulns'), input);
+    const packages = selectPackages(await readInventory(ctx, input.from, 'osv vulns'), input);
     const up = await probe(ctx, { service: SERVICE, url: QUERYBATCH, body: { queries: [] } });
     if (!up.reachable) {
       throw new ToilError('NETWORK', 'toil osv vulns requires OSV.dev access but api.osv.dev is not reachable from this machine.', {

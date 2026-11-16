@@ -33,7 +33,7 @@ It runs only what the OS ships, each behind a platform check, under the service
 
 | Platform | Program | Store |
 |----------|---------|-------|
-| macOS | `security` (`-i`, secret hex-encoded on stdin) | login Keychain |
+| macOS | `security` (`-i`, secret hex-encoded on stdin), run with `HOME` set to the account's home from the user database, since it finds keychains under `$HOME/Library` | login Keychain |
 | Windows | `powershell.exe` (`pwsh` if absent), a constant script calling advapi32 `CredRead`/`CredWrite`/`CredDelete`, request as JSON on stdin | Credential Manager, target `toil:<ref>` |
 | Linux | `secret-tool` | Secret Service (GNOME Keyring, KWallet) |
 

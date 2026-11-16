@@ -99,19 +99,30 @@ export function connectionsCommands(areas: readonly AnyArea[]): AnyCommand[] {
       }
       if (Object.keys(entered).length === 0) throw new ToilError('INVALID_INPUT', 'Nothing was entered, so nothing changed.', { fix: `Run toil connections login ${input.name} again.` });
 
-      const before: Settings = { ...conn };
+      // The prompt may have waited minutes, and another toil may have changed
+      // the file meanwhile: check the connection is still there before storing
+      // anything, and write back the file as it is now, not as it was read.
+      const before: Settings = { ...rereadConnection(path, input.name, area.name, 'login').conn };
+      const refs: Record<string, string> = {};
       for (const [key, value] of Object.entries(entered)) {
         const ref = refFor(input.name, key);
         await storeVerified(required(secrets, ref), ref, value, ctx.signal);
-        conn[key] = `${KEYCHAIN_PREFIX}${ref}`;
+        refs[key] = `${KEYCHAIN_PREFIX}${ref}`;
       }
-      writeConfigFile(path, file);
+      let latest: ReturnType<typeof rereadConnection>;
+      try {
+        latest = rereadConnection(path, input.name, area.name, 'login');
+      } catch (err) {
+        throw await withdrawStored(err, path, Object.values(refs), secrets, ctx);
+      }
+      Object.assign(latest.conn, refs);
+      writeConfigFile(path, latest.file);
       // Only now, with config pointing at the new copy, does an old one go.
       for (const key of Object.keys(entered)) {
         const old = before[key];
-        if (isKeychainRef(old) && old !== conn[key]) await deleteUnreferenced(file, old, secrets, ctx);
+        if (isKeychainRef(old) && old !== refs[key]) await deleteUnreferenced(latest.file, old, secrets, ctx);
       }
-      return { name: input.name, area: area.name, configFile: slashes(path), secrets: whereKept(Object.fromEntries(Object.keys(entered).map((k) => [k, conn[k]]))) };
+      return { name: input.name, area: area.name, configFile: slashes(path), secrets: whereKept(refs) };
     },
   });
 
@@ -250,9 +261,11 @@ export function connectionsCommands(areas: readonly AnyArea[]): AnyCommand[] {
         if (typed !== input.name) throw new ToilError('CANCELLED', `Writes stay off for "${input.name}": what was typed didn't match the name.`, { fix: `Run toil connections writes ${input.name} on again.` });
       }
       if (on !== was) {
-        if (on) conn.writes = true;
-        else delete conn.writes;
-        writeConfigFile(path, file);
+        // Re-read after the question, so a change made meanwhile isn't written over.
+        const latest = rereadConnection(path, input.name, conn.area, `writes ${input.state}`);
+        if (on) latest.conn.writes = true;
+        else delete latest.conn.writes;
+        writeConfigFile(path, latest.file);
       }
       // An env var outranks the file (Configuration Precedence), so say when this change won't be what applies.
       const fromEnv = config.sources[`${input.name}.writes`] === 'env';
@@ -427,16 +440,31 @@ export async function addConnection(ctx: CommandContext<unknown>, areas: readonl
   const answer = await prompt.ask(`Save ${input.name} (${review})? y/n`, 'y', 'confirm');
   if (!/^y(es)?$/i.test(answer)) throw new ToilError('CANCELLED', 'Nothing was saved.', { fix: `Run toil connections add ${input.name} again.` });
 
+  // The questions may have taken minutes, and another toil may have changed
+  // the file meanwhile: check the name is still free before storing anything,
+  // and add to the file as it is now, not as it was read.
+  if (readConfigForEdit(path).connections[input.name]) throw changedMeanwhile(path, input.name, 'add');
   const kept = await storeNew(secrets, input.name, secretValues, ctx.signal);
-  file.connections[input.name] = { area: area.name, ...settings, ...kept };
+  try {
+    return saveNew(path, input.name, area, settings, kept);
+  } catch (err) {
+    throw await withdrawStored(err, path, Object.values(kept).filter(isKeychainRef), secrets, ctx);
+  }
+}
+
+/** Adds connection `name` to the config file as it is at this moment, and makes it the area's default when it's the first. */
+function saveNew(path: string, name: string, area: AnyArea, settings: Settings, kept: Settings) {
+  const file = readConfigForEdit(path);
+  if (file.connections[name]) throw changedMeanwhile(path, name, 'add');
+  file.connections[name] = { area: area.name, ...settings, ...kept };
   // The first connection to an area becomes its default, so adding a
   // second one later doesn't leave the area with no default.
-  const others = Object.keys(file.connections).filter((n) => n !== input.name && file.connections[n]!.area === area.name);
+  const others = Object.keys(file.connections).filter((n) => n !== name && file.connections[n]!.area === area.name);
   if (others.length === 0 && typeof file.defaults[area.name]?.connection !== 'string') {
-    file.defaults[area.name] = { ...(file.defaults[area.name] ?? {}), connection: input.name };
+    file.defaults[area.name] = { ...(file.defaults[area.name] ?? {}), connection: name };
   }
   writeConfigFile(path, file);
-  return { name: input.name, area: area.name, configFile: slashes(path), secrets: whereKept(kept) };
+  return { name, area: area.name, configFile: slashes(path), secrets: whereKept(kept) };
 }
 
 /**
@@ -630,6 +658,63 @@ function checkName(name: string): void {
   if (!CONNECTION_NAME.test(name)) {
     throw new ToilError('INVALID_INPUT', `"${name}" isn't a valid connection name.`, { fix: 'Use lowercase letters, digits and single hyphens, starting with a letter, e.g. corp-jira.' });
   }
+}
+
+/**
+ * A connection as the config file holds it now, re-read for a command that
+ * asked its questions after it first read the file. Whatever another toil
+ * saved meanwhile is kept, since only this connection is changed and the rest
+ * is written back as found. If the connection itself was removed or moved to
+ * another area meanwhile, that's refused rather than resurrected.
+ */
+function rereadConnection(path: string, name: string, area: string, command: string): { file: EditableConfig; conn: Settings & { area: string } } {
+  const file = readConfigForEdit(path);
+  const conn = file.connections[name];
+  if (!conn || conn.area !== area) throw changedMeanwhile(path, name, command);
+  return { file, conn };
+}
+
+/** The refusal when the config file changed under a command waiting for an answer. Change control, but for one file. */
+function changedMeanwhile(path: string, name: string, command: string): ToilError {
+  return new ToilError('INVALID_INPUT', `Connection "${name}" changed in ${slashes(path)} while toil was waiting for your answers, so nothing was saved.`, {
+    fix: `Run toil connections list to see it as it is now, then run toil connections ${command} ${name} again.`,
+  });
+}
+
+/**
+ * The file changed in the moment between storing a secret and writing the
+ * config that points at it. The entries just stored are deleted again unless
+ * the file as it is now uses them, and the refusal says what became of them,
+ * so "nothing was saved" stays true or is corrected.
+ */
+async function withdrawStored(err: unknown, path: string, refs: string[], secrets: SecretStore | undefined, ctx: CommandContext<unknown>): Promise<unknown> {
+  if (!(err instanceof ToilError) || refs.length === 0) return err;
+  // A file that can't be read now can't say what uses the entries, so none is deleted and each is named.
+  let now: EditableConfig | undefined;
+  try {
+    now = readConfigForEdit(path);
+  } catch {
+    now = undefined;
+  }
+  const kept: string[] = [];
+  for (const ref of refs) {
+    const used = now === undefined || [...Object.values(now.connections), ...Object.values(now.defaults)].some((s) => Object.values(s).includes(ref));
+    if (used) {
+      kept.push(ref);
+      continue;
+    }
+    // An entry already gone (another toil removed it) was not kept; only one that couldn't be deleted was.
+    try {
+      if (!secrets) throw new Error('no OS credential store is available here');
+      await secrets.delete(refName(ref), ctx.signal);
+    } catch {
+      kept.push(ref);
+    }
+  }
+  if (kept.length === 0) return err;
+  return new ToilError(err.code, `${err.message.replace(/, so nothing was saved\.$/, '.')} The config file was not changed, but the secret was already in the OS credential store as ${kept.join(', ')}, which the file now uses or which couldn't be deleted.`, {
+    ...(err.fix ? { fix: err.fix } : {}),
+  });
 }
 
 /** The connection as written in the file; one defined only by env vars can't be edited here. */

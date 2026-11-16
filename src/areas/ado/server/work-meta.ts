@@ -76,7 +76,7 @@ export const workAddAttachmentCommand = adoArea.command({
   run: async (input, ctx) => {
     const { collection } = where(ctx);
     const id = toInt(input.id);
-    const data = ctx.files.readBytes(input.file);
+    const data = await ctx.files.readBytes(input.file);
     // Step 1, the upload; step 2, the link. Suspected bug (#69 item 16): a failed link leaves the upload behind.
     const attachment = await adoUpload<Attachment>(ctx, `/${enc(collection)}/_apis/wit/attachments?fileName=${enc(basename(input.file))}&api-version=${API}`, data);
     const relation = { rel: 'AttachedFile', url: attachment.url, ...(input.comment ? { attributes: { comment: input.comment } } : {}) };

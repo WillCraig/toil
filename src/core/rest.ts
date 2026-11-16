@@ -221,6 +221,21 @@ export interface RestOptions {
   errorMessage?: (body: string) => string | undefined;
   /** Statuses besides 401 and 403 that mean the credential was refused, so they're AUTH with `authFix` (Bitbucket Cloud's 410). */
   authStatuses?: readonly number[];
+  /**
+   * Domains (each with its subdomains) of the service's sign-in pages. A
+   * redirect to one means the credential was refused, so it's AUTH with
+   * `authFix`, not a host to point `baseUrl` at (Azure DevOps Services sends
+   * an unaccepted PAT to `*.vssps.visualstudio.com`).
+   */
+  signInDomains?: readonly string[];
+  /**
+   * True for a response that says, in its headers, that the credential sent
+   * was refused even though the status is a success: a service that falls
+   * back to answering as an anonymous user (Jira Cloud's
+   * `X-Seraph-LoginReason: AUTHENTICATED_FAILED`), which would otherwise
+   * read as an empty result. It's AUTH with `authFix`.
+   */
+  refusedWhen?: (headers: Headers) => boolean;
 }
 
 /**
@@ -257,6 +272,13 @@ export async function restResponse<T>(ctx: RestContext, url: string, init: Reque
     const attemptInit: RequestInit = signals.length > 0 ? { ...init, signal: AbortSignal.any(signals) } : init;
     try {
       const { response, finalUrl } = await follow(ctx, url, attemptInit, options);
+      if (options.refusedWhen?.(response.headers)) {
+        await response.body?.cancel().catch(() => {});
+        throw new ToilError('AUTH', `${options.service} didn't accept the credential sent to ${redactUrl(finalUrl)}${response.ok ? ', and answered as an anonymous user instead' : ''}.`, {
+          fix: options.authFix,
+          details: { status: response.status, url: redactUrl(finalUrl) },
+        });
+      }
       if (response.status === 429 && options.retryRateLimit !== false) {
         const wait = parseRetryAfter(response.headers.get('Retry-After'));
         if (attempt >= ATTEMPTS || (wait !== undefined && wait > MAX_RETRY_AFTER_SECONDS)) {
@@ -324,6 +346,12 @@ async function follow(ctx: RestContext, url: string, init: RequestInit, options:
     }
     const from = new URL(current).origin;
     const method = (currentInit.method ?? 'GET').toUpperCase();
+    if (next.origin !== from && options.signInDomains?.some((d) => next.hostname === d || next.hostname.endsWith(`.${d}`))) {
+      throw new ToilError('AUTH', `${options.service} sent the request to its sign-in page at ${next.origin} instead of answering, which is how it refuses a credential.`, {
+        fix: options.authFix,
+        details: { status: response.status, url: redactUrl(current), location: redactUrl(next.toString()) },
+      });
+    }
     if (next.origin !== from && options.redirect === 'follow-without-auth' && (method === 'GET' || method === 'HEAD')) {
       // A signed download URL carries its own authority. Ours stays behind:
       // every header goes, Accept excepted, so a custom auth header can't

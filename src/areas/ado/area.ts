@@ -174,6 +174,9 @@ export const adoArea = defineArea({
         baseUrl: organizationUrl(conn, area),
         headers,
         service: 'Azure DevOps Services',
+        // An unaccepted PAT isn't a 401 here: the service redirects to its
+        // sign-in host, which would otherwise read as "baseUrl is wrong".
+        signInDomains: ['vssps.visualstudio.com', 'login.microsoftonline.com'],
         authFix: `Azure DevOps Services rejected the personal access token on connection "${conn.name}", or it lacks the scope this needs, or it was made for another organization. ${PAT_HELP} Then set pat (${area.envName('pat')} for the default connection).`,
       };
     }

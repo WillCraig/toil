@@ -64,6 +64,23 @@ describe('one tree for both deployments', () => {
   });
 });
 
+describe('a wrong token on Jira Cloud', () => {
+  // Found live: Cloud answers a wrong email or API token as an anonymous user,
+  // 200 and no projects, and says so only in X-Seraph-LoginReason.
+  it('is AUTH with the API token fix, not an empty list, when Cloud answers as anonymous after a failed sign-in', async () => {
+    const anonymous = { method: 'GET', url: /\/rest\/api\/3\/project\/search/, respond: { status: 200, headers: { 'X-Seraph-LoginReason': 'AUTHENTICATED_FAILED' }, json: { startAt: 0, maxResults: 50, total: 0, isLast: true, values: [] } } } as const;
+    const t = testContext({ config: fixture.config, routes: [anonymous, ...(fixture.routes ?? [])], files: fixture.files });
+    const run = await runCli(['jira', 'project', 'list', '--connection', 'jira-cloud'], { commands, context: t.context });
+    expect(run.envelope?.data).toBeNull();
+    expect(run.envelope?.error).toMatchObject({ code: 'AUTH', message: expect.stringContaining('anonymous'), fix: expect.stringContaining('API token on connection "jira-cloud"') });
+  });
+
+  it('still lists projects when Cloud signed the caller in', async () => {
+    const run = await runCli(['jira', 'project', 'list', '--connection', 'jira-cloud'], { commands, context: ctx().context });
+    expect(run.envelope?.ok, run.stdout).toBe(true);
+  });
+});
+
 describe('the retired Jira Cloud names fail with the new form', () => {
   it('toil jira-cloud … is INVALID_INPUT naming toil jira and the deployment', async () => {
     const run = await runCli(['jira-cloud', 'issue', 'get', 'PROJ-1'], { commands, context: testContext().context });

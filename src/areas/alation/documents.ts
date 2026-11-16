@@ -149,7 +149,7 @@ export const documentCreateCommand = alationArea.command({
     { inputFile: 'alation-doc.json', title: 'From flag', template: '9', parentDocument: '12', allowWrite: true },
   ],
   run: async (input, ctx) => {
-    const { payload, overrides } = buildDocumentPayload(input, ctx.files, ctx.warn);
+    const { payload, overrides } = await buildDocumentPayload(input, ctx.files, ctx.warn);
     for (const [key, flag] of [['title', '--title'], ['document_hub_id', '--hub'], ['parent_folder_id', '--folder']] as const) {
       if (payload[key] === undefined) throw new ToilError('INVALID_INPUT', `${flag} is required to create a document (or set it in --input-file)`, { fix: `Pass ${flag}, or set it in --input-file.` });
     }
@@ -185,7 +185,7 @@ export const documentUpdateCommand = alationArea.command({
   ],
   run: async (input, ctx) => {
     const documentId = parsePositiveId(input.id, 'document ID');
-    const { payload, overrides } = buildDocumentPayload(input, ctx.files, ctx.warn);
+    const { payload, overrides } = await buildDocumentPayload(input, ctx.files, ctx.warn);
     if (payload.document_hub_id !== undefined) {
       throw new ToilError('INVALID_INPUT', 'A document cannot change hubs; remove "hub" from --input-file.', { fix: 'Remove "hub" from --input-file.' });
     }

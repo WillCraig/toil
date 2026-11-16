@@ -111,7 +111,7 @@ describe('an area alias onto a core command', () => {
     expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', fix: expect.stringContaining('widgets') });
   });
 
-  it('refuses a target that is not a core command taking an area', () => {
+  it('refuses a target that is not a core command taking an area', async () => {
     const bad = (target: string) => defineArea({ name: 'bad', description: 'test', connection: z.object({}), coreAliases: { x: target } });
     expect(() => withCoreAliases([...commands, ...demoCommands], [bad('demo get-thing')])).toThrow(/isn't a core command/);
     expect(() => withCoreAliases(commands, [bad('connections nothing')])).toThrow(/isn't a core command/);
@@ -119,7 +119,7 @@ describe('an area alias onto a core command', () => {
 });
 
 describe('an area command kept off MCP', () => {
-  it('is never listed, even with writes on and its area named', () => {
+  it('is never listed, even with writes on and its area named', async () => {
     const tools = selectCommands(demoCommands, ['demo'], testConfig({ demo: { token: 't', writes: true } }));
     expect(servedOverMcp(deleteThing)).toBe(false);
     expect(tools).not.toContain(deleteThing);
@@ -140,7 +140,7 @@ describe('an area command kept off MCP', () => {
     expect(envelope.error?.code).toBe('TIMEOUT');
   });
 
-  it('accepts only false', () => {
+  it('accepts only false', async () => {
     const spec = { path: ['demo', 'x'] as [string, ...string[]], description: 'test', input: z.object({}), writes: false, examples: [{}], run: async () => ({}) };
     expect(() => demoArea.command({ ...spec, mcp: true } as never)).toThrow(/"mcp" is false/);
   });
@@ -175,13 +175,13 @@ describe('a command that handles an unconfigured area itself', () => {
     expect((await execute(getThing, { id: 'THING-1' }, context)).error?.code).toBe('CONFIG_INVALID');
   });
 
-  it('is an MCP tool with its area unconfigured, as a command with no connection is', () => {
+  it('is an MCP tool with its area unconfigured, as a command with no connection is', async () => {
     const tools = selectCommands(demoCommands, undefined, testConfig());
     expect(tools).toContain(thingStatus);
     expect(tools).not.toContain(getThing);
   });
 
-  it('is only for a read with no required context', () => {
+  it('is only for a read with no required context', async () => {
     const spec = { path: ['demo', 'w'] as [string, ...string[]], description: 'test', input: z.object({}), writes: false, connectionOptional: true as const, examples: [{}], run: async () => ({}) };
     expect(() => demoArea.command({ ...spec, writes: true })).toThrow(/write always needs its connection/);
     expect(() => demoArea.command({ ...spec, kind: 'area-local' })).toThrow(/connectionOptional/);
@@ -189,9 +189,9 @@ describe('a command that handles an unconfigured area itself', () => {
 });
 
 describe('stdin on an interactive terminal', () => {
-  it('refuses "-" at once with INVALID_INPUT, and never waits', () => {
+  it('refuses "-" at once with INVALID_INPUT, and never waits', async () => {
     const files = nodeFiles({ cwd: tmpdir(), stdin: 'terminal' });
-    expect(() => files.readText('-')).toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: expect.stringContaining('Nothing was piped in'), fix: expect.stringContaining('--from <file>') }));
+    await expect(files.readText('-')).rejects.toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: expect.stringContaining('Nothing was piped in'), fix: expect.stringContaining('--from <file>') }));
   });
 
   it('is the same error through a command on the CLI', async () => {
@@ -202,7 +202,7 @@ describe('stdin on an interactive terminal', () => {
       writes: false,
       options: [{ flags: '--from <file>', field: 'from', description: 'File' }],
       examples: [{ from: '-' }],
-      run: async (input, ctx) => ({ text: ctx.files.readText(input.from ?? '-') }),
+      run: async (input, ctx) => ({ text: (await ctx.files.readText(input.from ?? '-')) }),
     });
     const { context } = testContext({ config: { demo: { token: 't' } }, stdin: { terminal: true } });
     const run = await runCli(['demo', 'read-in'], { commands: [read], context });
@@ -228,7 +228,7 @@ describe("a missing connection key's fix", () => {
     expect(missing.error).toMatchObject({ code: 'CONFIG_INVALID', fix: expect.stringContaining('TOIL_FIGLET_BASE_URL (e.g. https://api.figlet.imagile.dev)') });
   });
 
-  it('refuses an example for a key the connection does not have', () => {
+  it('refuses an example for a key the connection does not have', async () => {
     expect(() => defineArea({ name: 'x', description: 'test', connection: z.object({}), examples: { nope: 'y' } as never })).toThrow(/example "nope"/);
   });
 });
@@ -265,7 +265,7 @@ describe('the repository on ctx', () => {
 });
 
 describe("the repository's remotes", () => {
-  it('lose an http(s) userinfo, which may be a token, and keep an ssh user', () => {
+  it('lose an http(s) userinfo, which may be a token, and keep an ssh user', async () => {
     expect(withoutHttpUserinfo('https://x-token:abc123@bitbucket.imagile.dev/scm/PRJ/repo.git')).toBe('https://bitbucket.imagile.dev/scm/PRJ/repo.git');
     expect(withoutHttpUserinfo('HTTP://abc123@ghe.imagile.dev/o/r.git')).toBe('HTTP://ghe.imagile.dev/o/r.git');
     expect(withoutHttpUserinfo('ssh://git@bitbucket.imagile.dev:7999/prj/repo.git')).toBe('ssh://git@bitbucket.imagile.dev:7999/prj/repo.git');
@@ -294,7 +294,7 @@ describe('argv for a negated flag', () => {
 });
 
 describe('the contract check and group flags', () => {
-  it('counts a group flag for a contract leaf flag of the same spelling', () => {
+  it('counts a group flag for a contract leaf flag of the same spelling', async () => {
     const program = new Command('toil');
     program.command('bites').option('--project <key>', '').command('get');
     const contract = { globalOptions: [], commands: [{ command: 'bites get', usage: '[options]', leaf: true, options: [{ flags: '--project <key>', description: '' }, { flags: '--gone', description: '' }] }] };
@@ -303,7 +303,7 @@ describe('the contract check and group flags', () => {
 });
 
 describe('removed contract paths', () => {
-  it('are read from divergences marked removed, which may list only command paths', () => {
+  it('are read from divergences marked removed, which may list only command paths', async () => {
     expect(removedPaths()).toEqual(expect.arrayContaining(['git credentials', 'deps connectivity']));
     const dir = mkdtempSync(join(tmpdir(), 'toil-removed-'));
     const entry = { old: 'o', toil: 't', why: 'w', principle: '1', removed: true };
@@ -315,7 +315,7 @@ describe('removed contract paths', () => {
 });
 
 describe('articles in messages', () => {
-  it('reads "an" before a vowel and "a" otherwise', () => {
+  it('reads "an" before a vowel and "a" otherwise', async () => {
     expect(withArticle('elasticsearch')).toBe('an elasticsearch');
     expect(withArticle('jira')).toBe('a jira');
   });

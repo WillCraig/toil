@@ -95,7 +95,7 @@ export const categorizeCommand = githubArea.command({
     // The plan's keys say which repository each item is in, so the owner and repo core resolved were never used.
     delete ctx.resolved.inputs?.owner;
     delete ctx.resolved.inputs?.repo;
-    const plan = readPlanFrom(ctx, input.from);
+    const plan = await readPlanFrom(ctx, input.from);
     const connection = ctx.connection.name;
     const { group, skipped } = planFor(plan, 'github', connection);
 

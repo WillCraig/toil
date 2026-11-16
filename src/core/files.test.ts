@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe('nodeFiles', () => {
-  it('resolves relative paths against its working directory, and writes with parents created', () => {
+  it('resolves relative paths against its working directory, and writes with parents created', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'toil-files-'));
     dirs.push(cwd);
     const files = nodeFiles({ cwd, stdin: true });
@@ -22,11 +22,11 @@ describe('nodeFiles', () => {
     expect(saved).toBe(forwardSlashes(join(cwd, 'out', 'deep', 'a.txt')));
     expect(saved).not.toContain('\\');
     expect(readFileSync(join(cwd, 'out', 'deep', 'a.txt'), 'utf8')).toBe('hi');
-    expect(files.readText('out/deep/a.txt')).toBe('hi');
-    expect([...files.readBytes(join(cwd, 'out', 'deep', 'a.txt'))]).toEqual([104, 105]);
+    expect((await files.readText('out/deep/a.txt'))).toBe('hi');
+    expect([...(await files.readBytes(join(cwd, 'out', 'deep', 'a.txt')))]).toEqual([104, 105]);
   });
 
-  it('never replaces a file already there', () => {
+  it('never replaces a file already there', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'toil-files-'));
     dirs.push(cwd);
     const files = nodeFiles({ cwd, stdin: true });
@@ -35,7 +35,7 @@ describe('nodeFiles', () => {
     expect(readFileSync(join(cwd, 'mine.txt'), 'utf8')).toBe('mine');
   });
 
-  it('refuses, on every platform, a name Windows would write somewhere else, and leaves the existing file alone', () => {
+  it('refuses, on every platform, a name Windows would write somewhere else, and leaves the existing file alone', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'toil-files-'));
     dirs.push(cwd);
     const files = nodeFiles({ cwd, stdin: true });
@@ -49,7 +49,7 @@ describe('nodeFiles', () => {
     expect(files.writeBytes('com10', new TextEncoder().encode('ok'))).toBe(forwardSlashes(join(cwd, 'com10')));
   });
 
-  it('turns a server-supplied file name into one that is safe to save', () => {
+  it('turns a server-supplied file name into one that is safe to save', async () => {
     expect(downloadFileName('CON')).toBe('_CON');
     expect(downloadFileName('Prn.TXT')).toBe('_Prn.TXT');
     expect(downloadFileName('nul .txt')).toBe('_nul .txt');
@@ -62,14 +62,14 @@ describe('nodeFiles', () => {
     for (const name of ['CON', 'a.txt:s', 'x. ', 'COM².png', 'ordinary.txt', '.hidden']) expect(unsafeFileName(downloadFileName(name)), name).toBeUndefined();
   });
 
-  it('turns a missing file into INVALID_INPUT with a fix', () => {
+  it('turns a missing file into INVALID_INPUT with a fix', async () => {
     const files = nodeFiles({ cwd: tmpdir(), stdin: true });
-    expect(() => files.readText('no-such-file-for-toil.json')).toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: expect.stringContaining('does not exist') }));
+    await expect(files.readText('no-such-file-for-toil.json')).rejects.toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: expect.stringContaining('does not exist') }));
   });
 
-  it('refuses "-" when stdin carries the MCP protocol', () => {
+  it('refuses "-" when stdin carries the MCP protocol', async () => {
     const files = nodeFiles({ cwd: tmpdir(), stdin: false });
-    expect(() => files.readText('-')).toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: expect.stringContaining('not available over MCP') }));
+    await expect(files.readText('-')).rejects.toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: expect.stringContaining('not available over MCP') }));
   });
 });
 
@@ -92,9 +92,9 @@ describe('nodeFiles never touches toil\'s own config', () => {
     return { root, home, cwd, custom, files };
   }
 
-  const refused = (fn: () => unknown) => {
+  const refused = async (fn: () => unknown) => {
     try {
-      fn();
+      await fn();
     } catch (err) {
       expect(err).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining("toil's own configuration") });
       expect(JSON.stringify({ message: (err as Error).message, fix: (err as { fix?: string }).fix })).not.toMatch(/SECRET/);
@@ -103,26 +103,26 @@ describe('nodeFiles never touches toil\'s own config', () => {
     throw new Error('expected a refusal');
   };
 
-  it('refuses the config file, anything else under ~/.toil, and the --config file', () => {
+  it('refuses the config file, anything else under ~/.toil, and the --config file', async () => {
     const { home, custom, files } = setup();
-    refused(() => files.readText(join(home, '.toil', 'config.json')));
-    refused(() => files.readBytes(join(home, '.toil', 'projects', 'team.json')));
-    refused(() => files.readText(join(home, '.toil')));
-    refused(() => files.readText(custom));
-    refused(() => files.writeBytes(join(home, '.toil', 'new.json'), new Uint8Array([1])));
-    refused(() => files.writeBytes(custom, new Uint8Array([1])));
-    expect(files.readText('ok.txt')).toBe('fine');
+    await refused(() => files.readText(join(home, '.toil', 'config.json')));
+    await refused(() => files.readBytes(join(home, '.toil', 'projects', 'team.json')));
+    await refused(() => files.readText(join(home, '.toil')));
+    await refused(() => files.readText(custom));
+    await refused(() => files.writeBytes(join(home, '.toil', 'new.json'), new Uint8Array([1])));
+    await refused(() => files.writeBytes(custom, new Uint8Array([1])));
+    expect((await files.readText('ok.txt'))).toBe('fine');
   });
 
-  it('refuses a .. traversal, and a differently cased path on Windows', () => {
+  it('refuses a .. traversal, and a differently cased path on Windows', async () => {
     const { home, cwd, files } = setup();
     const rel = relative(cwd, join(home, '.toil', 'config.json'));
-    refused(() => files.readText(rel));
-    refused(() => files.readText(join(cwd, '..', 'home', 'x', '..', '.toil', 'config.json')));
-    if (process.platform === 'win32') refused(() => files.readText(join(home, '.TOIL', 'CONFIG.JSON')));
+    await refused(() => files.readText(rel));
+    await refused(() => files.readText(join(cwd, '..', 'home', 'x', '..', '.toil', 'config.json')));
+    if (process.platform === 'win32') await refused(() => files.readText(join(home, '.TOIL', 'CONFIG.JSON')));
   });
 
-  it('refuses a symlink or junction into ~/.toil', () => {
+  it('refuses a symlink or junction into ~/.toil', async () => {
     const { home, cwd, files } = setup();
     try {
       // A junction needs no privilege on Windows; elsewhere this is a plain directory symlink.
@@ -130,45 +130,45 @@ describe('nodeFiles never touches toil\'s own config', () => {
     } catch {
       return; // the platform refused to make one, so there's nothing to get around
     }
-    refused(() => files.readText(join('innocent', 'config.json')));
-    refused(() => files.writeBytes(join('innocent', 'planted.json'), new Uint8Array([1])));
+    await refused(() => files.readText(join('innocent', 'config.json')));
+    await refused(() => files.writeBytes(join('innocent', 'planted.json'), new Uint8Array([1])));
   });
 
 });
 
 describe('nodeFiles never reads /proc or /sys', () => {
-  it('treats anything under /proc or /sys as a system path on Linux and macOS, never on Windows', () => {
+  it('treats anything under /proc or /sys as a system path on Linux and macOS, never on Windows', async () => {
     for (const p of ['/proc/self/environ', '/proc/1234/environ', '/proc', '/sys/kernel/x', '/sys']) expect(isSystemPath(p, 'linux'), p).toBe(true);
     for (const p of ['/procurement/a.txt', '/system/x', '/home/u/proc/environ', '/work/sys']) expect(isSystemPath(p, 'linux'), p).toBe(false);
     expect(isSystemPath('/proc/self/environ', 'darwin')).toBe(true);
     expect(isSystemPath('/proc/self/environ', 'win32')).toBe(false);
   });
 
-  it.skipIf(process.platform !== 'linux')('refuses /proc/self/environ and a symlink to it (Linux only: the file exists only there)', () => {
+  it.skipIf(process.platform !== 'linux')('refuses /proc/self/environ and a symlink to it (Linux only: the file exists only there)', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'toil-proc-'));
     dirs.push(cwd);
     const files = nodeFiles({ cwd, stdin: false });
-    expect(() => files.readText('/proc/self/environ')).toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: expect.stringContaining('/proc or /sys') }));
+    await expect(files.readText('/proc/self/environ')).rejects.toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: expect.stringContaining('/proc or /sys') }));
     symlinkSync('/proc/self/environ', join(cwd, 'env.txt'));
-    expect(() => files.readText('env.txt')).toThrow(/\/proc or \/sys/);
+    await expect(files.readText('env.txt')).rejects.toThrow(/\/proc or \/sys/);
   });
 });
 
 describe('memoryFiles', () => {
-  it('refuses to replace a file already there, as nodeFiles does', () => {
+  it('refuses to replace a file already there, as nodeFiles does', async () => {
     const files = memoryFiles({ 'a.png': 'x' });
     expect(() => files.writeBytes('a.png', new Uint8Array([1]))).toThrow(expect.objectContaining({ code: 'INVALID_INPUT', message: '"/work/a.png" already exists.' }));
-    expect(files.readText('a.png')).toBe('x');
+    expect((await files.readText('a.png'))).toBe('x');
   });
 
-  it('reads seeded files relative to /work, records writes, and serves stdin when given one', () => {
+  it('reads seeded files relative to /work, records writes, and serves stdin when given one', async () => {
     const files = memoryFiles({ 'a.json': '{}' }, { stdin: 'piped' });
-    expect(files.readText('./a.json')).toBe('{}');
-    expect(files.readText('/work/a.json')).toBe('{}');
-    expect(files.readText('-')).toBe('piped');
+    expect((await files.readText('./a.json'))).toBe('{}');
+    expect((await files.readText('/work/a.json'))).toBe('{}');
+    expect((await files.readText('-'))).toBe('piped');
     expect(files.writeBytes('x/../b.bin', new Uint8Array([1]))).toBe('/work/b.bin');
     expect(Object.keys(files.written)).toEqual(['/work/b.bin']);
-    expect(() => memoryFiles().readText('-')).toThrow(/not available over MCP/);
+    await expect(memoryFiles().readText('-')).rejects.toThrow(/not available over MCP/);
   });
 });
 
@@ -192,17 +192,17 @@ describe('the file workspace', () => {
     fix: expect.stringMatching(/--workspace <dir> or TOIL_WORKSPACE.*"bounds": \{ "files": "unbounded" \}/),
   });
 
-  it('resolves relative paths against the workspace, not the working directory, and reports it with forward slashes', () => {
+  it('resolves relative paths against the workspace, not the working directory, and reports it with forward slashes', async () => {
     const { ws, files } = setup();
     expect(files.workspace).toBe(forwardSlashes(ws));
-    expect(files.readText('in.txt')).toBe('in');
+    expect((await files.readText('in.txt'))).toBe('in');
     expect(files.writeBytes('sub/new.txt', new Uint8Array([1]))).toBe(forwardSlashes(join(ws, 'sub', 'new.txt')));
   });
 
-  it('refuses .. and absolute paths that leave it, for reads, writes, exists, stat, list and findUp', () => {
+  it('refuses .. and absolute paths that leave it, for reads, writes, exists, stat, list and findUp', async () => {
     const { outside, files } = setup();
-    expect(() => files.readText('../outside/secret.txt')).toThrow(outsideError);
-    expect(() => files.readText(join(outside, 'secret.txt'))).toThrow(outsideError);
+    await expect(files.readText('../outside/secret.txt')).rejects.toThrow(outsideError);
+    await expect(files.readText(join(outside, 'secret.txt'))).rejects.toThrow(outsideError);
     expect(() => files.writeBytes('../outside/planted.txt', new Uint8Array([1]))).toThrow(outsideError);
     expect(() => files.exists(join(outside, 'secret.txt'))).toThrow(outsideError);
     expect(() => files.stat(outside)).toThrow(outsideError);
@@ -210,36 +210,36 @@ describe('the file workspace', () => {
     expect(() => files.findUp('secret.txt', outside)).toThrow(outsideError);
   });
 
-  it('refuses a symlink or junction that leads out of it', () => {
+  it('refuses a symlink or junction that leads out of it', async () => {
     const { ws, outside, files } = setup();
     try {
       symlinkSync(outside, join(ws, 'link'), 'junction');
     } catch {
       return; // the platform refused to make one, so there's nothing to get around
     }
-    expect(() => files.readText('link/secret.txt')).toThrow(outsideError);
+    await expect(files.readText('link/secret.txt')).rejects.toThrow(outsideError);
     expect(() => files.writeBytes('link/planted.txt', new Uint8Array([1]))).toThrow(outsideError);
   });
 
-  it('with "files": "unbounded", reaches outside it, but still never overwrites and never reads toil\'s own files', () => {
+  it('with "files": "unbounded", reaches outside it, but still never overwrites and never reads toil\'s own files', async () => {
     const { root, outside, files } = setup({ unbounded: true, protect: (r) => [join(r, 'outside', 'secret.txt')] });
     writeFileSync(join(root, 'other.txt'), 'other');
-    expect(files.readText('../other.txt')).toBe('other');
+    expect((await files.readText('../other.txt'))).toBe('other');
     expect(files.writeBytes(join(outside, 'new.txt'), new Uint8Array([1]))).toBe(forwardSlashes(join(outside, 'new.txt')));
     expect(() => files.writeBytes(join(outside, 'new.txt'), new Uint8Array([2]))).toThrow(/already exists/);
-    expect(() => files.readText(join(outside, 'secret.txt'))).toThrow(/toil's own configuration/);
+    await expect(files.readText(join(outside, 'secret.txt'))).rejects.toThrow(/toil's own configuration/);
   });
 
-  it('with no workspace, every file operation refuses with the reason, and unbounded still refuses relative paths', () => {
+  it('with no workspace, every file operation refuses with the reason, and unbounded still refuses relative paths', async () => {
     const error = new ToilError('NOT_CONFIGURED', 'No workspace folder is set, and this command reads or writes files.', { fix: 'x' });
     const files = nodeFiles({ cwd: tmpdir(), stdin: false, workspace: { error, source: 'none' } });
     expect(files.workspace).toBeUndefined();
-    expect(() => files.readText('a.txt')).toThrow(error);
-    expect(() => files.readText(join(tmpdir(), 'a.txt'))).toThrow(error);
+    await expect(files.readText('a.txt')).rejects.toThrow(error);
+    await expect(files.readText(join(tmpdir(), 'a.txt'))).rejects.toThrow(error);
     expect(() => files.list()).toThrow(error);
     const open = nodeFiles({ cwd: tmpdir(), stdin: false, workspace: { error, source: 'none' }, unbounded: true });
-    expect(() => open.readText(join(tmpdir(), 'no-such-file-for-toil.txt'))).toThrow(/does not exist/);
-    expect(() => open.readText('relative.txt')).toThrow(error);
+    await expect(open.readText(join(tmpdir(), 'no-such-file-for-toil.txt'))).rejects.toThrow(/does not exist/);
+    await expect(open.readText('relative.txt')).rejects.toThrow(error);
     expect(() => open.writeBytes('relative.txt', new Uint8Array([1]))).toThrow(error);
   });
 });
@@ -252,7 +252,7 @@ describe('resolveWorkspace', () => {
     return root;
   };
 
-  it('takes --workspace, then TOIL_WORKSPACE, then the CLI working directory', () => {
+  it('takes --workspace, then TOIL_WORKSPACE, then the CLI working directory', async () => {
     const r = base();
     const env = { TOIL_WORKSPACE: join(r, 'env') };
     expect(resolveWorkspace({ flag: 'flag', env, cwd: r, mcp: false })).toEqual({ dir: join(r, 'flag'), source: 'flag' });
@@ -260,7 +260,7 @@ describe('resolveWorkspace', () => {
     expect(resolveWorkspace({ env: {}, cwd: join(r, 'cwd'), mcp: false })).toEqual({ dir: join(r, 'cwd'), source: 'cwd' });
   });
 
-  it("under MCP, uses the client's single root instead of the working directory, and refuses none or several", () => {
+  it("under MCP, uses the client's single root instead of the working directory, and refuses none or several", async () => {
     const r = base();
     expect(resolveWorkspace({ env: {}, cwd: join(r, 'cwd'), mcp: true, roots: [join(r, 'root1')] })).toEqual({ dir: join(r, 'root1'), source: 'mcp-root' });
     expect(resolveWorkspace({ env: { TOIL_WORKSPACE: join(r, 'env') }, cwd: r, mcp: true, roots: [join(r, 'root1')] }).source).toBe('env');
@@ -270,7 +270,7 @@ describe('resolveWorkspace', () => {
     expect(resolveWorkspace({ env: {}, cwd: r, mcp: true }).error).toMatchObject({ code: 'NOT_CONFIGURED', message: "This command reads or writes files, but there's no workspace folder to keep them in." });
   });
 
-  it('defers a workspace that is not a folder to the first file operation', () => {
+  it('defers a workspace that is not a folder to the first file operation', async () => {
     const r = base();
     const ws = resolveWorkspace({ flag: 'missing', env: {}, cwd: r, mcp: false });
     expect(ws.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining("(from --workspace) isn't a folder that exists") });
@@ -278,7 +278,7 @@ describe('resolveWorkspace', () => {
 });
 
 describe('exists, stat, findUp and writeCsv', () => {
-  it('answers inside the workspace', () => {
+  it('answers inside the workspace', async () => {
     const ws = mkdtempSync(join(tmpdir(), 'toil-more-'));
     dirs.push(ws);
     mkdirSync(join(ws, 'a', 'b'), { recursive: true });
@@ -298,7 +298,7 @@ describe('exists, stat, findUp and writeCsv', () => {
     expect(() => files.writeCsv('out/report.csv', ['a'], [])).toThrow(/already exists/);
   });
 
-  it('findUp stops at the top of the workspace', () => {
+  it('findUp stops at the top of the workspace', async () => {
     const root = mkdtempSync(join(tmpdir(), 'toil-up-'));
     dirs.push(root);
     mkdirSync(join(root, 'ws', 'a'), { recursive: true });
@@ -307,7 +307,7 @@ describe('exists, stat, findUp and writeCsv', () => {
     expect(files.findUp('above.json', 'a')).toBeUndefined();
   });
 
-  it('toCsv quotes only what needs it and ends every line with LF', () => {
+  it('toCsv quotes only what needs it and ends every line with LF', async () => {
     expect(toCsv(['a', 'b'], [['x\ny', 'p,q'], [undefined, 1.5]])).toBe('a,b\n"x\ny","p,q"\n,1.5\n');
   });
 });
@@ -338,7 +338,7 @@ describe('list', () => {
     put('local-only.txt');
   }
 
-  it('skips .git and what .gitignore files say, the deepest file deciding', () => {
+  it('skips .git and what .gitignore files say, the deepest file deciding', async () => {
     const root = mkdtempSync(join(tmpdir(), 'toil-list-'));
     dirs.push(root);
     tree(root);
@@ -357,7 +357,7 @@ describe('list', () => {
   // has passed 5 s without anything being wrong.
   const REAL_GIT_TIMEOUT_MS = 30_000;
   const git = findGit({ env: process.env }).found;
-  it.skipIf(!git)('matches git ls-files --cached --others --exclude-standard: tracked-but-ignored, deleted, nested repos, ignored folders, index v4 (skipped where git is not installed)', () => {
+  it.skipIf(!git)('matches git ls-files --cached --others --exclude-standard: tracked-but-ignored, deleted, nested repos, ignored folders, index v4 (skipped where git is not installed)', async () => {
     const root = mkdtempSync(join(tmpdir(), 'toil-lsf-'));
     dirs.push(root);
     const env = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(root, 'no-global') };
@@ -396,7 +396,7 @@ describe('list', () => {
     same();
   }, REAL_GIT_TIMEOUT_MS);
 
-  it('skips only the .gitignore line that does not compile, keeps the rest of that file, and warns with the file and line (#262)', () => {
+  it('skips only the .gitignore line that does not compile, keeps the rest of that file, and warns with the file and line (#262)', async () => {
     const root = mkdtempSync(join(tmpdir(), 'toil-badline-'));
     dirs.push(root);
     const put = (path: string, text = 'x') => {
@@ -438,7 +438,7 @@ describe('list', () => {
     expect(off).toEqual([]);
   });
 
-  it('outside a repository applies only the .gitignore files under the folder (git would list nothing: the deps area must check for a repository itself)', () => {
+  it('outside a repository applies only the .gitignore files under the folder (git would list nothing: the deps area must check for a repository itself)', async () => {
     const root = mkdtempSync(join(tmpdir(), 'toil-norepo-'));
     dirs.push(root);
     writeFileSync(join(root, '.gitignore'), '*.log\n');
@@ -465,7 +465,7 @@ describe('readStream', () => {
     expect(Buffer.concat(parts).equals(Buffer.from(bytes))).toBe(true);
   });
 
-  it('checks the bounds when called, before any chunk: outside the workspace, toil\'s own files and stdin over MCP', () => {
+  it('checks the bounds when called, before any chunk: outside the workspace, toil\'s own files and stdin over MCP', async () => {
     const root = mkdtempSync(join(tmpdir(), 'toil-stream-'));
     dirs.push(root);
     mkdirSync(join(root, 'ws'));

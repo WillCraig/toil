@@ -33,6 +33,42 @@ describe('macOS store (security)', () => {
     expectSecretOnlyOnStdin(calls, Buffer.from(SECRET).toString('hex'));
   });
 
+  // Found running Toil UI on an isolated home: with HOME elsewhere, `security`
+  // finds no keychain and every entry reads as not found.
+  it("runs security with HOME set to the account's own home, not $HOME, for every call", async () => {
+    const envs: Array<Record<string, string> | undefined> = [];
+    const spawn: Spawner = async (_command, args, _input, _signal, env) => {
+      envs.push(env);
+      return { status: 0, stdout: args.includes('find-generic-password') ? `${SECRET}\n` : '', stderr: '' };
+    };
+    const store = createSecretStore({ platform: 'darwin', spawn, accountHome: '/Users/you' });
+    await store.set('corp-jira.token', SECRET);
+    expect(await store.get('corp-jira.token')).toBe(SECRET);
+    await store.delete('corp-jira.token');
+    expect(envs).toEqual([{ HOME: '/Users/you' }, { HOME: '/Users/you' }, { HOME: '/Users/you' }]);
+  });
+
+  it('takes the account home from the user database by default, whatever $HOME says', async () => {
+    const envs: Array<Record<string, string> | undefined> = [];
+    const spawn: Spawner = async (_command, _args, _input, _signal, env) => (envs.push(env), { status: 44, stdout: '', stderr: '' });
+    const was = process.env.HOME;
+    process.env.HOME = join(tmpdir(), 'not-the-account-home');
+    try {
+      await createSecretStore({ platform: 'darwin', spawn }).get('corp-jira.token');
+    } finally {
+      process.env.HOME = was;
+    }
+    expect(envs[0]?.HOME).toBe((await import('node:os')).userInfo().homedir);
+    expect(envs[0]?.HOME).not.toBe(join(tmpdir(), 'not-the-account-home'));
+  });
+
+  it('the Windows and Linux stores pass no environment override', async () => {
+    const envs: unknown[] = [];
+    const spawn: Spawner = async (_command, _args, _input, _signal, env) => (envs.push(env), { status: 0, stdout: '', stderr: '' });
+    await createSecretStore({ platform: 'linux', spawn }).get('corp-jira.token');
+    expect(envs).toEqual([undefined]);
+  });
+
   it('reads with find-generic-password -w, and treats exit 44 as no entry', async () => {
     const found = recorder(() => ({ stdout: `${SECRET}\n` }));
     expect(await createSecretStore({ platform: 'darwin', spawn: found.spawn }).get('corp-jira.token')).toBe(SECRET);

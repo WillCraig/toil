@@ -64,7 +64,7 @@ interface IqEvaluationResponse {
 const FROM_DESCRIPTION = 'Inventory to evaluate: a file holding toil deps scan output (its envelope, its data, or a list of packages). Omitted, it is read from stdin on the CLI';
 
 /** The inventory's packages, through core's reader, in this command's own words. */
-function readInventory(ctx: SonatypeIqContext, from: string | undefined): InventoryPackage[] {
+function readInventory(ctx: SonatypeIqContext, from: string | undefined): Promise<InventoryPackage[]> {
   return readCoreInventory(ctx, from, {
     verb: 'evaluate',
     fix: 'Pass the output of toil deps scan, e.g. toil deps scan --include-transitive | toil sonatypeiq evaluate --application-id <id>, or --from <file> holding it.',
@@ -297,7 +297,7 @@ export const evaluateCommand = sonatypeiqArea.command({
         fix: 'Pass --application-id <public ID>; toil sonatypeiq application list shows each application\'s publicId.',
       });
     }
-    const packages = selected(readInventory(ctx, input.from), input.ecosystem, input.directOnly === true, input.includeDev === true);
+    const packages = selected(await readInventory(ctx, input.from), input.ecosystem, input.directOnly === true, input.includeDev === true);
     // tier used to come from pinging OSV.dev and Artifactory; this command asks only IQ.
     const result = { tier: 'full', source: 'sonatypeiq', sourcesQueried: ['sonatypeiq'], sourceErrors: [] as Array<{ source: string; error: string }> };
     if (packages.length === 0) return { ...result, scanned: 0, vulnerable: 0, packages: [] };

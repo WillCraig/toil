@@ -38,7 +38,7 @@ const INCLUDE_DEV = 'Include dev/test dependencies (default: false)';
 function treeReader(ctx: Ctx): ReadFile {
   return async (relPath) => {
     try {
-      return ctx.files.readText(relPath);
+      return await ctx.files.readText(relPath);
     } catch (err) {
       let present: boolean;
       try {

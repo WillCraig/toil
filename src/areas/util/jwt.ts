@@ -66,7 +66,7 @@ export const jwtDecodeCommand = defineCommand({
   examples: [{ token: EXAMPLE_TOKEN }],
   run: async (input, ctx) => {
     // From stdin, the line ending `echo` or a file adds is not part of the token.
-    const token = input.token === '-' ? ctx.files.readText('-').replace(/\r?\n$/, '') : input.token;
+    const token = input.token === '-' ? (await ctx.files.readText('-')).replace(/\r?\n$/, '') : input.token;
     return decodeJwt(token);
   },
 });

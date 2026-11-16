@@ -105,11 +105,11 @@ function pathText(path: ReadonlyArray<PropertyKey>): string {
  * entry, and an item that adds or removes a label its entry's labels map
  * doesn't name.
  */
-export function readPlanFrom(ctx: { files: FileAccess }, from: string | undefined): ClassifyPlan {
+export async function readPlanFrom(ctx: { files: FileAccess }, from: string | undefined): Promise<ClassifyPlan> {
   const where = from === undefined || from === '-' ? 'stdin' : `"${from}"`;
   let source: string;
   try {
-    source = ctx.files.readText(from ?? '-');
+    source = await ctx.files.readText(from ?? '-');
   } catch (err) {
     if (err === STDIN_OVER_MCP && from === undefined) {
       throw new ToilError('INVALID_INPUT', 'No plan to apply: pass from, a file holding toil classify run output. Over MCP there is no stdin to read it from.', {

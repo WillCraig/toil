@@ -46,10 +46,10 @@ type Input = z.output<typeof input>;
 /** The `--input-file` fields, each optional; anything else in the file is refused. */
 const fileShape = z.object({ kind: z.string(), title: z.string(), body: z.string(), email: z.string() }).partial().strict();
 
-function readFile(path: string, ctx: CommandContext<unknown>): z.output<typeof fileShape> {
+async function readFile(path: string, ctx: CommandContext<unknown>): Promise<z.output<typeof fileShape>> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(ctx.files.readText(path));
+    parsed = JSON.parse(await ctx.files.readText(path));
   } catch (err) {
     if (err instanceof ToilError) throw err;
     throw new ToilError('INVALID_INPUT', `--input-file must contain valid JSON: ${(err as Error).message}`, {
@@ -160,7 +160,7 @@ export function feedbackCommands(commit: string | null = COMMIT): AnyCommand[] {
     ],
     run: async (call: Input, ctx) => {
       const manage = access(ctx);
-      const file = call.inputFile ? readFile(call.inputFile, ctx) : {};
+      const file = call.inputFile ? await readFile(call.inputFile, ctx) : {};
       const report = buildReport(
         { kind: call.kind ?? file.kind, title: call.title ?? file.title, body: call.body ?? file.body, email: call.email ?? file.email },
         ctx.version,

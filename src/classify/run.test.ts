@@ -262,7 +262,7 @@ describe('classify run', () => {
 
   it('writes a plan that categorize reads, as the whole envelope', async () => {
     const e = await cli(disk(), ['classify', 'run', '--toil-project', 'payments', '--file', 'items.json']);
-    const plan = readPlanFrom({ files: memoryFiles({ 'plan.json': JSON.stringify(e) }) }, 'plan.json');
+    const plan = (await readPlanFrom({ files: memoryFiles({ 'plan.json': JSON.stringify(e) }) }, 'plan.json'));
     expect(plan.plan[0]!.items.length).toBeGreaterThan(0);
     expect(plan.scheme).toEqual({ name: 'team', revision: 3 });
   });
@@ -379,13 +379,13 @@ describe('what counts as a correction from the tracker: the label is the record,
   const record = (result: ReturnType<typeof read>['result'], lines: Parameters<typeof recordable>[1]) => recordable(result, lines, null, '2026-11-12T00:00:00Z');
   const lines = (result: ReturnType<typeof read>['result']) => record(result, []).verdicts;
 
-  it('treats a changed label as a correction', () => {
+  it('treats a changed label as a correction', async () => {
     const before = lines(read(['ktlo'], 'KTLO').result);
     const out = record(read(['feature'], 'KTLO').result, before);
     expect(out.corrections).toMatchObject([{ from: 'ktlo', to: 'feature', via: 'tracker' }]);
   });
 
-  it('does not treat a changed field alone as one, and the next plan puts the field back to the label', () => {
+  it('does not treat a changed field alone as one, and the next plan puts the field back to the label', async () => {
     const before = lines(read(['ktlo'], 'KTLO').result);
     const { result } = read(['ktlo'], 'Feature');
     expect(record(result, before)).toEqual({ verdicts: [], corrections: [] });

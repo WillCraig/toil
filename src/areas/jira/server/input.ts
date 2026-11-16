@@ -24,14 +24,14 @@ const unknownField = (name: string) =>
   new ToilError('INVALID_INPUT', `Unknown custom field: "${name}". Fields must be registered in config by friendly name or ID. Run: toil jira issue fields`, { fix: FIELD_FIX });
 
 /** A string value starting with `@` is replaced by that file's contents; anything else is returned as is. */
-export function resolveAtFileRef(value: unknown, files: FileAccess): unknown {
+export async function resolveAtFileRef(value: unknown, files: FileAccess): Promise<unknown> {
   if (typeof value !== 'string' || !value.startsWith('@')) return value;
-  return files.readText(value.slice(1));
+  return await files.readText(value.slice(1));
 }
 
 /** Reads and parses a JSON file argument. `-` reads stdin where available. */
-export function readJsonInputFile(path: string, files: FileAccess, flag = '--input-file'): unknown {
-  const raw = files.readText(path);
+export async function readJsonInputFile(path: string, files: FileAccess, flag = '--input-file'): Promise<unknown> {
+  const raw = await files.readText(path);
   try {
     return JSON.parse(raw) as unknown;
   } catch (err) {
@@ -46,15 +46,15 @@ export function readJsonInputFile(path: string, files: FileAccess, flag = '--inp
  * (summary, description, priority, assignee, labels, parent; any case) and
  * custom fields, resolving `@file` references on every value.
  */
-export function splitFieldsDictionary(
+export async function splitFieldsDictionary(
   fields: Record<string, unknown>,
   fieldMap: CustomFieldMap,
   files: FileAccess,
-): { builtin: Record<string, unknown>; custom: Record<string, unknown> } {
+): Promise<{ builtin: Record<string, unknown>; custom: Record<string, unknown> }> {
   const builtin: Record<string, unknown> = {};
   const custom: Record<string, unknown> = {};
   for (const [rawKey, rawValue] of Object.entries(fields)) {
-    const value = resolveAtFileRef(rawValue, files);
+    const value = await resolveAtFileRef(rawValue, files);
     const key = rawKey.toLowerCase();
     if (BUILTIN_ISSUE_FIELDS.has(key)) {
       builtin[key] = value;
@@ -72,7 +72,7 @@ export function splitFieldsDictionary(
  * value from a file, as JSON when it parses and as text when it doesn't;
  * otherwise a registered field's type shapes the value.
  */
-export function parseFieldArgs(args: string[], fieldMap: CustomFieldMap, files: FileAccess): Record<string, unknown> {
+export async function parseFieldArgs(args: string[], fieldMap: CustomFieldMap, files: FileAccess): Promise<Record<string, unknown>> {
   const result: Record<string, unknown> = {};
   for (const arg of args) {
     const eq = arg.indexOf('=');
@@ -84,7 +84,7 @@ export function parseFieldArgs(args: string[], fieldMap: CustomFieldMap, files: 
     const id = resolveFieldKey(name, fieldMap);
     if (id === undefined) throw unknownField(name);
     if (value.startsWith('@')) {
-      const raw = files.readText(value.slice(1)).trim();
+      const raw = (await files.readText(value.slice(1))).trim();
       try {
         result[id] = JSON.parse(raw) as unknown;
       } catch {
@@ -99,10 +99,10 @@ export function parseFieldArgs(args: string[], fieldMap: CustomFieldMap, files: 
 }
 
 /** A --fields-file: a JSON object of field name or id to the value Jira's API takes, unshaped. */
-export function parseFieldsFile(path: string, fieldMap: CustomFieldMap, files: FileAccess): Record<string, unknown> {
+export async function parseFieldsFile(path: string, fieldMap: CustomFieldMap, files: FileAccess): Promise<Record<string, unknown>> {
   let raw: string;
   try {
-    raw = files.readText(path);
+    raw = await files.readText(path);
   } catch (err) {
     throw new ToilError('INVALID_INPUT', `Cannot read fields file "${path}": ${(err as Error).message}`, { fix: 'Check the path. Relative paths resolve against the working directory.' });
   }
@@ -162,11 +162,11 @@ export const commaList = (value: string): string[] =>
  * The JQL for `jira issue search`, from --jql or --jql-file, trimmed: a file almost
  * always ends in a newline, and Jira rejects the trailing whitespace.
  */
-export function resolveJql(jql: string | undefined, jqlFile: string | undefined, files: FileAccess): string {
+export async function resolveJql(jql: string | undefined, jqlFile: string | undefined, files: FileAccess): Promise<string> {
   if (jql !== undefined && jqlFile !== undefined) {
     throw new ToilError('INVALID_INPUT', 'Cannot specify both --jql and --jql-file', { fix: 'Pass one of them.' });
   }
-  const raw = jqlFile !== undefined ? files.readText(jqlFile) : jql;
+  const raw = jqlFile !== undefined ? await files.readText(jqlFile) : jql;
   if (raw === undefined) throw new ToilError('INVALID_INPUT', 'Must specify --jql or --jql-file', { fix: 'Pass --jql "project = ABC", or --jql-file query.jql.' });
   const trimmed = raw.trim();
   // Separate from the missing case: someone who did pass --jql-file shouldn't be told to pass it.

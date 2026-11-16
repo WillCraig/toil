@@ -38,9 +38,9 @@ export function inDateRange(time: number, after?: Date, before?: Date): boolean 
 }
 
 /** A body from `--body`, else `--body-file` (`-` is stdin), else nothing. */
-export function bodyOf(ctx: GitHubContext, body: string | undefined, bodyFile: string | undefined): string | undefined {
+export async function bodyOf(ctx: GitHubContext, body: string | undefined, bodyFile: string | undefined): Promise<string | undefined> {
   if (body !== undefined) return body;
-  return bodyFile === undefined ? undefined : ctx.files.readText(bodyFile);
+  return bodyFile === undefined ? undefined : await ctx.files.readText(bodyFile);
 }
 
 /** The PR's GraphQL node id, which every mutation needs, read with a plain GET first. */

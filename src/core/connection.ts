@@ -87,7 +87,7 @@ export async function resolveConnection(
     return key in shared ? 3 : 4;
   };
   const merged = renameKeys({ ...(area.defaults ?? {}), ...shared, ...own }, area, name, warn, tier);
-  await resolveSecrets(merged, area, name, secrets, warn, signal);
+  const unread = await resolveSecrets(merged, area, name, secrets, warn, signal);
   if (area.shares) await takeShared(config, area, name, stored, merged, { warn, secrets, signal, report: options.shared });
 
   const shape = area.connection.shape as Record<string, z.ZodType>;
@@ -126,7 +126,9 @@ export async function resolveConnection(
         return i.path.length ? `${i.path.join('.')}: ${reason}` : reason;
       });
     const why = !incomplete && reasons.length ? ` ${[...new Set(reasons)].join('; ')}.` : '';
-    const message = `Connection ${name} (${area.name}) is missing or has invalid ${keys.join(', ') || 'settings'}.${why}`;
+    // A secret whose store entry couldn't be read is named with the store's own reason, in the error, not only in a warning.
+    const storeWhy = keys.filter((k) => unread[k] !== undefined).map((k) => ` ${unread[k]}`).join('');
+    const message = `Connection ${name} (${area.name}) is missing or has invalid ${keys.join(', ') || 'settings'}.${why}${storeWhy}`;
     throw incomplete ? new IncompleteConnectionError(message, options) : new ToilError('CONFIG_INVALID', message, options);
   }
   return { ...(parsed.data as Record<string, unknown>), name, area: area.name, writes: connectionWrites(stored) };
@@ -203,7 +205,8 @@ async function resolveSecrets(
   secrets: Pick<SecretStore, 'get'> | undefined,
   warn: (w: Warning) => void,
   signal: AbortSignal | undefined,
-): Promise<void> {
+): Promise<Record<string, string>> {
+  const unread: Record<string, string> = {};
   for (const key of area.secrets ?? []) {
     const value = settings[key];
     if (!isKeychainRef(value)) continue;
@@ -219,6 +222,7 @@ async function resolveSecrets(
     }
     if (secret === undefined) {
       delete settings[key];
+      unread[key] = `${key} is ${value}, which couldn't be read: ${reason}.`;
       warn({
         code: 'CONFIG_SECRET_UNRESOLVED',
         message: `${key} on connection ${name} is ${value}, which couldn't be read (${reason}). Run toil connections login ${name}, or set ${connectionEnvName(name, key)}.`,
@@ -227,6 +231,7 @@ async function resolveSecrets(
       settings[key] = secret;
     }
   }
+  return unread;
 }
 
 /**

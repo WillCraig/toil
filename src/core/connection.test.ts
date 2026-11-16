@@ -199,15 +199,22 @@ describe('keychain: references', async () => {
   });
 
   it('an unresolvable reference is unset, never the literal string, with a warning naming the fix', async () => {
-    for (const secrets of [store({}), store({}, new Error('store is locked')), undefined]) {
+    const cases: Array<[ReturnType<typeof store> | undefined, string]> = [
+      [store({}), 'there is no such entry in the OS credential store'],
+      [store({}, new Error('store is locked')), 'store is locked'],
+      [undefined, 'no OS credential store is available here'],
+    ];
+    for (const [secrets, reason] of cases) {
       let thrown: unknown;
       try {
         await run(withRef(), secrets);
       } catch (err) {
         thrown = err;
       }
-      expect(thrown).toMatchObject({ code: 'CONFIG_INVALID', message: expect.stringContaining('token') });
-      expect(JSON.stringify(thrown)).not.toContain('keychain:');
+      // The error itself says which reference couldn't be read and the store's reason (principle 4), not only a warning.
+      expect(thrown).toMatchObject({ code: 'CONFIG_INVALID', message: expect.stringContaining(`token is keychain:a.token, which couldn't be read: ${reason}.`) });
+      // The reference is named, never used as the value: no schema issue was raised on the literal string.
+      expect(JSON.stringify((thrown as { details?: unknown }).details)).not.toContain('keychain:');
     }
     const optional = defineArea({ name: 'api', description: 'test', connection: z.object({ baseUrl: z.string(), token: z.string().optional() }), secrets: ['token'] });
     const warnings: Warning[] = [];

@@ -32,7 +32,7 @@ const fromField = z.string().optional().describe(FROM_DESCRIPTION);
 const ecosystemField = z.string().optional().describe(ECOSYSTEM_DESCRIPTION);
 
 /** The inventory, read by core's shared reader, with the fix naming this area's commands. */
-function readInventory(ctx: ArtifactoryContext, from: string | undefined): InventoryPackage[] {
+function readInventory(ctx: ArtifactoryContext, from: string | undefined): Promise<InventoryPackage[]> {
   return readSharedInventory(ctx, from, { pipeTo: 'toil artifactory package <command>' });
 }
 
@@ -154,7 +154,7 @@ export const outdatedCommand = artifactoryArea.command({
     { from: 'inventory.json', major: true, patch: true },
   ],
   run: async (input, ctx) => {
-    const packages = direct(readInventory(ctx, input.from), input.ecosystem, false);
+    const packages = direct(await readInventory(ctx, input.from), input.ecosystem, false);
     await requireReachable(ctx);
     const filterType = input.major ? 'major' : input.minor ? 'minor' : input.patch ? 'patch' : undefined;
     const order = { major: 3, minor: 2, patch: 1 };
@@ -198,7 +198,7 @@ export const licenseCheckCommand = artifactoryArea.command({
   ],
   examples: [{ from: 'inventory.json' }, { from: 'inventory.json', ecosystem: 'nuget', includeDev: true }],
   run: async (input, ctx) => {
-    const packages = direct(readInventory(ctx, input.from), input.ecosystem, input.includeDev === true);
+    const packages = direct(await readInventory(ctx, input.from), input.ecosystem, input.includeDev === true);
     await requireReachable(ctx);
     const licensed: Array<{ name: string; version: string; ecosystem: Ecosystem; source: string; license: string | null }> = [];
     for (const pkg of packages) {

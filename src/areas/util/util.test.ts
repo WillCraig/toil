@@ -36,7 +36,7 @@ describe('util jwt decode', () => {
     expect(envelope.data).toEqual({ header: { alg: 'HS256', typ: 'JWT' }, payload: { sub: 'abc12345', name: 'Ada Lovelace', iat: 1760000000 }, signature: 'c2lnbmF0dXJlLW5vdC1jaGVja2Vk' });
   });
 
-  it('pads base64url segments of every length and maps - and _', () => {
+  it('pads base64url segments of every length and maps - and _', async () => {
     // {"a":"??>"} has bytes that encode to - and _ in base64url.
     const header = b64('{"alg":"none"}');
     const payload = b64('{"a":"??>"}');
@@ -87,21 +87,21 @@ describe('util jwt decode', () => {
   });
 
   describe('suspected bugs, pinned (#75)', () => {
-    it('item 1: a header or payload that is JSON but not an object is accepted', () => {
+    it('item 1: a header or payload that is JSON but not an object is accepted', async () => {
       expect(decodeJwt('bnVsbA.bnVsbA.x')).toEqual({ header: null, payload: null, signature: 'x' });
       expect(decodeJwt('WzEsMl0.e30.x')).toEqual({ header: [1, 2], payload: {}, signature: 'x' });
     });
 
-    it('item 2: characters outside base64url are skipped, and standard base64 is accepted', () => {
+    it('item 2: characters outside base64url are skipped, and standard base64 is accepted', async () => {
       expect(decodeJwt('eyJh!!bGciOiJIUzI1NiJ9.e30.x').header).toEqual({ alg: 'HS256' });
       expect(decodeJwt(`${Buffer.from('{"a":"??>"}').toString('base64')}.e30.x`).header).toEqual({ a: '??>' });
     });
 
-    it('item 3: invalid UTF-8 becomes U+FFFD', () => {
+    it('item 3: invalid UTF-8 becomes U+FFFD', async () => {
       expect(decodeJwt('e30.eyJhIjoi_yJ9.x').payload).toEqual({ a: '�' });
     });
 
-    it('item 4: a Bearer prefix fails as a header error, and trailing whitespace stays in the signature', () => {
+    it('item 4: a Bearer prefix fails as a header error, and trailing whitespace stays in the signature', async () => {
       expect(() => decodeJwt(`Bearer ${EXAMPLE_TOKEN}`)).toThrow('Invalid JWT: header is not valid JSON');
       expect(decodeJwt(`${EXAMPLE_TOKEN}\n`).signature).toBe('c2lnbmF0dXJlLW5vdC1jaGVja2Vk\n');
     });
@@ -159,7 +159,7 @@ describe('util deps scan', () => {
 
   it('pipes into osv vulns on stdin, as its inventory', async () => {
     const scanned = await runCli(['util', 'deps', 'scan'], { commands: registry, context: testContext({ files, repo: REPO }).context });
-    expect(readInventory(testContext({ stdin: scanned.stdout }).context, undefined)).toHaveLength(6);
+    expect((await readInventory(testContext({ stdin: scanned.stdout }).context, undefined))).toHaveLength(6);
     const checked = await runCli(['osv', 'vulns'], { commands: registry, context: testContext({ stdin: scanned.stdout, routes: osvRoutes }).context });
     expect(checked.envelope?.ok, checked.stdout).toBe(true);
     // lodash and log4j-core have known vulnerabilities in the OSV fixture.
@@ -362,7 +362,7 @@ describe('util deps diff', () => {
     });
   });
 
-  it('marks a lower version as downgraded, and keeps Maven group:artifact names whole', () => {
+  it('marks a lower version as downgraded, and keeps Maven group:artifact names whole', async () => {
     const pkg = (name: string, version: string, ecosystem: Package['ecosystem'] = 'maven'): Package => ({ name, version, ecosystem, source: 'pom.xml', type: 'direct', scope: 'production' });
     const result = diffScans('a', 'b', buildScanData([], [pkg('g:a', '2.0.0')]), buildScanData([], [pkg('g:a', '1.9.0')]));
     expect(result.changes).toEqual([{ name: 'g:a', ecosystem: 'maven', change: 'downgraded', from: '2.0.0', to: '1.9.0', source: 'pom.xml' }]);
@@ -404,7 +404,7 @@ describe('util deps diff', () => {
   });
 
   describe('suspected bugs, pinned (#91)', () => {
-    it('item 19: one version per package and source survives, so a second copy hides the change', () => {
+    it('item 19: one version per package and source survives, so a second copy hides the change', async () => {
       const pkg = (version: string): Package => ({ name: 'qs', version, ecosystem: 'npm', source: 'package-lock.json', type: 'transitive', scope: 'production' });
       const result = diffScans('a', 'b', buildScanData([], [pkg('6.5.3'), pkg('6.11.0')]), buildScanData([], [pkg('6.5.4'), pkg('6.11.0')]));
       expect(result.changes).toEqual([]);

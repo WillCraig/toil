@@ -81,14 +81,14 @@ export function buildFieldPatch(fields: Record<string, unknown>, fieldAliases: R
 }
 
 /** A string value starting with `@` is that file's text; anything else is returned as is. */
-export function resolveAtFileRef(value: unknown, files: FileAccess): unknown {
+export async function resolveAtFileRef(value: unknown, files: FileAccess): Promise<unknown> {
   if (typeof value !== 'string' || !value.startsWith('@')) return value;
-  return files.readText(value.slice(1));
+  return await files.readText(value.slice(1));
 }
 
 /** Reads and parses an --input-file. `-` reads stdin where the front door allows it. */
-export function readJsonInputFile(path: string, files: FileAccess): WorkItemJsonInput {
-  const raw = files.readText(path);
+export async function readJsonInputFile(path: string, files: FileAccess): Promise<WorkItemJsonInput> {
+  const raw = await files.readText(path);
   try {
     return JSON.parse(raw) as WorkItemJsonInput;
   } catch (err) {
@@ -104,11 +104,11 @@ const BUILTIN_WORK_FIELD_KEYS = new Set(['title', 'description', 'assignee', 'as
  * spaces ignored, `AssignedTo` as assignee) and the rest, kept as written.
  * `@file` references are read on every value.
  */
-export function splitWorkFieldsDictionary(fields: Record<string, unknown>, files: FileAccess): { builtin: Record<string, unknown>; custom: Record<string, unknown> } {
+export async function splitWorkFieldsDictionary(fields: Record<string, unknown>, files: FileAccess): Promise<{ builtin: Record<string, unknown>; custom: Record<string, unknown> }> {
   const builtin: Record<string, unknown> = {};
   const custom: Record<string, unknown> = {};
   for (const [rawKey, rawValue] of Object.entries(fields)) {
-    const value = resolveAtFileRef(rawValue, files);
+    const value = await resolveAtFileRef(rawValue, files);
     const key = rawKey.toLowerCase().replace(/\s+/g, '');
     if (BUILTIN_WORK_FIELD_KEYS.has(key)) builtin[key === 'assignedto' ? 'assignee' : key] = value;
     else custom[rawKey] = value;

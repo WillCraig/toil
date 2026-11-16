@@ -190,7 +190,7 @@ export const createPrCommand = githubArea.command({
   run: async (input, ctx) => {
     const { owner, repo } = target(ctx);
     const base = input.base ?? ctx.connection.targetBranch ?? 'main';
-    const body = bodyOf(ctx, input.body, input.bodyFile);
+    const body = await bodyOf(ctx, input.body, input.bodyFile);
     return github(ctx, apiPath`/repos/${owner}/${repo}/pulls`, {
       method: 'POST',
       json: { title: input.title, head: input.head, base, ...(body !== undefined ? { body } : {}), ...(input.draft !== undefined ? { draft: input.draft } : {}) },

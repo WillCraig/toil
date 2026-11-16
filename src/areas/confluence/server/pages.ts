@@ -161,13 +161,13 @@ async function toStorage(ctx: { warn: (w: Warning) => void; signal?: AbortSignal
  * undefined for neither; both is refused. The file is read as it is, with no
  * trimming.
  */
-function bodyOf(files: FileAccess, body: string | undefined, bodyFile: string | undefined): string | undefined {
+async function bodyOf(files: FileAccess, body: string | undefined, bodyFile: string | undefined): Promise<string | undefined> {
   if (body !== undefined && bodyFile !== undefined) {
     throw new ToilError('INVALID_INPUT', 'Cannot specify both --body and --body-file', { fix: 'Pass one of them.' });
   }
   if (bodyFile === undefined) return body;
   try {
-    return files.readText(bodyFile);
+    return await files.readText(bodyFile);
   } catch (err) {
     const source = bodyFile === '-' ? 'stdin' : `file "${bodyFile}"`;
     const inner = err instanceof ToilError ? err : undefined;
@@ -207,7 +207,7 @@ export const createPage = confluenceArea.command({
   run: async (input, ctx) => {
     let sent: string | undefined;
     try {
-      const raw = bodyOf(ctx.files, input.body, input.bodyFile);
+      const raw = await bodyOf(ctx.files, input.body, input.bodyFile);
       if (raw === undefined) throw new ToilError('INVALID_INPUT', 'Must specify --body or --body-file', { fix: 'Pass the page body with --body, or a file with --body-file.' });
       sent = input.markdown ? await toStorage(ctx, raw) : raw;
       return await client.createPage(ctx, {
@@ -256,7 +256,7 @@ export const updatePage = confluenceArea.command({
   run: async (input, ctx) => {
     let sent: string | undefined;
     try {
-      const raw = bodyOf(ctx.files, input.body, input.bodyFile);
+      const raw = await bodyOf(ctx.files, input.body, input.bodyFile);
       sent = raw !== undefined && input.markdown ? await toStorage(ctx, raw) : raw;
       const current = (await client.getPage(ctx, input.id, 'version')) as { title: string; version: { number: number } };
       return await client.updatePage(ctx, input.id, {

@@ -38,7 +38,7 @@ export const inventoryOptions = [
  * The inventory's packages, from `from` or stdin, through core's reader in
  * the words these two sources shipped with.
  */
-export function readInventory(ctx: InventoryContext, from: string | undefined, command: string): InventoryPackage[] {
+export function readInventory(ctx: InventoryContext, from: string | undefined, command: string): Promise<InventoryPackage[]> {
   return readCoreInventory(ctx, from, {
     holds: 'a JSON file holding a list of { name, version, ecosystem } packages',
     missingFix: 'Write the package list to a file in the workspace, then pass its path as from.',
