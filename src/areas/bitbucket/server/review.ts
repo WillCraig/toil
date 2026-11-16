@@ -23,14 +23,14 @@ export const diffCommand = bitbucketArea.command({
     "Returns a pull request's diff as data.diff: Bitbucket's JSON diff structure (diffs, hunks, segments) serialized to a string, not unified diff text. file limits it to one path; contextLines sets the lines of context.",
   input: z.object({
     id: prInput,
-    file: z.string().optional().describe('Limit diff to a specific file'),
+    path: z.string().optional().describe('Limit diff to a specific file'),
     contextLines: intText.optional().describe('Lines of context around changes'),
   }),
   writes: false,
   context: IN_REPO,
   args: [prArg],
-  options: [{ flags: '--file <path>', field: 'file', description: 'Limit diff to a specific file' }, { flags: '--context-lines <n>', field: 'contextLines', description: 'Lines of context around changes' }],
-  examples: [example, { ...example, file: 'src/retry.ts', contextLines: '5' }],
+  options: [{ flags: '--path <path>', field: 'path', description: 'Limit diff to a specific file', deprecated: ['--file <path>'] }, { flags: '--context-lines <n>', field: 'contextLines', description: 'Lines of context around changes' }],
+  examples: [example, { ...example, path: 'src/retry.ts', contextLines: '5' }],
   run: async (input, ctx) => {
     const { project, repo } = where(ctx);
     // The flag's text is read as the contract specifies: any non-empty value, "0" included.
@@ -39,7 +39,7 @@ export const diffCommand = bitbucketArea.command({
     // its own, so a # or ? in a file name stays part of the name. The JSON
     // answer is stringified, not turned into a unified diff (#76 item 5).
     const base = `${prPath(project, repo, toInt(input.id))}/diff`;
-    const result = await bb<unknown>(ctx, input.file ? apiPath`${rawPath(base)}/${segments(input.file, 'The --file path')}` : base, { query: contextLines !== undefined ? { contextLines } : {} });
+    const result = await bb<unknown>(ctx, input.path ? apiPath`${rawPath(base)}/${segments(input.path, 'The --path value')}` : base, { query: contextLines !== undefined ? { contextLines } : {} });
     return { diff: typeof result === 'string' ? result : JSON.stringify(result) };
   },
 });

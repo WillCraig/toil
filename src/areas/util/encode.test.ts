@@ -45,7 +45,7 @@ const codes = (envelope: Envelope) => (envelope.meta.warnings ?? []).map((w) => 
 
 /** Encodes `bytes` from a file, then decodes the output to a file, and returns what came back. */
 async function roundTrip(scheme: Encoding, bytes: Uint8Array) {
-  const enc = await run({ scheme, file: 'in.bin' }, { 'in.bin': bytes });
+  const enc = await run({ scheme, inputFile: 'in.bin' }, { 'in.bin': bytes });
   expect(enc.envelope.ok, `${scheme} encode`).toBe(true);
   expect(enc.data.verified.passed, `${scheme} encode verified`).toBe(true);
   const output = enc.data.output as string;
@@ -148,7 +148,7 @@ describe('util encode: decoding padding, case and whitespace variants', () => {
 
   it('reads MIME-wrapped base64 from a file, CRLF and all', async () => {
     expect(PIXEL_B64.split('\r\n')).toHaveLength(3);
-    const { data, files } = await run({ scheme: 'base64', decode: true, file: 'pixel.b64', out: 'pixel.png' }, { 'pixel.b64': PIXEL_B64 });
+    const { data, files } = await run({ scheme: 'base64', decode: true, inputFile: 'pixel.b64', out: 'pixel.png' }, { 'pixel.b64': PIXEL_B64 });
     expect(files.written['/work/pixel.png']).toEqual(PIXEL_PNG);
     expect(data).toMatchObject({ operation: 'decode', utf8: false, outputBytes: PIXEL_PNG.length, inputBytes: PIXEL_B64.length, file: '/work/pixel.png' });
     expect(data.verified.passed).toBe(true);
@@ -196,14 +196,14 @@ describe('util encode: invalid input', () => {
     expect(unknown.exitCode).toBe(1);
     expect((await run({ scheme: 'sha256', decode: true, text: 'x' })).envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: "sha256 is a hash, which can't be decoded." });
     expect((await run({ scheme: 'md5', text: 'x', out: 'x.txt' })).envelope.error).toMatchObject({ code: 'INVALID_INPUT' });
-    const binary = await run({ scheme: 'base64', decode: true, file: 'pixel.png' }, { 'pixel.png': PIXEL_PNG });
+    const binary = await run({ scheme: 'base64', decode: true, inputFile: 'pixel.png' }, { 'pixel.png': PIXEL_PNG });
     expect(binary.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('looks binary') });
   });
 });
 
 describe('util encode: binary output never comes back as JSON text', () => {
   it('refuses decoded bytes that are not UTF-8 without --out, and returns no output at all', async () => {
-    const { envelope } = await run({ scheme: 'base64', decode: true, file: 'pixel.b64' }, { 'pixel.b64': PIXEL_B64 });
+    const { envelope } = await run({ scheme: 'base64', decode: true, inputFile: 'pixel.b64' }, { 'pixel.b64': PIXEL_B64 });
     expect(envelope.ok).toBe(false);
     expect(envelope.data).toBeNull();
     expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: `The input decodes to ${PIXEL_PNG.length} bytes that aren't valid UTF-8 text, so they can't be returned as JSON without changing them.` });
@@ -305,14 +305,14 @@ describe('util encode: hashes', () => {
     ['md5', '', 'd41d8cd98f00b204e9800998ecf8427e'],
     ['md5', 'abc', '900150983cd24fb0d6963f7d28e17f72'],
   ])('%s of %j is the published digest, in hex and base64', async (scheme, text, hex) => {
-    const { data } = await run({ scheme, file: 'in.txt' }, { 'in.txt': text });
+    const { data } = await run({ scheme, inputFile: 'in.txt' }, { 'in.txt': text });
     expect(data).toMatchObject({ operation: 'hash', scheme, inputBytes: text.length, hex, base64: Buffer.from(hex, 'hex').toString('base64') });
     expect(check(data, 'input.complete')).toMatchObject({ status: 'passed', checked: 1 });
     expect(data.verified.passed).toBe(true);
   });
 
   it('hashes binary and non-UTF-8 files byte for byte, with no warning', async () => {
-    const { envelope, data } = await run({ scheme: 'sha256', file: 'pixel.png' }, { 'pixel.png': PIXEL_PNG });
+    const { envelope, data } = await run({ scheme: 'sha256', inputFile: 'pixel.png' }, { 'pixel.png': PIXEL_PNG });
     expect(data.hex).toBe(createHash('sha256').update(PIXEL_PNG).digest('hex'));
     expect(envelope.meta.warnings).toBeUndefined();
   });
@@ -329,7 +329,7 @@ describe('util encode: hashes', () => {
         }
       })();
     const warnings: Warning[] = [];
-    const result = (await runEncode({ scheme: 'sha256', file: 'big.bin' }, { files, warn: (w) => warnings.push(w) })) as unknown as Data;
+    const result = (await runEncode({ scheme: 'sha256', inputFile: 'big.bin' }, { files, warn: (w) => warnings.push(w) })) as unknown as Data;
     expect(result.inputBytes).toBe(65536);
     expect(result.verified.passed).toBe(false);
     expect(check(result, 'input.complete')).toMatchObject({ status: 'failed', failed: 1 });
@@ -338,10 +338,10 @@ describe('util encode: hashes', () => {
 
   it('hashes a file past the 64 MiB cap the other operations keep, since it streams', async () => {
     const big = new Uint8Array(DEFAULT_MAX_BYTES + 1);
-    const { data } = await run({ scheme: 'sha1', file: 'big.bin' }, { 'big.bin': big });
+    const { data } = await run({ scheme: 'sha1', inputFile: 'big.bin' }, { 'big.bin': big });
     expect(data).toMatchObject({ inputBytes: DEFAULT_MAX_BYTES + 1, hex: createHash('sha1').update(big).digest('hex') });
     expect(data.verified.passed).toBe(true);
-    expect((await run({ scheme: 'hex', file: 'big.bin' }, { 'big.bin': big })).envelope.error?.code).toBe('INVALID_INPUT');
+    expect((await run({ scheme: 'hex', inputFile: 'big.bin' }, { 'big.bin': big })).envelope.error?.code).toBe('INVALID_INPUT');
   });
 
   it('says a hash of stdin could not be checked against a size', async () => {
@@ -353,7 +353,7 @@ describe('util encode: hashes', () => {
 
 describe('util encode: --out', () => {
   it('writes encoded text to a new file, reads it back, and leaves output out', async () => {
-    const { data, files } = await run({ scheme: 'hex', file: 'pixel.png', out: 'out/pixel.hex' }, { 'pixel.png': PIXEL_PNG });
+    const { data, files } = await run({ scheme: 'hex', inputFile: 'pixel.png', out: 'out/pixel.hex' }, { 'pixel.png': PIXEL_PNG });
     expect(new TextDecoder().decode(files.written['/work/out/pixel.hex'])).toBe(Buffer.from(PIXEL_PNG).toString('hex'));
     expect(data).toMatchObject({ operation: 'encode', file: '/work/out/pixel.hex', outputBytes: PIXEL_PNG.length * 2 });
     expect(data).not.toHaveProperty('output');

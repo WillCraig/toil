@@ -233,7 +233,7 @@ describe('build runs and build get', () => {
 
 describe('package outdated', () => {
   it('pings with only the token, then looks up each direct production package with only the token, one at a time', async () => {
-    const { envelope, calls } = await run(outdatedCommand, { from: 'inventory.json' }, fixtureRoutes);
+    const { envelope, calls } = await run(outdatedCommand, { inputFile: 'inventory.json' }, fixtureRoutes);
     expect(calls.map((c) => [c.method, c.url, c.headers])).toEqual([
       ['GET', `${ARTIFACTORY}/api/system/ping`, TOKEN_ONLY],
       ['GET', `${ARTIFACTORY}/api/npm/npm-remote/express`, TOKEN_ONLY],
@@ -257,40 +257,40 @@ describe('package outdated', () => {
   });
 
   it('--minor keeps minor and major bumps; --major wins over the others', async () => {
-    const minor = await run(outdatedCommand, { from: 'inventory.json', minor: true }, fixtureRoutes);
+    const minor = await run(outdatedCommand, { inputFile: 'inventory.json', minor: true }, fixtureRoutes);
     expect((minor.envelope.data as { outdated: Array<{ name: string }> }).outdated.map((p) => p.name)).toEqual(['express', '@types/node', 'org.slf4j:slf4j-api']);
-    const major = await run(outdatedCommand, { from: 'inventory.json', major: true, patch: true }, fixtureRoutes);
+    const major = await run(outdatedCommand, { inputFile: 'inventory.json', major: true, patch: true }, fixtureRoutes);
     expect((major.envelope.data as { summary: unknown }).summary).toEqual({ total: 2, major: 2, minor: 0, patch: 0 });
   });
 
   it('lists ecosystems with no repository key as unchecked', async () => {
     const config = { artifactory: { baseUrl: ARTIFACTORY, token: 'test-token', npmRepo: 'npm-remote' } };
-    const { envelope, calls } = await run(outdatedCommand, { from: 'inventory.json' }, fixtureRoutes, { config });
+    const { envelope, calls } = await run(outdatedCommand, { inputFile: 'inventory.json' }, fixtureRoutes, { config });
     expect(calls.map((c) => new URL(c.url).pathname)).toEqual(['/api/system/ping', '/api/npm/npm-remote/express', '/api/npm/npm-remote/@types%2Fnode']);
     expect(envelope.data).toMatchObject({ uncheckedEcosystems: ['nuget', 'maven'], summary: { total: 2 } });
   });
 
   it('suspected bug #91 item 23: a lookup that fails for any reason drops the package, and the command succeeds', async () => {
     const routes: Route[] = [PING, { url: /\/api\/npm\//, respond: { status: 404, json: { errors: [{ message: 'no repo' }] } } }, { url: /.*/, respond: { status: 500, text: 'down' } }];
-    const { envelope } = await run(outdatedCommand, { from: 'inventory.json' }, routes);
+    const { envelope } = await run(outdatedCommand, { inputFile: 'inventory.json' }, routes);
     expect(envelope).toMatchObject({ ok: true, data: { outdated: [], uncheckedEcosystems: [], summary: { total: 0 } } });
   });
 
   it('suspected bug #91 item 24: an unknown --ecosystem matches nothing and still succeeds', async () => {
-    const { envelope, calls } = await run(outdatedCommand, { from: 'inventory.json', ecosystem: 'nugget' }, fixtureRoutes);
+    const { envelope, calls } = await run(outdatedCommand, { inputFile: 'inventory.json', ecosystem: 'nugget' }, fixtureRoutes);
     expect(envelope).toMatchObject({ ok: true, data: { outdated: [], summary: { total: 0 } } });
     expect(calls.map((c) => new URL(c.url).pathname)).toEqual(['/api/system/ping']);
   });
 
   it('stops when the ping fails, with its documented message pointing at ping', async () => {
-    const denied = await run(outdatedCommand, { from: 'inventory.json' }, [{ url: /.*/, respond: { status: 401, text: '' } }]);
+    const denied = await run(outdatedCommand, { inputFile: 'inventory.json' }, [{ url: /.*/, respond: { status: 401, text: '' } }]);
     expect(denied.calls).toHaveLength(1);
     expect(denied.envelope.error).toMatchObject({
       code: 'AUTH',
       message: `Artifactory at ${ARTIFACTORY} is not reachable or authentication failed. Run 'toil artifactory ping' to diagnose.`,
       details: { status: 503 },
     });
-    const down = await run(outdatedCommand, { from: 'inventory.json' }, [{ url: /.*/, respond: { status: 502, text: '' } }]);
+    const down = await run(outdatedCommand, { inputFile: 'inventory.json' }, [{ url: /.*/, respond: { status: 502, text: '' } }]);
     expect(down.envelope.error?.code).toBe('NETWORK');
   });
 
@@ -298,7 +298,7 @@ describe('package outdated', () => {
     const list = JSON.stringify([{ name: 'express', version: '4.18.2', ecosystem: 'npm', source: 'package.json' }]);
     const { envelope } = await run(outdatedCommand, {}, fixtureRoutes, { stdin: list });
     expect(envelope.data).toMatchObject({ outdated: [{ name: 'express', latest: '5.1.0' }] });
-    const data = await run(outdatedCommand, { from: '-' }, fixtureRoutes, { stdin: JSON.stringify(inventory.data) });
+    const data = await run(outdatedCommand, { inputFile: '-' }, fixtureRoutes, { stdin: JSON.stringify(inventory.data) });
     expect(data.envelope.data).toMatchObject({ summary: { total: 4 } });
   });
 
@@ -309,7 +309,7 @@ describe('package outdated', () => {
     expect(notJson.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: "The inventory from stdin isn't JSON." });
     const failed = await run(outdatedCommand, {}, [], { stdin: JSON.stringify({ ok: false, error: { message: 'Not inside a git repository.' } }) });
     expect(failed.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'The inventory from stdin is a failed result: Not inside a git repository..' });
-    const shapeless = await run(outdatedCommand, { from: 'inventory.json' }, [], { files: { 'inventory.json': '{"ok":true,"data":{}}' } });
+    const shapeless = await run(outdatedCommand, { inputFile: 'inventory.json' }, [], { files: { 'inventory.json': '{"ok":true,"data":{}}' } });
     expect(shapeless.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'The inventory from "inventory.json" has no packages list.' });
     const partial = await run(outdatedCommand, {}, [], { stdin: '[{"name":"x","ecosystem":"npm"}]' });
     expect(partial.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'The inventory from stdin has a package without a usable version (packages[0]).' });
@@ -326,7 +326,7 @@ describe('package outdated', () => {
 
 describe('package license-check', () => {
   it('reports npm string and object licenses, NuGet expressions, and null for Maven, without calling OSV or anything else', async () => {
-    const { envelope, calls } = await run(licenseCheckCommand, { from: 'inventory.json' }, fixtureRoutes);
+    const { envelope, calls } = await run(licenseCheckCommand, { inputFile: 'inventory.json' }, fixtureRoutes);
     expect(calls.every((c) => new URL(c.url).origin === ARTIFACTORY)).toBe(true);
     expect(calls.map((c) => new URL(c.url).pathname)).toEqual([
       '/api/system/ping',
@@ -349,7 +349,7 @@ describe('package license-check', () => {
 
   it('--include-dev adds dev packages; a licenseUrl alone is "See licenseUrl"; no repository key means null', async () => {
     const config = { artifactory: { baseUrl: ARTIFACTORY, token: 'test-token', nugetRepo: 'nuget-remote' } };
-    const { envelope } = await run(licenseCheckCommand, { from: 'inventory.json', includeDev: true }, fixtureRoutes, { config });
+    const { envelope } = await run(licenseCheckCommand, { inputFile: 'inventory.json', includeDev: true }, fixtureRoutes, { config });
     expect(envelope.data).toMatchObject({
       packages: [
         { name: 'express', license: null },
@@ -365,7 +365,7 @@ describe('package license-check', () => {
 
   it("suspected bug #91 item 23: the npm license is the packument's top-level one, whatever version is installed", async () => {
     const routes: Route[] = [PING, { url: /.*/, respond: { json: packument('9.9.9', 'Apache-2.0') } }];
-    const { envelope } = await run(licenseCheckCommand, { from: 'inventory.json', ecosystem: 'npm' }, routes);
+    const { envelope } = await run(licenseCheckCommand, { inputFile: 'inventory.json', ecosystem: 'npm' }, routes);
     expect(envelope.data).toMatchObject({ packages: [{ name: 'express', version: '4.18.2', license: 'Apache-2.0' }, { license: 'Apache-2.0' }] });
   });
 });

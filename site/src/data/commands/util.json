@@ -51,7 +51,7 @@
     "connection": false,
     "flags": [
       "<scheme>",
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--decode",
       "--out <file>"
@@ -64,7 +64,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--host <host>"
     ]
@@ -76,7 +76,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--format <format>",
       "--lowest <n>"
@@ -89,7 +89,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--since <timestamp>",
       "--level <level>",
@@ -105,7 +105,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[path]",
+      "--input-file <path>",
       "--text <text>",
       "--diff <kind>",
       "--allow-file <file>"
@@ -118,7 +118,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--language <language>",
       "--top <n>",
@@ -158,7 +158,7 @@
       "<start>",
       "<days>",
       "--zone <zone>",
-      "--holidays <file>",
+      "--holidays-file <path>",
       "--holiday <date>"
     ]
   },
@@ -172,7 +172,7 @@
       "<start>",
       "<end>",
       "--zone <zone>",
-      "--holidays <file>",
+      "--holidays-file <path>",
       "--holiday <date>"
     ]
   },
@@ -223,7 +223,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--ecosystem <ecosystem>",
       "--range <range>",
@@ -250,7 +250,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--from <format>",
       "--to <format>"
@@ -263,7 +263,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--tag <tag>",
       "--path <text>"
@@ -276,7 +276,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--operation <operationId>",
       "--method <method>",
@@ -291,7 +291,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--operation <operationId>",
       "--method <method>",
@@ -307,7 +307,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--view <key>",
       "--out <file>"
@@ -320,7 +320,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--view <key>"
     ]
@@ -332,7 +332,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--view <key>"
     ]
@@ -344,7 +344,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--command <name>",
       "--key <key>",
@@ -361,7 +361,6 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
       "--text <text>",
       "--input-file <path>",
       "--query <text>",

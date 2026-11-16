@@ -304,7 +304,7 @@ describe('bounds', () => {
 
 describe('util c4 commands', () => {
   it('render returns the SVG, laid out by toil, with what it drew and what it checked', async () => {
-    const envelope = await execute(c4RenderCommand, { file: 'bookshop.c4.json', view: 'context' }, testContext({ files }).context);
+    const envelope = await execute(c4RenderCommand, { inputFile: 'bookshop.c4.json', view: 'context' }, testContext({ files }).context);
     expect(envelope.ok).toBe(true);
     const data = envelope.data as { svg: string; verified: Verified };
     expect(data).toMatchObject({ view: 'context', type: 'systemContext', title: 'System context: Online Bookshop', format: 'svg', relationships: 6 });
@@ -325,14 +325,14 @@ describe('util c4 commands', () => {
   });
 
   it('render checks the boundary too in a container view', async () => {
-    const envelope = await execute(c4RenderCommand, { file: 'bookshop.c4.json', view: 'containers' }, testContext({ files }).context);
+    const envelope = await execute(c4RenderCommand, { inputFile: 'bookshop.c4.json', view: 'containers' }, testContext({ files }).context);
     const checks = (envelope.data as { verified: Verified }).verified.checks;
     expect(checks.find((c) => c.check === 'children.inBoundary')).toMatchObject({ status: 'passed', checked: 10 });
   });
 
   it('render --out writes a new file in the workspace and returns its path and size instead of the SVG', async () => {
     const { context, files: written } = testContext({ files });
-    const envelope = await execute(c4RenderCommand, { file: 'bookshop.c4.json', view: 'containers', out: 'out/containers.svg' }, context);
+    const envelope = await execute(c4RenderCommand, { inputFile: 'bookshop.c4.json', view: 'containers', out: 'out/containers.svg' }, context);
     expect(envelope.ok).toBe(true);
     const data = envelope.data as { file: string; bytes: number; svg?: string };
     expect(data.svg).toBeUndefined();
@@ -354,9 +354,9 @@ describe('util c4 commands', () => {
   });
 
   it.each([
-    [{ text: JSON.stringify(EXAMPLE_MODEL), file: 'bookshop.c4.json' }, 'both'],
-    [{ file: 'bookshop.c4.json' }, 'The model has 3 views, and no --view said which to draw.'],
-    [{ file: 'bookshop.c4.json', view: 'deployment' }, 'The model has no view "deployment".'],
+    [{ text: JSON.stringify(EXAMPLE_MODEL), inputFile: 'bookshop.c4.json' }, 'both'],
+    [{ inputFile: 'bookshop.c4.json' }, 'The model has 3 views, and no --view said which to draw.'],
+    [{ inputFile: 'bookshop.c4.json', view: 'deployment' }, 'The model has no view "deployment".'],
   ])('refuses %j with INVALID_INPUT', async (input, message) => {
     const envelope = await execute(c4MermaidCommand, input, testContext({ files }).context);
     expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining(message) });

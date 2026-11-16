@@ -135,7 +135,7 @@ function plan(connection: string, items: PlanItem[], field: string | false = REF
 
 async function run(d: Deployment, tracker: Tracker, planText: string, input: Record<string, unknown> = {}, settings: Record<string, unknown> = {}, options: Parameters<typeof testContext>[0] = {}) {
   const t = testContext({ config: { [d.connection]: { ...d.config[d.connection], ...settings } }, routes: routesFor(tracker), files: { 'plan.json': planText }, ...options });
-  const envelope = await execute(categorizeCommand(), { ...d.input, from: 'plan.json', allowWrite: true, ...input }, t.context);
+  const envelope = await execute(categorizeCommand(), { ...d.input, inputFile: 'plan.json', allowWrite: true, ...input }, t.context);
   const data = envelope.data as CategorizeResult | undefined;
   const calls = t.http.calls;
   return {

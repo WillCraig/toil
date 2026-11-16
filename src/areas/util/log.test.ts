@@ -22,7 +22,7 @@ import { classify, finish, frameKind, MAX_TRACKED, parseFilters, scan, signature
 
 const triage = async (text: string, options: LogOptions = {}) => {
   const warnings: Warning[] = [];
-  const result = await runLog({ files: memoryFiles({ 'build.log': text }), warn: (w) => warnings.push(w) }, { file: 'build.log' }, options);
+  const result = await runLog({ files: memoryFiles({ 'build.log': text }), warn: (w) => warnings.push(w) }, { inputFile: 'build.log' }, options);
   return { result, warnings, codes: warnings.map((w) => w.code) };
 };
 
@@ -279,7 +279,7 @@ describe('util log self-check', () => {
   const setup = async (text: string) => {
     const warnings: Warning[] = [];
     const ctx = { files: memoryFiles({ 'build.log': text }), warn: (w: Warning) => warnings.push(w) };
-    const input = await openInput(ctx, { file: 'build.log' });
+    const input = await openInput(ctx, { inputFile: 'build.log' });
     const v = new Verifier(ctx.warn);
     const found = await scan(input, parseFilters({}), v);
     return { warnings, found, run: () => finish(found, input, {}, v, ctx.warn) };
@@ -331,7 +331,7 @@ describe('util log self-check', () => {
       yield new TextEncoder().encode(`  Restoring...\n${LOGS.dotnet}`);
     })());
     const warnings: Warning[] = [];
-    const result = await runLog({ files: memory, warn: (w) => warnings.push(w) }, { file: 'build.log' }, {});
+    const result = await runLog({ files: memory, warn: (w) => warnings.push(w) }, { inputFile: 'build.log' }, {});
     expect(result.verified.passed).toBe(false);
     expect(warnings.map((w) => w.code)).toContain('LOG_LINE_MISMATCH');
   });
@@ -424,7 +424,7 @@ describe('util log memory', () => {
     gc();
     const baseline = process.memoryUsage().heapUsed;
     const warnings: Warning[] = [];
-    const result = await runLog({ files, warn: (w) => warnings.push(w) }, { file: 'huge.log' }, {});
+    const result = await runLog({ files, warn: (w) => warnings.push(w) }, { inputFile: 'huge.log' }, {});
     sample();
 
     const grew = peak - baseline;

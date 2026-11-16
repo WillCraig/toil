@@ -185,7 +185,7 @@ describe('determinism', () => {
     const files = { 'triage.owi.json': text };
     const cli = await runCli(['util', 'owi', 'similar', '--input-file', 'triage.owi.json', '--item', 'corp-jira:PAY-210'], { commands: registry, context: testContext({ files }).context });
     const positional = await runCli(['util', 'owi', 'similar', 'triage.owi.json', '--item', 'corp-jira:PAY-210'], { commands: registry, context: testContext({ files }).context });
-    const direct = await run({ file: 'triage.owi.json', item: 'corp-jira:PAY-210' }, files);
+    const direct = await run({ inputFile: 'triage.owi.json', item: 'corp-jira:PAY-210' }, files);
     expect(cli.envelope!.data).toEqual(direct.data);
     expect(positional.envelope!.data).toEqual(direct.data);
   });

@@ -149,7 +149,7 @@ describe('work-item areas are all mapped to OWI', () => {
 });
 
 describe('the sprint fixture (test/fixtures/owi/)', async () => {
-  const { envelope, data, warnings } = await map({ file: 'owi/sprint-42.jsonl' }, { 'owi/sprint-42.jsonl': sprintJsonl });
+  const { envelope, data, warnings } = await map({ inputFile: 'owi/sprint-42.jsonl' }, { 'owi/sprint-42.jsonl': sprintJsonl });
   // A refusal fails here, not at collection, so the rest of the file still reports.
   const items = (data?.items ?? []) as WorkItem[];
   it('maps without an error', () => expect(envelope.error).toBeNull());
@@ -248,7 +248,7 @@ describe('mapping rules', () => {
     const issue = jiraIssue({ customfield_10234: 13, 'Story Points': 2 });
     const { data } = await map({ text: json(env('jira issue get', issue)), field: ['estimate=customfield_10234', 'estimateUnit=days'] });
     expect(data.items[0].estimate).toEqual({ value: 13, unit: 'days', field: 'customfield_10234' });
-    const ado = await map({ file: 'b.json', field: ['estimate=Custom.TeamPoints'] }, { 'b.json': json(env('ado work-item get-many', { value: [{ id: 7, fields: { 'System.Title': 'T', 'System.State': 'New', 'Custom.TeamPoints': 8 } }] })) });
+    const ado = await map({ inputFile: 'b.json', field: ['estimate=Custom.TeamPoints'] }, { 'b.json': json(env('ado work-item get-many', { value: [{ id: 7, fields: { 'System.Title': 'T', 'System.State': 'New', 'Custom.TeamPoints': 8 } }] })) });
     expect(ado.data.items[0].estimate).toEqual({ value: 8, unit: 'points', field: 'Custom.TeamPoints' });
   });
 

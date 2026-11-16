@@ -134,20 +134,20 @@ describe('classify scheme export', () => {
     expect(existsSync(join(d.workspace, '.git', 'index'))).toBe(false);
   });
 
-  it('writes one file with --file, and needs exactly one of --repo and --file', async () => {
+  it('writes one file with --out, and needs exactly one of --repo and --out', async () => {
     const d = disk();
-    expect(data(await cli(d, ['classify', 'scheme', 'export', 'balance', '--file', 'shared/balance.json'])).file).toBe(forwardSlashes(join(d.workspace, 'shared', 'balance.json')));
-    expect((await cli(d, ['classify', 'scheme', 'export', 'balance'])).error?.message).toContain('exactly one of --repo and --file');
-    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--file', 'a.json', '--repo', '.'])).error?.code).toBe('INVALID_INPUT');
+    expect(data(await cli(d, ['classify', 'scheme', 'export', 'balance', '--out', 'shared/balance.json'])).file).toBe(forwardSlashes(join(d.workspace, 'shared', 'balance.json')));
+    expect((await cli(d, ['classify', 'scheme', 'export', 'balance'])).error?.message).toContain('exactly one of --repo and --out');
+    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--out', 'a.json', '--repo', '.'])).error?.code).toBe('INVALID_INPUT');
   });
 
   it('refuses an existing scheme without --replace, a file that is not a scheme, and a path outside the workspace', async () => {
     const d = disk({ 'work/shared/balance.json': team({ name: 'old' }), 'work/shared/other.json': '{"x":1}' });
-    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--file', 'shared/balance.json'])).error?.fix).toContain('--replace');
-    expect(data(await cli(d, ['classify', 'scheme', 'export', 'balance', '--file', 'shared/balance.json', '--replace'])).name).toBe('balance');
-    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--file', 'shared/other.json', '--replace'])).error?.message).toContain("isn't a valid scheme");
-    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--file', join(d.root, 'away.json')])).error?.message).toContain('outside the workspace');
-    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--file', join(d.home, '.toil', 'config.json'), '--replace'])).error?.message).toContain("one of toil's own files");
+    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--out', 'shared/balance.json'])).error?.fix).toContain('--replace');
+    expect(data(await cli(d, ['classify', 'scheme', 'export', 'balance', '--out', 'shared/balance.json', '--replace'])).name).toBe('balance');
+    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--out', 'shared/other.json', '--replace'])).error?.message).toContain("isn't a valid scheme");
+    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--out', join(d.root, 'away.json')])).error?.message).toContain('outside the workspace');
+    expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--out', join(d.home, '.toil', 'config.json'), '--replace'])).error?.message).toContain("one of toil's own files");
     expect((await cli(d, ['classify', 'scheme', 'export', 'balance', '--repo', 'shared'])).error?.message).toContain("isn't the root of a git repository");
   });
 
@@ -155,14 +155,14 @@ describe('classify scheme export', () => {
     const d = disk();
     const s = await mcp(d);
     expect(data((await s.call('classify_scheme_export', { name: 'balance', repo: '.' })).envelope).file).toContain('.toil/classify/balance.json');
-    expect((await s.call('classify_scheme_export', { name: 'balance', file: join(d.root, 'away.json') })).envelope.error?.message).toContain('outside the workspace');
+    expect((await s.call('classify_scheme_export', { name: 'balance', out: join(d.root, 'away.json') })).envelope.error?.message).toContain('outside the workspace');
   });
 });
 
 describe('classify scheme set', () => {
   it('writes a revised file over the scheme in your folder and raises the revision by one, whatever the file says', async () => {
     const d = disk({ 'home/.toil/classify/team.json': team(), 'work/v2.json': team({ revision: 99, guidance: ['A bug fix is KTLO.'], rules: [{ id: 'esc', when: { label: ['customer-escalation'] }, then: 'ktlo' }] }) });
-    const out = data(await cli(d, ['classify', 'scheme', 'set', 'team', '--from', 'v2.json']));
+    const out = data(await cli(d, ['classify', 'scheme', 'set', 'team', '--input-file', 'v2.json']));
     expect(out).toMatchObject({ name: 'team', revision: 4, previousRevision: 3, source: 'user', file: forwardSlashes(join(d.home, '.toil', 'classify', 'team.json')) });
     expect(out.changes).toMatchObject({ guidance: true, rules: { added: ['esc'] }, any: true });
     expect(read(out.file)).toMatchObject({ revision: 4, guidance: ['A bug fix is KTLO.'] });
@@ -170,7 +170,7 @@ describe('classify scheme set', () => {
 
   it('writes the repository\'s working-tree file for a scheme that lives there', async () => {
     const d = disk({ 'work/.toil/classify/team.json': team(), 'work/v2.json': team({ guidance: ['Changed.'] }) });
-    const out = data(await cli(d, ['classify', 'scheme', 'set', 'team', '--from', 'v2.json']));
+    const out = data(await cli(d, ['classify', 'scheme', 'set', 'team', '--input-file', 'v2.json']));
     expect(out).toMatchObject({ source: 'repo', revision: 4, file: forwardSlashes(join(d.workspace, '.toil', 'classify', 'team.json')) });
     expect(existsSync(join(d.home, '.toil', 'classify', 'team.json'))).toBe(false);
   });
@@ -178,7 +178,7 @@ describe('classify scheme set', () => {
   it('writes a scheme named by path in place, which is how one beside a toil project is reached', async () => {
     const d = disk({ 'work/shared/mine.json': { name: 'mine', classify: { scheme: './team.json' } }, 'work/shared/team.json': team(), 'work/v2.json': team({ guidance: ['Changed.'] }) });
     // A toil project's `./team.json` is a file beside it; `set` has no toil project input, so it takes the path and writes the file where it lives.
-    const out = data(await cli(d, ['classify', 'scheme', 'set', './shared/team.json', '--from', 'v2.json']));
+    const out = data(await cli(d, ['classify', 'scheme', 'set', './shared/team.json', '--input-file', 'v2.json']));
     expect(out).toMatchObject({ source: 'file', revision: 4, file: forwardSlashes(join(d.workspace, 'shared', 'team.json')) });
   });
 
@@ -193,7 +193,7 @@ describe('classify scheme set', () => {
     expect((await cli(d, ['classify', 'scheme', 'show', file])).ok).toBe(false);
     const shown = data(await cli(d, ['classify', 'scheme', 'show', '--toil-project', 'mine']));
     expect(shown).toMatchObject({ source: 'toil-project', file, scheme: { name: 'team', revision: 3 } });
-    const out = data(await cli(d, ['classify', 'scheme', 'set', '--toil-project', 'mine', '--from', 'v2.json']));
+    const out = data(await cli(d, ['classify', 'scheme', 'set', '--toil-project', 'mine', '--input-file', 'v2.json']));
     expect(out).toMatchObject({ source: 'toil-project', revision: 4, previousRevision: 3, file });
     expect(read(file)).toMatchObject({ revision: 4, guidance: ['Changed.'] });
     expect(existsSync(join(d.home, '.toil', 'classify', 'team.json'))).toBe(false);
@@ -208,7 +208,7 @@ describe('classify scheme set', () => {
 
   it('writes a user copy for a built-in scheme, leaving the built-in as it was', async () => {
     const d = disk({ 'work/v2.json': { ...builtinScheme('ktlo-feature'), guidance: ['Mine.'] } });
-    const out = data(await cli(d, ['classify', 'scheme', 'set', 'ktlo-feature', '--from', 'v2.json']));
+    const out = data(await cli(d, ['classify', 'scheme', 'set', 'ktlo-feature', '--input-file', 'v2.json']));
     expect(out).toMatchObject({ source: 'user', revision: 2, previousRevision: 1, file: forwardSlashes(join(d.home, '.toil', 'classify', 'ktlo-feature.json')) });
     expect(read(out.file).guidance).toEqual(['Mine.']);
     expect(builtinScheme('ktlo-feature')!.guidance).toHaveLength(1);
@@ -217,8 +217,8 @@ describe('classify scheme set', () => {
 
   it('takes a file with no name as the scheme\'s own, and refuses a file for another scheme', async () => {
     const d = disk({ 'home/.toil/classify/team.json': team(), 'work/noname.json': { ...team({ guidance: ['x'] }), name: undefined }, 'work/other.json': team({ name: 'other' }) });
-    expect(data(await cli(d, ['classify', 'scheme', 'set', 'team', '--from', 'noname.json'])).revision).toBe(4);
-    const e = await cli(d, ['classify', 'scheme', 'set', 'team', '--from', 'other.json']);
+    expect(data(await cli(d, ['classify', 'scheme', 'set', 'team', '--input-file', 'noname.json'])).revision).toBe(4);
+    const e = await cli(d, ['classify', 'scheme', 'set', 'team', '--input-file', 'other.json']);
     expect(e.error?.code).toBe('INVALID_INPUT');
     expect(e.error?.message).toContain('holds a scheme named "other", and team is "team"');
     expect(read(join(d.home, '.toil', 'classify', 'team.json')).revision).toBe(4);
@@ -226,7 +226,7 @@ describe('classify scheme set', () => {
 
   it('writes nothing for a file that changes nothing, and warns SCHEME_UNCHANGED with the revision kept', async () => {
     const d = disk({ 'home/.toil/classify/team.json': team(), 'work/same.json': team({ revision: 50 }) });
-    const e = await cli(d, ['classify', 'scheme', 'set', 'team', '--from', 'same.json']);
+    const e = await cli(d, ['classify', 'scheme', 'set', 'team', '--input-file', 'same.json']);
     expect(data(e)).toMatchObject({ revision: 3, previousRevision: 3, changes: { any: false } });
     expect(e.meta.warnings?.map((w) => w.code)).toContain('SCHEME_UNCHANGED');
     expect(read(join(d.home, '.toil', 'classify', 'team.json')).revision).toBe(3);
@@ -234,7 +234,7 @@ describe('classify scheme set', () => {
 
   it('refuses an invalid revised file by key path, leaving the scheme as it was', async () => {
     const d = disk({ 'home/.toil/classify/team.json': team(), 'work/bad.json': team({ categories: [category('only')] }) });
-    const e = await cli(d, ['classify', 'scheme', 'set', 'team', '--from', 'bad.json']);
+    const e = await cli(d, ['classify', 'scheme', 'set', 'team', '--input-file', 'bad.json']);
     expect(e.error?.code).toBe('CONFIG_INVALID');
     expect(e.error?.message).toContain('categories:');
     expect(read(join(d.home, '.toil', 'classify', 'team.json'))).toEqual(team());
@@ -242,7 +242,7 @@ describe('classify scheme set', () => {
 
   it('refuses a revised file outside the workspace', async () => {
     const d = disk({ 'home/.toil/classify/team.json': team(), 'outside/v2.json': team({ guidance: ['x'] }) });
-    expect((await cli(d, ['classify', 'scheme', 'set', 'team', '--from', join(d.root, 'outside', 'v2.json')])).error?.message).toContain('outside the workspace');
+    expect((await cli(d, ['classify', 'scheme', 'set', 'team', '--input-file', join(d.root, 'outside', 'v2.json')])).error?.message).toContain('outside the workspace');
   });
 
   it('is never an MCP tool, and is a person\'s command for a host that has one', async () => {

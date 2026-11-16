@@ -97,7 +97,7 @@ export const addInlineCommentCommand = bitbucketArea.command({
     "Adds a comment on one line of a file in a pull request's diff and returns it. lineType is ADDED (default), REMOVED or CONTEXT; the line is always numbered in the new version of the file.",
   input: z.object({
     id: prInput,
-    file: z.string().describe('File path'),
+    path: z.string().describe('File path'),
     line: intText.describe('Line number'),
     body: z.string().describe('Comment text'),
     lineType: z.string().optional().describe('Line type: ADDED|REMOVED|CONTEXT (default: "ADDED")'),
@@ -107,19 +107,19 @@ export const addInlineCommentCommand = bitbucketArea.command({
   context: IN_REPO,
   args: [prArg],
   options: [
-    { flags: '--file <path>', field: 'file', description: 'File path' },
+    { flags: '--path <path>', field: 'path', description: 'File path', deprecated: ['--file <path>'] },
     { flags: '--line <n>', field: 'line', description: 'Line number' },
     { flags: '--body <text>', field: 'body', description: 'Comment text' },
     { flags: '--line-type <type>', field: 'lineType', description: 'Line type: ADDED|REMOVED|CONTEXT (default: "ADDED")' },
   ],
   examples: [
-    { project: 'PROJ', repo: 'imagile-api', id: '42', file: 'src/retry.ts', line: '12', body: 'Cap the backoff?', allowWrite: true },
-    { project: 'PROJ', repo: 'imagile-api', id: '42', file: 'src/old.ts', line: 3, body: 'Why was this removed?', lineType: 'REMOVED', allowWrite: true },
+    { project: 'PROJ', repo: 'imagile-api', id: '42', path: 'src/retry.ts', line: '12', body: 'Cap the backoff?', allowWrite: true },
+    { project: 'PROJ', repo: 'imagile-api', id: '42', path: 'src/old.ts', line: 3, body: 'Why was this removed?', lineType: 'REMOVED', allowWrite: true },
   ],
   run: async (input, ctx) => {
     const { project, repo } = where(ctx);
     // Suspected bug (#76 item 7): fileType is TO even for a REMOVED line, which exists only in FROM.
-    const anchor = { line: toInt(input.line), lineType: input.lineType ?? 'ADDED', fileType: 'TO', path: input.file };
+    const anchor = { line: toInt(input.line), lineType: input.lineType ?? 'ADDED', fileType: 'TO', path: input.path };
     return bb(ctx, `${prPath(project, repo, toInt(input.id))}/comments`, { method: 'POST', json: { text: input.body, anchor } });
   },
 });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineCommand } from '../../core/command.js';
-import { DEFAULT_MAX_BYTES, fileArgument, inputFields, openInput, textOption, type InputContext } from './kit/input.js';
+import { DEFAULT_MAX_BYTES, fileArgument, inputFields, openInput, inputFileOption, textOption, type InputContext } from './kit/input.js';
 import type { BoundedLimits } from './kit/bounded.js';
 import type { LogOptions, LogTriage } from './log/triage.js';
 
@@ -22,10 +22,10 @@ const LEVELS = ['error', 'warning'] as const;
  * streams with no size cap; stdin and text are held for the re-read, so they
  * keep the reader's.
  */
-export async function runLog(ctx: InputContext, fields: { file?: string | undefined; text?: string | undefined }, options: LogOptions, limits?: BoundedLimits): Promise<LogTriage> {
+export async function runLog(ctx: InputContext, fields: { inputFile?: string | undefined; text?: string | undefined }, options: LogOptions, limits?: BoundedLimits): Promise<LogTriage> {
   const { MAX_LINE, parseFilters, triageLog } = await import('./log/triage.js');
   const filters = parseFilters(options);
-  const streams = fields.text === undefined && fields.file !== undefined && fields.file !== '-';
+  const streams = fields.text === undefined && fields.inputFile !== undefined && fields.inputFile !== '-';
   const input = await openInput(ctx, fields, { maxBytes: streams ? Number.POSITIVE_INFINITY : DEFAULT_MAX_BYTES, maxLineLength: MAX_LINE });
   // --grep runs in the bounded worker under its deadline (log/triage.ts, grepped); `limits` replaces the defaults only in tests.
   return triageLog(input, filters, options, ctx.warn, { signal: ctx.signal, ...(limits ? { limits } : {}) });
@@ -58,7 +58,7 @@ export const logCommand = defineCommand({
   timeLimitMs: 30 * 60_000,
   args: [fileArgument],
   options: [
-    textOption,
+    inputFileOption, textOption,
     { flags: '--since <timestamp>', field: 'since', description: 'Only lines dated at or after this ISO 8601 timestamp; undated lines take the last date before them' },
     { flags: '--level <level>', field: 'level', description: 'warning (default: errors and warnings) or error (errors only)' },
     { flags: '--grep <regex>', field: 'grep', description: 'Only error and warning lines matching this regular expression, or errors whose trace starts with a matching exception line' },
@@ -66,15 +66,15 @@ export const logCommand = defineCommand({
     { flags: '--context <n>', field: 'context', description: 'Lines to show around each sample (default 0, up to 20)' },
   ],
   examples: [
-    { file: 'logs/maven.log' },
-    { file: 'logs/jenkins.log', level: 'error', since: '2026-10-14T09:12:20Z', context: 2 },
-    { file: 'logs/npm.log', grep: 'TS\\d+', maxGroups: 5 },
-    { file: 'logs/dotnet.log' },
+    { inputFile: 'logs/maven.log' },
+    { inputFile: 'logs/jenkins.log', level: 'error', since: '2026-10-14T09:12:20Z', context: 2 },
+    { inputFile: 'logs/npm.log', grep: 'TS\\d+', maxGroups: 5 },
+    { inputFile: 'logs/dotnet.log' },
     { text: SAMPLE_LOG },
   ],
   run: async (input, ctx) => {
-    const { file, text, ...options } = input;
-    return runLog(ctx, { file, text }, options);
+    const { inputFile, text, ...options } = input;
+    return runLog(ctx, { inputFile, text }, options);
   },
 });
 

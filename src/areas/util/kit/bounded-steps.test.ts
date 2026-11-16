@@ -46,7 +46,7 @@ const REDOS_LOG = `[2026-10-14T09:12:20.411Z] [ERROR] ${'a'.repeat(40)}!\n[2026-
 describe('util log --grep in the bounded worker', () => {
   it('stops a backtracking pattern at its deadline, naming the lines and the limit', async () => {
     const { ctx } = ctxWith({ 'build.log': REDOS_LOG });
-    const { error, ms } = await timed(() => runLog(ctx, { file: 'build.log' }, { grep: '(a+)+$' }, { timeoutMs: DEADLINE_MS }));
+    const { error, ms } = await timed(() => runLog(ctx, { inputFile: 'build.log' }, { grep: '(a+)+$' }, { timeoutMs: DEADLINE_MS }));
     expect(error).toBeInstanceOf(ToilError);
     expect(error).toMatchObject({ code: 'TIMEOUT', message: 'Matching --grep against lines 1-2 took longer than the 0.3 s it may run, so it was stopped.', fix: expect.stringContaining('(a+)+') });
     expect(ms).toBeLessThan(DEADLINE_MS + ROOM_MS);
@@ -58,7 +58,7 @@ describe('util log --grep in the bounded worker', () => {
     // The step's deadline is far past the abort: if the cancel didn't stop the worker, the deadline would, as TIMEOUT.
     const timeoutMs = 10_000;
     setTimeout(() => controller.abort(), 100);
-    const { error, ms } = await timed(() => runLog(ctx, { file: 'build.log' }, { grep: '(a+)+$' }, { timeoutMs }));
+    const { error, ms } = await timed(() => runLog(ctx, { inputFile: 'build.log' }, { grep: '(a+)+$' }, { timeoutMs }));
     expect(error).toMatchObject({ code: 'CANCELLED' });
     expect(ms).toBeLessThan(timeoutMs);
   }, 20_000);
@@ -66,7 +66,7 @@ describe('util log --grep in the bounded worker', () => {
   it('still filters by the pattern, across batches of lines', async () => {
     const lines = Array.from({ length: 9_000 }, (_, i) => `[2026-10-14T09:12:20.411Z] [ERROR] Order ${i} failed${i % 1000 === 0 ? ' TS2304' : ''}`);
     const { ctx } = ctxWith({ 'build.log': `${lines.join('\n')}\n` });
-    const result = await runLog(ctx, { file: 'build.log' }, { grep: 'TS\\d+' });
+    const result = await runLog(ctx, { inputFile: 'build.log' }, { grep: 'TS\\d+' });
     // 9,000 lines cross the 4,096-line batch twice; every tenth hundred carries the code.
     expect(result.matched).toBe(9);
     expect(result.filtered).toBe(8_991);
@@ -128,7 +128,7 @@ describe('util md in the bounded worker', () => {
 describe('util size outlines in the bounded worker', () => {
   const sizeOf = (files: Record<string, string>, file: string, limits?: { timeoutMs?: number; maxMemoryMb?: number }) => {
     const { ctx, warnings } = ctxWith(files);
-    return { warnings, run: () => measure({ file }, ctx, limits) as Promise<FileSize> };
+    return { warnings, run: () => measure({ inputFile: file }, ctx, limits) as Promise<FileSize> };
   };
 
   it('stops an outline that passes its deadline, as TIMEOUT naming the file', async () => {
@@ -191,7 +191,7 @@ describe('telling the stack running out from a result grown too big', () => {
     }));
     const { measure: mocked } = await import('../size/measure.js');
     const { ctx } = ctxWith({ 'a.ts': 'export function f() {}\n' });
-    await expect(mocked({ file: 'a.ts' }, ctx)).rejects.toMatchObject({ code: 'INTERNAL', message: 'Outlining the file "a.ts" failed: it failed: Invalid string length.' });
+    await expect(mocked({ inputFile: 'a.ts' }, ctx)).rejects.toMatchObject({ code: 'INTERNAL', message: 'Outlining the file "a.ts" failed: it failed: Invalid string length.' });
   });
 });
 
@@ -199,7 +199,7 @@ describe('util openapi documents in the bounded worker', () => {
   const yaml = (paths: number) => ['openapi: 3.0.3', 'info:', '  title: Imagile API', '  version: 1.0.0', 'paths:', ...Array.from({ length: paths }, (_, i) => `  /items${i}:\n    get:\n      operationId: get${i}\n      responses:\n        '200':\n          description: OK`)].join('\n');
   const opened = async (text: string) => {
     const { ctx } = ctxWith({ 'api.yaml': text });
-    return openInput(ctx, { file: 'api.yaml' });
+    return openInput(ctx, { inputFile: 'api.yaml' });
   };
 
   it('reads YAML in the worker and stops it at its deadline, as TIMEOUT naming the file', async () => {

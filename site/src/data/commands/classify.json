@@ -42,7 +42,7 @@
     "flags": [
       "<name>",
       "--repo <dir>",
-      "--file <path>",
+      "--out <path>",
       "--replace",
       "--cwd <dir>"
     ]
@@ -55,7 +55,7 @@
     "connection": false,
     "flags": [
       "[name]",
-      "--from <file>",
+      "--input-file <path>",
       "--toil-project <name|file>",
       "--cwd <dir>"
     ]
@@ -80,14 +80,14 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "--file <path>",
+      "--input-file <path>",
       "--text <text>",
       "--toil-project <name|file>",
       "--cwd <dir>",
       "--scheme <name|file>",
       "--recheck",
       "--record",
-      "--verdicts <file>"
+      "--verdicts-file <path>"
     ]
   },
   {
@@ -97,7 +97,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "--file <path>",
+      "--input-file <path>",
       "--text <text>",
       "--toil-project <name|file>",
       "--cwd <dir>",
@@ -129,13 +129,13 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "--file <path>",
+      "--input-file <path>",
       "--text <text>",
       "--toil-project <name|file>",
       "--cwd <dir>",
       "--scheme <name|file>",
-      "--backtest <file>",
-      "--revised <file>",
+      "--backtest-file <path>",
+      "--revised-file <path>",
       "--standing"
     ]
   },
@@ -159,7 +159,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "--file <path>",
+      "--input-file <path>",
       "--text <text>",
       "--toil-project <name|file>",
       "--cwd <dir>",

@@ -327,7 +327,7 @@ describe('util cert: the command', () => {
   const files = { 'certs/chain.pem': chain.pem, 'certs/leaf.der': chain.leaf.der, 'certs/notes.txt': 'nothing here' };
 
   it('reads a file and checks it read all of it', async () => {
-    const envelope = await execute(certCommand, { file: 'certs/chain.pem', host: 'api.imagile.dev' }, testContext({ files }).context);
+    const envelope = await execute(certCommand, { inputFile: 'certs/chain.pem', host: 'api.imagile.dev' }, testContext({ files }).context);
     expect(envelope.ok).toBe(true);
     const data = envelope.data as CertData;
     expect([data.certificates.length, data.host?.covered, data.verified.passed]).toEqual([3, true, true]);
@@ -336,13 +336,13 @@ describe('util cert: the command', () => {
   });
 
   it('reads DER from a file without a UTF-8 warning', async () => {
-    const envelope = await execute(certCommand, { file: 'certs/leaf.der' }, testContext({ files }).context);
+    const envelope = await execute(certCommand, { inputFile: 'certs/leaf.der' }, testContext({ files }).context);
     expect((envelope.data as CertData).format).toBe('der');
     expect(envelope.meta.warnings?.map((w) => w.code)).toEqual(['UNVERIFIED']);
   });
 
   it('reads PEM from stdin on the CLI, and says stdin has no size to check against', async () => {
-    const run = await runCli(['util', 'cert', '-', '--host', 'nope.example.imagile.dev'], { commands: [certCommand], context: testContext({ stdin: chain.pem }).context });
+    const run = await runCli(['util', 'cert', '--input-file', '-', '--host', 'nope.example.imagile.dev'], { commands: [certCommand], context: testContext({ stdin: chain.pem }).context });
     expect(run.envelope?.ok).toBe(true);
     const data = run.envelope?.data as CertData;
     expect(data.host?.covered).toBe(false);
@@ -354,7 +354,7 @@ describe('util cert: the command', () => {
     const run = await runCli(['util', 'cert', 'certs/notes.txt'], { commands: [certCommand], context: testContext({ files }).context });
     expect(run.envelope?.error).toMatchObject({ code: 'INVALID_INPUT', message: 'The file "certs/notes.txt" is neither PEM (no "-----BEGIN" line) nor DER (it doesn\'t start with a DER sequence).' });
     expect(run.exitCode).toBe(1);
-    const empty = await execute(certCommand, { file: 'certs/chain.pem', host: '' }, testContext({ files }).context);
+    const empty = await execute(certCommand, { inputFile: 'certs/chain.pem', host: '' }, testContext({ files }).context);
     expect(empty.error?.code).toBe('INVALID_INPUT');
   });
 });

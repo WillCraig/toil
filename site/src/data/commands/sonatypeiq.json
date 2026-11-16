@@ -44,7 +44,7 @@
     "writes": false,
     "connection": true,
     "flags": [
-      "--from <file>",
+      "--input-file <path>",
       "--application-id <id>",
       "--ecosystem <ecosystem>",
       "--direct-only",

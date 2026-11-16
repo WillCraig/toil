@@ -6,7 +6,7 @@
     "package": "@imagile-dev/toil"
   },
   "_contractVersion": "contractVersion is the version of this contract that toil reports in toil version and on every envelope's meta (CONTRACT_VERSION in src/core/envelope.ts; test/api.test.ts keeps them equal). It goes up by one with every breaking change to what this file records or to the envelope, and never for an additive one. See docs/command-contract.md, Changing the contract.",
-  "contractVersion": 3,
+  "contractVersion": 4,
   "globalOptions": [
     {
       "flags": "-v, --version",
@@ -72,7 +72,7 @@
           "description": "Show staged changes only"
         },
         {
-          "flags": "--file <path>",
+          "flags": "--path <path>",
           "description": "Limit diff to a specific file"
         }
       ],
@@ -887,7 +887,7 @@
       "leaf": true,
       "options": [
         {
-          "flags": "--file <path>",
+          "flags": "--input-file <path>",
           "description": "Path to the file to upload"
         }
       ],
@@ -1609,7 +1609,7 @@
       "leaf": true,
       "options": [
         {
-          "flags": "--file <path>",
+          "flags": "--input-file <path>",
           "description": "Path to the file to upload"
         },
         {
@@ -2559,7 +2559,7 @@
       "leaf": true,
       "options": [
         {
-          "flags": "--file <path>",
+          "flags": "--path <path>",
           "description": "File path"
         },
         {
@@ -3889,7 +3889,7 @@
       "leaf": true,
       "options": [
         {
-          "flags": "--file <path>",
+          "flags": "--path <path>",
           "description": "File path"
         },
         {
@@ -4045,7 +4045,7 @@
       "leaf": true,
       "options": [
         {
-          "flags": "--file <path>",
+          "flags": "--path <path>",
           "description": "Limit diff to a specific file"
         },
         {
@@ -5114,7 +5114,7 @@
           "description": "Commit SHA the comment is on"
         },
         {
-          "flags": "--file <path>",
+          "flags": "--path <path>",
           "description": "File path"
         },
         {
@@ -6203,7 +6203,7 @@
       "leaf": true,
       "options": [
         {
-          "flags": "--file <path>",
+          "flags": "--input-file <path>",
           "description": "Path to the file to upload"
         },
         {

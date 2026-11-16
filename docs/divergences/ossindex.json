@@ -4,7 +4,7 @@
     {
       "allows": [],
       "old": "deps frisk --source sonatype scanning the git repository's manifests itself",
-      "toil": "toil ossindex vulns checks an inventory: toil deps scan output from --from <file> or stdin (toil deps scan --include-transitive | toil ossindex vulns). The --ecosystem, --direct-only and --include-dev filters apply to that inventory",
+      "toil": "toil ossindex vulns checks an inventory: toil deps scan output from --input-file <path> or stdin (toil deps scan --include-transitive | toil ossindex vulns). The --ecosystem, --direct-only and --include-dev filters apply to that inventory",
       "why": "One command does one thing against one source; the scan is its own command and the sources compose with it (docs/integrations.md, dependency analysis).",
       "principle": "3"
     },

@@ -288,10 +288,10 @@ Work items (`<id>` is the work item id):
   between makes the change fail rather than vanish, and a call that changes nothing
   sends nothing. `tag` adds to the list; `untag` replaces it with the tags that remain
   (`add` would keep the removed one), and clears the field when the last tag comes off.
-- `work-item categorize` (`--from <file>`): Apply a classification plan: tag work items with
+- `work-item categorize` (`--input-file <path>`): Apply a classification plan: tag work items with
   their category, and set a field when the plan names one. See **Categorizing work items**.
 - `work-item attachments <id>` (Server): The attached files (id, name, url, size, dates).
-- `work-item attach <id>` (Server): Upload `--file` (a path in the workspace), then link
+- `work-item attach <id>` (Server): Upload `--input-file` (a path in the workspace), then link
   it (`--comment` optional). Returns the uploaded attachment's `{ id, url }`. If the link
   fails, the upload stays on the server.
 - `work-item download <id> <attachment-id>` (Server): Save the attachment to `--dir`
@@ -340,7 +340,7 @@ Repositories:
 - `repo list`, `repo get`: Repositories in the project. `repo create --name <name>`
   makes an empty one.
 - `commit create` (Services): Commit workspace files to `--branch` in one commit, with
-  `--message`, needing no git. Each `--file <path>` (repeatable) is relative to the
+  `--message`, needing no git. Each `--input-file <path>` (repeatable) is relative to the
   workspace and is committed at the same path in the repository, replacing a file
   already there. A branch that doesn't exist is created from `--from <branch>` (the
   repository's default branch without it), or, in an empty repository, as its first
@@ -389,7 +389,7 @@ Pull requests (`<id>` is the pull request id):
   `threadContext` (null for a general comment). Server includes system comments;
   Services leaves them out unless `--include-system`. `--inline-only` or
   `--general-only` narrows it.
-- `pr comment <id>` (`--body`), `pr comment-inline <id>` (`--file /src/a.ts`,
+- `pr comment <id>` (`--body`), `pr comment-inline <id>` (`--path /src/a.ts`,
   `--line 12`, `--body`, `--line-type left|right`, default `right`; a path without a
   leading `/` gets one on Services), `pr reply <id> <thread-id>` (`--body`),
   `pr resolve <id> <thread-id>` (status `fixed`; Services takes `--status`: `fixed`
@@ -471,7 +471,7 @@ toil ado work-item link 42 --target 7 --type child --allow-write
 toil ado --repo imagile-api pr list --state all
 toil ado --repo imagile-api pr list --state all --updated-since 2026-10-01T00:00:00Z --limit 100
 toil ado --repo imagile-api pr get 42 --include reviews,checks,commits,files
-toil ado pr comment-inline 42 --file /src/app.ts --line 12 --body "Off by one?" --allow-write
+toil ado pr comment-inline 42 --path /src/app.ts --line 12 --body "Off by one?" --allow-write
 toil ado work-item search --wiql "SELECT [System.Id] FROM WorkItems" --updated-since 2026-10-01 --limit 200
 toil ado work-item get-many 42 7 --fields System.Title,System.State
 toil ado pipeline run 5 --branch main --wait --allow-write
@@ -481,7 +481,7 @@ toil ado --project Imagile work-item update 42 --field state=Active --rev 3 --al
 toil ado --project Imagile --repo imagile-api pr merge 42 --strategy squash --delete-source --allow-write --connection imagile-ado
 toil ado --project Imagile sprint list --state current --connection imagile-ado
 toil ado --project Imagile sprint update "Sprint 1" --start 2026-11-16 --end 2026-11-27 --allow-write --connection imagile-ado
-toil ado --project Imagile --repo imagile-api commit create --branch fix/retries --from main --message "Add retries" --file src/retry.js --allow-write --connection imagile-ado
+toil ado --project Imagile --repo imagile-api commit create --branch fix/retries --from main --message "Add retries" --input-file src/retry.js --allow-write --connection imagile-ado
 toil ado --project Imagile --repo imagile-api work-item link 42 --pr 44 --allow-write --connection imagile-ado
 toil ado --project Imagile board get "Backlog items" --team "Imagile Team" --connection imagile-ado
 ```
@@ -555,7 +555,7 @@ category each work item belongs to, and this command writes that down.
 
 ```bash
 toil ado work-item get-many 42 43 47 --fields System.Title,System.Description,System.WorkItemType,System.Tags,System.Parent | toil util owi map | toil classify run --toil-project payments --summary-file plan.json
-toil ado work-item categorize --from plan.json --allow-write
+toil ado work-item categorize --input-file plan.json --allow-write
 ```
 
 The plan's keys are work item ids, which are unique in a collection (Server) or organization
@@ -591,7 +591,7 @@ The plan's keys are work item ids, which are unique in a collection (Server) or 
   (`skipped`, `CATEGORIZE_SKIPPED`); a plan with entries but none for this connection is refused.
 
 It is a write: the connection needs `writes: true` and the call `--allow-write`. Over MCP it is
-`ado_work_item_categorize`, and `from` must name a file in the workspace, since there is no stdin.
+`ado_work_item_categorize`, and `inputFile` must name a file in the workspace, since there is no stdin.
 
 ## Ticket the work
 

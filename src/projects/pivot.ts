@@ -153,7 +153,7 @@ export function toilProjectPivotCommands(): AnyCommand[] {
     path: ['projects', 'pivot'],
     description: 'Pivot a toil project\'s work items: one measure, split by one dimension, across time or another, from OWI records you pass (local only)',
     toolDescription:
-      "Pivots Open Work Item records you pass (what util owi map printed, as file or text; several envelopes are fine). Asks no service: read each tracker with its own command and map it first. measure is items, estimate, days (person-days in progress), throughput, cycleTime, wip or aging; split makes the rows and across the columns, each a dimension: category, type, status, statusCategory, priority, assignee, team, parent (parent:Epic, parent:top), iteration, sprint, release, affects, component, label (label:<prefix>), area, project, tracker, connection, dim:<name>, created/started/resolved with :week, :month or :quarter, age, size, planned, hasEpic, carried, reopened. where keeps matching items (\"status != Done\", \"release = 1.4, 1.5\"); view runs a saved view of the toil project, and any field you pass overrides the view's. Every item is classified by the toil project's scheme (or scheme, else ktlo-feature) so category always works. Returns { toilProject, view, scheme { name, revision }, spec, asOf, period, measure, split, across, rows, columns, cells[row][column] { value, share, items, measured, of, reason }, rowTotals, columnTotals, total, allValues, coverage { items, measured, unreadSplit, unreadAcross, notes }, notable, markdown }. A figure nobody read is null, never 0: coverage and meta.warnings (PIVOT_UNREAD) say what was not read. Cite a cell as [[cell:<column>/<row>]] and an item as [[<owi id>]]. markdown adds the pivot as a Markdown table.",
+      "Pivots Open Work Item records you pass (what util owi map printed, as inputFile or text; several envelopes are fine). Asks no service: read each tracker with its own command and map it first. measure is items, estimate, days (person-days in progress), throughput, cycleTime, wip or aging; split makes the rows and across the columns, each a dimension: category, type, status, statusCategory, priority, assignee, team, parent (parent:Epic, parent:top), iteration, sprint, release, affects, component, label (label:<prefix>), area, project, tracker, connection, dim:<name>, created/started/resolved with :week, :month or :quarter, age, size, planned, hasEpic, carried, reopened. where keeps matching items (\"status != Done\", \"release = 1.4, 1.5\"); view runs a saved view of the toil project, and any field you pass overrides the view's. Every item is classified by the toil project's scheme (or scheme, else ktlo-feature) so category always works. Returns { toilProject, view, scheme { name, revision }, spec, asOf, period, measure, split, across, rows, columns, cells[row][column] { value, share, items, measured, of, reason }, rowTotals, columnTotals, total, allValues, coverage { items, measured, unreadSplit, unreadAcross, notes }, notable, markdown }. A figure nobody read is null, never 0: coverage and meta.warnings (PIVOT_UNREAD) say what was not read. Cite a cell as [[cell:<column>/<row>]] and an item as [[<owi id>]]. markdown adds the pivot as a Markdown table.",
     input: z.object({
       toilProject: z.string().min(1).optional().describe('A toil project name, or the path to a toil project file. Defaults to the toil project that applies to the folder, if there is one; with none, there are no people and the built-in scheme applies.'),
       cwd: z.string().min(1).optional().describe('The folder to look from; its repository decides which checked-in toil projects apply. Defaults to the workspace.'),
@@ -177,7 +177,7 @@ export function toilProjectPivotCommands(): AnyCommand[] {
     writesLocal: false,
     args: [toilProjectArg],
     options: [
-      { flags: '--file <path>', field: 'file', description: 'The OWI records: a file inside the workspace, or - for stdin (the default when no --text is given)' },
+      { flags: '--input-file <path>', field: 'inputFile', description: 'The OWI records: a file inside the workspace, or - for stdin (the default when no --text is given)', deprecated: ['--file <path>'] },
       textOption,
       ...flagsFor(),
       { flags: '--as-of <time>', field: 'asOf', description: 'Count to this ISO 8601 time (default: now)' },
@@ -189,10 +189,10 @@ export function toilProjectPivotCommands(): AnyCommand[] {
     examples: [
       { toilProject: 'payments', text: EXAMPLE_BRIEF_RECORDS, measure: 'items', split: 'category', share: true, asOf: '2026-10-13T08:00:00Z' },
       {
-        toilProject: 'payments', cwd: '.', file: 'owi/brief.owi.json', measure: 'throughput', split: 'category', across: 'resolved:week', where: ['status != Cancelled'],
+        toilProject: 'payments', cwd: '.', inputFile: 'owi/brief.owi.json', measure: 'throughput', split: 'category', across: 'resolved:week', where: ['status != Cancelled'],
         from: '2026-09-01', to: '2026-10-13', top: 3, pin: ['Feature'], includeParents: true, scheme: 'balance', markdown: true, asOf: '2026-10-13T08:00:00Z',
       },
-      { toilProject: 'payments', file: 'owi/brief.owi.json', view: 'release-mix', asOf: '2026-10-13T08:00:00Z' },
+      { toilProject: 'payments', inputFile: 'owi/brief.owi.json', view: 'release-mix', asOf: '2026-10-13T08:00:00Z' },
     ],
     run: async (input, ctx) => {
       // Everything the caller typed is checked first, one flag at a time, so each refusal names its own flag and fix.

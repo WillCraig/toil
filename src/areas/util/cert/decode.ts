@@ -283,7 +283,7 @@ export function decodeBundle(bytes: Uint8Array, label: string, v: Verifier, opti
   const format = text.includes('-----BEGIN ') ? 'pem' : 'der';
   if (format === 'der' && bytes[0] !== 0x30) {
     throw new ToilError('INVALID_INPUT', `${label[0]!.toUpperCase()}${label.slice(1)} is neither PEM (no "-----BEGIN" line) nor DER (it doesn't start with a DER sequence).`, {
-      fix: 'Pass a certificate in PEM (-----BEGIN CERTIFICATE-----) or DER. Over MCP, pass a DER file as file, since text is read as UTF-8.',
+      fix: 'Pass a certificate in PEM (-----BEGIN CERTIFICATE-----) or DER. Over MCP, pass a DER file as inputFile, since text is read as UTF-8.',
     });
   }
   const blocks = format === 'pem' ? pemBlocks(text) : derBlocks(bytes);
@@ -337,7 +337,7 @@ export function decodeBundle(bytes: Uint8Array, label: string, v: Verifier, opti
   if (decoded.length === 0) {
     const why = skipped.length ? `: ${skipped.map((s) => `${where(s)}: ${s.reason}`).join('; ')}` : '';
     throw new ToilError('INVALID_INPUT', `No certificate could be read from ${label}${why}.`, {
-      fix: 'Pass a certificate or chain in PEM (-----BEGIN CERTIFICATE-----) or DER. Over MCP, pass a DER file as file, since text is read as UTF-8.',
+      fix: 'Pass a certificate or chain in PEM (-----BEGIN CERTIFICATE-----) or DER. Over MCP, pass a DER file as inputFile, since text is read as UTF-8.',
     });
   }
 

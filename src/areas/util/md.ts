@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineCommand } from '../../core/command.js';
-import { fileArgument, inputFields, openInput, textOption } from './kit/input.js';
+import { fileArgument, inputFields, openInput, inputFileOption, textOption } from './kit/input.js';
 
 /**
  * `util md`: Markdown to and from Jira wiki markup (Data Center), Atlassian
@@ -46,17 +46,17 @@ export const mdCommand = defineCommand({
   writes: false,
   args: [fileArgument],
   options: [
-    textOption,
+    inputFileOption, textOption,
     { flags: '--from <format>', field: 'from', description: 'The input format: md, wiki, adf or storage (default: "md")' },
     { flags: '--to <format>', field: 'to', description: 'The output format: md, wiki, adf or storage (default: "md")' },
   ],
   examples: [
     { text: EXAMPLE_MD, to: 'adf' },
-    { file: 'docs/bug-report.md', to: 'wiki' },
-    { file: 'docs/runbook.md', to: 'storage' },
-    { file: 'docs/PROJ-142.wiki', from: 'wiki' },
-    { file: 'docs/PROJ-142.adf.json', from: 'adf' },
-    { file: 'docs/release-notes.storage.xml', from: 'storage' },
+    { inputFile: 'docs/bug-report.md', to: 'wiki' },
+    { inputFile: 'docs/runbook.md', to: 'storage' },
+    { inputFile: 'docs/PROJ-142.wiki', from: 'wiki' },
+    { inputFile: 'docs/PROJ-142.adf.json', from: 'adf' },
+    { inputFile: 'docs/release-notes.storage.xml', from: 'storage' },
   ],
   run: async (input, ctx) => {
     // The input is read here, not in the lazy module: the reader brings zod, which a lazily loaded module must not (docs/util.md).

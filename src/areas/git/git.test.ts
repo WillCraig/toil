@@ -121,7 +121,7 @@ describe('git diff', () => {
 
   it('passes --staged and the file as one pathspec after --, with no shell', async () => {
     const git = fakeGit(() => ok(''));
-    const { envelope } = await run('diff', { staged: true, file: 'my file.txt' }, git);
+    const { envelope } = await run('diff', { staged: true, path: 'my file.txt' }, git);
     expect(git.calls).toEqual([{ subcommand: 'diff', options: ['--staged'], paths: ['my file.txt'] }]);
     expect(envelope.data).toEqual({ files: [], truncated: false });
   });
@@ -163,7 +163,7 @@ describe('git diff', () => {
   });
 
   it("returns an empty diff when git fails, as specified (#74 item 3's swallow)", async () => {
-    const { envelope } = await run('diff', { file: 'nope' }, fakeGit(() => failed('fatal: bad revision')));
+    const { envelope } = await run('diff', { path: 'nope' }, fakeGit(() => failed('fatal: bad revision')));
     expect(envelope).toEqual(expect.objectContaining({ ok: true, data: { files: [], truncated: false } }));
   });
 });
@@ -370,7 +370,7 @@ describe.skipIf(!realGit)('against the real git (skipped where git is not instal
     expect(diff.files.map((f) => f.path)).toEqual(['a.txt']);
     expect(diff.files[0]!.hunks[0]!.lines).toEqual([' one', '-two', '+TWO']);
     // One pathspec, space and all, relative to the root; the memory workspace isn't the root, so it goes as :(top).
-    expect(((await real('diff', { staged: true, file: 'src/my file.txt' })).data as { files: unknown[] }).files).toHaveLength(1);
+    expect(((await real('diff', { staged: true, path: 'src/my file.txt' })).data as { files: unknown[] }).files).toHaveLength(1);
     expect((await real('log')).data).toEqual([{ hash: expect.stringMatching(/^[0-9a-f]{40}$/), author: 'Ada Lovelace', date: '2026-09-29T10:15:00+02:00', message: 'First, with a comma' }]);
     expect((await real('branch')).data).toEqual({ current: 'main', local: ['main'], remote: [] });
     expect((await real('report', { since: '2026-09-01' })).data).toMatchObject({ branch: 'main', summary: { commitCount: 1, totalInsertions: 3, totalFilesChanged: 2 }, weeks: [{ week: '2026-W40' }] });

@@ -173,7 +173,7 @@ Owner, repo, labels and refs go into request paths as typed; a value that would 
     <number>` and `issue unassign <number>` (repeatable `--assignee`). `pr label`,
     `pr unlabel`, `pr assign` and `pr unassign` are the same commands.
   - `issue close <number>` (`--reason completed|not-planned`, sent as `state_reason`; with none, GitHub's own, completed) and `issue reopen <number>`, both writes: a `PATCH` of the issue's `state`, answering with the issue as `issue get` returns it. Like the label commands they take a pull request's number too, and then close or reopen the pull request, as GitHub does (`pr close` is the same request). Merging is `pr merge`.
-  - `issue categorize --from <file>` (a write): applies the classification plan that `toil classify run` wrote to the issues and pull requests it names. See **Categorize issues** below.
+  - `issue categorize --input-file <path>` (a write): applies the classification plan that `toil classify run` wrote to the issues and pull requests it names. See **Categorize issues** below.
 - **Projects (v2):** GitHub's boards, over GraphQL (read, except `project status` and `project add`). They belong to an owner, so
   only `--owner` is read; `<project>` is the number in the project's URL.
   - `project list`: the owner's projects (`id`, `number`, `title`, `url`, `closed`, …).
@@ -230,7 +230,7 @@ Owner, repo, labels and refs go into request paths as typed; a value that would 
 - **Comments:** `pr comments <number>` and `pr comment <number> --body` (the general
   comments, which work on an issue's number too; `issue comments` and `issue comment`
   are the same commands), `pr review-comments <number>`,
-  `pr comment-inline <number>` (`--commit`, `--file`, `--line`, `--body`, `--side
+  `pr comment-inline <number>` (`--commit`, `--path`, `--line`, `--body`, `--side
   LEFT|RIGHT`, default `RIGHT`), `pr reply <number> <comment-id> --body`,
   `pr delete-comment <comment-id>`, `pr delete-review-comment <comment-id>`.
 - **Diff and files:** `pr diff <number>` returns `{ diff }`, the unified diff as text;
@@ -272,11 +272,11 @@ toil github pr create --title "Add the probe" --head feature --body-file pr.md -
 
 ## Categorize issues
 
-`issue categorize` writes the categories that `toil classify run` decided back to GitHub. Pass it the plan with `--from <file>` (over MCP, `from`; on the CLI, omit it to read the plan from stdin):
+`issue categorize` writes the categories that `toil classify run` decided back to GitHub. Pass it the plan with `--input-file <path>` (over MCP, `inputFile`; on the CLI, omit it to read the plan from stdin):
 
 ```bash
 toil github issue list --state open --limit 200 | toil util owi map | toil classify run --toil-project payments --summary-file plan.json
-toil github issue categorize --from plan.json --allow-write
+toil github issue categorize --input-file plan.json --allow-write
 ```
 
 - **What it sets.** Each item's category becomes a label, and, when the toil project names a Projects (v2) single-select field (`toil projects classify set <toil-project> --target github.field=<field> --target github.project=<owner>/<number>`), that field's option on the project. It works on pull requests too.

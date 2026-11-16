@@ -147,7 +147,7 @@ is refused the same way.
 | `space list` | `--type --limit`, `--cursor` (Cloud) | Every space (or `--limit` of them) |
 | `space get` | `<key>` | The space, with its plain-text description |
 | `page attachments` | `<id>` | Every attachment on the page |
-| `page attach` ✎ | `<id> --file --comment` | The attachments created |
+| `page attach` ✎ | `<id> --input-file --comment` | The attachments created |
 | `attachment download` | `<attachment-id> --dir` | `{ saved, filename, size }`; saves to `.toil/` by default |
 | `attachment delete` ✎ | `<attachment-id>` | `{ deleted }`; the attachment goes to the trash |
 | `check-toil-project` (Data Center) | `--toil-project <name\|file>` (or the folder's toil project) | `{ toil project, connection, env, ok, checked, checks, unchecked }`: each space the toil project names (`space`, `spaces`), found or not; exit 1 when one is missing |
@@ -166,7 +166,7 @@ toil confluence page list --space DOCS --limit 50
 toil confluence page create --space DOCS --title "Runbook" --body-file runbook.html --parent-id 12345 --allow-write
 toil confluence page update 12345 --body-file runbook.html --allow-write
 toil confluence page label 12345 --labels runbook,ops --allow-write
-toil confluence page attach 12345 --file diagram.png --allow-write
+toil confluence page attach 12345 --input-file diagram.png --allow-write
 toil confluence attachment download 98765 --dir downloads
 ```
 

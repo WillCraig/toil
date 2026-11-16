@@ -79,9 +79,9 @@ const CLASSIFY_TOOL = 'classify_prompt';
 export const CLASSIFY_PROMPT = {
   name: 'classify',
   title: 'Classify work items',
-  description: "Ask the AI agent to classify the work items classify_run left unsure, into the categories of a scheme. The items are untrusted data; the answer is a JSON array of { id, category, reason }, which goes to classify_run as verdicts.",
+  description: "Ask the AI agent to classify the work items classify_run left unsure, into the categories of a scheme. The items are untrusted data; the answer is a JSON array of { id, category, reason }, which goes to classify_run as verdictsFile.",
   arguments: [
-    { name: 'file', description: 'A file in the workspace holding the work items as OWI records (what util owi map printed)', required: true },
+    { name: 'inputFile', description: 'A file in the workspace holding the work items as OWI records (what util owi map printed)', required: true },
     { name: 'toilProject', description: 'The toil project whose scheme to use (default: the one the folder matches, if any)', required: false },
     { name: 'scheme', description: "A scheme name or file (default: the toil project's, else ktlo-feature)", required: false },
   ],
@@ -146,11 +146,11 @@ const PROMPTS: Array<PromptEntry | StaticPromptEntry> = [
     listing: CLASSIFY_PROMPT,
     tool: CLASSIFY_TOOL,
     input: (args) => {
-      const file = trimmed(args, 'file');
-      if (!file) throw new McpError(ErrorCode.InvalidParams, 'The classify prompt needs a file argument: a file in the workspace holding the work items as OWI records (what util owi map printed).');
+      const inputFile = trimmed(args, 'inputFile');
+      if (!inputFile) throw new McpError(ErrorCode.InvalidParams, 'The classify prompt needs an inputFile argument: a file in the workspace holding the work items as OWI records (what util owi map printed).');
       const toilProject = trimmed(args, 'toilProject');
       const scheme = trimmed(args, 'scheme');
-      return { file, ...(toilProject ? { toilProject } : {}), ...(scheme ? { scheme } : {}) };
+      return { inputFile, ...(toilProject ? { toilProject } : {}), ...(scheme ? { scheme } : {}) };
     },
     describe: (data) => `Classify ${data.items.unsure} unsure work item${data.items.unsure === 1 ? '' : 's'} into the scheme ${data.scheme.name}`,
   },

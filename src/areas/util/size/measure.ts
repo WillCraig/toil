@@ -50,7 +50,7 @@ export const DEFAULT_TOP = 10;
 export const DEFAULT_DEPTH = 3;
 
 export interface SizeInput {
-  file?: string | undefined;
+  inputFile?: string | undefined;
   text?: string | undefined;
   language?: Language | undefined;
   top?: number | undefined;
@@ -196,7 +196,7 @@ export const OUTLINE_LIMITS = { timeoutMs: 10_000, maxMemoryMb: 512 } as const;
 
 /** `size` on whatever the input names: a folder's totals, or one file's counts and outline. `limits` replaces OUTLINE_LIMITS only in tests. */
 export async function measure(input: SizeInput, ctx: InputContext, limits: BoundedLimits = OUTLINE_LIMITS): Promise<FileSize | FolderSize> {
-  const named = input.text === undefined && input.file !== undefined && input.file !== '-' ? input.file : undefined;
+  const named = input.text === undefined && input.inputFile !== undefined && input.inputFile !== '-' ? input.inputFile : undefined;
   if (named !== undefined && ctx.files.stat(named).type === 'directory') {
     if (input.language !== undefined) {
       throw new ToilError('INVALID_INPUT', 'language applies to one file, and this is a folder.', { fix: 'Leave out language: each file in a folder is told by its extension.' });
@@ -214,7 +214,7 @@ const clean = (path: string) => forwardSlashes(path).replace(/^(\.\/)+/, '').rep
 
 async function measureFile(input: SizeInput, ctx: InputContext, limits: BoundedLimits): Promise<FileSize> {
   const v = new Verifier(ctx.warn);
-  const isFile = input.text === undefined && input.file !== undefined && input.file !== '-';
+  const isFile = input.text === undefined && input.inputFile !== undefined && input.inputFile !== '-';
   const opened = await openInput(ctx, input, { binary: 'allow', ...(isFile ? { maxBytes: COUNT_MAX_BYTES } : {}) });
   const counts = await count(opened);
   v.inputComplete(opened);
@@ -494,7 +494,7 @@ async function measureFolder(dir: string, input: SizeInput, ctx: InputContext): 
         files.push({ path, folder, bytes: stat.size, lines: null, tokens: null, binary: true, language: null });
         continue;
       }
-      const opened = await openInput(ctx, { file: path }, { binary: 'allow', maxBytes: COUNT_MAX_BYTES });
+      const opened = await openInput(ctx, { inputFile: path }, { binary: 'allow', maxBytes: COUNT_MAX_BYTES });
       const counts = await count(opened);
       v.inputComplete(opened);
       files.push({ path, folder, bytes: counts.bytes, lines: counts.lines, tokens: counts.tokens, binary: counts.binary, language: languageOf(path) ?? null });

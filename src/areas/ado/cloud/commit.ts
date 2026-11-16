@@ -40,8 +40,8 @@ function repoFilePath(file: string): string {
   const absolute = file.startsWith('/') || file.startsWith('\\') || /^[A-Za-z]:/.test(file);
   const kept = parts.filter((part) => part !== '' && part !== '.');
   if (absolute || kept.length === 0 || kept.includes('..')) {
-    throw new ToilError('INVALID_INPUT', `--file "${file}" isn't a relative path inside the workspace.`, {
-      fix: 'Name each file relative to the workspace, with no .. parts: it is committed at the same path in the repository (--file src/index.js).',
+    throw new ToilError('INVALID_INPUT', `--input-file "${file}" isn't a relative path inside the workspace.`, {
+      fix: 'Name each file relative to the workspace, with no .. parts: it is committed at the same path in the repository (--input-file src/index.js).',
     });
   }
   return kept.join('/');
@@ -74,7 +74,7 @@ export const commitCreateCommand = adoArea.command({
   input: z.object({
     branch: z.string().min(1).describe(BRANCH),
     message: z.string().min(1).describe('Commit message'),
-    file: z.array(z.string().min(1)).min(1).describe(FILE),
+    inputFile: z.array(z.string().min(1)).min(1).describe(FILE),
     from: z.string().min(1).optional().describe(FROM),
     ...allowWriteField,
   }),
@@ -83,19 +83,19 @@ export const commitCreateCommand = adoArea.command({
   options: [
     { flags: '--branch <name>', field: 'branch', description: BRANCH },
     { flags: '--message <text>', field: 'message', description: 'Commit message' },
-    { flags: '--file <path>', field: 'file', description: FILE },
+    { flags: '--input-file <path>', field: 'inputFile', description: FILE },
     { flags: '--from <branch>', field: 'from', description: FROM },
   ],
   examples: [
-    { ...inRepo, allowWrite: true, branch: 'main', message: 'Update the readme', file: ['README.md'] },
-    { ...inRepo, allowWrite: true, branch: 'feature/retries', from: 'main', message: 'Add retries', file: ['src/retry.js', 'README.md'] },
+    { ...inRepo, allowWrite: true, branch: 'main', message: 'Update the readme', inputFile: ['README.md'] },
+    { ...inRepo, allowWrite: true, branch: 'feature/retries', from: 'main', message: 'Add retries', inputFile: ['src/retry.js', 'README.md'] },
   ],
   run: async (input, ctx) => {
-    const paths = input.file.map(repoFilePath);
+    const paths = input.inputFile.map(repoFilePath);
     const twice = paths.find((p, i) => paths.indexOf(p) !== i);
-    if (twice) throw new ToilError('INVALID_INPUT', `--file names ${twice} more than once.`, { fix: 'Name each file once.' });
+    if (twice) throw new ToilError('INVALID_INPUT', `--input-file names ${twice} more than once.`, { fix: 'Name each file once.' });
     // Read every file before anything is sent, so a missing one stops the commit rather than half of it.
-    const contents = await Promise.all(input.file.map(async (file) => Buffer.from(await ctx.files.readBytes(file)).toString('base64')));
+    const contents = await Promise.all(input.inputFile.map(async (file) => Buffer.from(await ctx.files.readBytes(file)).toString('base64')));
 
     const repo = await adoc<Repository>(ctx, repoPath(ctx));
     let base = await branchHead(ctx, input.branch);

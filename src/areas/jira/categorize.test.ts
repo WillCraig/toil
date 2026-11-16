@@ -134,7 +134,7 @@ function routes(d: Deployment, w: World): Route[] {
 
 async function apply(d: Deployment, plan: string, w: World = {}, extra: Record<string, unknown> = {}, config: Record<string, Record<string, unknown>> = { ...serverConfig, ...cloudConfig }) {
   const t = testContext({ config, routes: routes(d, w), files: { 'plan.json': plan } });
-  const envelope = await execute(d.def, { from: 'plan.json', allowWrite: true, connection: d.connection, ...extra }, t.context);
+  const envelope = await execute(d.def, { inputFile: 'plan.json', allowWrite: true, connection: d.connection, ...extra }, t.context);
   const calls = t.http.calls.map((c) => ({ method: c.method, path: new URL(c.url).pathname, body: c.body === undefined ? undefined : (JSON.parse(c.body) as Record<string, unknown>) }));
   return { envelope, calls, puts: calls.filter((c) => c.method === 'PUT'), t };
 }
@@ -182,7 +182,7 @@ describe.each(DEPLOYMENTS)('jira issue categorize on $name', (d) => {
     const disk = toilProjectDisk({ 'home/.toil/projects/pay.json': { name: 'pay', jira: { fields: { workCategory: FIELD } } } });
     try {
       const t = testContext({ config: { ...serverConfig, ...cloudConfig }, routes: routes(d, {}), files: { 'plan.json': planFile(d, { field: 'workCategory' }) }, toilProjects: (c) => disk.catalog(c) });
-      const envelope = await execute(d.def, { from: 'plan.json', allowWrite: true, connection: d.connection, toilProject: 'pay' }, t.context);
+      const envelope = await execute(d.def, { inputFile: 'plan.json', allowWrite: true, connection: d.connection, toilProject: 'pay' }, t.context);
       expect(envelope.ok, JSON.stringify(envelope.error)).toBe(true);
       expect(t.http.calls.some((c) => c.url.endsWith('/field'))).toBe(false);
       expect(envelope.data).toMatchObject({ field: { name: 'workCategory', id: FIELD }, changed: [{ field: { value: 'KTLO' } }] });
@@ -357,10 +357,10 @@ describe.each(DEPLOYMENTS)('jira issue categorize on $name', (d) => {
 
   it('runs from the command line: --from names the plan, and --allow-write lets it write', async () => {
     const t = testContext({ config: { ...serverConfig, ...cloudConfig }, routes: routes(d, {}), files: { 'plan.json': planFile(d, { field: null }) } });
-    const run = await runCli(['jira', 'issue', 'categorize', '--from', 'plan.json', '--allow-write', '--connection', d.connection], { commands: [d.def], context: t.context });
+    const run = await runCli(['jira', 'issue', 'categorize', '--input-file', 'plan.json', '--allow-write', '--connection', d.connection], { commands: [d.def], context: t.context });
     expect(run.envelope?.ok, run.stdout).toBe(true);
     expect(run.envelope?.data).toMatchObject({ counts: { changed: 1 } });
-    const refused = await runCli(['jira', 'issue', 'categorize', '--from', 'plan.json', '--connection', d.connection], { commands: [d.def], context: t.context });
+    const refused = await runCli(['jira', 'issue', 'categorize', '--input-file', 'plan.json', '--connection', d.connection], { commands: [d.def], context: t.context });
     expect(refused.envelope?.error?.code).toBe('WRITE_DISABLED');
   });
 });

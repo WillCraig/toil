@@ -308,7 +308,7 @@
     "writes": true,
     "connection": true,
     "flags": [
-      "--from <file>",
+      "--input-file <path>",
       "--collection <name>",
       "--organization <name>",
       "--project <name>",
@@ -338,7 +338,7 @@
     "connection": true,
     "flags": [
       "<id>",
-      "--file <path>",
+      "--input-file <path>",
       "--comment <text>",
       "--collection <name>",
       "--organization <name>",
@@ -758,7 +758,7 @@
     "connection": true,
     "flags": [
       "<id>",
-      "--file <path>",
+      "--path <path>",
       "--line <n>",
       "--body <text>",
       "--line-type <side>",
@@ -955,7 +955,7 @@
     "flags": [
       "--branch <name>",
       "--message <text>",
-      "--file <path>",
+      "--input-file <path>",
       "--from <branch>",
       "--collection <name>",
       "--organization <name>",

@@ -16,3 +16,17 @@ export function deprecatedName(old: string, replacement: string, ignored = false
     message: `${old} is now ${replacement}: dossiers are called toil projects. ${old} still works for now, so change it to ${replacement} before a later release drops it.${ignored ? ` ${replacement} is also set, so ${old} is ignored.` : ''}`,
   };
 }
+
+/** The warning every retired spelling of a flag gets (#622): `--file` for `--input-file`, `util`'s `[file]` positional. */
+export const DEPRECATED_FLAG = 'DEPRECATED_FLAG';
+
+/** A sentence's first letter, raised: `the [file] argument` opens one. A flag starts with -, which has no capital. */
+const upper = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** The warning for one old flag or positional, naming what replaces it. `ignored`: the new flag is given too, so the old one has no effect. */
+export function deprecatedFlag(old: string, replacement: string, ignored = false): Warning {
+  return {
+    code: DEPRECATED_FLAG,
+    message: `${upper(old)} is now ${replacement}. ${upper(old)} still works for now, so change it to ${replacement} before a later release drops it.${ignored ? ` ${replacement} is also given, so ${old} is ignored.` : ''}`,
+  };
+}

@@ -510,11 +510,11 @@ export function toilProjectBuildCommands(areas: readonly AnyArea[]): AnyCommand[
     path: ['projects', 'export'],
     description: "Write a toil project for sharing: into a repository's .toil/projects, or to one file",
     toolDescription:
-      "Writes a toil project for others to use: each connection name becomes a host selector taken from that connection's base URL (teammates name connections differently), and local repo paths are dropped. With repo, it writes <repo>/.toil/projects/<name>.json, where repo must be a working tree's root; with file, it writes that .json file. It never stages or commits. Refuses to overwrite anything but a toil project, and a toil project without replace. Over MCP, a toil project whose bindings select a connection with writes on is refused.",
+      "Writes a toil project for others to use: each connection name becomes a host selector taken from that connection's base URL (teammates name connections differently), and local repo paths are dropped. With repo, it writes <repo>/.toil/projects/<name>.json, where repo must be a working tree's root; with out, it writes that .json file. It never stages or commits. Refuses to overwrite anything but a toil project, and a toil project without replace. Over MCP, a toil project whose bindings select a connection with writes on is refused.",
     input: z.object({
       toilProject: toilProjectField,
       repo: z.string().min(1).optional().describe('The root of a working tree to write .toil/projects/<name>.json into'),
-      file: z.string().min(1).optional().describe('A .json file to write instead'),
+      out: z.string().min(1).optional().describe('A .json file to write instead'),
       replace: replaceField,
     }),
     writes: false,
@@ -522,17 +522,17 @@ export function toilProjectBuildCommands(areas: readonly AnyArea[]): AnyCommand[
     args: [toilProjectArg],
     options: [
       { flags: '--repo <dir>', field: 'repo', description: "A working tree's root; writes .toil/projects/<name>.json there" },
-      { flags: '--file <path>', field: 'file', description: 'Write one .json file instead' },
+      { flags: '--out <path>', field: 'out', description: 'Write one .json file instead', deprecated: ['--file <path>'] },
       replaceOption,
     ],
-    examples: [{ toilProject: 'payments', file: 'shared/payments.json' }, { toilProject: 'payments', repo: '.', replace: true }],
+    examples: [{ toilProject: 'payments', out: 'shared/payments.json' }, { toilProject: 'payments', repo: '.', replace: true }],
     run: async (input, ctx) => {
       const { catalog, config, via } = access(ctx);
-      if ((input.repo === undefined) === (input.file === undefined)) throw new ToilError('INVALID_INPUT', 'Pass exactly one of --repo and --file.', { fix: 'toil projects export <name> --repo <dir>, or --file <path>.' });
+      if ((input.repo === undefined) === (input.out === undefined)) throw new ToilError('INVALID_INPUT', 'Pass exactly one of --repo and --out.', { fix: 'toil projects export <name> --repo <dir>, or --out <path>.' });
       const source = catalog.find(input.toilProject);
       if (via !== 'cli') refuseWritesBindings(catalog, config, areas, source.toilProject, 'export');
       const { toilProject, hosts, droppedPaths } = forSharing(source.toilProject, config, areas);
-      const target = input.repo !== undefined ? join(catalog.repoFolder(input.repo), `${toilProject.name}.json`) : catalog.pathFor(input.file!, 'The export file');
+      const target = input.repo !== undefined ? join(catalog.repoFolder(input.repo), `${toilProject.name}.json`) : catalog.pathFor(input.out!, 'The export file');
       const file = catalog.save(target, toilProject, input.replace ? 'replace' : 'create');
       return { name: toilProject.name, file, hosts, droppedPaths, toilProject: toilProjectContent(toilProject) };
     },
@@ -752,10 +752,10 @@ export function toilProjectBuildCommands(areas: readonly AnyArea[]): AnyCommand[
     writes: false,
     writesLocal: false,
     args: [toilProjectArg],
-    options: [{ flags: '--file <path>', field: 'file', description: 'The OWI records: a file inside the workspace, or - for stdin (the default when no --text is given)' }, textOption],
+    options: [{ flags: '--input-file <path>', field: 'inputFile', description: 'The OWI records: a file inside the workspace, or - for stdin (the default when no --text is given)', deprecated: ['--file <path>'] }, textOption],
     examples: [
       { toilProject: 'payments', text: EXAMPLE_PEOPLE_RECORDS },
-      { toilProject: 'payments', file: 'owi/people.owi.json' },
+      { toilProject: 'payments', inputFile: 'owi/people.owi.json' },
     ],
     run: async (input, ctx) => {
       const { catalog } = access(ctx);

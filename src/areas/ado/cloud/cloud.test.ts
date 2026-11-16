@@ -398,7 +398,7 @@ describe('pull request comments', () => {
   });
 
   it('add-inline-comment roots the path and anchors on the side asked', async () => {
-    const { calls } = await run('pr comment-inline', { ...inRepo, id: 42, file: 'src/app.ts', line: 3, body: 'Why?', lineType: 'left', ...write });
+    const { calls } = await run('pr comment-inline', { ...inRepo, id: 42, path: 'src/app.ts', line: 3, body: 'Why?', lineType: 'left', ...write });
     expect(body(calls[0]!)).toEqual({
       comments: [{ parentCommentId: 0, content: 'Why?', commentType: 'text' }],
       status: 'active',
@@ -693,7 +693,7 @@ describe('the writes demo seeding needed (#618)', () => {
     const b64 = (text: string) => Buffer.from(text).toString('base64');
 
     it('moves an existing branch from its head, editing a path the base has and adding one it has not', async () => {
-      const { calls, envelope } = await run('commit create', { ...inRepo, branch: 'main', message: 'Update', file: ['README.md', 'src/retry.js'], ...write });
+      const { calls, envelope } = await run('commit create', { ...inRepo, branch: 'main', message: 'Update', inputFile: ['README.md', 'src/retry.js'], ...write });
       expect(envelope.ok).toBe(true);
       expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
         `GET ${R}?api-version=7.1`,
@@ -716,14 +716,14 @@ describe('the writes demo seeding needed (#618)', () => {
     });
 
     it('starts a new branch from --from', async () => {
-      const { calls } = await run('commit create', { ...inRepo, branch: 'feature/retries', from: 'main', message: 'Add retries', file: ['src/retry.js'], ...write });
+      const { calls } = await run('commit create', { ...inRepo, branch: 'feature/retries', from: 'main', message: 'Add retries', inputFile: ['src/retry.js'], ...write });
       expect(calls[1]!.url).toBe(`${R}/refs?api-version=7.1&filter=heads%2Ffeature%2Fretries`);
       expect(calls[2]!.url).toBe(`${R}/refs?api-version=7.1&filter=heads%2Fmain`);
       expect((body(calls[4]!) as { refUpdates: unknown }).refUpdates).toEqual([{ name: 'refs/heads/feature/retries', oldObjectId: SHA }]);
     });
 
     it("starts a new branch with no --from at the repository's default branch, and lists only the folder the files share", async () => {
-      const { calls } = await run('commit create', { ...inRepo, branch: 'feature/retries', message: 'Add retries', file: ['src/retry.js'], ...write });
+      const { calls } = await run('commit create', { ...inRepo, branch: 'feature/retries', message: 'Add retries', inputFile: ['src/retry.js'], ...write });
       expect(calls[2]!.url).toBe(`${R}/refs?api-version=7.1&filter=heads%2Fmain`);
       expect(calls[3]!.url).toContain('scopePath=%2Fsrc&');
       expect((body(calls[4]!) as { refUpdates: unknown }).refUpdates).toEqual([{ name: 'refs/heads/feature/retries', oldObjectId: SHA }]);
@@ -731,7 +731,7 @@ describe('the writes demo seeding needed (#618)', () => {
 
     it('commits into a folder the base does not have yet, every file an add, when its listing answers 404', async () => {
       const missing: Route[] = [{ path: '/imagile/Imagile/_apis/git/repositories/imagile-api/items', respond: { status: 404, json: { message: 'TF401174: The item \'/newdir\' could not be found.' } } }];
-      const { calls, envelope } = await run('commit create', { ...inRepo, branch: 'main', message: 'New', file: ['src/retry.js'], ...write }, missing);
+      const { calls, envelope } = await run('commit create', { ...inRepo, branch: 'main', message: 'New', inputFile: ['src/retry.js'], ...write }, missing);
       expect(envelope.ok).toBe(true);
       expect((body(calls[3]!) as { commits: Array<{ changes: Array<{ changeType: string }> }> }).commits[0]!.changes.map((c) => c.changeType)).toEqual(['add']);
     });
@@ -741,7 +741,7 @@ describe('the writes demo seeding needed (#618)', () => {
         { path: `/imagile/Imagile/_apis/git/repositories/imagile-api`, respond: { json: { id: 'abc12345-0000-0000-0000-000000000003', name: 'imagile-api' } } },
         { path: `/imagile/Imagile/_apis/git/repositories/imagile-api/refs`, respond: { json: { count: 0, value: [] } } },
       ];
-      const { calls } = await run('commit create', { ...inRepo, branch: 'main', message: 'First', file: ['README.md'], ...write }, empty);
+      const { calls } = await run('commit create', { ...inRepo, branch: 'main', message: 'First', inputFile: ['README.md'], ...write }, empty);
       expect(calls.map((c) => c.method)).toEqual(['GET', 'GET', 'POST']);
       const sent = body(calls[2]!) as { refUpdates: unknown; commits: Array<{ changes: Array<{ changeType: string }> }> };
       expect(sent.refUpdates).toEqual([{ name: 'refs/heads/main', oldObjectId: ZERO }]);
@@ -750,14 +750,14 @@ describe('the writes demo seeding needed (#618)', () => {
 
     it('refuses a path outside the workspace, a file named twice, a missing file and a missing --from before pushing', async () => {
       for (const file of [['../secret.txt'], ['/etc/hosts'], ['README.md', './README.md']]) {
-        const r = await run('commit create', { ...inRepo, branch: 'main', message: 'x', file, ...write });
+        const r = await run('commit create', { ...inRepo, branch: 'main', message: 'x', inputFile: file, ...write });
         expect(r.envelope.error?.code).toBe('INVALID_INPUT');
         expect(r.calls).toHaveLength(0);
       }
-      const missing = await run('commit create', { ...inRepo, branch: 'main', message: 'x', file: ['nope.txt'], ...write });
+      const missing = await run('commit create', { ...inRepo, branch: 'main', message: 'x', inputFile: ['nope.txt'], ...write });
       expect(missing.envelope.ok).toBe(false);
       expect(missing.calls).toHaveLength(0);
-      const noBase = await run('commit create', { ...inRepo, branch: 'feature/x', from: 'develop', message: 'x', file: ['README.md'], ...write });
+      const noBase = await run('commit create', { ...inRepo, branch: 'feature/x', from: 'develop', message: 'x', inputFile: ['README.md'], ...write });
       expect(noBase.envelope.error?.code).toBe('NOT_FOUND');
       expect(noBase.calls.some((c) => c.method === 'POST')).toBe(false);
     });

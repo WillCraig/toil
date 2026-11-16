@@ -71,7 +71,7 @@ import { categories, depsCommands, integrationCount, databaseCount, levels } fro
         <span class="card-tag">compose</span>
 <pre tabindex="0" role="region" aria-label="Composing the dependency commands"><span class="p">$</span> toil deps scan <span class="p">|</span> toil osv vulns
 <span class="p">$</span> toil deps scan <span class="k">&gt;</span> inventory.json
-<span class="p">$</span> toil sonatypeiq evaluate <span class="k">--from</span> inventory.json <span class="k">--application-id</span> <span class="s">payments-api</span></pre>
+<span class="p">$</span> toil sonatypeiq evaluate <span class="k">--input-file</span> inventory.json <span class="k">--application-id</span> <span class="s">payments-api</span></pre>
       </div>
       <div class="table-wrap" data-reveal tabindex="0" role="region" aria-label="Dependency commands">
         <table>

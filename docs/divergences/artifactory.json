@@ -4,7 +4,7 @@
     {
       "allows": [],
       "old": "deps outdated and deps license-check scanning the direct dependencies of the git repository they ran in, and failing with \"Not inside a git repository.\" elsewhere",
-      "toil": "toil artifactory package outdated and package license-check (deps outdated and deps license-check are aliases) read an inventory from --from <file>, or from stdin on the CLI: toil deps scan | toil artifactory package outdated. --ecosystem, --include-dev and the direct-only filter apply to the inventory as they applied to the scan",
+      "toil": "toil artifactory package outdated and package license-check (deps outdated and deps license-check are aliases) read an inventory from --input-file <path>, or from stdin on the CLI: toil deps scan | toil artifactory package outdated. --ecosystem, --include-dev and the direct-only filter apply to the inventory as they applied to the scan",
       "why": "One command talks to one source and the caller composes them (decision 6 on #68). Scanning is deps scan's job; these commands only ask Artifactory.",
       "principle": "3"
     },

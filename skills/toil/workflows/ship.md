@@ -23,7 +23,7 @@ answer the review on #12"), do that flow and its round bookkeeping, nothing else
    fails. Then `toil util secrets scan --diff staged` on what you are about to commit.
 2. **Update the docs the change made stale,** in the same branch. List what changed
    (`toil git diff --staged`), then find the README, `docs/`, skill and wiki pages that
-   mention it: `toil util size docs --depth 2` shows where the documents are, and for
+   mention it: `toil util size --input-file docs --depth 2` shows where the documents are, and for
    a wiki `toil confluence page search --cql "text ~ \"<name>\"" --limit 10`. Edit
    the files in the branch. A wiki page changes only on the person's yes:
    `toil confluence page update <id> --body-file <file> --markdown --allow-write`.
@@ -80,7 +80,7 @@ answer the review on #12"), do that flow and its round bookkeeping, nothing else
    | Azure DevOps | Server: `toil ado pr builds <id>`, then `toil ado run get <id>` | Server: `toil ado run logs <id> --log-id <n>` |
 
 2. **Condense the log** (save its text to a file in the workspace first):
-   `toil util log <file> --level error --context 3`.
+   `toil util log --input-file <file> --level error --context 3`.
 3. **Fix the cause, or say why it can't be fixed** (flaky test, infrastructure,
    a permission): never weaken a test or the gate to turn a check green.
 

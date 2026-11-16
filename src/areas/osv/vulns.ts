@@ -163,16 +163,16 @@ export const vulnsCommand = osvArea.command({
   kind: 'area-local',
   description: 'Check a dependency inventory for known vulnerabilities in OSV.dev (public API, no credential)',
   toolDescription:
-    'Known vulnerabilities from the public OSV.dev API for the packages in an inventory: a JSON list of { name, version, ecosystem } (npm, nuget or maven), in a file passed as from. Returns { tier, source, sourcesQueried, sourceErrors, scanned, vulnerable, packages[] }, each package with vulnerabilities[] of { id, summary, severity, cvss, aliases, remediation, references }. Each finding is filled from its full OSV record. For Sonatype OSS Index use ossindex_vulns.',
+    'Known vulnerabilities from the public OSV.dev API for the packages in an inventory: a JSON list of { name, version, ecosystem } (npm, nuget or maven), in a file passed as inputFile. Returns { tier, source, sourcesQueried, sourceErrors, scanned, vulnerable, packages[] }, each package with vulnerabilities[] of { id, summary, severity, cvss, aliases, remediation, references }. Each finding is filled from its full OSV record. For Sonatype OSS Index use ossindex_vulns.',
   input: z.object(inventoryFields),
   writes: false,
   // A batch query whose body can hold 500 packages: a read, sent as POST.
   queryByPost: true,
   timeLimitMs: TIME_LIMIT_MS,
   options: inventoryOptions,
-  examples: [{ from: 'inventory.json' }, { from: 'inventory.json', ecosystem: 'npm', directOnly: true, includeDev: true }],
+  examples: [{ inputFile: 'inventory.json' }, { inputFile: 'inventory.json', ecosystem: 'npm', directOnly: true, includeDev: true }],
   run: async (input, ctx) => {
-    const packages = selectPackages(await readInventory(ctx, input.from, 'osv vulns'), input);
+    const packages = selectPackages(await readInventory(ctx, input.inputFile, 'osv vulns'), input);
     const up = await probe(ctx, { service: SERVICE, url: QUERYBATCH, body: { queries: [] } });
     if (!up.reachable) {
       throw new ToilError('NETWORK', 'toil osv vulns requires OSV.dev access but api.osv.dev is not reachable from this machine.', {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineCommand } from '../../core/command.js';
-import { fileArgument, inputFields, openInput, textOption } from './kit/input.js';
+import { fileArgument, inputFields, openInput, inputFileOption, textOption } from './kit/input.js';
 
 /**
  * `util owi map`: toil's own Jira, Azure DevOps and GitHub output, mapped to
@@ -56,7 +56,7 @@ export const owiMapCommand = defineCommand({
   writes: false,
   args: [fileArgument],
   options: [
-    textOption,
+    inputFileOption, textOption,
     { flags: '--command <name>', field: 'command', description: 'The command whose data the input is, when it holds data without its envelope ("jira issue search")' },
     { flags: '--key <key>', field: 'key', description: "The item a history belongs to, when its output doesn't say (PROJ-123, owner/repo#9)" },
     { flags: '--field <name=field>', field: 'field', description: 'Point an OWI field at a field of your own (repeatable): estimate=customfield_10234, estimateUnit=hours, estimateLabel=size/{n}, release=Custom.FixedIn (release and affects: Azure DevOps only)' },
@@ -65,12 +65,12 @@ export const owiMapCommand = defineCommand({
     { flags: '--author-kind <id=KIND>', field: 'authorKind', description: "Set a pull request author's kind by hand (repeatable): release-bot=BOT, with KIND HUMAN, AGENT or BOT" },
   ],
   examples: [
-    { file: 'owi/sprint-42.jsonl' },
-    { file: 'owi/jira-changelog.json', key: 'PAY-104' },
-    { file: 'owi/ado-get-batch.json', field: ['estimate=Custom.TeamPoints', 'estimateUnit=points'] },
+    { inputFile: 'owi/sprint-42.jsonl' },
+    { inputFile: 'owi/jira-changelog.json', key: 'PAY-104' },
+    { inputFile: 'owi/ado-get-batch.json', field: ['estimate=Custom.TeamPoints', 'estimateUnit=points'] },
     { text: EXAMPLE_ISSUE, command: 'github issue get' },
-    { file: 'owi/ado-get-batch.json', dimension: ['customer=ado:Custom.Customer', 'customer=jira:customfield_10500'] },
-    { file: 'owi/pull-requests.jsonl', keyPattern: ['PAY-{n}=corp-jira', 'imagile/payments-web#{n}=github'], authorKind: ['svc-renovate=BOT'] },
+    { inputFile: 'owi/ado-get-batch.json', dimension: ['customer=ado:Custom.Customer', 'customer=jira:customfield_10500'] },
+    { inputFile: 'owi/pull-requests.jsonl', keyPattern: ['PAY-{n}=corp-jira', 'imagile/payments-web#{n}=github'], authorKind: ['svc-renovate=BOT'] },
   ],
   run: async (input, ctx) => {
     const source = await openInput(ctx, input, { maxBytes: MAX_BYTES });
@@ -92,7 +92,7 @@ export const owiSimilarCommand = defineCommand({
   path: ['util', 'owi', 'similar'],
   description: 'Find likely duplicate work items among OWI records: rank them against some text or one of them, or list likely duplicate pairs (local only, deterministic)',
   toolDescription:
-    "Finds likely duplicate work items among Open Work Item records (what util owi map returns: pass its envelope, its data, a JSON array of records, or one record a line, as file or text). Ask exactly one question: query ranks every item against some text (run it before filing or proposing a new item), item ranks the set against one of its items by OWI id (<connection>:<key>), and pairs lists likely duplicate pairs across the whole set, so items from Jira, Azure DevOps and GitHub are compared with each other. Scoring is lexical and deterministic, with no model and no network: BM25 over titles and bodies, title character trigrams (catching typos), and small boosts for shared labels, the same parent and a direct link. It finds shared words, not shared meaning. Returns { mode, method, fields, threshold, limit, query, item, items, count, matches, pairs, search, titleOnly, skipped, verified }: each match is { id, title, source, url, score, why } and each pair { score, a, b, why }, with why naming the title terms, body terms, trigram similarity, labels, parent and link that drove the score, and parts, what each added. Results score at least threshold (default 0.35), best first, at most limit (default 10). fields picks what is compared (title,body,labels,parent,links; default all). An item with no body is scored on its title alone, with a warning. A query that nothing scores threshold or more against gets an OWI_SIMILAR_NO_MATCH warning: there is no likely ticket, so suggest creating one rather than lowering threshold to force a match. Local only.",
+    "Finds likely duplicate work items among Open Work Item records (what util owi map returns: pass its envelope, its data, a JSON array of records, or one record a line, as inputFile or text). Ask exactly one question: query ranks every item against some text (run it before filing or proposing a new item), item ranks the set against one of its items by OWI id (<connection>:<key>), and pairs lists likely duplicate pairs across the whole set, so items from Jira, Azure DevOps and GitHub are compared with each other. Scoring is lexical and deterministic, with no model and no network: BM25 over titles and bodies, title character trigrams (catching typos), and small boosts for shared labels, the same parent and a direct link. It finds shared words, not shared meaning. Returns { mode, method, fields, threshold, limit, query, item, items, count, matches, pairs, search, titleOnly, skipped, verified }: each match is { id, title, source, url, score, why } and each pair { score, a, b, why }, with why naming the title terms, body terms, trigram similarity, labels, parent and link that drove the score, and parts, what each added. Results score at least threshold (default 0.35), best first, at most limit (default 10). fields picks what is compared (title,body,labels,parent,links; default all). An item with no body is scored on its title alone, with a warning. A query that nothing scores threshold or more against gets an OWI_SIMILAR_NO_MATCH warning: there is no likely ticket, so suggest creating one rather than lowering threshold to force a match. Local only.",
   input: z.object({
     ...inputFields,
     query: z.string().min(1).optional().describe('Rank every item against this text, such as the title of an item about to be filed'),
@@ -106,7 +106,7 @@ export const owiSimilarCommand = defineCommand({
   args: [fileArgument],
   options: [
     textOption,
-    { flags: '--input-file <path>', field: 'file', description: 'The OWI records to compare: a file inside the workspace (the same as the [file] argument)' },
+    { flags: '--input-file <path>', field: 'inputFile', description: 'The OWI records to compare: a file inside the workspace, or - for stdin' },
     { flags: '--query <text>', field: 'query', description: 'Rank every item against this text' },
     { flags: '--item <id>', field: 'item', description: 'Rank the set against the item with this OWI id (corp-jira:PAY-101)' },
     { flags: '--pairs', field: 'pairs', description: 'List likely duplicate pairs across the whole set' },
@@ -115,9 +115,9 @@ export const owiSimilarCommand = defineCommand({
     { flags: '--fields <list>', field: 'fields', description: 'What to compare: title, body, labels, parent and links, separated by commas (default all)' },
   ],
   examples: [
-    { file: 'owi/triage.owi.json', query: 'Card payments time out at checkout' },
-    { file: 'owi/triage.owi.json', item: 'corp-jira:PAY-210', limit: 5 },
-    { file: 'owi/triage.owi.json', pairs: true, threshold: 0.5, fields: 'title,body,labels' },
+    { inputFile: 'owi/triage.owi.json', query: 'Card payments time out at checkout' },
+    { inputFile: 'owi/triage.owi.json', item: 'corp-jira:PAY-210', limit: 5 },
+    { inputFile: 'owi/triage.owi.json', pairs: true, threshold: 0.5, fields: 'title,body,labels' },
     { text: EXAMPLE_RECORDS, pairs: true },
   ],
   run: async (input, ctx) => {

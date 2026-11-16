@@ -92,7 +92,7 @@ export const repoAddInlineCommentCommand = adoArea.command({
     'Starts an active thread on one line of a file in a pull request (the right, new side unless lineType is left) and returns the thread. Give the path as the server shows it, with a leading /.',
   input: z.object({
     id: prInput,
-    file: z.string().describe('File path'),
+    path: z.string().describe('File path'),
     line: intText.describe('Line number'),
     body: z.string().describe('Comment text'),
     lineType: z.string().optional().describe(LINE_TYPE),
@@ -101,14 +101,14 @@ export const repoAddInlineCommentCommand = adoArea.command({
   writes: true,
   args: [prArg],
   options: [
-    { flags: '--file <path>', field: 'file', description: 'File path' },
+    { flags: '--path <path>', field: 'path', description: 'File path', deprecated: ['--file <path>'] },
     { flags: '--line <n>', field: 'line', description: 'Line number' },
     bodyOption,
     { flags: '--line-type <side>', field: 'lineType', description: LINE_TYPE },
   ],
   examples: [
-    { ...W, id: '42', file: '/src/app.ts', line: '12', body: 'Off by one?' },
-    { ...W, id: '42', file: 'src/app.ts', line: '3', body: 'Was this removed on purpose?', lineType: 'left' },
+    { ...W, id: '42', path: '/src/app.ts', line: '12', body: 'Off by one?' },
+    { ...W, id: '42', path: 'src/app.ts', line: '3', body: 'Was this removed on purpose?', lineType: 'left' },
   ],
   run: async (input, ctx) => {
     const w = where(ctx, true);
@@ -120,7 +120,7 @@ export const repoAddInlineCommentCommand = adoArea.command({
         : { leftFileStart: { line, offset: 1 }, leftFileEnd: { line, offset: 1 } };
     return ado(ctx, `${repoPath(w)}/pullrequests/${enc(toInt(input.id))}/threads?api-version=${API}`, {
       method: 'POST',
-      json: { comments: [{ content: input.body, commentType: 'text' }], status: 'active', threadContext: { filePath: input.file, ...range } },
+      json: { comments: [{ content: input.body, commentType: 'text' }], status: 'active', threadContext: { filePath: input.path, ...range } },
     });
   },
 });

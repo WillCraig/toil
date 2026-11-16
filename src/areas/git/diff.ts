@@ -111,21 +111,21 @@ export const diffCommand = gitArea.command({
     'The uncommitted changes in the git repository in the workspace (working tree against the index, or the index against HEAD with staged), parsed: { files: [{ path, binary, truncated, hunks: [{ oldStart, oldCount, newStart, newCount, lines }] }], truncated }. Optionally one file, relative to the repository root. Parsing stops after 5,000 lines of output. Runs the git on PATH; a failing git gives an empty result.',
   input: z.object({
     staged: z.boolean().optional().describe('Show staged changes only'),
-    file: z.string().optional().describe('Limit diff to a specific file'),
+    path: z.string().optional().describe('Limit diff to a specific file'),
   }),
   writes: false,
   options: [
     { flags: '--staged', field: 'staged', description: 'Show staged changes only' },
-    { flags: '--file <path>', field: 'file', description: 'Limit diff to a specific file' },
+    { flags: '--path <path>', field: 'path', description: 'Limit diff to a specific file', deprecated: ['--file <path>'] },
   ],
-  examples: [{}, { staged: true, file: 'src/retry.ts' }],
+  examples: [{}, { staged: true, path: 'src/retry.ts' }],
   run: async (input, ctx) => {
     const repo = await requireRepo(ctx);
-    const command = ['git diff', ...(input.staged ? ['--staged'] : []), ...(input.file ? ['--', input.file] : [])].join(' ');
+    const command = ['git diff', ...(input.staged ? ['--staged'] : []), ...(input.path ? ['--', input.path] : [])].join(' ');
     const call = {
       subcommand: 'diff' as const,
       options: input.staged ? ['--staged'] : [],
-      ...(input.file ? { paths: [rootRelativePathspec(input.file, repo.root, ctx.files.workspace)] } : {}),
+      ...(input.path ? { paths: [rootRelativePathspec(input.path, repo.root, ctx.files.workspace)] } : {}),
     };
     // Any git failure, and a diff past execSync's 1 MB, is an empty diff with truncated false (#74 items 4 and 9).
     return swallowGitFailure(

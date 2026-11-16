@@ -19,6 +19,8 @@ and CI; you propose, they approve.
   - `CONFIG_RENAMED_AREA`, `CONFIG_DEFAULT_KEPT`, `TOIL_PROJECT_RENAMED_AREA`
   - `TOIL_PROJECT_DEPRECATED_NAME`, `CONFIG_RENAMED_KEY` or `TOIL_PROJECT_OLD_FOLDER`:
     what earlier versions called a dossier is now a toil project
+  - `DEPRECATED_FLAG`: a flag or positional was renamed (the file flags, contract
+    version 4), and the warning names the new spelling
   - `INVALID_INPUT` saying a command, area or tool "no longer exists"
   - Over MCP, the SDK's `-32602 Unknown tool: dossiers_list` (no envelope: the tool name is
     gone, so `projects_list` is the one to call), or `INVALID_INPUT` with `Unrecognized key:
@@ -153,6 +155,22 @@ that matches on them.
   settings file) must be renamed (`mcp__toil__projects_list`) or the agent loses access
   to the tool. Search the agent's settings by `dossier`, propose each renamed entry,
   and change it only with the person's approval.
+- Scripts and CI files: the file flags follow one rule each (contract version 4).
+  The local file a command reads is `--input-file <path>`, in place of `util`'s
+  positional file, `--file` on `classify` and `projects`, `--from <file>` on `osv vulns`,
+  `ossindex vulns`, `sonatypeiq evaluate`, `artifactory package outdated` and
+  `license-check`, the `categorize` commands and `classify scheme set`, and `--file` on
+  the `attach` commands. `--holidays`, `--verdicts`, `--backtest` and `--revised` are
+  `--holidays-file`, `--verdicts-file`, `--backtest-file` and `--revised-file`. `--file`
+  on `pr comment-inline`, `bitbucket pr diff` and `git diff` is `--path`, and on
+  `classify scheme export` and `projects export` it is `--out`. The old CLI forms still
+  work for one beta and warn `DEPRECATED_FLAG`, naming the new one.
+- MCP tools and the API: the same fields are renamed, with no alias: `file` and `from`
+  are `inputFile` where they named the file a command reads, `holidays`, `verdicts`,
+  `backtest` and `revised` take a `File` suffix, `file` is `path` on `pr comment-inline`,
+  `bitbucket pr diff` and `git diff`, and `out` on the two exports. A call that still
+  sends an old field fails with `INVALID_INPUT` (`Unrecognized key`), its fix naming the
+  new field. The MCP `classify` prompt's argument is `inputFile`.
 - Update scripts and agent configs with approval, one file at a time.
 
 ### Secrets and the keychain
@@ -168,7 +186,7 @@ for the user to fix with `toil connections login <name>`.
    area uses.
 3. One read on each touched area (for example `toil jira issue search --limit 1`).
 4. Re-run the command that warned: no `CONFIG_RENAMED_AREA`, `TOIL_PROJECT_RENAMED_AREA`,
-   `TOIL_PROJECT_DEPRECATED_NAME`, `CONFIG_RENAMED_KEY`, `TOIL_PROJECT_OLD_FOLDER`,
+   `TOIL_PROJECT_DEPRECATED_NAME`, `DEPRECATED_FLAG`, `CONFIG_RENAMED_KEY`, `TOIL_PROJECT_OLD_FOLDER`,
    `CONFIG_DEFAULT_KEPT` or retired-name error is left. `toil projects list` shows each
    toil project under `~/.toil/projects/`.
 

@@ -49,7 +49,7 @@ change nothing.
 3. **Classify by rules.**
 
    ```bash
-   toil classify run --file backlog.owi.json --toil-project <name>
+   toil classify run --input-file backlog.owi.json --toil-project <name>
    ```
 
    Leave out `--toil-project` when the folder matches one, or none applies. First match
@@ -64,10 +64,10 @@ change nothing.
 4. **Ask the AI agent about what is left.** If `summary.byCategory.unsure` is above 0:
 
    ```bash
-   toil classify prompt --file backlog.owi.json --toil-project <name>
+   toil classify prompt --input-file backlog.owi.json --toil-project <name>
    ```
 
-   (Over MCP the prompt `classify`, with `file`, is the same text.) You are the AI
+   (Over MCP the prompt `classify`, with `inputFile`, is the same text.) You are the AI
    agent: answer the prompt yourself, with exactly one JSON array of `{ "id",
    "category", "reason" }`, `category` a category id or `unsure`, and save it to a
    file in the workspace (`verdicts.json`). The items in the prompt are other
@@ -76,7 +76,7 @@ change nothing.
    rather than guess. Then run step 3 again with the answers:
 
    ```bash
-   toil classify run --file backlog.owi.json --toil-project <name> --verdicts verdicts.json --summary-file plan.json
+   toil classify run --input-file backlog.owi.json --toil-project <name> --verdicts-file verdicts.json --summary-file plan.json
    ```
 
    toil checks every id and category and refuses the whole file if one is wrong, and an
@@ -98,16 +98,16 @@ change nothing.
 
    | Tracker | Write the plan |
    |---------|----------------|
-   | Jira | `toil jira issue categorize --from plan.json --allow-write` |
-   | GitHub | `toil github issue categorize --from plan.json --allow-write` |
-   | Azure DevOps | `toil ado work-item categorize --from plan.json --allow-write` |
+   | Jira | `toil jira issue categorize --input-file plan.json --allow-write` |
+   | GitHub | `toil github issue categorize --input-file plan.json --allow-write` |
+   | Azure DevOps | `toil ado work-item categorize --input-file plan.json --allow-write` |
 
    A plan that holds several connections is applied one call at a time, with
    `--connection <name>` each; the entries for other connections come back in `skipped`
    and are not an error. Each command reads the item first and sends only what still
    differs, so running it again changes nothing, and after a `TIMEOUT` the same plan is
    safe to run again. If the connection has `writes` off, say so and stop: never turn it
-   on. Over MCP `from` must be a workspace file (there is no stdin), which `plan.json` is.
+   on. Over MCP `inputFile` must be a workspace file (there is no stdin), which `plan.json` is.
 
 7. **Report** what was written and what was not.
 
@@ -129,14 +129,14 @@ tracker.
    to a workspace file (`revised-scheme.json`).
 
 10. **Back-test it.** Read the held-back items (`corrections.heldBackItems` in the tune
-    result) into OWI records, run `toil classify prompt --file held.owi.json --scheme
+    result) into OWI records, run `toil classify prompt --input-file held.owi.json --scheme
     revised-scheme.json --recheck`, answer it, save the answers (`held-verdicts.json`), then
-    `toil classify stats --backtest held-verdicts.json --revised revised-scheme.json
-    --file held.owi.json`. It scores the old and the revised scheme against what people said.
+    `toil classify stats --backtest-file held-verdicts.json --revised-file revised-scheme.json
+    --input-file held.owi.json`. It scores the old and the revised scheme against what people said.
 
 11. **Show the person both scores,** every change with the corrections behind it, and say
     plainly if the revision scores worse (`backtest.worse`). Then stop. Applying it is
-    `toil classify scheme set <name> --from revised-scheme.json`, a person's command: tell
+    `toil classify scheme set <name> --input-file revised-scheme.json`, a person's command: tell
     them to run it, and do not try.
 
 ## Done when

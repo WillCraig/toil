@@ -149,16 +149,16 @@ export const vulnsCommand = ossindexArea.command({
   path: ['ossindex', 'vulns'],
   description: 'Check a dependency inventory for known vulnerabilities in Sonatype OSS Index (needs a free account)',
   toolDescription:
-    "Known vulnerabilities from the Sonatype OSS Index API, using the connection's free account, for the packages in an inventory: a JSON list of { name, version, ecosystem } (npm, nuget or maven), in a file passed as from. Returns { tier, source, sourcesQueried, sourceErrors, scanned, vulnerable, packages[] }, each package with vulnerabilities[] of { id, summary, severity, cvss, aliases, remediation, references }; OSS Index gives no fixed versions. For OSV.dev use osv_vulns.",
+    "Known vulnerabilities from the Sonatype OSS Index API, using the connection's free account, for the packages in an inventory: a JSON list of { name, version, ecosystem } (npm, nuget or maven), in a file passed as inputFile. Returns { tier, source, sourcesQueried, sourceErrors, scanned, vulnerable, packages[] }, each package with vulnerabilities[] of { id, summary, severity, cvss, aliases, remediation, references }; OSS Index gives no fixed versions. For OSV.dev use osv_vulns.",
   input: z.object(inventoryFields),
   writes: false,
   // A batch report request whose body can hold 128 package URLs: a read, sent as POST.
   queryByPost: true,
   timeLimitMs: TIME_LIMIT_MS,
   options: inventoryOptions,
-  examples: [{ from: 'inventory.json' }, { from: 'inventory.json', ecosystem: 'maven', directOnly: true, includeDev: true }],
+  examples: [{ inputFile: 'inventory.json' }, { inputFile: 'inventory.json', ecosystem: 'maven', directOnly: true, includeDev: true }],
   run: async (input, ctx) => {
-    const packages = selectPackages(await readInventory(ctx, input.from, 'ossindex vulns'), input);
+    const packages = selectPackages(await readInventory(ctx, input.inputFile, 'ossindex vulns'), input);
     await requireReachable(ctx);
     if (packages.length === 0) return friskData('sonatype', 0, []);
     const vulnerable: VulnerablePackage[] = [];

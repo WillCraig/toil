@@ -74,7 +74,7 @@ export const addInlineCommentCommand = githubArea.command({
   input: z.object({
     number: prNumber,
     commit: z.string().describe('Commit SHA the comment is on'),
-    file: z.string().describe('File path'),
+    path: z.string().describe('File path'),
     line: intText.describe('Line number'),
     body: z.string().describe('Comment text'),
     side: z.enum(['LEFT', 'RIGHT']).optional().describe('Comment side (choices: "LEFT", "RIGHT", default: "RIGHT")'),
@@ -84,20 +84,20 @@ export const addInlineCommentCommand = githubArea.command({
   args: [prNumberArg],
   options: [
     { flags: '--commit <sha>', field: 'commit', description: 'Commit SHA the comment is on' },
-    { flags: '--file <path>', field: 'file', description: 'File path' },
+    { flags: '--path <path>', field: 'path', description: 'File path', deprecated: ['--file <path>'] },
     { flags: '--line <n>', field: 'line', description: 'Line number' },
     { flags: '--body <text>', field: 'body', description: 'Comment text' },
     { flags: '--side <side>', field: 'side', description: 'Comment side (choices: "LEFT", "RIGHT", default: "RIGHT")' },
   ],
   examples: [
-    { owner: 'imagile', repo: 'toil-probe', number: '7', commit: 'abc1234', file: 'src/probe.ts', line: '12', body: 'Off by one?', allowWrite: true },
-    { owner: 'imagile', repo: 'toil-probe', number: '7', commit: 'abc1234', file: 'src/probe.ts', line: 3, body: 'Was this removed on purpose?', side: 'LEFT', allowWrite: true },
+    { owner: 'imagile', repo: 'toil-probe', number: '7', commit: 'abc1234', path: 'src/probe.ts', line: '12', body: 'Off by one?', allowWrite: true },
+    { owner: 'imagile', repo: 'toil-probe', number: '7', commit: 'abc1234', path: 'src/probe.ts', line: 3, body: 'Was this removed on purpose?', side: 'LEFT', allowWrite: true },
   ],
   run: async (input, ctx) => {
     const { owner, repo } = target(ctx);
     return github(ctx, apiPath`/repos/${owner}/${repo}/pulls/${parseIntText(input.number)}/comments`, {
       method: 'POST',
-      json: { body: input.body, commit_id: input.commit, path: input.file, line: parseIntText(input.line), side: input.side ?? 'RIGHT' },
+      json: { body: input.body, commit_id: input.commit, path: input.path, line: parseIntText(input.line), side: input.side ?? 'RIGHT' },
     });
   },
 });

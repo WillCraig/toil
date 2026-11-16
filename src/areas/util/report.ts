@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineCommand } from '../../core/command.js';
-import { fileArgument, inputFields, textOption } from './kit/input.js';
+import { fileArgument, inputFields, inputFileOption, textOption } from './kit/input.js';
 import { summariseReport } from './report/summarise.js';
 
 /**
@@ -39,19 +39,19 @@ export const reportCommand = defineCommand({
   writes: false,
   args: [fileArgument],
   options: [
-    textOption,
+    inputFileOption, textOption,
     { flags: '--format <format>', field: 'format', description: 'junit, trx, sarif, lcov or cobertura (default: detected from the content)' },
     { flags: '--lowest <n>', field: 'lowest', description: 'How many of the lowest-covered files to list (default: 10)' },
   ],
   examples: [
-    { file: 'reports/surefire.xml' },
-    { file: 'reports/jenkins.xml' },
-    { file: 'reports/azure-devops.xml' },
-    { file: 'reports/dotnet.trx' },
-    { file: 'reports/codeql.sarif' },
-    { file: 'reports/lcov.info', lowest: 2 },
-    { file: 'reports/coverlet.cobertura.xml' },
-    { file: 'reports/coverage-py.xml', format: 'cobertura' },
+    { inputFile: 'reports/surefire.xml' },
+    { inputFile: 'reports/jenkins.xml' },
+    { inputFile: 'reports/azure-devops.xml' },
+    { inputFile: 'reports/dotnet.trx' },
+    { inputFile: 'reports/codeql.sarif' },
+    { inputFile: 'reports/lcov.info', lowest: 2 },
+    { inputFile: 'reports/coverlet.cobertura.xml' },
+    { inputFile: 'reports/coverage-py.xml', format: 'cobertura' },
     { text: SAMPLE_JUNIT },
   ],
   run: async (input, ctx) => summariseReport(input, ctx),

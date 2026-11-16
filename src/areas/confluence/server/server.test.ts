@@ -353,7 +353,7 @@ describe('spaces', () => {
 
 describe('attachments', () => {
   it('page attach: multipart with the file then the comment, and the no-check header', async () => {
-    const { envelope, calls } = await run(uploadAttachment, { id: '12345', file: 'docs/a.txt', comment: 'v1', ...write }, [
+    const { envelope, calls } = await run(uploadAttachment, { id: '12345', inputFile: 'docs/a.txt', comment: 'v1', ...write }, [
       { method: 'POST', url: `${API}/content/12345/child/attachment`, respond: { json: { results: [{ id: '1' }] } } },
     ], { files: { 'docs/a.txt': 'hello' } });
     const expected = multipart([{ name: 'file', fileName: 'a.txt', data: new TextEncoder().encode('hello') }, { name: 'comment', value: 'v1' }]);
@@ -363,13 +363,13 @@ describe('attachments', () => {
   });
 
   it("page attach: a missing file is INVALID_INPUT naming the path, before any request", async () => {
-    const { envelope, calls } = await run(uploadAttachment, { id: '12345', file: 'gone.txt', ...write }, []);
+    const { envelope, calls } = await run(uploadAttachment, { id: '12345', inputFile: 'gone.txt', ...write }, []);
     expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'File not found: gone.txt' });
     expect(calls).toHaveLength(0);
   });
 
   it('page attach: always POSTs a new attachment, never a new version (#78 item 5)', async () => {
-    const { calls } = await run(uploadAttachment, { id: '12345', file: 'a.txt', ...write }, [{ method: 'POST', url: /attachment$/, respond: { json: { results: [] } } }], { files: { 'a.txt': 'x' } });
+    const { calls } = await run(uploadAttachment, { id: '12345', inputFile: 'a.txt', ...write }, [{ method: 'POST', url: /attachment$/, respond: { json: { results: [] } } }], { files: { 'a.txt': 'x' } });
     expect(calls[0]!.url).toBe(`${API}/content/12345/child/attachment`);
   });
 

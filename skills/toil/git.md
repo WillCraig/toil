@@ -46,13 +46,13 @@ The uncommitted changes, parsed. MCP tool: `git_diff`.
 
 ```bash
 toil git diff
-toil git diff --staged --file src/retry.ts
+toil git diff --staged --path src/retry.ts
 ```
 
 | Flag | Meaning |
 |------|---------|
 | `--staged` | The index against HEAD, instead of the working tree against the index |
-| `--file <path>` | One file, relative to the repository root |
+| `--path <path>` | One file, relative to the repository root |
 
 Output: `{ files: [{ path, binary, truncated, hunks: [{ oldStart, oldCount,
 newStart, newCount, lines }] }], truncated }`. Parsing stops after 5,000 lines of

@@ -111,7 +111,7 @@ export const STDIN_OVER_MCP = new ToilError('INVALID_INPUT', '"-" (stdin) is not
  * someone to type and press Ctrl+D, and look like a hang (principle 4).
  */
 export const STDIN_IS_TERMINAL = new ToilError('INVALID_INPUT', 'Nothing was piped in, and stdin is a terminal, so toil did not wait for input.', {
-  fix: 'Pass --from <file> or pipe the input. Where a flag was given "-", give it a file path instead.',
+  fix: 'Pass --input-file <path> or pipe the input. Where a flag was given "-", give it a file path instead.',
 });
 
 /** The error for a write that would replace a file already there. */

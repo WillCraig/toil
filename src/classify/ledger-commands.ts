@@ -140,53 +140,53 @@ export function classifyLedgerCommands(): AnyCommand[] {
     path: ['classify', 'stats'],
     description: "Where a scheme gets it wrong: agreement, the sources people overrule, and which way the errors run, from the ledger (local only)",
     toolDescription:
-      "Reads the scheme's ledger on this machine (what classify_run recorded and what people corrected) and reports how often people agreed: overall, per category and per scheme revision; per source (each rule, each built-in signal, label, field, parent and the AI agent) how often it was overruled and to what; which way errors run (from a category to another); corrections since the last tune, items corrected more than once, and corrections by door (mcp is what an AI agent recorded for a person). Every share is null, never 0, where nothing was checked. An empty or missing ledger is not an error: zero counts and a LEDGER_EMPTY warning. toilProject narrows to one toil project. backtest scores a revised scheme (revised, a scheme file in the workspace) on the corrections held back from classify_tune: backtest is a workspace file of the AI agent's answers for those items, [{ id, category, reason }] from classify_prompt over them with the revised scheme; file or text may add the items as OWI records so the revised scheme's rules run by code. standing adds standing { <item id>: { category, reason, via, from } }, each item's last say from a person (category null where they took it back; via the door that recorded it; from what the tracker held when they said it, absent where there is none), which a screen needs to show an item as answered. Returns the statistics, plus backtest { heldBack, before, after, disagreements, worse } with it, and file. Changes nothing, not even a scheme; sends nothing anywhere.",
+      "Reads the scheme's ledger on this machine (what classify_run recorded and what people corrected) and reports how often people agreed: overall, per category and per scheme revision; per source (each rule, each built-in signal, label, field, parent and the AI agent) how often it was overruled and to what; which way errors run (from a category to another); corrections since the last tune, items corrected more than once, and corrections by door (mcp is what an AI agent recorded for a person). Every share is null, never 0, where nothing was checked. An empty or missing ledger is not an error: zero counts and a LEDGER_EMPTY warning. toilProject narrows to one toil project. backtest scores a revised scheme (revisedFile, a scheme file in the workspace) on the corrections held back from classify_tune: backtestFile is a workspace file of the AI agent's answers for those items, [{ id, category, reason }] from classify_prompt over them with the revised scheme; inputFile or text may add the items as OWI records so the revised scheme's rules run by code. standing adds standing { <item id>: { category, reason, via, from } }, each item's last say from a person (category null where they took it back; via the door that recorded it; from what the tracker held when they said it, absent where there is none), which a screen needs to show an item as answered. Returns the statistics, plus backtest { heldBack, before, after, disagreements, worse } with it, and file. Changes nothing, not even a scheme; sends nothing anywhere.",
     input: z.object({
       ...inputFields,
       toilProject: toilProjectField,
       cwd: cwdField,
       scheme: schemeField,
-      backtest: z.string().min(1).optional().describe("A workspace file of the AI agent's answers for the held-back items under the revised scheme: a JSON array of { id, category, reason }."),
-      revised: z.string().min(1).optional().describe('The revised scheme, a scheme file in the workspace. Required with backtest.'),
+      backtestFile: z.string().min(1).optional().describe("A workspace file of the AI agent's answers for the held-back items under the revised scheme: a JSON array of { id, category, reason }."),
+      revisedFile: z.string().min(1).optional().describe('The revised scheme, a scheme file in the workspace. Required with backtestFile.'),
       standing: z.boolean().optional().describe("Add standing { <item id>: { category, reason } }: each item's last say from a person, category null where they took it back (unsure). It is what classify_run holds an item to, for a screen that must show it."),
     }),
     writes: false,
     writesLocal: false,
     options: [
-      { flags: '--file <path>', field: 'file', description: 'With --backtest: the work items as OWI records, a file inside the workspace, or - for stdin' },
+      { flags: '--input-file <path>', field: 'inputFile', description: 'With --backtest-file: the work items as OWI records, a file inside the workspace, or - for stdin', deprecated: ['--file <path>'] },
       textOption,
       toilProjectOption,
       cwdOption,
       schemeOption,
-      { flags: '--backtest <file>', field: 'backtest', description: "Score a revised scheme: the AI agent's answers for the held-back items, a JSON array of { id, category, reason } in a file inside the workspace" },
-      { flags: '--revised <file>', field: 'revised', description: 'With --backtest: the revised scheme file' },
+      { flags: '--backtest-file <path>', field: 'backtestFile', description: "Score a revised scheme: the AI agent's answers for the held-back items, a JSON array of { id, category, reason } in a file inside the workspace", deprecated: ['--backtest <file>'] },
+      { flags: '--revised-file <path>', field: 'revisedFile', description: 'With --backtest-file: the revised scheme file', deprecated: ['--revised <file>'] },
       { flags: '--standing', field: 'standing', description: "Add each item's last say from a person, for a screen that shows which items are already answered" },
     ],
     examples: [
       {},
       { standing: true },
       { toilProject: 'payments', cwd: '.', scheme: 'team' },
-      { scheme: 'team', backtest: 'owi/verdicts.json', revised: 'schemes/team-v2.json', file: 'owi/brief.owi.json' },
-      { scheme: 'team', backtest: 'owi/verdicts.json', revised: 'schemes/team-v2.json', text: EXAMPLE_BRIEF_RECORDS },
+      { scheme: 'team', backtestFile: 'owi/verdicts.json', revisedFile: 'schemes/team-v2.json', inputFile: 'owi/brief.owi.json' },
+      { scheme: 'team', backtestFile: 'owi/verdicts.json', revisedFile: 'schemes/team-v2.json', text: EXAMPLE_BRIEF_RECORDS },
     ],
     run: async (input, ctx) => {
       const ledger = ledgerFor(ctx);
-      if ((input.backtest !== undefined) !== (input.revised !== undefined)) {
-        throw new ToilError('INVALID_INPUT', 'A backtest needs both the AI agent\'s answers and the revised scheme: --backtest and --revised go together.', {
-          fix: 'Pass --backtest <answers file> --revised <revised scheme file>, or neither.',
+      if ((input.backtestFile !== undefined) !== (input.revisedFile !== undefined)) {
+        throw new ToilError('INVALID_INPUT', 'A backtest needs both the AI agent\'s answers and the revised scheme: --backtest-file and --revised-file go together.', {
+          fix: 'Pass --backtest-file <answers file> --revised-file <revised scheme file>, or neither.',
         });
       }
-      if (input.backtest === undefined && (input.file !== undefined || input.text !== undefined)) {
-        throw new ToilError('INVALID_INPUT', 'The work items are read only for a backtest.', { fix: 'Add --backtest <answers file> --revised <revised scheme file>, or drop the items.' });
+      if (input.backtestFile === undefined && (input.inputFile !== undefined || input.text !== undefined)) {
+        throw new ToilError('INVALID_INPUT', 'The work items are read only for a backtest.', { fix: 'Add --backtest-file <answers file> --revised-file <revised scheme file>, or drop the items.' });
       }
       const s = select(ctx, input);
       const held = readLedger(ledger, s.scheme.name, ctx);
       if (held.lines.length === 0) ctx.warn({ code: 'LEDGER_EMPTY', message: `The ledger for ${s.scheme.name} is empty (${held.file}). ${emptyAdvice}` });
       const out = ledgerStats(held.lines, s.scheme, { toilProject: s.named });
       const says = input.standing === true ? { standing: lastSays(held.lines) } : {};
-      if (input.backtest === undefined || input.revised === undefined) return { ...out, ...says, file: held.file };
+      if (input.backtestFile === undefined || input.revisedFile === undefined) return { ...out, ...says, file: held.file };
 
-      const revised = ctx.manage!.schemes?.readFile(input.revised, input.cwd);
+      const revised = ctx.manage!.schemes?.readFile(input.revisedFile, input.cwd);
       if (!revised) throw new ToilError('NOT_CONFIGURED', 'Classification schemes are not available here.', { fix: 'Run toil classify from the CLI or toil mcp.' });
       for (const w of revised.warnings) ctx.warn(w);
       if (revised.scheme.name !== s.scheme.name) {
@@ -196,13 +196,13 @@ export function classifyLedgerCommands(): AnyCommand[] {
       const { items, unscored } = heldBackItems(held.lines, { toilProject: s.named });
       const heldIds = new Set(items.map((i) => i.item));
       let work: ReturnType<typeof complete>[] | undefined;
-      if (input.file !== undefined || input.text !== undefined) {
+      if (input.inputFile !== undefined || input.text !== undefined) {
         const records = readBriefRecords(await (await openInput(ctx, input)).text());
         if (records.skipped.length) ctx.warn({ code: 'CLASSIFY_SKIPPED', message: `${records.skipped.length} record${records.skipped.length > 1 ? 's were' : ' was'} skipped.` });
         work = records.items.map(complete);
       }
       const known = new Set([...heldIds, ...(work?.map((i) => i.id) ?? [])]);
-      const verdicts: AgentVerdict[] = readVerdicts(await ctx.files.readText(input.backtest), input.backtest, revised.scheme, known);
+      const verdicts: AgentVerdict[] = readVerdicts(await ctx.files.readText(input.backtestFile), input.backtestFile, revised.scheme, known);
       const said = new Map(verdicts.map((v) => [v.id, v.category === UNSURE ? null : v.category]));
 
       // The revised scheme's rules run by code over the items given, as they would on a fresh read: a label already on an item

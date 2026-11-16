@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineCommand } from '../../core/command.js';
 import { runEncode } from './encode/run.js';
-import { fileArgument, inputFields, textOption } from './kit/input.js';
+import { fileArgument, inputFields, inputFileOption, textOption } from './kit/input.js';
 
 /**
  * `util encode`: base64, base64url, hex and URL percent-encoding in either
@@ -48,14 +48,14 @@ export const encodeCommand = defineCommand({
   // The content may be a credential on its way into a header; the audit line keeps only its hash.
   auditInput: { text: 'hash' },
   args: [{ name: 'scheme', field: 'scheme', description: SCHEME, required: true }, fileArgument],
-  options: [textOption, { flags: '--decode', field: 'decode', description: DECODE }, { flags: '--out <file>', field: 'out', description: OUT }],
+  options: [inputFileOption, textOption, { flags: '--decode', field: 'decode', description: DECODE }, { flags: '--out <file>', field: 'out', description: OUT }],
   examples: [
     { scheme: 'base64', text: 'you@example.com:abc12345' },
-    { scheme: 'base64', decode: true, file: 'encode/pixel.b64', out: 'encode/decoded.png' },
+    { scheme: 'base64', decode: true, inputFile: 'encode/pixel.b64', out: 'encode/decoded.png' },
     { scheme: 'url', text: 'project = PAY AND assignee = "you@example.com"' },
     { scheme: 'form', decode: true, text: 'project+%3D+PAY+AND+assignee+%3D+%22you%40example.com%22' },
-    { scheme: 'hex', file: 'encode/pixel.png' },
-    { scheme: 'sha256', file: 'encode/pixel.png' },
+    { scheme: 'hex', inputFile: 'encode/pixel.png' },
+    { scheme: 'sha256', inputFile: 'encode/pixel.png' },
   ],
   run: (input, ctx) => runEncode(input, ctx),
 });

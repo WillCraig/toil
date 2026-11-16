@@ -459,7 +459,7 @@ describe('worklogs and attachments', () => {
   });
 
   it('issue attach: one multipart part named file, with the no-check header', async () => {
-    const { calls } = await run(addAttachment, { key: 'PROJ-123', file: 'dir/shot.png', ...write }, [{ method: 'POST', path: '/rest/api/3/issue/PROJ-123/attachments', respond: { json: [] } }], { files: { 'dir/shot.png': 'PNG!' } });
+    const { calls } = await run(addAttachment, { key: 'PROJ-123', inputFile: 'dir/shot.png', ...write }, [{ method: 'POST', path: '/rest/api/3/issue/PROJ-123/attachments', respond: { json: [] } }], { files: { 'dir/shot.png': 'PNG!' } });
     expect(calls[0]!.headers).toMatchObject({ authorization: AUTH, 'x-atlassian-token': 'no-check', 'content-type': expect.stringMatching(/^multipart\/form-data; boundary=/) });
     expect(String(calls[0]!.body)).toContain('name="file"; filename="shot.png"');
   });

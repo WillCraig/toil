@@ -107,7 +107,7 @@ export function fixtureClassify(): ClassifyApi {
       area: g.area,
       connection: g.connection,
       writes: false,
-      command: { name: g.area === 'ado' ? 'ado work-item categorize' : `${g.area} issue categorize`, input: { connection: g.connection, from: 'plan.json' } },
+      command: { name: g.area === 'ado' ? 'ado work-item categorize' : `${g.area} issue categorize`, input: { connection: g.connection, inputFile: 'plan.json' } },
       changes: g.items.map((p) => {
         const item = byId.get(p.id)!;
         const own = new Set(Object.values(g.labels).map((l) => l.toLowerCase()));

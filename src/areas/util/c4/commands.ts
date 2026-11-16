@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineCommand, type CliOption } from '../../../core/command.js';
 import type { CommandContext } from '../../../core/context.js';
-import { fileArgument, inputFields, openInput, textOption } from '../kit/input.js';
+import { fileArgument, inputFields, openInput, inputFileOption, textOption } from '../kit/input.js';
 import { Verifier } from '../kit/verify.js';
 import { checkDrawable, computeView, loadModel, MODEL_LIMITS, pickView, VIEW_LIMITS, type C4Model, type ComputedView } from './model.js';
 import { toD2, toMermaid } from './text.js';
@@ -33,7 +33,7 @@ const modelInput = {
   view: z.string().optional().describe('The key of the view to draw; may be left out when the model has only one'),
 };
 
-const modelOptions: CliOption[] = [textOption, { flags: '--view <key>', field: 'view', description: 'The key of the view to draw (may be left out when the model has only one)' }];
+const modelOptions: CliOption[] = [inputFileOption, textOption, { flags: '--view <key>', field: 'view', description: 'The key of the view to draw (may be left out when the model has only one)' }];
 
 /** A small model for the examples: one person, one system, one view. The sample bookshop is in docs/c4/. */
 export const EXAMPLE_MODEL: C4Model = {
@@ -45,7 +45,7 @@ export const EXAMPLE_MODEL: C4Model = {
 const EXAMPLE_TEXT = JSON.stringify(EXAMPLE_MODEL);
 
 /** The model the input holds, checked, and the view it asks for, computed; the reader's own check is recorded on `v`. */
-async function viewOf(input: { file?: string | undefined; text?: string | undefined; view?: string | undefined }, ctx: Ctx, v: Verifier): Promise<ComputedView> {
+async function viewOf(input: { inputFile?: string | undefined; text?: string | undefined; view?: string | undefined }, ctx: Ctx, v: Verifier): Promise<ComputedView> {
   const source = await openInput(ctx, input, { maxBytes: MAX_BYTES, signal: ctx.signal });
   const text = await source.text();
   v.inputComplete(source);
@@ -98,7 +98,7 @@ export const c4RenderCommand = defineCommand({
   writesLocalWhen: (input) => input.out !== undefined,
   args: [fileArgument],
   options: [...modelOptions, { flags: '--out <file>', field: 'out', description: 'Write the SVG to this new file inside the workspace instead of returning it in data' }],
-  examples: [{ text: EXAMPLE_TEXT }, { file: 'bookshop.c4.json', view: 'containers' }, { file: 'bookshop.c4.json', view: 'components', out: 'components.svg' }],
+  examples: [{ text: EXAMPLE_TEXT }, { inputFile: 'bookshop.c4.json', view: 'containers' }, { inputFile: 'bookshop.c4.json', view: 'components', out: 'components.svg' }],
   run: async (input, ctx) => {
     const v = new Verifier(ctx.warn);
     const view = await viewOf(input, ctx, v);
@@ -127,7 +127,7 @@ export const c4MermaidCommand = defineCommand({
   writes: false,
   args: [fileArgument],
   options: modelOptions,
-  examples: [{ text: EXAMPLE_TEXT }, { file: 'bookshop.c4.json', view: 'context' }],
+  examples: [{ text: EXAMPLE_TEXT }, { inputFile: 'bookshop.c4.json', view: 'context' }],
   run: async (input, ctx) => {
     const v = new Verifier(ctx.warn);
     const view = await viewOf(input, ctx, v);
@@ -145,7 +145,7 @@ export const c4D2Command = defineCommand({
   writes: false,
   args: [fileArgument],
   options: modelOptions,
-  examples: [{ text: EXAMPLE_TEXT }, { file: 'bookshop.c4.json', view: 'containers' }],
+  examples: [{ text: EXAMPLE_TEXT }, { inputFile: 'bookshop.c4.json', view: 'containers' }],
   run: async (input, ctx) => {
     const v = new Verifier(ctx.warn);
     const view = await viewOf(input, ctx, v);

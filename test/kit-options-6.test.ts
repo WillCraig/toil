@@ -51,10 +51,10 @@ describe('a CLI command line quoted in an input error stays CLI-shaped over MCP'
     const { context } = testContext({ config: iqConfig, routes: iqFixture.routes!, files: { 'bad.json': 'not json' } });
     const mcp = await connectMcp({ commands: [evaluateCommand], context });
     try {
-      const { envelope } = await mcp.call('sonatypeiq_evaluate', { applicationId: 'app-1', from: 'bad.json' });
+      const { envelope } = await mcp.call('sonatypeiq_evaluate', { applicationId: 'app-1', inputFile: 'bad.json' });
       expect(envelope.error).toMatchObject({
         code: 'INVALID_INPUT',
-        fix: 'Pass the output of toil deps scan, e.g. toil deps scan --include-transitive | toil sonatypeiq evaluate --application-id <id>, or from <file> holding it.',
+        fix: 'Pass the output of toil deps scan, e.g. toil deps scan --include-transitive | toil sonatypeiq evaluate --application-id <id>, or inputFile <path> holding it.',
       });
     } finally {
       await mcp.close();

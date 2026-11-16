@@ -24,7 +24,7 @@ export const diffCommand = bitbucketArea.command({
   input: z.object({
     id: pr.optional(),
     spec: z.string().min(1).optional().describe('A commit, or two as a..b, instead of a pull request'),
-    file: z.string().min(1).optional().describe('Limit diff to a specific file'),
+    path: z.string().min(1).optional().describe('Limit diff to a specific file'),
     contextLines: z.number().int().nonnegative().optional().describe('Lines of context around changes'),
   }),
   writes: false,
@@ -33,16 +33,16 @@ export const diffCommand = bitbucketArea.command({
   args: [{ ...prArg, required: false }],
   options: [
     { flags: '--spec <a..b>', field: 'spec', description: 'A commit, or two as a..b, instead of a pull request' },
-    { flags: '--file <path>', field: 'file', description: 'Limit diff to a specific file' },
+    { flags: '--path <path>', field: 'path', description: 'Limit diff to a specific file', deprecated: ['--file <path>'] },
     { flags: '--context-lines <n>', field: 'contextLines', description: 'Lines of context around changes' },
   ],
-  examples: [example, { ...at, spec: 'abc12345def67890abc12345def67890abc12345', file: 'src/retry.ts', contextLines: 0 }],
+  examples: [example, { ...at, spec: 'abc12345def67890abc12345def67890abc12345', path: 'src/retry.ts', contextLines: 0 }],
   run: async (input, ctx) => {
     if ((input.id === undefined) === (input.spec === undefined)) {
       throw new ToilError('INVALID_INPUT', 'Pass exactly one of a pull request id and --spec.', { fix: 'Use pr diff <id> for a pull request, or pr diff --spec <commit> (or <a>..<b>) for commits.' });
     }
     const spec = input.spec ?? prSpec(await getPR(ctx, input.id!));
-    const query = { ...(input.id !== undefined ? { topic: true } : {}), ...(input.file ? { path: input.file } : {}), ...(input.contextLines !== undefined ? { context: input.contextLines } : {}) };
+    const query = { ...(input.id !== undefined ? { topic: true } : {}), ...(input.path ? { path: input.path } : {}), ...(input.contextLines !== undefined ? { context: input.contextLines } : {}) };
     return { diff: await bbc<string>(ctx, `${repoPath(ctx)}/diff/${seg(spec)}`, { query, as: 'text' }) };
   },
 });

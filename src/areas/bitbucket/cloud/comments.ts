@@ -70,7 +70,7 @@ export const addInlineCommentCommand = bitbucketArea.command({
     "Adds a comment on one line of a file in a pull request's diff and returns it. lineType ADDED (default) or CONTEXT numbers the line in the new version of the file; REMOVED numbers it in the old version.",
   input: z.object({
     id: pr,
-    file: z.string().min(1).describe('File path'),
+    path: z.string().min(1).describe('File path'),
     line: z.number().int().positive().describe('Line number'),
     body: z.string().min(1).describe('Comment text (Markdown)'),
     lineType: z.enum(['ADDED', 'REMOVED', 'CONTEXT']).optional().describe('Line type: ADDED|REMOVED|CONTEXT (default: "ADDED")'),
@@ -80,18 +80,18 @@ export const addInlineCommentCommand = bitbucketArea.command({
   context: IN_REPO,
   args: [prArg],
   options: [
-    { flags: '--file <path>', field: 'file', description: 'File path' },
+    { flags: '--path <path>', field: 'path', description: 'File path', deprecated: ['--file <path>'] },
     { flags: '--line <n>', field: 'line', description: 'Line number' },
     { flags: '--body <text>', field: 'body', description: 'Comment text (Markdown)' },
     { flags: '--line-type <type>', field: 'lineType', description: 'Line type: ADDED|REMOVED|CONTEXT (default: "ADDED")' },
   ],
   examples: [
-    { ...at, file: 'src/retry.ts', line: 12, body: 'Cap the backoff?', allowWrite: true },
-    { ...at, file: 'src/old.ts', line: 3, body: 'Why was this removed?', lineType: 'REMOVED', allowWrite: true },
+    { ...at, path: 'src/retry.ts', line: 12, body: 'Cap the backoff?', allowWrite: true },
+    { ...at, path: 'src/old.ts', line: 3, body: 'Why was this removed?', lineType: 'REMOVED', allowWrite: true },
   ],
   run: (input, ctx) => {
     // `to` is a line of the new file, `from` one of the old: a removed line exists only in the old.
-    const inline = input.lineType === 'REMOVED' ? { path: input.file, from: input.line } : { path: input.file, to: input.line };
+    const inline = input.lineType === 'REMOVED' ? { path: input.path, from: input.line } : { path: input.path, to: input.line };
     return bbc(ctx, `${prPath(ctx, input.id)}/comments`, { method: 'POST', json: { content: { raw: input.body }, inline } });
   },
 });

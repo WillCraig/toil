@@ -38,7 +38,7 @@ export function classifyMixCommands(): AnyCommand[] {
     path: ['classify', 'mix'],
     description: "Show how work divides between a scheme's categories, by period or by team, assignee, project, epic, component or release (local only)",
     toolDescription:
-      "Classifies Open Work Item records you pass (what util owi map printed, as file or text; same input as classify_run: toilProject, cwd, scheme) and shows the mix: each category's share of the finished work per week, month or quarter (by, default month), or per team, assignee, project, epic, component or release (group). unit counts items (count, the default: items finished per period, or items per group), sums estimates (estimate) or counts person-days in progress (days). from and to bound the period (days, YYYY-MM-DD; default the 90 days to asOf). Asks no service. Returns { scheme { name, revision }, toilProject, unit, by, group, periods or groups [{ key, label, total, shares [{ category (an id, or unsure), name, short, value, share, items }] }], overall [same shares], sources { rules, signals, labels, parent, agent, person, unsure } (how each item's category was decided, adding up to the item count), coverage, notable }. Unsure is always its own share, never spread over the categories. A share that cannot be computed is null with a MIX_UNREAD warning, never 0; a period with no finished work has null shares and a MIX_EMPTY warning. Cite a figure as [[cell:<column>/<row>]].",
+      "Classifies Open Work Item records you pass (what util owi map printed, as inputFile or text; same input as classify_run: toilProject, cwd, scheme) and shows the mix: each category's share of the finished work per week, month or quarter (by, default month), or per team, assignee, project, epic, component or release (group). unit counts items (count, the default: items finished per period, or items per group), sums estimates (estimate) or counts person-days in progress (days). from and to bound the period (days, YYYY-MM-DD; default the 90 days to asOf). Asks no service. Returns { scheme { name, revision }, toilProject, unit, by, group, periods or groups [{ key, label, total, shares [{ category (an id, or unsure), name, short, value, share, items }] }], overall [same shares], sources { rules, signals, labels, parent, agent, person, unsure } (how each item's category was decided, adding up to the item count), coverage, notable }. Unsure is always its own share, never spread over the categories. A share that cannot be computed is null with a MIX_UNREAD warning, never 0; a period with no finished work has null shares and a MIX_EMPTY warning. Cite a figure as [[cell:<column>/<row>]].",
     input: z.object({
       ...inputFields,
       toilProject: toilProjectField,
@@ -68,8 +68,8 @@ export function classifyMixCommands(): AnyCommand[] {
     ],
     examples: [
       { text: EXAMPLE_BRIEF_RECORDS, asOf: '2026-10-13T08:00:00Z' },
-      { toilProject: 'payments', cwd: '.', file: 'owi/brief.owi.json', scheme: 'balance', by: 'week', unit: 'estimate', from: '2026-09-01', to: '2026-10-13', asOf: '2026-10-13T08:00:00Z' },
-      { file: 'owi/brief.owi.json', group: 'assignee', unit: 'days', asOf: '2026-10-13T08:00:00Z' },
+      { toilProject: 'payments', cwd: '.', inputFile: 'owi/brief.owi.json', scheme: 'balance', by: 'week', unit: 'estimate', from: '2026-09-01', to: '2026-10-13', asOf: '2026-10-13T08:00:00Z' },
+      { inputFile: 'owi/brief.owi.json', group: 'assignee', unit: 'days', asOf: '2026-10-13T08:00:00Z' },
     ],
     run: async (input, ctx) => {
       const by = input.by ?? 'month';

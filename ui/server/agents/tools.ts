@@ -180,7 +180,7 @@ export const LIVE_COMMANDS: readonly string[] = [
 ];
 
 /** Fields a live tool never offers: the toilProject is fixed, and a file or folder on this machine is not the agent's to name. */
-export const HIDDEN_FIELDS = new Set(['toilProject', 'cwd', 'connection', 'select', 'file']);
+export const HIDDEN_FIELDS = new Set(['toilProject', 'cwd', 'connection', 'select', 'file', 'inputFile']);
 const hidden = (field: string) => HIDDEN_FIELDS.has(field) || /File$/.test(field) || field === 'out' || field === 'allowWrite';
 
 /** The bounds on what one tool call returns (Bounds). */

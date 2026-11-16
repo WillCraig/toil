@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { fileArgument, inputFields, openInput, textOption } from '../areas/util/kit/input.js';
+import { fileArgument, inputFields, openInput, inputFileOption, textOption } from '../areas/util/kit/input.js';
 import { computeView, pickView, type C4Model } from '../areas/util/c4/model.js';
 import { defineConfigCommand, type AnyCommand } from '../core/command.js';
 import type { CommandContext } from '../core/context.js';
@@ -56,7 +56,7 @@ export function diagramCommands(): AnyCommand[] {
   };
 
   /** The model the input holds, checked as `save` checks it. */
-  const modelOf = async (input: { file?: string | undefined; text?: string | undefined; notMapped?: string[] | undefined }, ctx: CommandContext<unknown>): Promise<C4Model> => {
+  const modelOf = async (input: { inputFile?: string | undefined; text?: string | undefined; notMapped?: string[] | undefined }, ctx: CommandContext<unknown>): Promise<C4Model> => {
     const source = await openInput(ctx, input, { maxBytes: MAX_DIAGRAM_BYTES, signal: ctx.signal });
     return loadStorable(await source.text(), source.label, input.notMapped);
   };
@@ -74,15 +74,15 @@ export function diagramCommands(): AnyCommand[] {
     path: ['projects', 'diagram', 'check'],
     description: "Check an architecture diagram's model exactly as save would, without keeping it (local only)",
     toolDescription:
-      'Reads a C4 model (file: a JSON file in the workspace; or text: the JSON itself) and runs every check projects_diagram_save runs, so a model can be fixed before a person is asked to save it: the C4 model checks (unique ids, every reference and view pointing at something, at most 1000 elements) and the stored-diagram checks (no string anywhere may hold a URL (<scheme>://), a host with a port, a user:password@host, or anything shaped like a secret; a bare host name is allowed; notMapped is a short list of paths). Every problem comes back at once as INVALID_INPUT, named by path, never quoting the value. Any person, system, container, component or relationship may say how it is known: how (observed or inferred), source (the file and line, or the command, an observed fact was read from) and reason (why an inferred one is believed). Returns { title, views [{ key, type, title }], counts { elements, relationships, observed, inferred, unmarked }, notMapped? }; with view, also view, the computed view { key, type, title, boundary?, inside[], outside[], edges[] }. Nothing is kept. Reads local files only.',
+      'Reads a C4 model (inputFile: a JSON file in the workspace; or text: the JSON itself) and runs every check projects_diagram_save runs, so a model can be fixed before a person is asked to save it: the C4 model checks (unique ids, every reference and view pointing at something, at most 1000 elements) and the stored-diagram checks (no string anywhere may hold a URL (<scheme>://), a host with a port, a user:password@host, or anything shaped like a secret; a bare host name is allowed; notMapped is a short list of paths). Every problem comes back at once as INVALID_INPUT, named by path, never quoting the value. Any person, system, container, component or relationship may say how it is known: how (observed or inferred), source (the file and line, or the command, an observed fact was read from) and reason (why an inferred one is believed). Returns { title, views [{ key, type, title }], counts { elements, relationships, observed, inferred, unmarked }, notMapped? }; with view, also view, the computed view { key, type, title, boundary?, inside[], outside[], edges[] }. Nothing is kept. Reads local files only.',
     input: z.object({ ...modelInputs, view: viewField }),
     writes: false,
     writesLocal: false,
     // As with save: an agent checks a model several times a run, and none of those copies belongs in the audit log.
     auditInput: { text: 'hash' },
     args: [fileArgument],
-    options: [textOption, viewOption, notMappedOption],
-    examples: [{ text: EXAMPLE_TEXT }, { file: 'diagrams/payments.c4.json', view: 'containers', notMapped: ['dist/'] }],
+    options: [inputFileOption, textOption, viewOption, notMappedOption],
+    examples: [{ text: EXAMPLE_TEXT }, { inputFile: 'diagrams/payments.c4.json', view: 'containers', notMapped: ['dist/'] }],
     run: async (input, ctx) => {
       const model = await modelOf(input, ctx);
       const view = input.view === undefined ? undefined : computeView(model, pickView(model, input.view), (w) => ctx.warn(w));
@@ -100,7 +100,7 @@ export function diagramCommands(): AnyCommand[] {
     path: ['projects', 'diagram', 'save'],
     description: "Keep a toil project's architecture diagram in your own folder (~/.toil/diagrams)",
     toolDescription:
-      "Checks a C4 model exactly as projects_diagram_check does and keeps it as the toil project's architecture diagram: ~/.toil/diagrams/<toil-project>.json, in your own storage, never in a repository. The toil project must exist (a name, as projects_list shows). Without replace, a toil project that already has a diagram is refused, naming it; with replace, the file is replaced and its revision goes up by one, only if the file there is a valid diagram. A diagram holds no URL, no host with a port and nothing shaped like a credential: a string holding one, or a token-shaped value, is refused, by path. Pass the model as file (a JSON file in the workspace) or text; notMapped lists paths left out on purpose. Returns { toilProject, revision, savedAt, file, views [{ key, type, title }], counts { elements, relationships, observed, inferred, unmarked } }. Ask the person before saving. A local write: it needs no allowWrite.",
+      "Checks a C4 model exactly as projects_diagram_check does and keeps it as the toil project's architecture diagram: ~/.toil/diagrams/<toil-project>.json, in your own storage, never in a repository. The toil project must exist (a name, as projects_list shows). Without replace, a toil project that already has a diagram is refused, naming it; with replace, the file is replaced and its revision goes up by one, only if the file there is a valid diagram. A diagram holds no URL, no host with a port and nothing shaped like a credential: a string holding one, or a token-shaped value, is refused, by path. Pass the model as inputFile (a JSON file in the workspace) or text; notMapped lists paths left out on purpose. Returns { toilProject, revision, savedAt, file, views [{ key, type, title }], counts { elements, relationships, observed, inferred, unmarked } }. Ask the person before saving. A local write: it needs no allowWrite.",
     input: z.object({
       toilProject: z.string().min(1).describe('The toil project the diagram is for: a name, e.g. payments'),
       ...modelInputs,
@@ -111,10 +111,10 @@ export function diagramCommands(): AnyCommand[] {
     // A whole model never lands in the audit log: it keeps what the call was, and the SHA-256 of what it carried.
     auditInput: { text: 'hash' },
     args: [toilProjectArg, fileArgument],
-    options: [textOption, notMappedOption, { flags: '--replace', field: 'replace', description: "Replace the diagram that is already kept; the revision goes up by one" }],
+    options: [inputFileOption, textOption, notMappedOption, { flags: '--replace', field: 'replace', description: "Replace the diagram that is already kept; the revision goes up by one" }],
     examples: [
       { toilProject: 'team', text: EXAMPLE_TEXT },
-      { toilProject: 'payments', file: 'diagrams/payments.c4.json', notMapped: ['dist/', 'node_modules/'], replace: true },
+      { toilProject: 'payments', inputFile: 'diagrams/payments.c4.json', notMapped: ['dist/', 'node_modules/'], replace: true },
     ],
     run: async (input, ctx) => {
       const { catalog } = access(ctx);

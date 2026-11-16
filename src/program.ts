@@ -1,7 +1,7 @@
 import { Command, CommanderError, Option } from 'commander';
 import { aliasInput, aliasPaths, commandName, deprecatedPathsOf, takesAllowWrite, toolName, writesFor, type AnyCommand, type CliOption } from './core/command.js';
 import type { Context } from './core/context.js';
-import { deprecatedName } from './core/deprecation.js';
+import { deprecatedFlag, deprecatedName } from './core/deprecation.js';
 import { failure, type Envelope, type Warning } from './core/envelope.js';
 import { TOIL_PROJECT_FIELD } from './core/area.js';
 import { ToilError, toToilError } from './core/errors.js';
@@ -159,6 +159,11 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
     // `--toil-project` was `--dossier` until toil projects got their name: still read on the CLI, never over MCP or the API.
     const oldFlag = (def.options ?? []).some((o) => o.field === TOIL_PROJECT_FIELD);
     if (oldFlag) leaf.addOption(new Option('--dossier <name|file>').hideHelp());
+    // Retired spellings of a flag (#622): hidden, still read, each with a warning naming the flag that replaced it.
+    // A group flag's retired spelling would need registering on the group, which nothing does yet: refuse it here rather than let it be an unknown option.
+    for (const opt of def.options ?? []) if (opt.group && opt.deprecated?.length) throw new Error(`${commandName(def)}: the group flag ${opt.flags} lists retired spellings, which only a leaf flag may.`);
+    const retiredFlags = retiredFlagsOf(def).filter(({ opt }) => !(opt.field in preset));
+    for (const { opt, flags } of retiredFlags) addOption(leaf, def, { ...opt, flags, description: `retired: use ${longFlag(opt.flags)}` }, true);
 
     leaf.action(async (...actionArgs: unknown[]) => {
       const cmd = actionArgs[actionArgs.length - 1] as Command;
@@ -174,6 +179,14 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
         input[TOIL_PROJECT_FIELD] ??= flagged;
       }
       if (retired) deprecations.push(deprecatedName(`toil ${path.join(' ')}`, `toil ${commandName(def)}`));
+      const given = cmd.opts<Record<string, unknown>>();
+      deprecations.push(...readRetiredFlags(def, retiredFlags, given, input));
+      (def.args ?? []).forEach((arg, i) => {
+        if (!arg.deprecated || (cmd.processedArgs as unknown[])[i] === undefined) return;
+        const flag = (def.options ?? []).find((o) => o.field === arg.field && longFlag(o.flags) === arg.deprecated);
+        const current = flag !== undefined && given[new Option(flag.flags).attributeName()] !== undefined;
+        deprecations.push(deprecatedFlag(`the [${arg.name}] argument`, arg.deprecated, current));
+      });
       // Through an alias in another group (`openshift cluster list` for
       // `connections list`), say so in the words the user typed, rather than
       // let strict parsing name a command and a field they never mentioned.
@@ -282,6 +295,12 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
         if (!owners.has(long)) addOption(leaf, def, opt);
         owners.set(long, [...(owners.get(long) ?? []), value]);
       }
+      // The routes' retired spellings (#622) are read too, hidden, for the route that has them.
+      for (const { opt, flags } of retiredFlagsOf(def)) {
+        const long = longFlag(flags);
+        if (!owners.has(long)) addOption(leaf, def, { ...opt, flags, description: `retired: use ${longFlag(opt.flags)}` }, true);
+        owners.set(long, [...(owners.get(long) ?? []), value]);
+      }
     }
     leaf.action(async (...actionArgs: unknown[]) => {
       const cmd = actionArgs[actionArgs.length - 1] as Command;
@@ -300,13 +319,14 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
       if (!def) {
         return refuse(`toil ${alias.path.join(' ')} ${routing} ${value} runs toil ${alias.targets[value]}, which this build of toil doesn't have yet.`, `Use another ${routing} value, or a toil release that has toil ${alias.targets[value]}.`);
       }
-      const theirs = new Set((def.options ?? []).map((o) => longFlag(o.flags)));
+      const theirs = new Set([...(def.options ?? []).map((o) => longFlag(o.flags)), ...retiredFlagsOf(def).map((r) => longFlag(r.flags))]);
       for (const [long, values] of owners) {
         // Where the value came from, not whether it is set: commander defaults a --no-x flag to true.
         if (theirs.has(long) || cmd.getOptionValueSource(new Option(long).attributeName()) !== "cli") continue;
         return refuse(`${long} is for ${routing} ${values.join(' or ')}; ${routing} ${value} runs toil ${commandName(def)}, which doesn't take it.`, `Leave out ${long}, or pass ${routing} ${values[0]}.`);
       }
       const input = withCore(inputFromCli(def, cmd, groupFlags(alias.path[0]!)), globals);
+      const deprecations = readRetiredFlags(def, retiredFlagsOf(def), cmd.opts<Record<string, unknown>>(), input);
       if (options.capture) return options.capture({ def, input, globals });
       if (globals.outputFile && io.checkFile) {
         try {
@@ -318,6 +338,7 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
         }
       }
       const envelope = await runCommand(def, input, (d) => options.createContext(globals, d), options.version);
+      if (deprecations.length > 0) envelope.meta.warnings = [...(envelope.meta.warnings ?? []), ...deprecations];
       const written = emit(envelope, globals, io, writesFor(def, input));
       result.exitCode = written ? exitCodeOf(envelope) : 1;
     });
@@ -564,18 +585,35 @@ function globalsFromArgv(args: string[]): GlobalOptions {
  * A=1 --field B=2): each use appends, so nobody has to invent a separator that
  * a value may contain.
  */
-function addOption(cmd: Command, def: AnyCommand, opt: CliOption): void {
+/** Every retired spelling of a command's flags (#622), with the flag that replaced it. */
+function retiredFlagsOf(def: AnyCommand): Array<{ opt: CliOption; flags: string }> {
+  return (def.options ?? []).flatMap((opt) => (opt.deprecated ?? []).map((flags) => ({ opt, flags })));
+}
+
+/** Reads the retired spellings given on the command line into `input`, unless the current flag is given too, and returns a warning for each. */
+function readRetiredFlags(def: AnyCommand, retired: Array<{ opt: CliOption; flags: string }>, given: Record<string, unknown>, input: Record<string, unknown>): Warning[] {
+  const warnings: Warning[] = [];
+  for (const { opt, flags } of retired) {
+    const value = given[new Option(flags).attributeName()];
+    if (value === undefined) continue;
+    const current = given[new Option(opt.flags).attributeName()] !== undefined;
+    warnings.push(deprecatedFlag(longFlag(flags), longFlag(opt.flags), current));
+    if (!current) input[opt.field] = typed(def, opt.field, value);
+  }
+  return warnings;
+}
+
+function addOption(cmd: Command, def: AnyCommand, opt: CliOption, hidden = false): void {
   const repeats = takesValue(opt.flags) ? repeatsAs(def, opt.field) : undefined;
+  const option = new Option(opt.flags, opt.description);
+  if (hidden) option.hideHelp();
   if (repeats?.single) {
     // One value or a list of them: once is the value, twice is the list.
-    cmd.option(opt.flags, opt.description, (value: string, previous: string | string[] | undefined) =>
-      previous === undefined ? value : [...(Array.isArray(previous) ? previous : [previous]), value],
-    );
+    option.argParser((value: string, previous: string | string[] | undefined) => (previous === undefined ? value : [...(Array.isArray(previous) ? previous : [previous]), value]));
   } else if (repeats) {
-    cmd.option(opt.flags, opt.description, (value: string, previous: string[] | undefined) => [...(previous ?? []), value]);
-  } else {
-    cmd.option(opt.flags, opt.description);
+    option.argParser((value: string, previous: string[] | undefined) => [...(previous ?? []), value]);
   }
+  cmd.addOption(option);
 }
 
 /**
@@ -687,7 +725,8 @@ export function argvFor(def: AnyCommand, input: Record<string, unknown>, path: s
   const text = (value: unknown) => (typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value));
   for (const arg of def.args ?? []) {
     const value = input[arg.field];
-    if (value === undefined) continue;
+    // A retired positional (#622) is never written: its flag carries the value.
+    if (value === undefined || arg.deprecated) continue;
     if (Array.isArray(value)) argv.push(...value.map(text));
     else argv.push(text(value));
   }

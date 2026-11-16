@@ -52,7 +52,7 @@ describe('projects view set', () => {
     const d = disk();
     const s = await mcp(d);
     data((await s.call('projects_view_set', { toilProject: 'payments', name: 'by-type', split: 'type' })).envelope);
-    const out = data(await cli(d, ['projects', 'pivot', 'payments', '--file', 'work.json', '--as-of', AS_OF, '--view', 'by-type']));
+    const out = data(await cli(d, ['projects', 'pivot', 'payments', '--input-file', 'work.json', '--as-of', AS_OF, '--view', 'by-type']));
     expect(out.rows.map((r: any) => r.label)).toContain('Task');
   });
 });

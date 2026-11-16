@@ -296,14 +296,14 @@ describe('the Toil projects module', () => {
     let s = press(settled, w, '6', '2');
     s = press(await perform(s, d, c), w, 'return', 'return');
     s = press(await perform(s, d, c), w, 'return', '3', '1', 'return');
-    expect(steps(s)).toEqual([['projects', 'export', 'team', '--file', 'team.json']]);
+    expect(steps(s)).toEqual([['projects', 'export', 'team', '--out', 'team.json']]);
     s = await perform(s, d, c);
     expect(JSON.parse(readFileSync(join(d.workspace, 'team.json'), 'utf8')).sonar).toEqual({ host: 'sonar.imagile.dev' });
     // Again, onto the file now there: asks to replace.
     s = press(press(s, w, 'return'), w, '3', '1', 'return');
     s = press(await perform(s, d, c), w, 'return');
     expect(where(s)).toBe('toil-project-export-replace');
-    expect(steps(press(s, w, 'return'))?.[0]).toEqual(['projects', 'export', 'team', '--file', 'team.json', '--replace']);
+    expect(steps(press(s, w, 'return'))?.[0]).toEqual(['projects', 'export', 'team', '--out', 'team.json', '--replace']);
 
     // Import: checked first; jira's binding lands on a connection with writes on, so the name is typed.
     let i = press(settled, w, '6', '4');

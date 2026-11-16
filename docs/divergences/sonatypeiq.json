@@ -4,7 +4,7 @@
     {
       "allows": [],
       "old": "deps frisk --source sonatypeiq scanning the git repository it ran in (transitive dependencies included by default), and failing with \"Not inside a git repository.\" elsewhere",
-      "toil": "toil sonatypeiq evaluate (deps frisk is an alias) reads an inventory from --from <file>, or from stdin on the CLI: toil deps scan --include-transitive | toil sonatypeiq evaluate --application-id <id>. --ecosystem, --direct-only and --include-dev filter the inventory as they filtered the scan",
+      "toil": "toil sonatypeiq evaluate (deps frisk is an alias) reads an inventory from --input-file <path>, or from stdin on the CLI: toil deps scan --include-transitive | toil sonatypeiq evaluate --application-id <id>. --ecosystem, --direct-only and --include-dev filter the inventory as they filtered the scan",
       "why": "One command talks to one source and the caller composes them (decision 6 on #68). Scanning is deps scan's job; this command only asks IQ Server.",
       "principle": "3"
     },

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineCommand } from '../../core/command.js';
-import { fileArgument, inputFields, textOption } from './kit/input.js';
+import { fileArgument, inputFields, inputFileOption, textOption } from './kit/input.js';
 import { DEFAULT_DEPTH, DEFAULT_TOP, LANGUAGES, measure } from './size/measure.js';
 
 /**
@@ -25,24 +25,24 @@ export const sizeCommand = defineCommand({
     'Sizes something before you read it. For a file: { kind: "file", path, language, bytes, lines, tokens, tokenMethod, outline: { precision, method, symbols[] of { name, kind, startLine, endLine, container } } | null, notOutlined: { reason: binary | unsupported-language | parse-error | too-large, detail } | null, verified }. Outlines cover TypeScript, JavaScript, Python, C#, Java and Go (functions, classes, types, methods, exported names, by a syntactic scan, not a compiler), Markdown headings, and JSON/YAML top-level keys. For a folder: { kind: "folder", path, totals, tree (folders largest first, with files, bytes, lines, tokens, binaryFiles), largest[], skipped[], verified }, skipping what .gitignore ignores. Tokens are estimated as ceil(characters / 4), not counted by any model\'s tokenizer. Each symbol\'s start line is re-read to confirm it names the symbol, and folder totals are summed two ways; data.verified says what was checked. Local only, no network.',
   input: z.object({
     ...inputFields,
-    file: z.string().optional().describe('A file or folder inside the workspace to size. On the CLI, - (or leaving out both file and text) reads stdin'),
+    inputFile: z.string().optional().describe('A file or folder inside the workspace to size. On the CLI, - (or leaving out both inputFile and text) reads stdin'),
     language: z.enum(LANGUAGES).optional().describe(LANGUAGE),
     top: z.number().int().min(0).max(1000).optional().describe(TOP),
     depth: z.number().int().min(0).max(100).optional().describe(DEPTH),
   }),
   writes: false,
-  args: [{ ...fileArgument, description: 'A file or folder inside the workspace, or - for stdin (the default when no --text is given)' }],
+  args: [fileArgument],
   options: [
-    textOption,
+    { ...inputFileOption, description: 'A file or folder inside the workspace to size, or - for stdin (the default when no --text is given)' }, textOption,
     { flags: '--language <language>', field: 'language', description: LANGUAGE },
     { flags: '--top <n>', field: 'top', description: TOP },
     { flags: '--depth <n>', field: 'depth', description: DEPTH },
   ],
   examples: [
-    { file: 'samples/size' },
-    { file: 'samples/size', top: 3, depth: 1 },
-    { file: 'samples/size/verify.ts' },
-    { file: 'samples/size/flatted.py' },
+    { inputFile: 'samples/size' },
+    { inputFile: 'samples/size', top: 3, depth: 1 },
+    { inputFile: 'samples/size/verify.ts' },
+    { inputFile: 'samples/size/flatted.py' },
     { text: '# Notes\n\n## Budget\n\nTwo lines.\n', language: 'markdown' },
   ],
   run: (input, ctx) => measure(input, ctx),

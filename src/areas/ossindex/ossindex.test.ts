@@ -32,7 +32,7 @@ async function run(input: Record<string, unknown>, routes: Route[] = [fixtureRou
 
 describe('ossindex vulns: requests', () => {
   it("probes with no coordinates, then sends the packages as package URLs, with the account as Basic auth", async () => {
-    const { envelope, calls } = await run({ from: 'inventory.json' });
+    const { envelope, calls } = await run({ inputFile: 'inventory.json' });
     expect(envelope.ok, JSON.stringify(envelope.error)).toBe(true);
     expect(calls.map((c) => [c.method, c.url, c.headers])).toEqual([
       ['POST', URL_, HEADERS],
@@ -43,7 +43,7 @@ describe('ossindex vulns: requests', () => {
   });
 
   it('#91 item 7, fixed: with no account set up it fails before any request, naming both variables', async () => {
-    const { envelope, calls } = await run({ from: 'inventory.json' }, [fixtureRoute], { config: {} });
+    const { envelope, calls } = await run({ inputFile: 'inventory.json' }, [fixtureRoute], { config: {} });
     expect(envelope.error?.code).toBe('NOT_CONFIGURED');
     expect(envelope.error?.message).toBe('OSS Index requires a free account now; set TOIL_OSSINDEX_USERNAME and TOIL_OSSINDEX_TOKEN.');
     expect(envelope.error?.fix).toContain('TOIL_OSSINDEX_USERNAME and TOIL_OSSINDEX_TOKEN');
@@ -52,7 +52,7 @@ describe('ossindex vulns: requests', () => {
 
   it('is an area command with a connection, whose host is fixed in code', () => {
     expect(commands.map((c) => c.kind)).toEqual(['area']);
-    expect(Object.keys(vulnsCommand.input.shape).sort()).toEqual(['connection', 'cwd', 'directOnly', 'ecosystem', 'from', 'includeDev', 'toilProject']);
+    expect(Object.keys(vulnsCommand.input.shape).sort()).toEqual(['connection', 'cwd', 'directOnly', 'ecosystem', 'includeDev', 'inputFile', 'toilProject']);
   });
 
   it('builds package URLs as specified: a scope encoded, Maven group and artifact encoded, anything else generic', () => {
@@ -66,7 +66,7 @@ describe('ossindex vulns: requests', () => {
 
   it('sends 128 package URLs a batch, one batch after another', async () => {
     const many = Array.from({ length: 129 }, (_, i) => ({ name: `pkg-${i}`, version: '1.0.0', ecosystem: 'npm' }));
-    const { envelope, calls } = await run({ from: 'many.json' }, [fixtureRoute], { files: { 'many.json': JSON.stringify(many) } });
+    const { envelope, calls } = await run({ inputFile: 'many.json' }, [fixtureRoute], { files: { 'many.json': JSON.stringify(many) } });
     expect(envelope.ok).toBe(true);
     expect(calls.map((c) => coordinatesOf(c).length)).toEqual([0, 128, 1]);
   });
@@ -81,7 +81,7 @@ describe('ossindex vulns: requests', () => {
 
 describe('ossindex vulns: reshaping', () => {
   it("returns frisk shape with source 'sonatype', reports matched by coordinates, clean packages left out", async () => {
-    const { envelope } = await run({ from: 'inventory.json' });
+    const { envelope } = await run({ inputFile: 'inventory.json' });
     const data = envelope.data as { packages: Array<{ name: string; vulnerabilities: unknown[] }> } & Record<string, unknown>;
     expect({ ...data, packages: undefined }).toEqual({ tier: 'full', source: 'sonatype', sourcesQueried: ['sonatype'], sourceErrors: [], scanned: 4, vulnerable: 2, packages: undefined });
     expect(data.packages.map((p) => p.name)).toEqual(['lodash', 'org.apache.logging.log4j:log4j-core']);
@@ -98,7 +98,7 @@ describe('ossindex vulns: reshaping', () => {
 
   it('falls back to id and description, scrapes every CVE once, and reads a zero score as UNKNOWN with no cvss', async () => {
     const odd = { ...vulnerability(3, '', 0), displayName: '', title: '', description: 'See cve-2020-1 and CVE-2020-1, also CVE-2019-22.', reference: '' };
-    const { envelope } = await run({ from: 'inventory.json', ecosystem: 'npm' }, [afterProbe((r) => componentReport(r, { 'pkg:npm/lodash@4.17.20': [odd] }))]);
+    const { envelope } = await run({ inputFile: 'inventory.json', ecosystem: 'npm' }, [afterProbe((r) => componentReport(r, { 'pkg:npm/lodash@4.17.20': [odd] }))]);
     expect((envelope.data as { packages: Array<{ vulnerabilities: unknown[] }> }).packages[0]!.vulnerabilities[0]).toMatchObject({
       id: odd.id,
       summary: odd.description,
@@ -111,7 +111,7 @@ describe('ossindex vulns: reshaping', () => {
 
   it('suspected bug #91 item 26: a report whose coordinates come back normalised matches no package and is dropped, silently', async () => {
     const normalised = afterProbe(() => ({ json: [{ coordinates: 'pkg:npm/lodash@4.17.20?type=jar', reference: '', vulnerabilities: [vulnerability(1, 'CVE-2021-23337', 7.2)] }] }));
-    const { envelope } = await run({ from: 'inventory.json' }, [normalised]);
+    const { envelope } = await run({ inputFile: 'inventory.json' }, [normalised]);
     expect(envelope.ok).toBe(true);
     expect(envelope.data).toMatchObject({ scanned: 4, vulnerable: 0, packages: [] });
     expect(envelope.meta.warnings).toBeUndefined();
@@ -120,31 +120,31 @@ describe('ossindex vulns: reshaping', () => {
 
 describe('ossindex vulns: failures', () => {
   it('#91 item 7, fixed: a rejected account is AUTH with where the token lives, not "not reachable"', async () => {
-    const { envelope, calls } = await run({ from: 'inventory.json' }, [route(() => ({ status: 401, json: { message: 'Authentication required' } }))]);
+    const { envelope, calls } = await run({ inputFile: 'inventory.json' }, [route(() => ({ status: 401, json: { message: 'Authentication required' } }))]);
     expect(envelope.error?.code).toBe('AUTH');
     expect(envelope.error?.fix).toContain('TOIL_OSSINDEX_TOKEN');
     expect(calls).toHaveLength(1);
   });
 
   it('any other failed probe is the "not reachable" error', async () => {
-    const { envelope, calls } = await run({ from: 'inventory.json' }, [route(() => ({ status: 502, text: 'bad gateway' }))]);
+    const { envelope, calls } = await run({ inputFile: 'inventory.json' }, [route(() => ({ status: 502, text: 'bad gateway' }))]);
     expect(envelope.error).toMatchObject({ code: 'NETWORK', message: 'toil ossindex vulns requires Sonatype OSS Index access but ossindex.sonatype.org is not reachable from this machine.' });
     expect(envelope.error?.details).toMatchObject({ status: 503, cause: 'HTTP 502 Bad Gateway' });
     expect(calls).toHaveLength(1);
   });
 
   it('a batch rejected for the credential is AUTH too', async () => {
-    const { envelope } = await run({ from: 'inventory.json' }, [afterProbe(() => ({ status: 403, json: { message: 'Forbidden' } }))]);
+    const { envelope } = await run({ inputFile: 'inventory.json' }, [afterProbe(() => ({ status: 403, json: { message: 'Forbidden' } }))]);
     expect(envelope.error?.code).toBe('AUTH');
   });
 
   it('a probe answered with 400 still counts as reachable', async () => {
     const r = route((request) => (coordinatesOf(request).length === 0 ? { status: 400, text: 'no coordinates' } : componentReport(request)));
-    expect((await run({ from: 'inventory.json' }, [r])).envelope.ok).toBe(true);
+    expect((await run({ inputFile: 'inventory.json' }, [r])).envelope.ok).toBe(true);
   });
 
   it('a 429 keeps its specified message, whose advice to add credentials holds since toil sends them, and is answered at once', async () => {
-    const { envelope, calls } = await run({ from: 'inventory.json' }, [afterProbe(() => ({ status: 429, text: '' }))]);
+    const { envelope, calls } = await run({ inputFile: 'inventory.json' }, [afterProbe(() => ({ status: 429, text: '' }))]);
     // No retry (retryRateLimit: false): the probe and one batch.
     expect(calls).toHaveLength(2);
     expect(envelope.error?.code).toBe('HTTP');
@@ -155,23 +155,23 @@ describe('ossindex vulns: failures', () => {
   });
 
   it('any other failed batch keeps the specified wording, "Sonatype OSS Index returned HTTP <status>"', async () => {
-    const { envelope } = await run({ from: 'inventory.json' }, [afterProbe(() => ({ status: 500, text: 'oops' }))]);
+    const { envelope } = await run({ inputFile: 'inventory.json' }, [afterProbe(() => ({ status: 500, text: 'oops' }))]);
     expect(envelope.error).toMatchObject({ code: 'HTTP', message: 'Sonatype OSS Index returned HTTP 500 Internal Server Error' });
   });
 
   it('an answer that is not a list of reports fails, as the contract specifies, in words', async () => {
-    const { envelope } = await run({ from: 'inventory.json' }, [afterProbe(() => ({ json: { coordinates: 'x' } }))]);
+    const { envelope } = await run({ inputFile: 'inventory.json' }, [afterProbe(() => ({ json: { coordinates: 'x' } }))]);
     expect(envelope.error).toMatchObject({ code: 'HTTP', message: `Sonatype OSS Index answered ${URL_} with something other than a list of reports.` });
   });
 
   it('an empty selection still probes, and returns nothing scanned', async () => {
-    const { envelope, calls } = await run({ from: 'inventory.json', ecosystem: 'pip' });
+    const { envelope, calls } = await run({ inputFile: 'inventory.json', ecosystem: 'pip' });
     expect(envelope.data).toMatchObject({ scanned: 0, vulnerable: 0, packages: [] });
     expect(calls).toHaveLength(1);
   });
 
   it('refuses a bad inventory before any request', async () => {
-    const { envelope, calls } = await run({ from: 'bad.json' }, [fixtureRoute], { files: { 'bad.json': '{' } });
+    const { envelope, calls } = await run({ inputFile: 'bad.json' }, [fixtureRoute], { files: { 'bad.json': '{' } });
     expect(envelope.error?.code).toBe('INVALID_INPUT');
     expect(envelope.error?.fix).toContain('toil ossindex vulns');
     expect(calls).toHaveLength(0);

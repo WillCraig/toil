@@ -13,10 +13,10 @@ import type { SummaryReport } from './output/summary.js';
  * removed, renamed or repurposed, or an error code repurposed. Additive
  * changes (a new command, flag, field or code) leave it alone, so a caller
  * built against version N works with any toil that reports N. Version 2 (#495):
- * the `jira-cloud` and `confluence-cloud` areas folded into `jira` and `confluence`, and `jira_cloud_*` and `confluence_cloud_*` tools into `jira_*` and `confluence_*`. Version 3 (#555): dossiers became toil projects: the `projects` command group and `<area> check-toil-project`, the `projects_*` and `<area>_check_toil_project` tools, the `toilProject` input and `meta.context.toilProject`, the `TOIL_PROJECT_*` codes, `TOIL_PROJECT` and `TOIL_PROJECT_PATHS`, and `toil://projects`.
+ * the `jira-cloud` and `confluence-cloud` areas folded into `jira` and `confluence`, and `jira_cloud_*` and `confluence_cloud_*` tools into `jira_*` and `confluence_*`. Version 3 (#555): dossiers became toil projects: the `projects` command group and `<area> check-toil-project`, the `projects_*` and `<area>_check_toil_project` tools, the `toilProject` input and `meta.context.toilProject`, the `TOIL_PROJECT_*` codes, `TOIL_PROJECT` and `TOIL_PROJECT_PATHS`, and `toil://projects`. Version 4 (#622): one flag per file idea: the local file a command reads is `inputFile` (`--input-file`), one field's file is `<field>File`, a path in a remote repository is `path`, and a file a command writes is `out`; the CLI keeps the old spellings for a beta, MCP and the API take only the new field names.
  * docs/command-contract.md, Changing the contract, says the same for people.
  */
-export const CONTRACT_VERSION = 3;
+export const CONTRACT_VERSION = 4;
 
 /**
  * The output contract: every command, through the CLI or MCP, produces exactly

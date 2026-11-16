@@ -22,12 +22,14 @@ import { STDIN_OVER_MCP, type FileAccess } from '../../../core/files.js';
 
 /** The input fields of a command that reads one document. Spread them into its zod object. */
 export const inputFields = {
-  file: z.string().optional().describe('A file inside the workspace to read. On the CLI, - (or leaving out both file and text) reads stdin'),
+  inputFile: z.string().optional().describe('A file inside the workspace to read. On the CLI, - (or leaving out both inputFile and text) reads stdin'),
   text: z.string().optional().describe('The content itself, instead of a file'),
 };
 
-/** `[file]`, the positional for {@link inputFields}. */
-export const fileArgument: CliArgument = { name: 'file', field: 'file', description: 'A file inside the workspace, or - for stdin (the default when no --text is given)', required: false };
+/** `--input-file <path>`, the flag for {@link inputFields}: the one flag for the local file a command reads (#622). */
+export const inputFileOption: CliOption = { flags: '--input-file <path>', field: 'inputFile', description: 'A file inside the workspace, or - for stdin (the default when no --text is given)' };
+/** `[file]`, the positional `--input-file` replaced (#622): still read, with a DEPRECATED_FLAG warning, for at least one beta. */
+export const fileArgument: CliArgument = { name: 'file', field: 'inputFile', description: 'Retired: use --input-file', required: false, deprecated: '--input-file' };
 /** `--text <text>`, the flag for {@link inputFields}. */
 export const textOption: CliOption = { flags: '--text <text>', field: 'text', description: 'The content itself, instead of a file' };
 
@@ -98,8 +100,8 @@ export interface InputContext {
   signal?: AbortSignal;
 }
 
-const NEITHER_OVER_MCP = new ToilError('INVALID_INPUT', 'Nothing to read: pass file or text. Over MCP there is no stdin to read from.', {
-  fix: 'Pass the content as text, or write it to a file in the workspace and pass its path as file.',
+const NEITHER_OVER_MCP = new ToilError('INVALID_INPUT', 'Nothing to read: pass inputFile or text. Over MCP there is no stdin to read from.', {
+  fix: 'Pass the content as text, or write it to a file in the workspace and pass its path as inputFile.',
 });
 
 /** Where a NUL byte sits in the first {@link BINARY_SNIFF} bytes, or -1. */
@@ -132,12 +134,12 @@ const concat = (parts: Uint8Array[], total: number) => {
 
 /**
  * Opens a command's input from {@link inputFields}: `text` when given, else
- * `file`, else stdin. Both at once is INVALID_INPUT, and so is stdin over
+ * `inputFile`, else stdin. Both at once is INVALID_INPUT, and so is stdin over
  * MCP. Nothing is read until a pass asks, except stdin, which is read here.
  */
-export async function openInput(ctx: InputContext, fields: { file?: string | undefined; text?: string | undefined }, options: ReadOptions = {}): Promise<UtilInput> {
-  if (fields.file !== undefined && fields.text !== undefined) {
-    throw new ToilError('INVALID_INPUT', 'Pass a file or text, not both.', { fix: 'Drop one of them: file names a file in the workspace, text is the content itself.' });
+export async function openInput(ctx: InputContext, fields: { inputFile?: string | undefined; text?: string | undefined }, options: ReadOptions = {}): Promise<UtilInput> {
+  if (fields.inputFile !== undefined && fields.text !== undefined) {
+    throw new ToilError('INVALID_INPUT', 'Pass a file or text, not both.', { fix: 'Drop one of them: --input-file (inputFile over MCP) names a file in the workspace, --text is the content itself.' });
   }
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
   const maxLine = options.maxLineLength ?? DEFAULT_MAX_LINE;
@@ -154,7 +156,7 @@ export async function openInput(ctx: InputContext, fields: { file?: string | und
     source = { kind: 'text' };
     held = new TextEncoder().encode(fields.text);
     expectedBytes = held.length;
-  } else if (fields.file === undefined || fields.file === '-') {
+  } else if (fields.inputFile === undefined || fields.inputFile === '-') {
     source = { kind: 'stdin' };
     const parts: Uint8Array[] = [];
     let total = 0;
@@ -162,7 +164,7 @@ export async function openInput(ctx: InputContext, fields: { file?: string | und
     try {
       stream = ctx.files.readStream('-', signal ? { signal } : {});
     } catch (err) {
-      throw err === STDIN_OVER_MCP && fields.file === undefined ? NEITHER_OVER_MCP : err;
+      throw err === STDIN_OVER_MCP && fields.inputFile === undefined ? NEITHER_OVER_MCP : err;
     }
     for await (const chunk of stream) {
       total += chunk.length;
@@ -171,7 +173,7 @@ export async function openInput(ctx: InputContext, fields: { file?: string | und
     }
     held = concat(parts, total);
   } else {
-    const path = fields.file;
+    const path = fields.inputFile;
     const stat = ctx.files.stat(path);
     if (stat.type !== 'file') throw new ToilError('INVALID_INPUT', `"${path}" is a ${stat.type === 'directory' ? 'folder' : 'special file'}, not a file.`, { fix: 'Pass the path of a file.' });
     source = { kind: 'file', path };

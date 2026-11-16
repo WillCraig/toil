@@ -116,7 +116,7 @@ export const repoAddInlineCommentCommand = adoArea.command({
     'Starts an active thread on one line of a file in a pull request (the right, new side unless lineType is left) and returns the thread. Give the path from the repository root, with or without a leading / (toil adds it).',
   input: z.object({
     id: prId,
-    file: z.string().min(1).describe('File path'),
+    path: z.string().min(1).describe('File path'),
     line: z.number().int().positive().describe('Line number'),
     body: z.string().min(1).describe('Comment text (Markdown)'),
     lineType: z.enum(LINE_TYPES).optional().describe(LINE_TYPE),
@@ -126,19 +126,19 @@ export const repoAddInlineCommentCommand = adoArea.command({
   context: IN_REPO,
   args: [prArg],
   options: [
-    { flags: '--file <path>', field: 'file', description: 'File path' },
+    { flags: '--path <path>', field: 'path', description: 'File path', deprecated: ['--file <path>'] },
     { flags: '--line <n>', field: 'line', description: 'Line number' },
     { flags: '--body <text>', field: 'body', description: 'Comment text (Markdown)' },
     { flags: '--line-type <side>', field: 'lineType', description: LINE_TYPE },
   ],
   examples: [
-    { ...W, id: 42, file: 'src/app.ts', line: 12, body: 'Off by one?' },
-    { ...W, id: 42, file: '/src/app.ts', line: 3, body: 'Was this removed on purpose?', lineType: 'left' },
+    { ...W, id: 42, path: 'src/app.ts', line: 12, body: 'Off by one?' },
+    { ...W, id: 42, path: '/src/app.ts', line: 3, body: 'Was this removed on purpose?', lineType: 'left' },
   ],
   run: (input, ctx) => {
     const position = { line: input.line, offset: 1 };
     const range = (input.lineType ?? 'right') === 'left' ? { leftFileStart: position, leftFileEnd: position } : { rightFileStart: position, rightFileEnd: position };
-    return startThread(ctx, input.id, input.body, { filePath: input.file.startsWith('/') ? input.file : `/${input.file}`, ...range });
+    return startThread(ctx, input.id, input.body, { filePath: input.path.startsWith('/') ? input.path : `/${input.path}`, ...range });
   },
 });
 

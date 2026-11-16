@@ -192,7 +192,7 @@
     "connection": true,
     "flags": [
       "<id>",
-      "--file <path>",
+      "--path <path>",
       "--line <n>",
       "--body <text>",
       "--line-type <type>",
@@ -258,7 +258,7 @@
     "connection": true,
     "flags": [
       "[id]",
-      "--file <path>",
+      "--path <path>",
       "--context-lines <n>",
       "--project <key>",
       "--ws <slug>",

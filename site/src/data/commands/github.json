@@ -134,7 +134,7 @@
     "writes": true,
     "connection": true,
     "flags": [
-      "--from <file>",
+      "--input-file <path>",
       "--owner <owner>",
       "--repo <repo>",
       "--allow-write"
@@ -577,7 +577,7 @@
     "flags": [
       "<number>",
       "--commit <sha>",
-      "--file <path>",
+      "--path <path>",
       "--line <n>",
       "--body <text>",
       "--side <side>",

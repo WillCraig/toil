@@ -10,7 +10,7 @@
  * - **Ask your AI agent**: toil's own `classify prompt` is what the agent is
  *   given, on the adapter the person chose, with no tool at all. Its answer is
  *   checked by `readVerdicts` (every id one of the items, every category one
- *   of the scheme's, or unsure) exactly as `classify run --verdicts` would,
+ *   of the scheme's, or unsure) exactly as `classify run --verdicts-file` would,
  *   and comes back as answers for a person to accept. Accepting one is the
  *   person's word, recorded as a correction in their ledger (`classify
  *   correct`) by the route a pick by hand takes. The agent never applies
@@ -23,7 +23,7 @@
  *   Then `classify run --record`, with the same input and flags, tells the
  *   ledger what the verdicts are. Running it twice changes nothing.
  * - **Tune**: `classify tune`, the agent, `readScheme`, the revised scheme and
- *   the held-back answers staged as files, `classify stats --backtest`. Its
+ *   the held-back answers staged as files, `classify stats --backtest-file`. Its
  *   Apply is `classify scheme set` as a person's command, which an agent can
  *   never run and this server runs only on a press.
  *
@@ -357,7 +357,7 @@ export class ClassifyService {
             field: field && p.field ? { name: field.name, from: undefined, to: String(asRecord(p.field).value) } : null,
           };
         });
-        groups.push({ area, connection: String(g.connection), changes, command: { name: CATEGORIZE[area], input: { connection: String(g.connection), from: 'plan.json' } }, writes: await this.writesOf(String(g.connection)) });
+        groups.push({ area, connection: String(g.connection), changes, command: { name: CATEGORIZE[area], input: { connection: String(g.connection), inputFile: 'plan.json' } }, writes: await this.writesOf(String(g.connection)) });
       }
       const id = this.uid();
       this.plans.set(id, { toilProject, planFile, input, files, groups, expires: this.now() + STAGED_LIFETIME_MS });
@@ -382,7 +382,7 @@ export class ClassifyService {
     try {
       const outcomes: ApplyOutcome[] = [];
       for (const g of staged.groups) {
-        const e = await this.call(g.command.name, { connection: g.connection, from: staged.planFile, allowWrite: true }, { write: true, files: true, signal });
+        const e = await this.call(g.command.name, { connection: g.connection, inputFile: staged.planFile, allowWrite: true }, { write: true, files: true, signal });
         if (!e.ok) {
           outcomes.push({ connection: g.connection, changed: [], unchanged: [], failed: [], refused: `${e.error.message}${e.error.fix ? ` ${e.error.fix}` : ''}` });
           continue;
@@ -465,7 +465,7 @@ export class ClassifyService {
           answersFile = await this.stage('answers', JSON.stringify(answers));
         }
         files.push(answersFile);
-        const scored = asRecord(this.must(await this.call('classify stats', { toilProject, backtest: answersFile, revised, text: this.records(heldItems), ...this.cwd() }, { files: true }), "toil couldn't score the revision"));
+        const scored = asRecord(this.must(await this.call('classify stats', { toilProject, backtestFile: answersFile, revisedFile: revised, text: this.records(heldItems), ...this.cwd() }, { files: true }), "toil couldn't score the revision"));
         const b = asRecord(scored.backtest);
         if (Object.keys(b).length > 0) {
           const side = (o: Record<string, unknown>) => ({ agreed: Number(o.agreed ?? 0), agreement: typeof o.agreement === 'number' ? o.agreement : null });
@@ -501,7 +501,7 @@ export class ClassifyService {
 
   /** `classify scheme set` through the toil project, so the file that is changed is the one the toil project reads, wherever it lives. */
   private async setScheme(toilProject: string, file: string): Promise<SaveResult> {
-    const e = await this.call('classify scheme set', { toilProject, from: file, ...this.cwd() }, { write: true, files: true, person: true });
+    const e = await this.call('classify scheme set', { toilProject, inputFile: file, ...this.cwd() }, { write: true, files: true, person: true });
     const d = asRecord(this.must(e, "toil couldn't save the scheme"));
     const warnings = (e.meta.warnings ?? []).map((w) => w.message);
     // A copy saved where the toil project doesn't look (it names no scheme, so it uses the built-in one) is saved but not yet read.

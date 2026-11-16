@@ -15,7 +15,7 @@
     "connection": false,
     "flags": [
       "--staged",
-      "--file <path>"
+      "--path <path>"
     ]
   },
   {

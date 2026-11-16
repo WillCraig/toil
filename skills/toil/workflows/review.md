@@ -25,7 +25,7 @@ whichever connection the PR is on; `<id>` is the PR's number or id.
    toil <host> pr diff <id>
    ```
 
-   Read a big diff a file at a time where the host allows it (`pr diff <id> --file
+   Read a big diff a file at a time where the host allows it (`pr diff <id> --path
    <path>` on Bitbucket, `--path` on Azure DevOps Server), or add `--summary-file`.
 
 2. **Read its checks.** The checks on the PR's head commit:
@@ -40,7 +40,7 @@ whichever connection the PR is on; `<id>` is the PR's number or id.
    something, and "unchecked" if it couldn't run.
 
    ```bash
-   toil util secrets scan <file-of-the-added-lines>
+   toil util secrets scan --input-file <file-of-the-added-lines>
    toil deps diff --from <base-branch> --to <head-branch>
    toil sonar quality-gate get --project <key> --branch <head-branch>
    toil sonar issue list --project <key> --branch <head-branch> --resolved false
@@ -81,7 +81,7 @@ whichever connection the PR is on; `<id>` is the PR's number or id.
    a connection with `writes` on, with `--allow-write`:
 
    ```bash
-   toil <host> pr comment-inline <id> --file <path> --line <n> --body "<finding>" --allow-write
+   toil <host> pr comment-inline <id> --path <path> --line <n> --body "<finding>" --allow-write
    toil <host> pr comment <id> --body "<summary>" --allow-write
    ```
 

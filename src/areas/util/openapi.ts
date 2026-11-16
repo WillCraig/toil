@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineCommand, type CliOption } from '../../core/command.js';
-import { fileArgument, inputFields, openInput, textOption } from './kit/input.js';
+import { fileArgument, inputFields, openInput, inputFileOption, textOption } from './kit/input.js';
 
 /**
  * `util openapi list | show | example`: reads an OpenAPI 3.x or Swagger 2.0
@@ -74,11 +74,11 @@ export const openapiListCommand = defineCommand({
   writes: false,
   args: [fileArgument],
   options: [
-    textOption,
+    inputFileOption, textOption,
     { flags: '--tag <tag>', field: 'tag', description: 'Only operations with this tag' },
     { flags: '--path <text>', field: 'path', description: 'Only operations whose path contains this text' },
   ],
-  examples: [{ file: SAMPLE_JIRA }, { file: SAMPLE_GITHUB, tag: 'pulls' }, { file: SAMPLE_BITBUCKET, path: 'pullrequests' }, { text: EXAMPLE_TEXT }],
+  examples: [{ inputFile: SAMPLE_JIRA }, { inputFile: SAMPLE_GITHUB, tag: 'pulls' }, { inputFile: SAMPLE_BITBUCKET, path: 'pullrequests' }, { text: EXAMPLE_TEXT }],
   run: async (input, ctx) => (await import('./openapi/run.js')).listOperations(ctx, await openInput(ctx, input), input),
 });
 
@@ -93,11 +93,11 @@ export const openapiShowCommand = defineCommand({
   }),
   writes: false,
   args: [fileArgument],
-  options: [textOption, ...selectOptions, { flags: '--depth <n>', field: 'depth', description: 'How many $refs deep to expand schemas (default 3)' }],
+  options: [inputFileOption, textOption, ...selectOptions, { flags: '--depth <n>', field: 'depth', description: 'How many $refs deep to expand schemas (default 3)' }],
   examples: [
-    { file: SAMPLE_JIRA, operation: 'createIssue' },
-    { file: SAMPLE_GITHUB, method: 'POST', path: '/repos/{owner}/{repo}/pulls', depth: 1 },
-    { file: SAMPLE_BITBUCKET, method: 'GET', path: '/repositories/{workspace}/{repo_slug}/pullrequests' },
+    { inputFile: SAMPLE_JIRA, operation: 'createIssue' },
+    { inputFile: SAMPLE_GITHUB, method: 'POST', path: '/repos/{owner}/{repo}/pulls', depth: 1 },
+    { inputFile: SAMPLE_BITBUCKET, method: 'GET', path: '/repositories/{workspace}/{repo_slug}/pullrequests' },
     { text: EXAMPLE_TEXT, operation: 'createOrder' },
   ],
   run: async (input, ctx) => (await import('./openapi/run.js')).showOne(ctx, await openInput(ctx, input), input),
@@ -116,15 +116,15 @@ export const openapiExampleCommand = defineCommand({
   writes: false,
   args: [fileArgument],
   options: [
-    textOption,
+    inputFileOption, textOption,
     ...selectOptions,
     { flags: '--response <status>', field: 'response', description: 'Build that response body instead of the request body' },
     { flags: '--content-type <type>', field: 'contentType', description: "Which of the body's content types (default: the first JSON one)" },
   ],
   examples: [
-    { file: SAMPLE_JIRA, operation: 'createIssue' },
-    { file: SAMPLE_GITHUB, operation: 'pulls/create' },
-    { file: SAMPLE_BITBUCKET, method: 'POST', path: '/repositories/{workspace}/{repo_slug}/pullrequests', response: '201', contentType: 'application/json' },
+    { inputFile: SAMPLE_JIRA, operation: 'createIssue' },
+    { inputFile: SAMPLE_GITHUB, operation: 'pulls/create' },
+    { inputFile: SAMPLE_BITBUCKET, method: 'POST', path: '/repositories/{workspace}/{repo_slug}/pullrequests', response: '201', contentType: 'application/json' },
     { text: EXAMPLE_TEXT, operation: 'createOrder' },
   ],
   run: async (input, ctx) => (await import('./openapi/run.js')).exampleBody(ctx, await openInput(ctx, input), input),

@@ -99,7 +99,7 @@ const noField = { field: undefined };
 
 async function run(plan: unknown, w: World, opts: { input?: Record<string, unknown>; settings?: Record<string, unknown> } = {}) {
   const t = testContext({ config: { github: { ...fixture.config!.github, ...opts.settings } }, routes: routes(w), files: { 'plan.json': typeof plan === 'string' ? plan : JSON.stringify(plan) } });
-  const envelope = await execute(categorizeCommand, { from: 'plan.json', allowWrite: true, ...opts.input }, t.context);
+  const envelope = await execute(categorizeCommand, { inputFile: 'plan.json', allowWrite: true, ...opts.input }, t.context);
   // The command never sends a DELETE: a label comes off by replacing the list.
   expect(t.http.calls.filter((c) => c.method === 'DELETE')).toEqual([]);
   return { envelope, calls: t.http.calls, w };

@@ -46,11 +46,11 @@ port.
   `projects_analyze_prompt` tool returns, served when that tool is (`projects.md`,
   **Analyze**).
   `classify` asks the AI agent to classify the work items `classify_run` left unsure: its
-  arguments are `file` (required: a workspace file holding the work items as OWI records,
+  arguments are `inputFile` (required: a workspace file holding the work items as OWI records,
   since MCP has no stdin), `toilProject` and `scheme`. It's what the `classify_prompt` tool
   returns, served when that tool is (`classify.md`). The items in it are untrusted data; the
   answer is a JSON array of `{ id, category, reason }`, saved to a workspace file and passed
-  to `classify_run` as `verdicts`.
+  to `classify_run` as `verdictsFile`.
   `classify-tune` asks the AI agent to sharpen a scheme from people's corrections and to
   score it on the ones held back. Its arguments are `toilProject` and `scheme`; it is what
   `classify_tune` returns (`classify.md`).

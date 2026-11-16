@@ -43,7 +43,7 @@
     {
       "allows": [],
       "old": "git diff building a shell command string, so --file with a space or a shell metacharacter becoming several pathspecs or shell syntax, and usually an empty diff (#74 item 3)",
-      "toil": "git runs with a fixed argument list and no shell, so --file is one pathspec after --: a path with a space gets its diff",
+      "toil": "git runs with a fixed argument list and no shell, so --path is one pathspec after --: a path with a space gets its diff",
       "why": "toil never spawns through a shell (CLAUDE.md, Cross-Platform and No Executables; decision 1 on #68).",
       "principle": "1",
       "class": "security"

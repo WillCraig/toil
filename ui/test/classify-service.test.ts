@@ -54,7 +54,7 @@ function wrapped(writes: boolean) {
     if (command === 'connections list') return ok(command, { configFile: 'x', connections: [{ name: 'sample-jira', area: 'jira', isDefault: true, host: null, writes, values: {} }] });
     if (command.endsWith('categorize')) {
       // The plan file is read as `categorize` would: Apply removes it once the flow ends.
-      calls.push({ command, input, options: options as Record<string, unknown>, plan: readFileSync(String(input.from), 'utf8') });
+      calls.push({ command, input, options: options as Record<string, unknown>, plan: readFileSync(String(input.inputFile), 'utf8') });
       return ok(command, { connection: 'sample-jira', changed: [{ id: 'x', key: 'SHOP-1', category: 'feature', labels: { added: ['feature'], removed: ['ktlo'] }, field: null }], unchanged: [], failed: [], skipped: [], counts: { planned: 1, changed: 1, unchanged: 0, failed: 0 } });
     }
     return execute(command, input, options);
@@ -125,7 +125,7 @@ describe('the plan and Apply', () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({ command: 'jira issue categorize', input: { connection: 'sample-jira', allowWrite: true }, options: { readOnly: false, caller: 'toil-ui' } });
-    const file = String(calls[0]!.input.from);
+    const file = String(calls[0]!.input.inputFile);
     expect(fwd(file).startsWith(fwd(join(data, 'classify')))).toBe(true);
     expect(existsSync(file)).toBe(false);
     const written = JSON.parse(calls[0]!.plan) as { plan: Array<{ connection: string; items: Array<{ id: string; category: string; labels: { add: string[]; remove: string[] } }> }> };

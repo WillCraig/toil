@@ -45,7 +45,7 @@ commands keep the shape listed in [command-contract.md](command-contract.md).
 | `toil deps outdated` | JFrog Artifactory | Newer versions available in your mirrors | Access token |
 | `toil deps license-check` | JFrog Artifactory | License metadata for an inventory | Access token |
 
-Each source command reads an inventory from `--from <file>` or stdin, so
+Each source command reads an inventory from `--input-file <path>` or stdin, so
 `toil deps scan | toil osv vulns` works. None of them scans a repository itself:
 `toil deps scan` makes the inventory, and the source commands only read one. They
 share core's reader (`src/core/inventory.ts`), so each accepts the same shapes: the

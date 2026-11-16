@@ -46,7 +46,7 @@ const codes = (warnings: Warning[]) => warnings.map((w) => w.code);
 
 describe('util report: JUnit', () => {
   it('reads a Maven Surefire report: totals, failure and error with file and line from the stack, flaky rerun counted as passed', async () => {
-    const { data, warnings } = await run({ file: 'reports/surefire.xml' });
+    const { data, warnings } = await run({ inputFile: 'reports/surefire.xml' });
     expect(data.format).toBe('junit');
     expect(data.formatFrom).toBe('content');
     expect(data.findings).toBeNull();
@@ -76,7 +76,7 @@ describe('util report: JUnit', () => {
   });
 
   it('reads the Jenkins shape: nested suites, each declaring totals that are recounted, status and assertions attributes', async () => {
-    const { data } = await run({ file: 'reports/jenkins.xml' });
+    const { data } = await run({ inputFile: 'reports/jenkins.xml' });
     expect(data.tests?.totals).toEqual({ tests: 5, passed: 3, failures: 1, errors: 0, skipped: 1, flaky: 0, other: 0 });
     expect(data.tests?.suites).toBe(3);
     expect(data.tests?.failures).toEqual([expect.objectContaining({ suite: 'gateway/routing', name: 'TestRouteRejectsUnknownHost', file: 'routing_test.go', line: 88, type: null, message: 'Failed' })]);
@@ -87,7 +87,7 @@ describe('util report: JUnit', () => {
   });
 
   it('reads the Azure DevOps shape: the VSTest JUnit logger, with a .NET stack and a multi-line message', async () => {
-    const { data } = await run({ file: 'reports/azure-devops.xml' });
+    const { data } = await run({ inputFile: 'reports/azure-devops.xml' });
     expect(data.tests?.totals).toEqual({ tests: 4, passed: 2, failures: 1, errors: 0, skipped: 1, flaky: 0, other: 0 });
     expect(data.tests?.failures).toEqual([
       expect.objectContaining({
@@ -142,7 +142,7 @@ describe('util report: JUnit', () => {
 describe('util report: the totals self-check', () => {
   it('catches a JUnit suite whose declared failures disagree with its cases, naming both numbers', async () => {
     const broken = sample('surefire.xml').replace('skipped="1" failures="1"', 'skipped="1" failures="2"');
-    const { data, warnings } = await run({ file: 'reports/broken.xml' }, { 'reports/broken.xml': broken });
+    const { data, warnings } = await run({ inputFile: 'reports/broken.xml' }, { 'reports/broken.xml': broken });
     expect(data.verified.passed).toBe(false);
     expect(check(data, 'tests.failures')).toMatchObject({
       status: 'failed',
@@ -180,7 +180,7 @@ describe('util report: the totals self-check', () => {
   });
 
   it('reads the dotnet TRX sample: classes from the definitions, the failure located from its stack, notExecuted left at 0 reported unchecked', async () => {
-    const { data, warnings } = await run({ file: 'reports/dotnet.trx' });
+    const { data, warnings } = await run({ inputFile: 'reports/dotnet.trx' });
     expect(data.format).toBe('trx');
     expect(data.tests?.totals).toEqual({ tests: 4, passed: 2, failures: 1, errors: 0, skipped: 1, flaky: 0, other: 0 });
     expect(data.tests?.failures).toEqual([
@@ -200,7 +200,7 @@ describe('util report: the totals self-check', () => {
 
 describe('util report: coverage', () => {
   it('reads coverlet Cobertura: classes sharing a file merged, method copies of lines not counted twice, every rate rechecked', async () => {
-    const { data } = await run({ file: 'reports/coverlet.cobertura.xml' });
+    const { data } = await run({ inputFile: 'reports/coverlet.cobertura.xml' });
     expect(data.format).toBe('cobertura');
     expect(data.coverage).toEqual({
       sources: ['/home/vsts/work/1/s/src/Imagile.Billing/'],
@@ -220,7 +220,7 @@ describe('util report: coverage', () => {
   });
 
   it('reads coverage.py Cobertura with --format given, an empty module having no percentage', async () => {
-    const { data } = await run({ file: 'reports/coverage-py.xml', format: 'cobertura', lowest: 1 });
+    const { data } = await run({ inputFile: 'reports/coverage-py.xml', format: 'cobertura', lowest: 1 });
     expect(data.formatFrom).toBe('flag');
     expect(data.coverage?.totals).toEqual({ lines: { covered: 12, total: 16, percent: 75 }, branches: { covered: 3, total: 4, percent: 75 } });
     expect(data.coverage?.files[0]).toEqual({ file: 'inventory/__init__.py', lines: { covered: 0, total: 0, percent: null }, branches: null });
@@ -248,7 +248,7 @@ describe('util report: coverage', () => {
   });
 
   it('reads lcov: per-record LF, LH, BRF, BRH, FNF and FNH recounted, the lowest files first', async () => {
-    const { data } = await run({ file: 'reports/lcov.info', lowest: 2 });
+    const { data } = await run({ inputFile: 'reports/lcov.info', lowest: 2 });
     expect(data.format).toBe('lcov');
     expect(data.coverage?.totals).toEqual({ lines: { covered: 17, total: 23, percent: 73.91 }, branches: { covered: 2, total: 6, percent: 33.33 } });
     expect(data.coverage?.files.map((f) => [f.file, f.lines.percent, f.branches?.percent ?? null])).toEqual([
@@ -289,7 +289,7 @@ describe('util report: coverage', () => {
 
 describe('util report: SARIF', () => {
   it('reads CodeQL SARIF: levels from each rule, file and line from the first location, ruleIndex cross-checked', async () => {
-    const { data, warnings } = await run({ file: 'reports/codeql.sarif' });
+    const { data, warnings } = await run({ inputFile: 'reports/codeql.sarif' });
     expect(data.format).toBe('sarif');
     expect(data.tests).toBeNull();
     expect(data.findings).toEqual({
@@ -389,7 +389,7 @@ describe('util report: detection, skipped elements and limits', () => {
     const unknown = await run({ text: 'hello' });
     expect(unknown.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: "Couldn't tell what kind of report the text is: it doesn't start like JUnit, TRX, SARIF, lcov or Cobertura." });
     expect(unknown.envelope.error?.fix).toContain('--format');
-    const wrong = await run({ file: 'reports/dotnet.trx', format: 'junit' });
+    const wrong = await run({ inputFile: 'reports/dotnet.trx', format: 'junit' });
     expect(wrong.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'The file "reports/dotnet.trx" starts with <TestRun>, which is not a JUnit report (expected <testsuites> or <testsuite>).' });
   });
 
@@ -426,9 +426,9 @@ describe('util report: detection, skipped elements and limits', () => {
 
   it('gives the same answer for any chunking of the stream', async () => {
     for (const name of ['surefire.xml', 'jenkins.xml', 'dotnet.trx', 'coverlet.cobertura.xml', 'lcov.info']) {
-      const whole = await summarise({ file: name }, { [name]: sample(name) });
+      const whole = await summarise({ inputFile: name }, { [name]: sample(name) });
       for (const chunkSize of [1, 7, 64]) {
-        const chunked = await summarise({ file: name }, { [name]: sample(name) }, { chunkSize });
+        const chunked = await summarise({ inputFile: name }, { [name]: sample(name) }, { chunkSize });
         expect(chunked.data, `${name} in chunks of ${chunkSize}`).toEqual(whole.data);
       }
     }
@@ -437,7 +437,7 @@ describe('util report: detection, skipped elements and limits', () => {
   it('streams a large report, and recounts it exactly', async () => {
     const cases = Array.from({ length: 20000 }, (_, i) => (i % 1000 === 0 ? `<testcase name="t${i}"><failure message="m${i}">at x.Y.t${i}(Y.java:${i})</failure></testcase>` : `<testcase name="t${i}" classname="x.Y"/>`)).join('\n');
     const xml = `<testsuite name="big" tests="20000" failures="20">\n${cases}\n</testsuite>`;
-    const { data } = await summarise({ file: 'big.xml' }, { 'big.xml': xml }, { chunkSize: 4096 });
+    const { data } = await summarise({ inputFile: 'big.xml' }, { 'big.xml': xml }, { chunkSize: 4096 });
     expect(data.tests?.totals).toMatchObject({ tests: 20000, failures: 20, passed: 19980 });
     expect(data.tests?.failures).toHaveLength(20);
     expect(data.verified.passed).toBe(true);
@@ -447,7 +447,7 @@ describe('util report: detection, skipped elements and limits', () => {
     const xml = sample('surefire.xml');
     // Cut inside the fourth case, refundsCancelledOrder.
     const cap = Buffer.byteLength(xml.slice(0, xml.indexOf('<testcase name="refundsCancelledOrder"') + 20));
-    const { data, warnings } = await summarise({ file: 'r.xml' }, { 'r.xml': xml }, { maxBytes: cap });
+    const { data, warnings } = await summarise({ inputFile: 'r.xml' }, { 'r.xml': xml }, { maxBytes: cap });
     expect(codes(warnings)).toContain('INPUT_TRUNCATED');
     expect(check(data, 'input.complete')).toMatchObject({ status: 'failed' });
     expect(data.verified.passed).toBe(false);
@@ -455,7 +455,7 @@ describe('util report: detection, skipped elements and limits', () => {
     expect(data.tests?.totals.tests).toBe(3);
     expect(check(data, 'tests.total')).toBeUndefined();
     expect(check(data, 'tests.totals')).toMatchObject({ status: 'unchecked', detail: 'the read stopped before 1 suite that declares totals ended, so those totals were not compared' });
-    const sarif = await summarise({ file: 'r.sarif' }, { 'r.sarif': sample('codeql.sarif') }, { maxBytes: 1000 }).catch((err: unknown) => err);
+    const sarif = await summarise({ inputFile: 'r.sarif' }, { 'r.sarif': sample('codeql.sarif') }, { maxBytes: 1000 }).catch((err: unknown) => err);
     expect(sarif).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('more than the 1000 bytes this command reads') });
   });
 });
@@ -479,10 +479,10 @@ describe('util report: helpers', () => {
 describe('util report: front doors', () => {
   it('gives the same envelope on the CLI (file and stdin) and over MCP (file and text)', async () => {
     const context = () => testContext({ files: reportFiles, stdin: sample('jenkins.xml') }).context;
-    const cli = await runCli(['util', 'report', 'reports/jenkins.xml'], { commands, context: context() });
+    const cli = await runCli(['util', 'report', '--input-file', 'reports/jenkins.xml'], { commands, context: context() });
     const session = await connectMcp({ commands, context: context() });
     try {
-      const mcp = await session.call('util_report', { file: 'reports/jenkins.xml' });
+      const mcp = await session.call('util_report', { inputFile: 'reports/jenkins.xml' });
       expect({ ...mcp.envelope, meta: { ...mcp.envelope.meta, durationMs: 0 } }).toEqual({ ...cli.envelope, meta: { ...cli.envelope?.meta, durationMs: 0 } });
       const viaText = await session.call('util_report', { text: sample('jenkins.xml') });
       const viaStdin = await runCli(['util', 'report'], { commands, context: context() });
@@ -496,9 +496,9 @@ describe('util report: front doors', () => {
   });
 
   it('takes --format and --lowest on the CLI', async () => {
-    const cli = await runCli(['util', 'report', 'reports/lcov.info', '--format', 'lcov', '--lowest', '1'], { commands, context: testContext({ files: reportFiles }).context });
+    const cli = await runCli(['util', 'report', '--input-file', 'reports/lcov.info', '--format', 'lcov', '--lowest', '1'], { commands, context: testContext({ files: reportFiles }).context });
     expect(cli.envelope?.data).toMatchObject({ format: 'lcov', formatFrom: 'flag', coverage: { lowest: [{ file: 'src/coupons.ts' }] } });
-    const bad = await runCli(['util', 'report', 'reports/lcov.info', '--format', 'xml'], { commands, context: testContext({ files: reportFiles }).context });
+    const bad = await runCli(['util', 'report', '--input-file', 'reports/lcov.info', '--format', 'xml'], { commands, context: testContext({ files: reportFiles }).context });
     expect(bad.envelope?.error?.code).toBe('INVALID_INPUT');
   });
 });

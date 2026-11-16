@@ -91,7 +91,7 @@ set `TOIL_ARTIFACTORY_TOKEN`.
   always `null`; a NuGet package with only a license URL reports `See licenseUrl`.
 
 `package outdated` and `package license-check` read the inventory that `toil deps scan` writes, from
-`--from <file>` or, when that's left out on the CLI, from stdin; over MCP, pass `from`.
+`--input-file <path>` or, when that's left out on the CLI, from stdin; over MCP, pass `inputFile`.
 They first ping Artifactory and stop if it doesn't answer or rejects the token, then
 make one request per package, one at a time, so they're allowed up to 600 s. A lookup
 that fails for any reason (a wrong repository key included) counts as no answer: the
@@ -101,5 +101,5 @@ package is left out of `outdated`, or gets `license: null`.
 toil artifactory artifact search --repo libs-release-local --name 'api-*.jar' --limit 10
 toil artifactory artifact set-properties libs-release-local dev/imagile/api/1.4.0/api-1.4.0.jar qa.status=passed --allow-write
 toil deps scan | toil artifactory package outdated --ecosystem npm --minor
-toil artifactory package license-check --from inventory.json --include-dev
+toil artifactory package license-check --input-file inventory.json --include-dev
 ```

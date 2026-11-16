@@ -10,7 +10,7 @@ import { isNewer, updateType } from '../../core/versions.js';
 /**
  * `package outdated` and `package license-check`: newer versions and licenses, from the
  * connection's npm, NuGet and Maven repositories, for the direct
- * dependencies in an inventory that `toil deps scan` wrote (`--from <file>`,
+ * dependencies in an inventory that `toil deps scan` wrote (`--input-file <path>`,
  * or stdin). `deps outdated` and `deps license-check` paths are
  * aliases. One request per package, one package at a time, after a ping that
  * must pass; a lookup that fails for any reason counts as no answer, not as
@@ -133,7 +133,7 @@ export const outdatedCommand = artifactoryArea.command({
   toolDescription:
     "Newer versions in the connection's npm, NuGet and Maven repositories for the direct production dependencies of an inventory from toil deps scan. Returns { outdated, uncheckedEcosystems, summary }; ecosystems with no repository configured are listed in uncheckedEcosystems.",
   input: z.object({
-    from: fromField,
+    inputFile: fromField,
     ecosystem: ecosystemField,
     major: z.boolean().optional().describe('Only show major version bumps'),
     minor: z.boolean().optional().describe('Only show minor version bumps or higher'),
@@ -142,19 +142,19 @@ export const outdatedCommand = artifactoryArea.command({
   writes: false,
   timeLimitMs: TIME_LIMIT_MS,
   options: [
-    { flags: '--from <file>', field: 'from', description: FROM_DESCRIPTION },
+    { flags: '--input-file <path>', field: 'inputFile', description: FROM_DESCRIPTION, deprecated: ['--from <file>'] },
     { flags: '--ecosystem <ecosystem>', field: 'ecosystem', description: ECOSYSTEM_DESCRIPTION },
     { flags: '--major', field: 'major', description: 'Only show major version bumps' },
     { flags: '--minor', field: 'minor', description: 'Only show minor version bumps or higher' },
     { flags: '--patch', field: 'patch', description: 'Only show patch version bumps or higher' },
   ],
   examples: [
-    { from: 'inventory.json' },
-    { from: 'inventory.json', ecosystem: 'npm', minor: true },
-    { from: 'inventory.json', major: true, patch: true },
+    { inputFile: 'inventory.json' },
+    { inputFile: 'inventory.json', ecosystem: 'npm', minor: true },
+    { inputFile: 'inventory.json', major: true, patch: true },
   ],
   run: async (input, ctx) => {
-    const packages = direct(await readInventory(ctx, input.from), input.ecosystem, false);
+    const packages = direct(await readInventory(ctx, input.inputFile), input.ecosystem, false);
     await requireReachable(ctx);
     const filterType = input.major ? 'major' : input.minor ? 'minor' : input.patch ? 'patch' : undefined;
     const order = { major: 3, minor: 2, patch: 1 };
@@ -185,20 +185,20 @@ export const licenseCheckCommand = artifactoryArea.command({
   toolDescription:
     "Licenses from the connection's npm and NuGet repositories for the direct dependencies of an inventory from toil deps scan. Returns { packages, summary }; license is null when unknown, and always null for Maven.",
   input: z.object({
-    from: fromField,
+    inputFile: fromField,
     ecosystem: ecosystemField,
     includeDev: z.boolean().optional().describe('Include dev/test dependencies (default: false)'),
   }),
   writes: false,
   timeLimitMs: TIME_LIMIT_MS,
   options: [
-    { flags: '--from <file>', field: 'from', description: FROM_DESCRIPTION },
+    { flags: '--input-file <path>', field: 'inputFile', description: FROM_DESCRIPTION, deprecated: ['--from <file>'] },
     { flags: '--ecosystem <ecosystem>', field: 'ecosystem', description: ECOSYSTEM_DESCRIPTION },
     { flags: '--include-dev', field: 'includeDev', description: 'Include dev/test dependencies (default: false)' },
   ],
-  examples: [{ from: 'inventory.json' }, { from: 'inventory.json', ecosystem: 'nuget', includeDev: true }],
+  examples: [{ inputFile: 'inventory.json' }, { inputFile: 'inventory.json', ecosystem: 'nuget', includeDev: true }],
   run: async (input, ctx) => {
-    const packages = direct(await readInventory(ctx, input.from), input.ecosystem, input.includeDev === true);
+    const packages = direct(await readInventory(ctx, input.inputFile), input.ecosystem, input.includeDev === true);
     await requireReachable(ctx);
     const licensed: Array<{ name: string; version: string; ecosystem: Ecosystem; source: string; license: string | null }> = [];
     for (const pkg of packages) {

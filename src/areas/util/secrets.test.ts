@@ -62,7 +62,7 @@ const at = (f: Finding) => `${f.file ?? '-'}:${f.line}:${f.column}`;
  */
 /**
  * Joins a planted token from pieces, so the token is never written whole in
- * this file: a host's push protection would otherwise stop it at the door,
+ * this inputFile: a host's push protection would otherwise stop it at the door,
  * correctly, for looking exactly like what it is impersonating.
  */
 const plant = (...parts: string[]) => parts.join('');
@@ -242,7 +242,7 @@ describe('util secrets scan: what it finds', () => {
     expect((run.envelope?.data as ScanData).findings).toHaveLength(1);
     expect(run.exitCode).toBe(1);
     const both = await scan({ text: 'x', diff: 'staged' });
-    expect(both.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'Pass one of file, text or diff.' });
+    expect(both.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'Pass one of inputFile, text or diff.' });
   });
 });
 
@@ -269,8 +269,8 @@ describe('util secrets scan: nothing it puts out holds a secret', () => {
   const files = { 'deploy/creds.txt': PLANTED_TEXT, 'deploy/more/creds.env': PLANTED_TEXT };
 
   const cases: Array<{ name: string; argv: string[]; mcp?: Record<string, unknown>; options?: TestContextOptions }> = [
-    { name: 'a file', argv: ['deploy/creds.txt'], mcp: { file: 'deploy/creds.txt' } },
-    { name: 'a folder', argv: ['deploy'], mcp: { file: 'deploy' } },
+    { name: 'a file', argv: ['deploy/creds.txt'], mcp: { inputFile: 'deploy/creds.txt' } },
+    { name: 'a folder', argv: ['deploy'], mcp: { inputFile: 'deploy' } },
     { name: 'text', argv: ['--text', PLANTED_TEXT], mcp: { text: PLANTED_TEXT } },
     { name: 'stdin', argv: ['-'], options: { stdin: PLANTED_TEXT } },
     { name: 'the staged diff', argv: ['--diff', 'staged'], mcp: { diff: 'staged' } },
@@ -365,7 +365,7 @@ describe('util secrets scan: the self-checks catch a broken result', () => {
         })();
       },
     };
-    const envelope = await execute(secretsScanCommand, { file: 'app.env' }, { ...context, files: changing } as Context);
+    const envelope = await execute(secretsScanCommand, { inputFile: 'app.env' }, { ...context, files: changing } as Context);
     const data = envelope.data as ScanData;
     expect(data.verified.checks.find((c) => c.check === 'finding.reread')).toMatchObject({ status: 'failed', failures: [{ at: 'app.env:1:10', expected: 'name-value at column 10', actual: 'different characters' }] });
   });
@@ -374,7 +374,7 @@ describe('util secrets scan: the self-checks catch a broken result', () => {
     const { context } = ctxOf({ files: { 'app.env': 'LOG_LEVEL=info\n' } });
     const real = context.files;
     const short: FileAccess = { ...real, stat: (path) => ({ ...real.stat(path), size: 999 }) };
-    const envelope = await execute(secretsScanCommand, { file: 'app.env' }, { ...context, files: short } as Context);
+    const envelope = await execute(secretsScanCommand, { inputFile: 'app.env' }, { ...context, files: short } as Context);
     expect((envelope.data as ScanData).verified).toMatchObject({ passed: false });
     expect(envelope.meta.warnings).toContainEqual(expect.objectContaining({ code: 'INPUT_INCOMPLETE' }));
   });
@@ -393,7 +393,7 @@ describe("util secrets scan: what it can't read is listed", () => {
         return real.readStream(path, options);
       },
     };
-    const envelope = await execute(secretsScanCommand, { file: 'w' }, { ...context, files } as Context);
+    const envelope = await execute(secretsScanCommand, { inputFile: 'w' }, { ...context, files } as Context);
     const data = envelope.data as ScanData;
     expect(data.unreadable.map((u) => [u.file, u.reason])).toEqual([
       ['w/big.log', 'too-large'],
@@ -407,19 +407,19 @@ describe("util secrets scan: what it can't read is listed", () => {
   });
 
   it('skips only the bad line of a .gitignore, so the rest still keeps files out, and says so in meta.warnings (#262)', async () => {
-    const { envelope, data } = await scan({ file: 'w' }, { files: { 'w/.gitignore': '*.log\n[b-a]\n', 'w/debug.log': 'password=Pl4ntedPassw0rd\n', 'w/a.env': 'password=Pl4ntedPassw0rd\n' } });
+    const { envelope, data } = await scan({ inputFile: 'w' }, { files: { 'w/.gitignore': '*.log\n[b-a]\n', 'w/debug.log': 'password=Pl4ntedPassw0rd\n', 'w/a.env': 'password=Pl4ntedPassw0rd\n' } });
     expect(data.findings.map(at)).toEqual(['w/a.env:1:10']);
     expect(envelope.meta.warnings).toContainEqual({ code: 'GITIGNORE_LINE_SKIPPED', message: expect.stringContaining('Line 2 of /work/w/.gitignore ("[b-a]")') });
   });
 
   it('a single file named on the call that is binary fails the call, as any util command would', async () => {
-    const { envelope } = await scan({ file: 'logo.png' }, { files: { 'logo.png': new Uint8Array([1, 0, 2]) } });
+    const { envelope } = await scan({ inputFile: 'logo.png' }, { files: { 'logo.png': new Uint8Array([1, 0, 2]) } });
     expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', fix: 'Pass a text file.' });
   });
 
   it('lists a line too long to scan whole, and still scans its start', async () => {
     const long = `password=Pl4ntedPassw0rd ${'a'.repeat(4 * 1024 * 1024)}`;
-    const { data } = await scan({ file: 'min.js' }, { files: { 'min.js': `${long}\n` } });
+    const { data } = await scan({ inputFile: 'min.js' }, { files: { 'min.js': `${long}\n` } });
     expect(data.unreadable).toEqual([expect.objectContaining({ file: 'min.js', line: 1, reason: 'line-too-long' })]);
     expect(data.findings.map((f) => f.rule)).toContain('name-value');
   });
@@ -454,11 +454,11 @@ describe('util secrets scan: the allow file', () => {
     try {
       writeFileSync(join(home, 'app.env'), 'password=Pl4ntedPassw0rd\n');
       const ctx = createNodeContext({ globals: { workspace: home }, def: secretsScanCommand, signal: new AbortController().signal, env: {}, cwd: home, home, areas: [], version: '0.0.0-test', stderr: () => {}, stdin: false });
-      const envelope = await execute(secretsScanCommand, { file: 'app.env' }, ctx);
+      const envelope = await execute(secretsScanCommand, { inputFile: 'app.env' }, ctx);
       expect(envelope.ok, JSON.stringify(envelope.error)).toBe(true);
       expect(envelope.data).toMatchObject({ allowList: null, summary: { findings: 1 } });
       // Named outright, the same file is refused by the bound, loudly.
-      const named = await execute(secretsScanCommand, { file: 'app.env', allowFile: '.toil/secrets-allow' }, ctx);
+      const named = await execute(secretsScanCommand, { inputFile: 'app.env', allowFile: '.toil/secrets-allow' }, ctx);
       expect(named.ok).toBe(false);
     } finally {
       rmSync(home, { recursive: true, force: true });
@@ -475,14 +475,14 @@ describe('util secrets scan: the allow file', () => {
       writeFileSync(join(root, 'build', 'app.env'), 'password=Pl4ntedPassw0rd\n');
       const home = join(root, 'home');
       const ctx = createNodeContext({ globals: { workspace: root }, def: secretsScanCommand, signal: new AbortController().signal, env: {}, cwd: root, home, areas: [], version: '0.0.0-test', stderr: () => {}, stdin: false });
-      const envelope = await execute(secretsScanCommand, { file: 'build' }, ctx);
+      const envelope = await execute(secretsScanCommand, { inputFile: 'build' }, ctx);
       expect(envelope.ok, JSON.stringify(envelope.error)).toBe(true);
       expect(envelope.data).toMatchObject({ findings: [], summary: { files: 0 } });
       expect(envelope.meta.warnings).toEqual([
         { code: 'SECRETS_NOTHING_SCANNED', message: expect.stringMatching(/^0 files were scanned, because \.gitignore excludes this folder: .*build is inside build\/, which \.gitignore excludes, so nothing under it is listed\./) },
       ]);
       // Named outright, the file is scanned.
-      const named = await execute(secretsScanCommand, { file: 'build/app.env' }, ctx);
+      const named = await execute(secretsScanCommand, { inputFile: 'build/app.env' }, ctx);
       expect(named.data).toMatchObject({ summary: { files: 1, findings: 1 } });
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -503,8 +503,8 @@ describe('util secrets scan: the allow file', () => {
 
   it('the sample allow file names every secret in the samples, so the parity examples exit 0', async () => {
     const git = gitOf(canned);
-    for (const input of [{ file: 'samples/secrets', allowFile: 'samples/secrets-allow' }, { diff: 'staged', allowFile: 'samples/secrets-allow' }]) {
-      const run = await runCli(['util', 'secrets', 'scan', ...(input.file ? [input.file] : ['--diff', 'staged']), '--allow-file', 'samples/secrets-allow'], { commands, context: ctxOf({ files: samples, git }).context });
+    for (const input of [{ inputFile: 'samples/secrets', allowFile: 'samples/secrets-allow' }, { diff: 'staged', allowFile: 'samples/secrets-allow' }]) {
+      const run = await runCli(['util', 'secrets', 'scan', ...(input.inputFile ? ['--input-file', input.inputFile] : ['--diff', 'staged']), '--allow-file', 'samples/secrets-allow'], { commands, context: ctxOf({ files: samples, git }).context });
       const data = run.envelope?.data as ScanData;
       expect(data.findings, JSON.stringify(data.findings)).toEqual([]);
       expect(data.allowed.length).toBeGreaterThan(0);

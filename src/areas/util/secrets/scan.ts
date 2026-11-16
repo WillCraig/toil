@@ -63,7 +63,7 @@ export interface Unreadable {
 }
 
 export interface ScanOptions {
-  file?: string | undefined;
+  inputFile?: string | undefined;
   text?: string | undefined;
   diff?: DiffKind | undefined;
   allowFile?: string | undefined;
@@ -427,7 +427,7 @@ async function scanFile(scan: Scan, path: string): Promise<void> {
       scan.cantRead({ file: path, reason: 'too-large', message: `${path} is ${stat.size} bytes, more than the ${DEFAULT_MAX_BYTES} this command reads from one file.` });
       return;
     }
-    const input = await openInput(ctx, { file: path }, { maxLineLength: MAX_LINE });
+    const input = await openInput(ctx, { inputFile: path }, { maxLineLength: MAX_LINE });
     const fileScan = scan.fileScan(path);
     for await (const line of input.lines()) scanLine(scan, fileScan, path, line);
     scan.v.inputComplete(input);
@@ -445,7 +445,7 @@ function scanLine(scan: Scan, fileScan: FileScan, file: string | null, line: Inp
 }
 
 /** stdin or text: one input, through the kit, re-read from what it holds. */
-async function scanOne(scan: Scan, fields: { file?: string | undefined; text?: string | undefined }): Promise<void> {
+async function scanOne(scan: Scan, fields: { inputFile?: string | undefined; text?: string | undefined }): Promise<void> {
   const input = await openInput(scan.ctx, fields, { maxLineLength: MAX_LINE });
   const fileScan = scan.fileScan(null);
   for await (const line of input.lines()) scanLine(scan, fileScan, null, line);
@@ -583,7 +583,7 @@ async function scanDiff(scan: Scan, kind: DiffKind): Promise<void> {
             const shown = await runGit(ctx, { subcommand: 'show', revisions: [`:./${file.path}`] });
             return shown.exitCode === 0 ? splitLines(shown.stdout) : new Map();
           }
-        : async (lines) => (await openInput(ctx, { file: file.path }, { maxLineLength: MAX_LINE })).linesAt(lines);
+        : async (lines) => (await openInput(ctx, { inputFile: file.path }, { maxLineLength: MAX_LINE })).linesAt(lines);
     scan.done(fileScan, file.path, reread);
   }
   await warnPartialDiff(scan, kind);
@@ -660,7 +660,7 @@ async function readAllowList(ctx: Ctx, named: string | undefined): Promise<Allow
     }
     if (!present) return null;
   }
-  const input = await openInput(ctx, { file });
+  const input = await openInput(ctx, { inputFile: file });
   const fingerprints = new Set<string>();
   let entries = 0;
   const invalid: number[] = [];
@@ -696,9 +696,9 @@ const output = (h: Held): Finding => ({
 });
 
 export async function scanSecrets(input: ScanOptions, ctx: Ctx): Promise<ScanData> {
-  const given = [input.file !== undefined, input.text !== undefined, input.diff !== undefined].filter(Boolean).length;
+  const given = [input.inputFile !== undefined, input.text !== undefined, input.diff !== undefined].filter(Boolean).length;
   if (given > 1) {
-    throw new ToilError('INVALID_INPUT', 'Pass one of file, text or diff.', { fix: 'file names a file or folder in the workspace, text is the content itself, and diff scans the repository\'s staged or working-tree changes.' });
+    throw new ToilError('INVALID_INPUT', 'Pass one of inputFile, text or diff.', { fix: 'inputFile (--input-file) names a file or folder in the workspace, text is the content itself, and diff scans the repository\'s staged or working-tree changes.' });
   }
   const allow = await readAllowList(ctx, input.allowFile);
   const scan = new Scan(ctx, input.mask ?? maskSecret);
@@ -709,16 +709,16 @@ export async function scanSecrets(input: ScanOptions, ctx: Ctx): Promise<ScanDat
   } else if (input.text !== undefined) {
     source = { kind: 'text', path: null };
     await scanOne(scan, { text: input.text });
-  } else if (input.file === undefined || input.file === '-') {
+  } else if (input.inputFile === undefined || input.inputFile === '-') {
     source = { kind: 'stdin', path: null };
-    await scanOne(scan, input.file === undefined ? {} : { file: '-' });
-  } else if (ctx.files.stat(input.file).type === 'directory') {
-    source = { kind: 'folder', path: input.file };
-    await scanFolder(scan, input.file);
+    await scanOne(scan, input.inputFile === undefined ? {} : { inputFile: '-' });
+  } else if (ctx.files.stat(input.inputFile).type === 'directory') {
+    source = { kind: 'folder', path: input.inputFile };
+    await scanFolder(scan, input.inputFile);
   } else {
-    source = { kind: 'file', path: input.file };
+    source = { kind: 'file', path: input.inputFile };
     const before = scan.unreadable.length;
-    await scanFile(scan, input.file);
+    await scanFile(scan, input.inputFile);
     // One file named on the call that can't be read is the call's failure, not a list entry.
     const failed = scan.unreadable.slice(before).find((u) => u.reason !== 'line-too-long');
     if (failed) throw new ToilError('INVALID_INPUT', failed.message, { fix: failed.reason === 'binary' ? 'Pass a text file.' : 'Check the path, and that the file can be read.' });

@@ -6,7 +6,7 @@
     "writes": false,
     "connection": true,
     "flags": [
-      "--from <file>",
+      "--input-file <path>",
       "--ecosystem <ecosystem>",
       "--direct-only",
       "--include-dev"

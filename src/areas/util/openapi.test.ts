@@ -43,7 +43,7 @@ describe('util openapi list', () => {
     [GITHUB, 'openapi-3.1', '3.1.0', 'yaml', 5, ['https://api.github.com']],
     [BITBUCKET, 'swagger-2.0', '2.0', 'json', 4, ['https://api.bitbucket.org/2.0']],
   ])('lists every operation in %s and validates it against its version', async (file, spec, version, format, count, servers) => {
-    const { envelope, data } = await run(openapiListCommand, { file });
+    const { envelope, data } = await run(openapiListCommand, { inputFile: file });
     expect(envelope.ok).toBe(true);
     expect(data.document).toMatchObject({ spec, version, format, valid: true, problems: [], problemCount: 0, servers, operations: count });
     expect(data.document.refs.broken).toEqual([]);
@@ -55,11 +55,11 @@ describe('util openapi list', () => {
   });
 
   it('shows method, path, operationId, summary and tags, filtered by tag or by part of the path', async () => {
-    const { data } = await run(openapiListCommand, { file: JIRA });
+    const { data } = await run(openapiListCommand, { inputFile: JIRA });
     expect(data.operations[0]).toEqual({ method: 'GET', path: '/rest/api/2/issue/{issueIdOrKey}', operationId: 'getIssue', summary: 'Get issue', tags: ['Issues'], deprecated: false });
-    const pulls = await run(openapiListCommand, { file: GITHUB, tag: 'PULLS' });
+    const pulls = await run(openapiListCommand, { inputFile: GITHUB, tag: 'PULLS' });
     expect(pulls.data.operations.map((o: Data) => o.operationId)).toEqual(['pulls/list', 'pulls/create', 'pulls/get']);
-    const bb = await run(openapiListCommand, { file: BITBUCKET, path: 'pullrequests' });
+    const bb = await run(openapiListCommand, { inputFile: BITBUCKET, path: 'pullrequests' });
     expect(bb.data.operations.map((o: Data) => `${o.method} ${o.path}`)).toEqual([
       'GET /repositories/{workspace}/{repo_slug}/pullrequests',
       'POST /repositories/{workspace}/{repo_slug}/pullrequests',
@@ -69,7 +69,7 @@ describe('util openapi list', () => {
   });
 
   it('reports the loops among references once, without following them', async () => {
-    const { data } = await run(openapiListCommand, { file: BITBUCKET });
+    const { data } = await run(openapiListCommand, { inputFile: BITBUCKET });
     expect(data.document.refs.circular).toContainEqual(['#/definitions/branch', '#/definitions/commit', '#/definitions/ref', '#/definitions/repository']);
   });
 
@@ -211,7 +211,7 @@ describe('util openapi list', () => {
 
 describe('util openapi show', () => {
   it("lays out Jira's createIssue: each parameter and where it goes, the body with refs expanded, and the jira api call", async () => {
-    const { data } = await run(openapiShowCommand, { file: JIRA, operation: 'createIssue' });
+    const { data } = await run(openapiShowCommand, { inputFile: JIRA, operation: 'createIssue' });
     expect(data.operation).toMatchObject({ method: 'POST', path: '/rest/api/2/issue', operationId: 'createIssue', pointer: '/paths/~1rest~1api~12~1issue/post' });
     expect(data.parameters).toEqual([expect.objectContaining({ name: 'updateHistory', in: 'query', required: false, schema: { default: false, type: 'boolean' } })]);
     expect(data.requestBody).toMatchObject({ required: true, contentType: 'application/json', schemaPointer: '/paths/~1rest~1api~12~1issue/post/requestBody/content/application~1json/schema' });
@@ -233,23 +233,23 @@ describe('util openapi show', () => {
   });
 
   it('names an operation by method and path, a leading slash optional, and puts path parameters in the call', async () => {
-    const { data } = await run(openapiShowCommand, { file: JIRA, method: 'get', path: 'rest/api/2/issue/{issueIdOrKey}' });
+    const { data } = await run(openapiShowCommand, { inputFile: JIRA, method: 'get', path: 'rest/api/2/issue/{issueIdOrKey}' });
     expect(data.operation.operationId).toBe('getIssue');
     expect(data.parameters.find((p: Data) => p.name === 'issueIdOrKey')).toMatchObject({ in: 'path', required: true, schema: { type: 'string' } });
     expect(data.call).toMatchObject({ method: 'GET', path: '/rest/api/2/issue/{issueIdOrKey}', pathParameters: ['issueIdOrKey'], bodyFile: null, writes: false, cli: 'toil <area> api GET /rest/api/2/issue/{issueIdOrKey}' });
   });
 
   it('expands $refs to the depth asked for and says why each one left in place stopped', async () => {
-    const shallow = await run(openapiShowCommand, { file: GITHUB, method: 'GET', path: '/repos/{owner}/{repo}/pulls', depth: 0 });
+    const shallow = await run(openapiShowCommand, { inputFile: GITHUB, method: 'GET', path: '/repos/{owner}/{repo}/pulls', depth: 0 });
     expect(shallow.data.parameters[0]).toMatchObject({ name: 'owner', in: 'path', schema: { type: 'string' } });
     expect(shallow.data.responses[0].schema.items).toEqual({ $ref: '#/components/schemas/pull-request-simple', 'x-toil-stop': 'depth' });
     expect(shallow.data.expansion).toMatchObject({ depth: 0, stopped: { depth: 2, circular: 0 } });
-    const deeper = await run(openapiShowCommand, { file: GITHUB, method: 'GET', path: '/repos/{owner}/{repo}/pulls', depth: 2 });
+    const deeper = await run(openapiShowCommand, { inputFile: GITHUB, method: 'GET', path: '/repos/{owner}/{repo}/pulls', depth: 2 });
     expect(deeper.data.responses[0].schema.items['x-toil-ref']).toBe('#/components/schemas/pull-request-simple');
   });
 
   it('stops at a loop with x-toil-stop circular, whatever the depth', async () => {
-    const { data } = await run(openapiShowCommand, { file: BITBUCKET, method: 'GET', path: '/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}', depth: 20 });
+    const { data } = await run(openapiShowCommand, { inputFile: BITBUCKET, method: 'GET', path: '/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}', depth: 20 });
     expect(data.expansion.stopped.circular).toBeGreaterThan(0);
     expect(JSON.stringify(data.responses)).toContain('"x-toil-stop":"circular"');
   });
@@ -300,7 +300,7 @@ describe('util openapi show', () => {
   });
 
   it("turns Swagger 2.0's body parameter into a request body and puts basePath in the call's path", async () => {
-    const { data } = await run(openapiShowCommand, { file: BITBUCKET, method: 'POST', path: '/repositories/{workspace}/{repo_slug}/pullrequests' });
+    const { data } = await run(openapiShowCommand, { inputFile: BITBUCKET, method: 'POST', path: '/repositories/{workspace}/{repo_slug}/pullrequests' });
     expect(data.parameters.map((p: Data) => `${p.in} ${p.name}`)).toEqual(['path repo_slug', 'path workspace']);
     expect(data.requestBody).toMatchObject({ required: false, contentTypes: ['application/json'], contentType: 'application/json', schemaPointer: expect.stringMatching(/\/parameters\/0\/schema$/) });
     expect(data.call).toMatchObject({ path: '/2.0/repositories/{workspace}/{repo_slug}/pullrequests', pathParameters: ['repo_slug', 'workspace'], cli: 'toil <area> api POST /2.0/repositories/{workspace}/{repo_slug}/pullrequests --body-file body.json --allow-write' });
@@ -324,7 +324,7 @@ describe('util openapi show', () => {
     [{}, /^Name the operation/, /util openapi list/],
     [{ operation: 'createIssue', method: 'POST' }, /not both\.$/, /--operation/],
   ])('refuses %o with a fix', async (select, message, fix) => {
-    const { envelope } = await run(openapiShowCommand, { file: JIRA, ...select });
+    const { envelope } = await run(openapiShowCommand, { inputFile: JIRA, ...select });
     expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringMatching(message), fix: expect.stringMatching(fix) });
   });
 });
@@ -341,10 +341,10 @@ function diamondOfConsts(): Data {
 
 describe('util openapi example', () => {
   it.each([
-    [{ file: JIRA, operation: 'createIssue' }, {}],
-    [{ file: JIRA, operation: 'addComment' }, {}],
-    [{ file: GITHUB, operation: 'pulls/create' }, { head: 'string', base: 'string' }],
-    [{ file: GITHUB, operation: 'issues/create-comment' }, { body: 'string' }],
+    [{ inputFile: JIRA, operation: 'createIssue' }, {}],
+    [{ inputFile: JIRA, operation: 'addComment' }, {}],
+    [{ inputFile: GITHUB, operation: 'pulls/create' }, { head: 'string', base: 'string' }],
+    [{ inputFile: GITHUB, operation: 'issues/create-comment' }, { body: 'string' }],
     [{ text: EXAMPLE_TEXT, operation: 'createOrder' }, { sku: 'AAA-0', quantity: 1 }],
   ])('builds the minimal request body for %o and validates it against its schema', async (input, example) => {
     const { data } = await run(openapiExampleCommand, input);
@@ -359,7 +359,7 @@ describe('util openapi example', () => {
     [GITHUB, (o: Data) => o.operationId, '200', 'pulls/get'],
     [GITHUB, (o: Data) => o.operationId, '200', 'users/get-authenticated'],
   ])('builds a valid response body in %s', async (file, _id, response, operation) => {
-    const { data } = await run(openapiExampleCommand, { file, operation, response });
+    const { data } = await run(openapiExampleCommand, { inputFile: file, operation, response });
     expect(data).toMatchObject({ body: 'response', status: response });
     expect(check(data, 'example.valid')).toMatchObject({ status: 'passed' });
   });
@@ -371,7 +371,7 @@ describe('util openapi example', () => {
       ['GET', '/repositories/{workspace}/{repo_slug}/pullrequests', '200'],
       ['GET', '/user', '200'],
     ]) {
-      const { data } = await run(openapiExampleCommand, { file: BITBUCKET, method, path, ...(response ? { response } : {}) });
+      const { data } = await run(openapiExampleCommand, { inputFile: BITBUCKET, method, path, ...(response ? { response } : {}) });
       expect(check(data, 'example.valid'), `${method} ${path} ${response}`).toMatchObject({ status: 'passed' });
     }
   });
@@ -492,13 +492,13 @@ describe('util openapi example', () => {
   });
 
   it('refuses an operation with no request body, a status it lacks, and a content type it does not list', async () => {
-    const none = await run(openapiExampleCommand, { file: JIRA, operation: 'getIssue' });
+    const none = await run(openapiExampleCommand, { inputFile: JIRA, operation: 'getIssue' });
     expect(none.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'GET /rest/api/2/issue/{issueIdOrKey} has no request body.' });
-    const status = await run(openapiExampleCommand, { file: JIRA, operation: 'getIssue', response: '418' });
+    const status = await run(openapiExampleCommand, { inputFile: JIRA, operation: 'getIssue', response: '418' });
     expect(status.envelope.error).toMatchObject({ code: 'INVALID_INPUT', fix: 'Its responses are: 200, 401, 404.' });
-    const type = await run(openapiExampleCommand, { file: JIRA, operation: 'createIssue', contentType: 'text/csv' });
+    const type = await run(openapiExampleCommand, { inputFile: JIRA, operation: 'createIssue', contentType: 'text/csv' });
     expect(type.envelope.error).toMatchObject({ code: 'INVALID_INPUT', fix: 'It lists: application/json.' });
-    const empty = await run(openapiExampleCommand, { file: JIRA, operation: 'getIssue', response: '401' });
+    const empty = await run(openapiExampleCommand, { inputFile: JIRA, operation: 'getIssue', response: '401' });
     expect(empty.envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('has no schema') });
   });
 });

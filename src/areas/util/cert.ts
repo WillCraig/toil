@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineCommand } from '../../core/command.js';
-import { fileArgument, inputFields, openInput, textOption } from './kit/input.js';
+import { fileArgument, inputFields, openInput, inputFileOption, textOption } from './kit/input.js';
 
 /**
  * `util cert`: decodes a certificate or a chain bundle, PEM or DER, and checks
@@ -40,8 +40,8 @@ export const certCommand = defineCommand({
   }),
   writes: false,
   args: [fileArgument],
-  options: [textOption, { flags: '--host <host>', field: 'host', description: 'A host name or IP address: does the first certificate cover it?' }],
-  examples: [{ file: EXAMPLE_CHAIN }, { file: EXAMPLE_CHAIN, host: 'api.imagile.dev' }, { file: 'certs/leaf.der', host: 'imagile.dev' }, { text: EXAMPLE_PEM, host: 'example.imagile.dev' }],
+  options: [inputFileOption, textOption, { flags: '--host <host>', field: 'host', description: 'A host name or IP address: does the first certificate cover it?' }],
+  examples: [{ inputFile: EXAMPLE_CHAIN }, { inputFile: EXAMPLE_CHAIN, host: 'api.imagile.dev' }, { inputFile: 'certs/leaf.der', host: 'imagile.dev' }, { text: EXAMPLE_PEM, host: 'example.imagile.dev' }],
   run: async (input, ctx) => {
     const { decodeCertInput } = await import('./cert/decode.js');
     const opened = await openInput(ctx, input, { binary: 'allow', utf8: 'skip' });

@@ -321,7 +321,7 @@ describe('work items', () => {
 
 describe('attachments', () => {
   it('add-attachment uploads the bytes as octet-stream, then links the returned URL', async () => {
-    const { calls, data } = await run('work-item attach', { ...W, id: '42', file: 'logs/run.txt', comment: 'c' });
+    const { calls, data } = await run('work-item attach', { ...W, id: '42', inputFile: 'logs/run.txt', comment: 'c' });
     expect(calls[0]).toMatchObject({ method: 'POST', url: `${ADO}${COLL}/_apis/wit/attachments?fileName=run.txt&api-version=7.1` });
     expect(calls[0]!.headers['content-type']).toBe('application/octet-stream');
     expect(calls[0]!.body).toBe('log line\n');
@@ -446,7 +446,7 @@ describe('pull requests', () => {
   });
 
   it('add-inline-comment sends the path as given and any side but left as right (#69 item 23)', async () => {
-    const { calls } = await run('pr comment-inline', { ...W, id: '42', file: 'src/a.ts', line: '3', body: 'b', lineType: 'LEFT' });
+    const { calls } = await run('pr comment-inline', { ...W, id: '42', path: 'src/a.ts', line: '3', body: 'b', lineType: 'LEFT' });
     expect(body(calls[0]!)).toEqual({ comments: [{ content: 'b', commentType: 'text' }], status: 'active', threadContext: { filePath: 'src/a.ts', rightFileStart: { line: 3, offset: 1 }, rightFileEnd: { line: 3, offset: 1 } } });
   });
 

@@ -5,7 +5,7 @@ import { STDIN_OVER_MCP, type FileAccess } from './files.js';
 /**
  * Reading a dependency inventory that `toil deps scan` wrote, for the
  * commands that check one against a source (`artifactory package outdated`, `osv
- * vulns`, `sonatypeiq evaluate`): `--from <file>`, or stdin when it's left
+ * vulns`, `sonatypeiq evaluate`): `--input-file <path>`, or stdin when it's left
  * out (`toil deps scan | toil osv vulns`). They read an inventory; none of
  * them scans a repository itself (principle 3). One reader, so every source
  * accepts the same three shapes and refuses a bad one in the same words. An
@@ -22,7 +22,7 @@ export const inventoryPackage = z.object({
 });
 export type InventoryPackage = z.output<typeof inventoryPackage>;
 
-/** The `--from` field and flag description every inventory reader shares. */
+/** The `--input-file` field and flag description every inventory reader shares. */
 export const INVENTORY_FROM_DESCRIPTION =
   'Inventory to check: a file holding toil deps scan output (its envelope, its data, or a list of packages). Omitted, it is read from stdin on the CLI';
 
@@ -59,13 +59,13 @@ export async function readInventory(ctx: { files: FileAccess }, from: string | u
     text = await ctx.files.readText(from ?? '-');
   } catch (err) {
     if (err === STDIN_OVER_MCP && from === undefined) {
-      throw new ToilError('INVALID_INPUT', `No inventory to ${options.verb ?? 'check'}: pass from, ${options.holds ?? 'a file holding toil deps scan output'}. Over MCP there is no stdin to read it from.`, {
-        fix: options.missingFix ?? 'Write toil deps scan output to a file in the workspace, then pass its path as from.',
+      throw new ToilError('INVALID_INPUT', `No inventory to ${options.verb ?? 'check'}: pass inputFile, ${options.holds ?? 'a file holding toil deps scan output'}. Over MCP there is no stdin to read it from.`, {
+        fix: options.missingFix ?? 'Write toil deps scan output to a file in the workspace, then pass its path as inputFile.',
       });
     }
     throw err;
   }
-  const fix = options.fix ?? `Pass the output of toil deps scan, e.g. toil deps scan | ${options.pipeTo ?? 'toil <command>'}, or --from <file> holding it.`;
+  const fix = options.fix ?? `Pass the output of toil deps scan, e.g. toil deps scan | ${options.pipeTo ?? 'toil <command>'}, or --input-file <path> holding it.`;
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);

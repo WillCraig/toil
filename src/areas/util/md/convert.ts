@@ -44,7 +44,7 @@ export const MD_LIMITS = { timeoutMs: 10_000, maxMemoryMb: 1_024 } as const;
 const MD_FIX = 'Pass a smaller document, or one with less deeply nested quotes, lists and emphasis.';
 
 export interface MdInput {
-  file?: string | undefined;
+  inputFile?: string | undefined;
   text?: string | undefined;
   from?: Format | undefined;
   to?: Format | undefined;

@@ -684,7 +684,7 @@ files directly:
     by a `host` selector taken from that connection's `baseUrl`, and `path` entries,
     which are machine-specific, are dropped. toil writes the file and stops; it never
     stages or commits. Committing is the agent's or user's own git workflow.
-  - `toil projects export <name> --file <path>` writes a single file, for any other kind
+  - `toil projects export <name> --out <path>` writes a single file, for any other kind
     of sharing.
   - `toil projects import <file|dir> [--name <new>]` copies a toil project into your own
     folder, so you can adapt it. That's adoption: your copy wins wherever the original
@@ -695,7 +695,7 @@ files directly:
 - **Where export may write.** Exports are bounded, because over MCP an agent chooses
   the path (`projects.write` and `projects.replace` in `docs/bounds.md`):
   - `--repo` must be a git root, found the way **Reading git without git** finds one.
-  - `--file` must end in `.json`, and may not be inside `~/.toil/` unless it's under
+  - `--out` must end in `.json`, and may not be inside `~/.toil/` unless it's under
     `~/.toil/projects/`, so an export can never replace the config. It must also be
     inside the workspace or a toil project folder, as every other file a command writes is.
   - Neither overwrites a file that isn't already a valid toil project. Replacing an

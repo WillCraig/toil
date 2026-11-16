@@ -29,7 +29,7 @@ const projectActions = [
   { action: 'Create: an environment', cmd: 'toil projects env <name> <env> <area> --connection <connection>', then: '' },
   { action: 'Review', cmd: 'toil projects check <name>', then: 'and toil <area> check-toil-project' },
   { action: 'Remove a section', cmd: 'toil projects unlink <name> --area <area>', then: 'after you type the area' },
-  { action: 'Export', cmd: 'toil projects export <name> --repo <dir>', then: 'or --file <path>' },
+  { action: 'Export', cmd: 'toil projects export <name> --repo <dir>', then: 'or --out <path>' },
   { action: 'Import', cmd: 'toil projects import <file>', then: 'after toil projects check <file>' },
   { action: 'Delete', cmd: 'toil projects remove <name>', then: 'after you type the name' },
 ];

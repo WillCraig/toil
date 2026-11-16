@@ -55,7 +55,7 @@ const data = <T>(e: Envelope) => {
 
 describe('toil projects brief', () => {
   it('briefs from a file, and says what it read the toil project as', async () => {
-    const b = data<{ toilProject: unknown; recommendation: { text: string }; reasons: Array<{ lens: string }> }>(await cli(disk(), ['projects', 'brief', 'payments', '--file', 'brief.json', '--as-of', '2026-10-14T08:00:00Z']));
+    const b = data<{ toilProject: unknown; recommendation: { text: string }; reasons: Array<{ lens: string }> }>(await cli(disk(), ['projects', 'brief', 'payments', '--input-file', 'brief.json', '--as-of', '2026-10-14T08:00:00Z']));
     expect(b.toilProject).toMatchObject({ name: 'payments', source: 'user', adopted: true });
     expect(b.recommendation.text).toBe('Fix the failing checks on [[corp-jira:PAY-101]] first: it holds up 1 item (3 points).');
     expect(b.reasons.map((r) => r.lens)).toEqual(['failing', 'blocked']);
@@ -86,7 +86,7 @@ describe('toil projects analyze', () => {
     expect(shown.lenses.slice(0, 3).map((l) => [l.id, l.on, l.threshold])).toEqual([['blocked', true, null], ['failing', true, 48], ['stale', false, 5]]);
     expect(shown.lenses.map((l) => l.id)).toEqual(['blocked', 'failing', 'stale', 'waiting', 'sprint', 'load', 'drift', 'ready']);
 
-    const b = data<{ reasons: Array<{ lens: string }> }>(await cli(d, ['projects', 'brief', 'payments', '--file', 'brief.json', '--as-of', '2026-10-14T08:00:00Z']));
+    const b = data<{ reasons: Array<{ lens: string }> }>(await cli(d, ['projects', 'brief', 'payments', '--input-file', 'brief.json', '--as-of', '2026-10-14T08:00:00Z']));
     expect(b.reasons.map((r) => r.lens)).toEqual(['blocked']);
   });
 

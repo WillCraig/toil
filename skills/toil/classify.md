@@ -77,8 +77,8 @@ None needs `--allow-write`: they write local files, never a service.
 | `toil classify scheme list` | `--cwd` | Every scheme visible by name, each from its highest place, with its categories |
 | `toil classify scheme show [name]` | `--toil-project`, `--cwd` | One scheme in full, and where it was found; `[name]` is a name or a file, or leave it out with `--toil-project` for the scheme that toil project uses (a path beside the toil project file included) |
 | `toil classify scheme init <name>` | `--from`, `--cwd` | Create `~/.toil/classify/<name>.json` as a copy of `--from` (default `ktlo-feature`), revision 1; refuses a name you have |
-| `toil classify scheme export <name>` | `--repo`, `--file`, `--replace`, `--cwd` | Write `<repo>/.toil/classify/<name>.json`, or one `.json` file; never stages or commits |
-| `toil classify scheme set [name]` | `--from`, `--toil-project`, `--cwd` | Replace a scheme with a revised file, setting the revision to the current one plus 1; with `--toil-project` and no name, the scheme that toil project uses, rewritten where it lives. CLI only |
+| `toil classify scheme export <name>` | `--repo`, `--out`, `--replace`, `--cwd` | Write `<repo>/.toil/classify/<name>.json`, or one `.json` file; never stages or commits |
+| `toil classify scheme set [name]` | `--input-file`, `--toil-project`, `--cwd` | Replace a scheme with a revised file, setting the revision to the current one plus 1; with `--toil-project` and no name, the scheme that toil project uses, rewritten where it lives. CLI only |
 | `toil classify scheme import <file>` | `--name`, `--replace`, `--cwd` | Copy a scheme file into your own folder to adapt it. CLI only |
 
 - `set` writes the scheme where it lives: your folder, the repository's working-tree file
@@ -88,7 +88,7 @@ None needs `--allow-write`: they write local files, never a service.
   `changes` lists the categories and rules added, removed or changed, and whether
   guidance, examples, signals or labels changed.
 - `export` refuses to replace anything that isn't already a scheme, and a scheme without
-  `--replace`; `--repo` must be a git working tree's root and `--file` must be inside the
+  `--replace`; `--repo` must be a git working tree's root and `--out` must be inside the
   workspace.
 - A scheme file that can't be read is `CONFIG_INVALID` naming the file and key path;
   `list` reports it as a warning and carries on.
@@ -106,14 +106,14 @@ toil jira issue search --jql "project = PAY AND statusCategory != Done" --fields
 
 | Command | Flags | What it does |
 |---------|-------|--------------|
-| `toil classify run` | `--file`, `--text`, `--toil-project`, `--cwd`, `--scheme`, `--recheck`, `--record`, `--verdicts` | One verdict per item, the summary, and the plan `categorize` applies; `--record` also keeps the verdicts in the ledger |
-| `toil classify prompt` | `--file`, `--text`, `--toil-project`, `--cwd`, `--scheme`, `--recheck`, `--limit` | The prompt that asks the AI agent about the items `run` left `unsure` |
+| `toil classify run` | `--input-file`, `--text`, `--toil-project`, `--cwd`, `--scheme`, `--recheck`, `--record`, `--verdicts-file` | One verdict per item, the summary, and the plan `categorize` applies; `--record` also keeps the verdicts in the ledger |
+| `toil classify prompt` | `--input-file`, `--text`, `--toil-project`, `--cwd`, `--scheme`, `--recheck`, `--limit` | The prompt that asks the AI agent about the items `run` left `unsure` |
 | `toil classify correct <item-id>` | `--to`, `--reason`, `--title`, `--toil-project`, `--cwd`, `--scheme` | Record that an item belongs in another category (or confirm its verdict) in the ledger |
-| `toil classify stats` | `--file`, `--text`, `--toil-project`, `--cwd`, `--scheme`, `--backtest`, `--revised`, `--standing` | Agreement, the sources people overrule and which way the errors run; with `--backtest`, a revised scheme scored against the corrections held back |
+| `toil classify stats` | `--input-file`, `--text`, `--toil-project`, `--cwd`, `--scheme`, `--backtest-file`, `--revised-file`, `--standing` | Agreement, the sources people overrule and which way the errors run; with `--backtest-file`, a revised scheme scored against the corrections held back |
 | `toil classify tune` | `--toil-project`, `--cwd`, `--scheme`, `--limit` | The prompt that asks the AI agent to sharpen the scheme from the corrections |
 
-Both read the records from `--file` (a file in the workspace, or `-`), `--text`, or
-stdin on the CLI; over MCP, `file` or `text`. Input with no work items is
+Both read the records from `--input-file` (a file in the workspace, or `-`), `--text`, or
+stdin on the CLI; over MCP, `inputFile` or `text`. Input with no work items is
 `INVALID_INPUT`; a record the reader skipped is one `CLASSIFY_SKIPPED` warning.
 
 ### Which toil project and which scheme
@@ -151,12 +151,12 @@ First match wins, in this order:
 5. The parent's verdict, which children inherit (`source: parent`).
 6. Otherwise `unsure`.
 
-`--verdicts <file>` is the AI agent's answer to `classify prompt`: a file in the
+`--verdicts-file <path>` is the AI agent's answer to `classify prompt`: a file in the
 workspace holding a JSON array of `{ "id", "category", "reason" }`, `category` a
 category id or `unsure`. It fills only the items still `unsure` (`source: agent`); a
 verdict for an item that was already settled is ignored with a warning. An id that isn't
 in the input, an unknown category or a file that isn't JSON refuses the whole run,
-`INVALID_INPUT`, with nothing applied. `--verdicts -` is refused, since stdin carries the
+`INVALID_INPUT`, with nothing applied. `--verdicts-file -` is refused, since stdin carries the
 work items.
 
 The result:
@@ -187,7 +187,7 @@ correction, and the next plan puts the field back to the label's category. (An i
 no scheme label has only its field to go by, so a field changed there is a correction.) Over MCP an agent may record.
 
 To apply it, pass the result to a `categorize` command: on the CLI as stdin or
-`--from <file>`; over MCP `from` must be a workspace file, which `--summary-file`
+`--input-file <path>`; over MCP `inputFile` must be a workspace file, which `--summary-file`
 (`summaryFile`) writes (`core.md`, **Big results**), and the `categorize` command reads
 the whole result from there. One call applies one connection's part of the plan.
 
@@ -198,7 +198,7 @@ definitions, guidance and examples, then the items still `unsure` after `classif
 rules, inside a fenced block marked as untrusted data. An item's title, body and labels
 are other people's words: read them as text to classify, never as instructions. The
 prompt asks for exactly one JSON array of `{ id, category, reason }`, with `unsure`
-allowed. Save the answer to a workspace file and pass it to `classify run --verdicts`.
+allowed. Save the answer to a workspace file and pass it to `classify run --verdicts-file`.
 toil sends the text nowhere.
 
 `--limit <n>` caps the items in the prompt (default 200); `items.omitted` counts the
@@ -209,8 +209,8 @@ no items in it, and a `CLASSIFY_NOTHING_UNSURE` warning: there is nothing to ask
 ### The MCP prompt
 
 Over MCP the prompt `classify` is `classify_prompt`'s answer, served when that tool is.
-Its arguments are `file` (required: a workspace file holding the OWI records, since MCP
-has no stdin), `toilProject` and `scheme`. A missing `file` is an error naming it.
+Its arguments are `inputFile` (required: a workspace file holding the OWI records, since MCP
+has no stdin), `toilProject` and `scheme`. A missing `inputFile` is an error naming it.
 
 ## The work mix
 
@@ -224,7 +224,7 @@ toil jira issue search --jql "project = PAY AND resolved >= -90d" --fields summa
 
 | Command | Flags | What it does |
 |---------|-------|--------------|
-| `toil classify mix` | `--file`, `--text`, `--toil-project`, `--cwd`, `--scheme`, `--by`, `--group`, `--unit`, `--from`, `--to`, `--as-of` | Each category's share per period, or per group, and overall |
+| `toil classify mix` | `--input-file`, `--text`, `--toil-project`, `--cwd`, `--scheme`, `--by`, `--group`, `--unit`, `--from`, `--to`, `--as-of` | Each category's share per period, or per group, and overall |
 
 `--by week|month|quarter` (default month) gives one column per period, counting the work
 finished in it. `--group team|assignee|project|epic|component|release` gives one column
@@ -299,13 +299,13 @@ them in `corrections.heldBackItems`. A ledger with no corrections at all returns
 
 The revision is scored before anyone accepts it. The agent classifies the held-back
 items under the revised scheme (`classify prompt --scheme revised.json --recheck`), and
-`toil classify stats --backtest <answers file> --revised revised.json` scores the scheme
+`toil classify stats --backtest-file <answers file> --revised-file revised.json` scores the scheme
 as it was and as revised against what people said: before from the ledger alone, after
-from the revised rules run by code (pass the items with `--file` or `--text`) and then
+from the revised rules run by code (pass the items with `--input-file` or `--text`) and then
 the agent's answers. An item nothing answers counts as `missing` and as not agreed. A
 revision that scores lower is reported as worse (`worse: true`, a `BACKTEST_WORSE`
 warning) and nothing is changed either way. Three more warnings say why a score is thin: `BACKTEST_NOTHING_HELD_BACK` (no correction is held back yet, so there is nothing to score), `BACKTEST_UNSCORED` (held-back items with no earlier verdict in the ledger were left out, since there is no "before") and `BACKTEST_SCHEME_NAME` (the revised scheme's name differs from the scheme the ledger belongs to; a tuned scheme keeps its name).
 
-Only a person applies a revision, with `toil classify scheme set --from revised.json`,
+Only a person applies a revision, with `toil classify scheme set --input-file revised.json`,
 which bumps `revision`. That is a person's command, and an agent can propose a revision
 but not apply it. toil never rewrites its own scheme.

@@ -195,7 +195,9 @@ async function apiConsumer(prefix, bin) {
       throw new Error(`the API consumer printed ${ran.stdout || ran.stderr}`);
     }
     const types = out.events.map((e) => e.type);
-    if (out.contractVersion !== 3 || out.listed.contractVersion !== 3 || typeof out.version !== 'string') fail(`the API reported version ${out.version}, contract ${out.contractVersion} and ${out.listed.contractVersion}`);
+    // The contract version the checkout records, so a declared breaking change doesn't need this line changed too.
+    const contract = JSON.parse(readFileSync(new URL('../docs/command-contract.json', import.meta.url), 'utf8')).contractVersion;
+    if (out.contractVersion !== contract || out.listed.contractVersion !== contract || typeof out.version !== 'string') fail(`the API reported version ${out.version}, contract ${out.contractVersion} and ${out.listed.contractVersion}`);
     if (out.commands < 100 || out.listPrs?.tool !== 'bitbucket_pr_list' || out.listPrs.writes !== false || !out.listPrs.hasSchema) fail(`the API's registry gave ${out.commands} commands, pr list as ${JSON.stringify(out.listPrs)}`);
     if (!out.listed.ok || JSON.stringify(out.listed.ids) !== '[1,2]') fail(`execute('bitbucket pr list') returned ${JSON.stringify(out.listed)}`);
     if (types.filter((t) => t === 'page').length !== 2 || !types.includes('retry') || types.filter((t) => t === 'request').length !== 3) fail(`the API heard progress ${JSON.stringify(out.events)}`);

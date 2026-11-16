@@ -80,7 +80,7 @@ describe('util size: outlines of real files', () => {
     ['verify.ts', false],
     ['flatted.js', true],
   ])('outlines %s exactly as the TypeScript compiler reads it', async (name, js) => {
-    const { data } = await fileOf({ file: `samples/size/${name}` });
+    const { data } = await fileOf({ inputFile: `samples/size/${name}` });
     expect(data.outline!.precision).toBe('syntactic');
     expect(short(data.outline!.symbols)).toEqual(compilerOutline(sample(name), js));
     expect(data.outline!.symbols.length).toBeGreaterThan(8);
@@ -96,7 +96,7 @@ describe('util size: outlines of real files', () => {
   });
 
   it('outlines Python: classes, their methods, and top-level functions, not the functions inside them', async () => {
-    const { data } = await fileOf({ file: 'samples/size/flatted.py' });
+    const { data } = await fileOf({ inputFile: 'samples/size/flatted.py' });
     expect(data.language).toBe('python');
     expect(short(data.outline!.symbols)).toEqual([
       'class _Known 19-22', 'method _Known.__init__ 20-22', 'class _String 24-26', 'method _String.__init__ 25-26',
@@ -107,7 +107,7 @@ describe('util size: outlines of real files', () => {
   });
 
   it('outlines Go: types and functions, each to its closing brace', async () => {
-    const { data } = await fileOf({ file: 'samples/size/flatted.go' });
+    const { data } = await fileOf({ inputFile: 'samples/size/flatted.go' });
     expect(short(data.outline!.symbols)).toEqual([
       'type flattedIndex 30-30', 'function Stringify 33-160', 'function Parse 163-223', 'function revive 225-242',
       'function loop 244-264', 'function ref 266-276', 'function ToJSON 279-287', 'function FromJSON 290-296',
@@ -115,7 +115,7 @@ describe('util size: outlines of real files', () => {
   });
 
   it('outlines Java: the class, its constructor and methods, past annotations with arguments', async () => {
-    const { data } = await fileOf({ file: 'samples/size/CategoryService.java' });
+    const { data } = await fileOf({ inputFile: 'samples/size/CategoryService.java' });
     expect(short(data.outline!.symbols)).toEqual([
       'class CategoryService 39-217', 'constructor CategoryService.CategoryService 46-48', 'method CategoryService.resolveGuildId 50-55',
       'method CategoryService.createCategory 65-81', 'method CategoryService.deleteCategory 91-111', 'method CategoryService.editCategory 121-150',
@@ -124,7 +124,7 @@ describe('util size: outlines of real files', () => {
   });
 
   it('outlines C#: a file-scoped namespace, the class, constructor and overloads, past XML doc comments', async () => {
-    const { data } = await fileOf({ file: 'samples/size/FrameworkConfigurationBuilder.cs' });
+    const { data } = await fileOf({ inputFile: 'samples/size/FrameworkConfigurationBuilder.cs' });
     const ns = 'Imagile.Framework.Configuration';
     const cls = `${ns}.FrameworkConfigurationBuilder`;
     expect(short(data.outline!.symbols)).toEqual([
@@ -134,7 +134,7 @@ describe('util size: outlines of real files', () => {
   });
 
   it('outlines Markdown headings with their levels and nesting', async () => {
-    const { data } = await fileOf({ file: 'samples/size/docs/util.md' });
+    const { data } = await fileOf({ inputFile: 'samples/size/docs/util.md' });
     expect(data.outline!.symbols.map((s) => `${s.level} ${s.name} ${s.startLine}-${s.endLine}`)).toEqual([
       '1 Building a `util` command 1-132', '2 The rules 8-22', '2 Reading input: `kit/input.ts` 24-61', '2 Self-verification: `kit/verify.ts` 63-95',
       '2 Shared parsers 97-113', '2 Lazy loading 115-132',
@@ -142,18 +142,18 @@ describe('util size: outlines of real files', () => {
   });
 
   it('outlines JSON and YAML top-level keys, held against the parser', async () => {
-    const json = (await fileOf({ file: 'samples/size/data/sample.json' })).data;
+    const json = (await fileOf({ inputFile: 'samples/size/data/sample.json' })).data;
     expect(json.outline!.precision).toBe('parsed');
     expect(short(json.outline!.symbols).slice(0, 8)).toEqual(['key name 2-2', 'key version 3-3', 'key description 4-4', 'key license 5-5', 'key author 6-6', 'key homepage 7-7', 'key repository 8-11', 'key bugs 12-12']);
     expect(json.outline!.symbols.map((s) => s.name)).toEqual(Object.keys(JSON.parse(sample('data/sample.json'))));
     expect(checks(json)['outline.keys']).toBe('passed');
-    const yaml = (await fileOf({ file: 'samples/size/data/pages.yml' })).data;
+    const yaml = (await fileOf({ inputFile: 'samples/size/data/pages.yml' })).data;
     expect(short(yaml.outline!.symbols)).toEqual(['key name 1-1', 'key on 3-9', 'key permissions 11-12', 'key concurrency 14-16', 'key jobs 18-49']);
     expect(checks(yaml)['outline.keys']).toBe('passed');
   });
 
   it('re-reads every start line, and says the outline and the tokens are approximations', async () => {
-    const { envelope, data } = await fileOf({ file: 'samples/size/verify.ts' });
+    const { envelope, data } = await fileOf({ inputFile: 'samples/size/verify.ts' });
     const start = data.verified.checks.find((c) => c.check === 'outline.start')!;
     expect(start).toMatchObject({ status: 'passed', failed: 0, checked: data.outline!.symbols.length });
     expect(checks(data)).toMatchObject({ 'input.complete': 'passed', 'counts.reread': 'passed', 'outline.range': 'passed', 'outline.nesting': 'passed', 'outline.symbols': 'approximated', tokens: 'approximated' });
@@ -251,7 +251,7 @@ describe('util size: the self-checks catch a broken result', () => {
 
 describe('util size: folders', () => {
   it('totals the folder, skipping what .gitignore ignores, with the binary file in bytes only', async () => {
-    const { envelope, data } = await sizeOf({ file: 'samples/size' });
+    const { envelope, data } = await sizeOf({ inputFile: 'samples/size' });
     const folder = data as FolderSize;
     expect(envelope.ok).toBe(true);
     const all = Object.entries(sizeSamples).filter(([p]) => !p.includes('/build/'));
@@ -270,36 +270,36 @@ describe('util size: folders', () => {
   });
 
   it('lists a binary file with null lines and tokens', async () => {
-    const { data } = await sizeOf({ file: 'samples/size/data', top: 5 });
+    const { data } = await sizeOf({ inputFile: 'samples/size/data', top: 5 });
     expect((data as FolderSize).largest.find((f) => f.binary)).toEqual({ path: 'samples/size/data/logo.png', bytes: 16, lines: null, tokens: null, binary: true, language: null });
   });
 
   it('hides folders below depth, counting them, and lists only the top files', async () => {
-    const { data } = await sizeOf({ file: 'samples/size', depth: 0, top: 2 });
+    const { data } = await sizeOf({ inputFile: 'samples/size', depth: 0, top: 2 });
     const folder = data as FolderSize;
     expect(folder.tree).toMatchObject({ folders: [], foldersHidden: 2 });
     expect(folder.largest).toHaveLength(2);
   });
 
   it('sizes the whole workspace as .', async () => {
-    const { data } = await sizeOf({ file: '.' }, { files: { 'a.md': '# A\n', 'src/b.go': 'package b\n' } });
+    const { data } = await sizeOf({ inputFile: '.' }, { files: { 'a.md': '# A\n', 'src/b.go': 'package b\n' } });
     expect(data).toMatchObject({ kind: 'folder', path: '.', totals: { files: 2, bytes: 14, lines: 2 }, tree: { path: '.', folders: [{ path: 'src', files: 1 }] } });
   });
 
   it('refuses language for a folder, and top or depth for a file', async () => {
-    expect((await sizeOf({ file: 'samples/size', language: 'go' })).envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'language applies to one file, and this is a folder.' });
-    expect((await sizeOf({ file: 'samples/size/flatted.go', top: 1 })).envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'top applies to a folder, and this is one file.' });
+    expect((await sizeOf({ inputFile: 'samples/size', language: 'go' })).envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'language applies to one file, and this is a folder.' });
+    expect((await sizeOf({ inputFile: 'samples/size/flatted.go', top: 1 })).envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'top applies to a folder, and this is one file.' });
   });
 });
 
 describe('util size: what it cannot outline, it says', () => {
   it('counts a binary file in bytes, with no lines, tokens or outline', async () => {
-    const { data } = await fileOf({ file: 'samples/size/data/logo.png' });
+    const { data } = await fileOf({ inputFile: 'samples/size/data/logo.png' });
     expect(data).toMatchObject({ bytes: 16, lines: null, tokens: null, outline: null, notOutlined: { reason: 'binary' } });
   });
 
   it('counts a file of an unsupported type, and says why there is no outline', async () => {
-    const { data } = await fileOf({ file: 'samples/size/notes.txt' });
+    const { data } = await fileOf({ inputFile: 'samples/size/notes.txt' });
     expect(data).toMatchObject({ language: null, lines: 1, tokens: 6, outline: null, notOutlined: { reason: 'unsupported-language', detail: expect.stringContaining('typescript, javascript, python, csharp, java, go, markdown, json, yaml') } });
   });
 
@@ -330,7 +330,7 @@ describe('util size: what it cannot outline, it says', () => {
 
   it('counts a file too large to outline', async () => {
     const big = `// ${'x'.repeat(OUTLINE_MAX_BYTES)}\n`;
-    const { data } = await fileOf({ file: 'big.ts' }, { files: { 'big.ts': big } });
+    const { data } = await fileOf({ inputFile: 'big.ts' }, { files: { 'big.ts': big } });
     expect(data).toMatchObject({ bytes: big.length, lines: 1, outline: null, notOutlined: { reason: 'too-large' } });
   });
 });
@@ -421,7 +421,7 @@ describe('util size: the front doors', () => {
     expect(cli.envelope?.data).toMatchObject({ kind: 'file', language: 'go', outline: { symbols: expect.any(Array) } });
     const session = await connectMcp({ commands, context: testContext({ files: sizeSamples }).context });
     try {
-      const mcp = await session.call('util_size', { file: 'samples/size/flatted.go' });
+      const mcp = await session.call('util_size', { inputFile: 'samples/size/flatted.go' });
       expect(mcp.envelope.data).toEqual(cli.envelope?.data);
     } finally {
       await session.close();

@@ -1729,7 +1729,7 @@ difference, leaving out what the server assigns.
 toil ado work-item iterations --project "<project>" > board.jsonl
 toil ado work-item get-many <ids…> >> board.jsonl
 toil ado work-item history <id> >> board.jsonl        # once for each id
-toil util owi map board.jsonl > mapped.json
+toil util owi map --input-file board.jsonl > mapped.json
 node ui/scripts/ado-seed/compare.mjs mapped.json --project "<project>" --backdated
 ```
 

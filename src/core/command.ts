@@ -24,6 +24,12 @@ export interface CliArgument {
   description: string;
   required?: boolean;
   variadic?: boolean;
+  /**
+   * The flag that replaced this positional (`--input-file` for `util`'s `[file]`). The
+   * positional still works on the CLI for at least one beta (principle 7), with a
+   * DEPRECATED_FLAG warning naming the flag; the flag wins when both are given.
+   */
+  deprecated?: string;
 }
 
 /** A CLI flag, e.g. `--body <text>`, mapped onto one input field. */
@@ -37,6 +43,13 @@ export interface CliOption {
    * context inputs; commander accepts the flag before or after the leaf name.
    */
   group?: boolean;
+  /**
+   * Old spellings of this flag (`--file <path>` for `--input-file <path>`), still
+   * read on the CLI for at least one beta (principle 7), hidden from --help, each
+   * with a DEPRECATED_FLAG warning naming this flag. The new flag wins when both
+   * are given. MCP and the API take only the field's current name.
+   */
+  deprecated?: string[];
 }
 
 /**

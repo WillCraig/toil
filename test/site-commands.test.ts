@@ -35,7 +35,7 @@ export function siteCommands(): Record<string, SiteCommand[]> {
   for (const def of commands) {
     if (def.path.length < 2) continue;
     const flags = [
-      ...(def.args ?? []).map((a) => (a.required === false ? `[${a.name}${a.variadic ? '...' : ''}]` : `<${a.name}${a.variadic ? '...' : ''}>`)),
+      ...(def.args ?? []).filter((a) => !a.deprecated).map((a) => (a.required === false ? `[${a.name}${a.variadic ? '...' : ''}]` : `<${a.name}${a.variadic ? '...' : ''}>`)),
       // Core's own per-call inputs (--connection, --toil-project, --cwd) are documented once, not on every command.
       ...(def.options ?? []).filter((o) => !(def.area && CORE_FIELDS.includes(o.field))).map((o) => o.flags),
       ...(takesAllowWrite(def) ? ['--allow-write'] : []),

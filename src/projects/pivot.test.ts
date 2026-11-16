@@ -5,7 +5,7 @@ import { AS_OF, cleanup, cli, codes, commands, data, disk, done, item, mcp, reco
 
 afterEach(cleanup);
 
-const pivotArgs = ['projects', 'pivot', 'payments', '--file', 'work.json', '--as-of', AS_OF];
+const pivotArgs = ['projects', 'pivot', 'payments', '--input-file', 'work.json', '--as-of', AS_OF];
 const cell = (out: any, column: string, row: string) => out.cells[out.rows.findIndex((r: any) => r.label === row)][out.columns.findIndex((c: any) => c.label === column)];
 
 describe('projects pivot', () => {
@@ -25,13 +25,13 @@ describe('projects pivot', () => {
     const out = data(await cli(d, [...pivotArgs, '--split', 'team']));
     expect(out.rows.map((r: any) => r.label)).toEqual(['Checkout', 'Ledger', 'No team']);
     const s = await mcp(d);
-    const viaMcp = data((await s.call('projects_pivot', { toilProject: 'payments', file: 'work.json', split: 'team', asOf: AS_OF })).envelope);
+    const viaMcp = data((await s.call('projects_pivot', { toilProject: 'payments', inputFile: 'work.json', split: 'team', asOf: AS_OF })).envelope);
     expect(viaMcp.rows).toEqual(out.rows);
     expect(viaMcp.cells).toEqual(out.cells);
   });
 
   it('has no people and the built-in scheme when no toil project applies, and says team was not read', async () => {
-    const e = await cli(disk(), ['projects', 'pivot', '--file', 'work.json', '--as-of', AS_OF, '--split', 'team']);
+    const e = await cli(disk(), ['projects', 'pivot', '--input-file', 'work.json', '--as-of', AS_OF, '--split', 'team']);
     const out = data(e);
     expect(out.toilProject).toBeNull();
     expect(out.scheme.name).toBe('ktlo-feature');
@@ -99,7 +99,7 @@ describe('projects pivot and a saved view', () => {
   it('refuses an unknown view, naming the ones there are, and a view with no toil project', async () => {
     const e = await cli(disk(), [...pivotArgs, '--view', 'nope']);
     expect(e.error).toMatchObject({ code: 'INVALID_INPUT', message: 'Toil project payments has no view named "nope".', fix: 'It has: work-mix.' });
-    const none = await cli(disk(), ['projects', 'pivot', '--file', 'work.json', '--view', 'x']);
+    const none = await cli(disk(), ['projects', 'pivot', '--input-file', 'work.json', '--view', 'x']);
     expect(none.error).toMatchObject({ code: 'INVALID_INPUT' });
   });
 });

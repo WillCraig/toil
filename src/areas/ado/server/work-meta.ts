@@ -61,24 +61,24 @@ export const workAddAttachmentCommand = adoArea.command({
   path: ['ado', 'work-item', 'attach'],
   description: 'Upload a local file and attach it to a work item',
   toolDescription:
-    'Uploads a local file to the attachment store, then links it to the work item, and returns the uploaded attachment (id, url). file is a path in the workspace. If the link fails, the upload stays stored and the error says only why the link failed.',
-  input: z.object({ id: idInput, file: z.string().describe('Path to the file to upload'), comment: z.string().optional().describe('Optional comment for the attachment'), ...allowWriteField }),
+    'Uploads a local file to the attachment store, then links it to the work item, and returns the uploaded attachment (id, url). inputFile is a path in the workspace. If the link fails, the upload stays stored and the error says only why the link failed.',
+  input: z.object({ id: idInput, inputFile: z.string().describe('Path to the file to upload'), comment: z.string().optional().describe('Optional comment for the attachment'), ...allowWriteField }),
   writes: true,
   args: [idArg],
   options: [
-    { flags: '--file <path>', field: 'file', description: 'Path to the file to upload' },
+    { flags: '--input-file <path>', field: 'inputFile', description: 'Path to the file to upload', deprecated: ['--file <path>'] },
     { flags: '--comment <text>', field: 'comment', description: 'Optional comment for the attachment' },
   ],
   examples: [
-    { ...W, id: '42', file: 'screenshot.png' },
-    { ...W, id: '42', file: 'logs/run.txt', comment: 'From the failed run' },
+    { ...W, id: '42', inputFile: 'screenshot.png' },
+    { ...W, id: '42', inputFile: 'logs/run.txt', comment: 'From the failed run' },
   ],
   run: async (input, ctx) => {
     const { collection } = where(ctx);
     const id = toInt(input.id);
-    const data = await ctx.files.readBytes(input.file);
+    const data = await ctx.files.readBytes(input.inputFile);
     // Step 1, the upload; step 2, the link. Suspected bug (#69 item 16): a failed link leaves the upload behind.
-    const attachment = await adoUpload<Attachment>(ctx, `/${enc(collection)}/_apis/wit/attachments?fileName=${enc(basename(input.file))}&api-version=${API}`, data);
+    const attachment = await adoUpload<Attachment>(ctx, `/${enc(collection)}/_apis/wit/attachments?fileName=${enc(basename(input.inputFile))}&api-version=${API}`, data);
     const relation = { rel: 'AttachedFile', url: attachment.url, ...(input.comment ? { attributes: { comment: input.comment } } : {}) };
     await ado(ctx, `/${enc(collection)}/_apis/wit/workitems/${enc(id)}?api-version=${API}`, { method: 'PATCH', json: [{ op: 'add', path: '/relations/-', value: relation }], headers: PATCH });
     return attachment;

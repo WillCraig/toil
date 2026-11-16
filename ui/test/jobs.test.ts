@@ -161,8 +161,8 @@ describe('the question a job asks the agent', () => {
   });
   it('never lets the agent name a file on this machine through the diagram tool', () => {
     const props = Object.keys(((real.get('util c4 mermaid')!.inputSchema as { properties?: object }).properties ?? {}));
-    expect(props).toContain('file');
-    expect(HIDDEN).toContain('file');
+    expect(props).toContain('inputFile');
+    expect(HIDDEN).toContain('inputFile');
   });
   it('is not a job question for any other text', () => {
     expect(jobQuestion('d', 'what is stuck?', () => 0, KNOWN)).toBeNull();

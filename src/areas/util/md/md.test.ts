@@ -360,7 +360,7 @@ describe('util md: the command', () => {
   const context = () => testContext({ files: utilFiles }).context;
 
   it('converts a workspace file through execute(), with input.complete checked against its size', async () => {
-    const envelope = await execute(mdCommand, { file: 'docs/story.md', to: 'storage' }, context());
+    const envelope = await execute(mdCommand, { inputFile: 'docs/story.md', to: 'storage' }, context());
     expect(envelope.ok).toBe(true);
     const data = envelope.data as MdData;
     expect(data).toMatchObject({ from: 'md', to: 'storage', lossless: true });

@@ -99,7 +99,7 @@ toil projects import sample/sample-team.project.json
 toil sample team | toil projects brief sample-team
 
 # The same records from the file
-toil classify run --file sample/sample-team.owi.json --toil-project sample-team
+toil classify run --input-file sample/sample-team.owi.json --toil-project sample-team
 
 # Where the work goes: by team, then by category across the releases
 toil sample team | toil projects pivot sample-team --split team

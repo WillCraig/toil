@@ -81,21 +81,21 @@ export const categorizeCommand = githubArea.command({
   path: ['github', 'issue', 'categorize'],
   description: "Apply a classification plan: label issues and pull requests with their category, and set a project field",
   toolDescription:
-    "Applies the plan that classify run wrote (from, a file in the workspace) to the issues and pull requests it names on this connection. Each item's category becomes a label, created in its repository when missing, and, when the plan names a Projects (v2) single-select field, the field's option on the project, set to agree with the label (the label is the record; a field never changes a label). It reads each issue first and sends only what still differs, so running the same plan twice changes nothing. A reclassification replaces the issue's labels in one request with the scheme's other labels left out, so a label someone adds in that instant can be lost. It never deletes and never adds an issue to a project (those get the label and are listed in notOnProject; github_project_add puts them there). A field or option the project lacks refuses the whole plan before any write. Returns changed, unchanged, failed, skipped, counts, labelsCreated and notOnProject. Needs writes on the connection; the token needs Issues write, and Projects write when the plan names a field.",
+    "Applies the plan that classify run wrote (inputFile, a file in the workspace) to the issues and pull requests it names on this connection. Each item's category becomes a label, created in its repository when missing, and, when the plan names a Projects (v2) single-select field, the field's option on the project, set to agree with the label (the label is the record; a field never changes a label). It reads each issue first and sends only what still differs, so running the same plan twice changes nothing. A reclassification replaces the issue's labels in one request with the scheme's other labels left out, so a label someone adds in that instant can be lost. It never deletes and never adds an issue to a project (those get the label and are listed in notOnProject; github_project_add puts them there). A field or option the project lacks refuses the whole plan before any write. Returns changed, unchanged, failed, skipped, counts, labelsCreated and notOnProject. Needs writes on the connection; the token needs Issues write, and Projects write when the plan names a field.",
   input: z.object({
-    from: z.string().optional().describe(PLAN_FROM_DESCRIPTION),
+    inputFile: z.string().optional().describe(PLAN_FROM_DESCRIPTION),
     ...allowWriteField,
   }),
   writes: true,
   timeLimitMs: CATEGORIZE_TIME_LIMIT_MS,
-  options: [{ flags: '--from <file>', field: 'from', description: PLAN_FROM_DESCRIPTION }],
+  options: [{ flags: '--input-file <path>', field: 'inputFile', description: PLAN_FROM_DESCRIPTION, deprecated: ['--from <file>'] }],
   // The second names an owner and repo the plan never uses: the keys in the plan say where each item is.
-  examples: [{ from: 'classify-plan.json', allowWrite: true }, { owner: 'imagile', repo: 'unused', from: 'classify-plan.json', allowWrite: true }],
+  examples: [{ inputFile: 'classify-plan.json', allowWrite: true }, { owner: 'imagile', repo: 'unused', inputFile: 'classify-plan.json', allowWrite: true }],
   run: async (input, ctx) => {
     // The plan's keys say which repository each item is in, so the owner and repo core resolved were never used.
     delete ctx.resolved.inputs?.owner;
     delete ctx.resolved.inputs?.repo;
-    const plan = await readPlanFrom(ctx, input.from);
+    const plan = await readPlanFrom(ctx, input.inputFile);
     const connection = ctx.connection.name;
     const { group, skipped } = planFor(plan, 'github', connection);
 

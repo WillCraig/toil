@@ -79,32 +79,32 @@ const BACKLOG = records(bug('PAY-1'), item('PAY-2', { title: 'Add a wallet' }));
 describe('classify run --record', () => {
   it('keeps one verdict per item, and a second run keeps nothing', async () => {
     const d = disk();
-    const first = data(await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], { 'items.json': BACKLOG }));
+    const first = data(await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], { 'items.json': BACKLOG }));
     expect(first.recorded).toEqual({ verdicts: 2, corrections: 0, file: join(d.home, '.toil', 'classify', 'ktlo-feature.jsonl').split('\\').join('/') });
     expect(ledgerLines(d).map((l) => [l.kind, l.item, l.category, l.source])).toEqual([
       ['verdict', 'corp-jira:PAY-1', 'ktlo', 'signal:type'],
       ['verdict', 'corp-jira:PAY-2', null, 'unsure'],
     ]);
-    const second = data(await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], { 'items.json': BACKLOG }));
+    const second = data(await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], { 'items.json': BACKLOG }));
     expect(second.recorded).toMatchObject({ verdicts: 0, corrections: 0 });
     expect(ledgerLines(d)).toHaveLength(2);
   });
 
   it('adds nothing to the result, and writes nothing, without --record', async () => {
     const d = disk();
-    const plain = data(await cli(d, ['classify', 'run', '--file', 'items.json'], { 'items.json': BACKLOG }));
+    const plain = data(await cli(d, ['classify', 'run', '--input-file', 'items.json'], { 'items.json': BACKLOG }));
     expect(plain.recorded).toBeUndefined();
     expect(() => ledgerLines(d)).toThrow();
   });
 
   it('records a correction from the tracker when a label changed, and then keeps quiet', async () => {
     const d = disk();
-    await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], { 'items.json': BACKLOG });
+    await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], { 'items.json': BACKLOG });
     const relabelled = { 'items.json': records(bug('PAY-1'), item('PAY-2', { title: 'Add a wallet', labels: ['feature'] })) };
-    const run = data(await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], relabelled));
+    const run = data(await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], relabelled));
     expect(run.recorded).toMatchObject({ verdicts: 0, corrections: 1 });
     expect(ledgerLines(d).at(-1)).toMatchObject({ kind: 'correction', item: 'corp-jira:PAY-2', from: null, fromSource: 'unsure', to: 'feature', confirmed: false, via: 'tracker', by: null });
-    const again = data(await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], relabelled));
+    const again = data(await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], relabelled));
     expect(again.recorded).toMatchObject({ verdicts: 0, corrections: 0 });
   });
 
@@ -112,21 +112,21 @@ describe('classify run --record', () => {
     const d = disk();
     const def = commands.find((c) => c.path.join(' ') === 'classify run')!;
     const ctx = contextFor(d, { 'items.json': BACKLOG });
-    const refused = await execute(def, { file: 'items.json', record: true }, ctx, 'api', { readOnly: true });
+    const refused = await execute(def, { inputFile: 'items.json', record: true }, ctx, 'api', { readOnly: true });
     expect(refused.ok).toBe(false);
     expect(() => ledgerLines(d)).toThrow();
-    expect((await execute(def, { file: 'items.json' }, ctx, 'api', { readOnly: true })).ok).toBe(true);
+    expect((await execute(def, { inputFile: 'items.json' }, ctx, 'api', { readOnly: true })).ok).toBe(true);
   });
 
   it("honours a person's correction over a rule, saying who chose, and the engine's order holds over MCP", async () => {
     const d = disk();
-    await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], { 'items.json': BACKLOG });
+    await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], { 'items.json': BACKLOG });
     data(await cli(d, ['classify', 'correct', 'corp-jira:PAY-1', '--to', 'feature', '--reason', 'adds a new export format']));
-    const out = data(await cli(d, ['classify', 'run', '--file', 'items.json'], { 'items.json': BACKLOG }));
+    const out = data(await cli(d, ['classify', 'run', '--input-file', 'items.json'], { 'items.json': BACKLOG }));
     const v = out.verdicts.find((x: any) => x.key === 'PAY-1');
     expect(v).toMatchObject({ category: 'feature', source: 'person', reason: 'A person chose Feature: adds a new export format.' });
     const s = await mcp(d, { 'items.json': BACKLOG });
-    const viaMcp = data((await s.call('classify_run', { file: 'items.json', record: true })).envelope);
+    const viaMcp = data((await s.call('classify_run', { inputFile: 'items.json', record: true })).envelope);
     expect(viaMcp.verdicts.find((x: any) => x.key === 'PAY-1').source).toBe('person');
     expect(viaMcp.recorded).toMatchObject({ verdicts: 0, corrections: 0 });
   });
@@ -137,7 +137,7 @@ const threeWays = JSON.stringify({ name: 'team', revision: 1, categories: [categ
 
 describe("a person's say and a label the tracker hasn't caught up with", () => {
   const labelled = (...labels: string[]) => ({ 'items.json': records(item('PAY-2', { title: 'Add a wallet', labels })) });
-  const run = (d: ToilProjectDisk, files: Record<string, string>, ...more: string[]) => cli(d, ['classify', 'run', '--file', 'items.json', '--scheme', 'team', ...more], files);
+  const run = (d: ToilProjectDisk, files: Record<string, string>, ...more: string[]) => cli(d, ['classify', 'run', '--input-file', 'items.json', '--scheme', 'team', ...more], files);
   const diskWithTeam = () => {
     const d = disk();
     d.write('home/.toil/classify/team.json', threeWays);
@@ -191,11 +191,11 @@ describe('a ledger toil cannot read', () => {
   it('does not stop a plain run, but says so; recording, stats, tune and correct still refuse', async () => {
     const d = disk();
     d.write('home/.toil/classify/ktlo-feature.jsonl', 'x'.repeat(33 * 1024 * 1024));
-    const plain = await cli(d, ['classify', 'run', '--file', 'items.json'], { 'items.json': BACKLOG });
+    const plain = await cli(d, ['classify', 'run', '--input-file', 'items.json'], { 'items.json': BACKLOG });
     expect(data(plain).verdicts).toHaveLength(2);
     expect(codes(plain)).toContain('LEDGER_UNREADABLE');
     expect((plain.meta.warnings ?? []).find((w) => w.code === 'LEDGER_UNREADABLE')!.message).toContain('rename');
-    for (const argv of [['classify', 'run', '--file', 'items.json', '--record'], ['classify', 'stats'], ['classify', 'tune'], ['classify', 'correct', 'corp-jira:PAY-1', '--to', 'ktlo']]) {
+    for (const argv of [['classify', 'run', '--input-file', 'items.json', '--record'], ['classify', 'stats'], ['classify', 'tune'], ['classify', 'correct', 'corp-jira:PAY-1', '--to', 'ktlo']]) {
       const refused = await cli(d, argv, { 'items.json': BACKLOG });
       expect(refused.ok, argv.join(' ')).toBe(false);
       expect(refused.error!.fix).toContain('rename');
@@ -208,7 +208,7 @@ describe('a ledger line somebody edited by hand', () => {
 
   it('is skipped and counted, and never reaches the tune prompt', async () => {
     const d = disk();
-    await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], { 'items.json': BACKLOG });
+    await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], { 'items.json': BACKLOG });
     await cli(d, ['classify', 'correct', 'corp-jira:PAY-1', '--to', 'feature']);
     const good = ledgerLines(d).at(-1)!;
     const verdict = { kind: 'verdict', at: good.at, item: 'corp-jira:PAY-3', title: 't', toilProject: null, category: 'ktlo', source: 'label', scheme: 'ktlo-feature', revision: 1 };
@@ -237,7 +237,7 @@ describe('a ledger line somebody edited by hand', () => {
 describe('classify correct', () => {
   it('records a correction from what the ledger held, and a confirmation when it agrees', async () => {
     const d = disk();
-    await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], { 'items.json': BACKLOG });
+    await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], { 'items.json': BACKLOG });
     const out = data(await cli(d, ['classify', 'correct', 'corp-jira:PAY-1', '--to', 'feature', '--reason', 'adds a new export format']));
     expect(out.correction).toMatchObject({ item: 'corp-jira:PAY-1', title: 'Fix PAY-1', from: 'ktlo', fromSource: 'signal:type', to: 'feature', confirmed: false, reason: 'adds a new export format', scheme: 'ktlo-feature', revision: 1 });
     expect(out.correction.at).toBeUndefined();
@@ -286,7 +286,7 @@ describe('classify stats', () => {
 
   it('reports what people overruled', async () => {
     const d = disk();
-    await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], { 'items.json': BACKLOG });
+    await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], { 'items.json': BACKLOG });
     await cli(d, ['classify', 'correct', 'corp-jira:PAY-1', '--to', 'feature']);
     const out = data(await cli(d, ['classify', 'stats']));
     expect(out.agreement).toMatchObject({ overall: 0, checked: 1 });
@@ -323,7 +323,7 @@ describe('classify stats', () => {
       const [h1, h2, h3] = keys(true, 3) as [string, string, string];
       const [f1, f2] = keys(false, 2) as [string, string];
       const items = records(...[h1, h2, h3, f1, f2].map(bug));
-      await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], { 'items.json': items });
+      await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], { 'items.json': items });
       for (const k of [h1, h2, f1, f2]) await cli(d, ['classify', 'correct', `corp-jira:${k}`, '--to', 'feature']);
       await cli(d, ['classify', 'correct', `corp-jira:${h3}`, '--to', 'ktlo']);
       return { d, items, h: [h1, h2, h3], f: [f1, f2] };
@@ -332,7 +332,7 @@ describe('classify stats', () => {
     it('scores the revised scheme on held-back corrections, its rules run by code', async () => {
       const { d, items } = await seeded();
       d.write('work/revised.json', SCHEME({ rules: [{ id: 'bugs-are-features', when: { type: ['BUG'] }, then: 'feature' }] }));
-      const env = await cli(d, ['classify', 'stats', '--backtest', 'answers.json', '--revised', 'revised.json', '--file', 'items.json'], { 'items.json': items, 'answers.json': '[]' });
+      const env = await cli(d, ['classify', 'stats', '--backtest', 'answers.json', '--revised', 'revised.json', '--input-file', 'items.json'], { 'items.json': items, 'answers.json': '[]' });
       const out = data(env);
       expect(out.backtest.heldBack).toBe(3);
       expect(out.backtest.before).toEqual({ revision: 1, agreed: 1, agreement: 0.333 });
@@ -366,7 +366,7 @@ describe('classify stats', () => {
       const d = disk();
       const half = await cli(d, ['classify', 'stats', '--backtest', 'answers.json'], { 'answers.json': '[]' });
       expect(half.error).toMatchObject({ code: 'INVALID_INPUT' });
-      const stray = await cli(d, ['classify', 'stats', '--file', 'items.json'], { 'items.json': BACKLOG });
+      const stray = await cli(d, ['classify', 'stats', '--input-file', 'items.json'], { 'items.json': BACKLOG });
       expect(stray.error).toMatchObject({ code: 'INVALID_INPUT' });
     });
   });
@@ -377,7 +377,7 @@ describe('classify tune', () => {
     const d = disk();
     const [h1, h2] = keys(true, 2) as [string, string];
     const [f1, f2] = keys(false, 2) as [string, string];
-    await cli(d, ['classify', 'run', '--file', 'items.json', '--record'], { 'items.json': records(...[h1, h2, f1, f2].map(bug)) });
+    await cli(d, ['classify', 'run', '--input-file', 'items.json', '--record'], { 'items.json': records(...[h1, h2, f1, f2].map(bug)) });
     for (const k of [h1, h2, f1, f2]) await cli(d, ['classify', 'correct', `corp-jira:${k}`, '--to', 'feature', '--reason', `${k} is new work`]);
     const env = await cli(d, ['classify', 'tune']);
     const out = data(env);

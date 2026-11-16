@@ -394,9 +394,9 @@ describe('comments', () => {
   it('pr comment, pr reply and pr comment-inline POST the comment; an inline one is always fileType TO (#76 item 7)', async () => {
     expect((await run('pr comment', { ...W, id: '42', body: 'hi' })).calls[0]).toMatchObject({ method: 'POST', url: `${BITBUCKET}${REPO}/pull-requests/42/comments`, body: json({ text: 'hi' }) });
     expect((await run('pr reply', { ...W, id: '42', commentId: '1001', body: 'ok' })).calls[0]!.body).toBe(json({ text: 'ok', parent: { id: 1001 } }));
-    const inline = await run('pr comment-inline', { ...W, id: '42', file: 'src/old.ts', line: '3', body: 'why', lineType: 'REMOVED' });
+    const inline = await run('pr comment-inline', { ...W, id: '42', path: 'src/old.ts', line: '3', body: 'why', lineType: 'REMOVED' });
     expect(inline.calls[0]!.body).toBe(json({ text: 'why', anchor: { line: 3, lineType: 'REMOVED', fileType: 'TO', path: 'src/old.ts' } }));
-    const plain = await run('pr comment-inline', { ...W, id: '42', file: 'a.ts', line: 1, body: 'b' });
+    const plain = await run('pr comment-inline', { ...W, id: '42', path: 'a.ts', line: 1, body: 'b' });
     expect(JSON.parse(plain.calls[0]!.body!).anchor.lineType).toBe('ADDED');
   });
 
@@ -419,16 +419,16 @@ describe('review and builds', () => {
     expect(envelope.data).toEqual({ diff: '{"diffs":[]}' });
   });
 
-  it('pr diff --file encodes each segment of the path, so a # or ? stays in the file name (was appended as typed, #76 item 6)', async () => {
-    const { calls } = await run('pr diff', { ...AT, id: '42', file: 'docs/notes#1 a?.md' }, [{ path: /\/diff\/docs\//, respond: { json: {} } }]);
+  it('pr diff --path encodes each segment of the path, so a # or ? stays in the file name (was appended as typed, #76 item 6)', async () => {
+    const { calls } = await run('pr diff', { ...AT, id: '42', path: 'docs/notes#1 a?.md' }, [{ path: /\/diff\/docs\//, respond: { json: {} } }]);
     expect(new URL(calls[0]!.url).pathname).toBe(`${REPO}/pull-requests/42/diff/docs/notes%231%20a%3F.md`);
     expect(calls[0]!.url).toBe(`${BITBUCKET}${REPO}/pull-requests/42/diff/docs/notes%231%20a%3F.md`);
   });
 
-  it('pr diff --file with a . or .. part is INVALID_INPUT before anything is sent', async () => {
-    const { calls, envelope } = await run('pr diff', { ...AT, id: '42', file: 'src/../../../../admin' });
+  it('pr diff --path with a . or .. part is INVALID_INPUT before anything is sent', async () => {
+    const { calls, envelope } = await run('pr diff', { ...AT, id: '42', path: 'src/../../../../admin' });
     expect(calls).toHaveLength(0);
-    expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('--file path') });
+    expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('--path value') });
   });
 
   it('pr files reads one page of up to 1000 and stringifies path objects (#76 items 3 and 4)', async () => {

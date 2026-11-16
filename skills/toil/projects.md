@@ -335,10 +335,10 @@ Work Items, and contacts no service: read each tracker and code host with its ow
 command, map it, and pipe it in.
 
 ```bash
-toil jira issue search --toil-project card-payments --jql "project = PAY AND statusCategory != Done" --fields "summary,status,assignee,updated,issuelinks,Sprint,Story Points" | toil util owi map > items.owi.json
+toil jira issue search --toil-project card-payments --jql "project = PAY AND statusCategory != Done" --fields "summary,status,assignee,updated,issuelinks,Sprint,Story Points" | toil util owi map --input-file > items.owi.json
 toil bitbucket pr get 311 --toil-project card-payments --include reviews,checks | toil util owi map --key-pattern "PAY-{n}=corp-jira" > prs.owi.json
 cat items.owi.json prs.owi.json > work.owi.json
-toil projects brief card-payments --file work.owi.json
+toil projects brief card-payments --input-file work.owi.json
 ```
 
 Blocked needs `issuelinks`, and Sprint at risk needs the sprint and estimate fields.
@@ -416,15 +416,15 @@ service. The toil project supplies its people (for `team`), its scheme (for `cat
 its saved views.
 
 ```bash
-toil jira issue search --toil-project card-payments --jql "project = PAY AND resolved >= -90d" --changelog --fields summary,description,issuetype,status,labels,parent,fixVersions,versions,components,resolutiondate | toil util owi map > work.owi.json
-toil projects pivot card-payments --file work.owi.json --measure throughput --split category --across resolved:month --share
+toil jira issue search --toil-project card-payments --jql "project = PAY AND resolved >= -90d" --changelog --fields summary,description,issuetype,status,labels,parent,fixVersions,versions,components,resolutiondate | toil util owi map --input-file > work.owi.json
+toil projects pivot card-payments --input-file work.owi.json --measure throughput --split category --across resolved:month --share
 toil projects view set card-payments release-mix --split release --share --top 4
-toil projects pivot card-payments --file work.owi.json --view release-mix
+toil projects pivot card-payments --input-file work.owi.json --view release-mix
 ```
 
 | Command | Flags | What it does |
 |---------|-------|--------------|
-| `toil projects pivot [toil-project]` | `--file`, `--text`, `--measure`, `--split`, `--across`, `--where`, `--from`, `--to`, `--share`, `--top`, `--pin`, `--include-parents`, `--as-of`, `--view`, `--scheme`, `--markdown`, `--cwd` | The table: `rows`, `columns`, `cells[row][column]` each with its `value`, `share`, the `items` behind it and how many were `measured`, plus totals, `coverage` and `notable` |
+| `toil projects pivot [toil-project]` | `--input-file`, `--text`, `--measure`, `--split`, `--across`, `--where`, `--from`, `--to`, `--share`, `--top`, `--pin`, `--include-parents`, `--as-of`, `--view`, `--scheme`, `--markdown`, `--cwd` | The table: `rows`, `columns`, `cells[row][column]` each with its `value`, `share`, the `items` behind it and how many were `measured`, plus totals, `coverage` and `notable` |
 | `toil projects view set <toil-project> <name>` | the pivot flags, `--title`, `--chart`, `--replace` | Save a pivot as a named view in the toil project's `views` key |
 | `toil projects view show <toil-project> <name>` | | One view, and the pivot it runs |
 | `toil projects view list <toil-project>` | | The toil project's views |
@@ -486,8 +486,8 @@ its `revision`, when it was saved, the toil version, and `notMapped`, the paths 
 mapping left out on purpose.
 
 ```bash
-toil projects diagram check model.json --not-mapped dist/
-toil projects diagram save card-payments model.json --not-mapped dist/
+toil projects diagram check --input-file model.json --not-mapped dist/
+toil projects diagram save card-payments --input-file model.json --not-mapped dist/
 toil projects diagram show card-payments --view containers
 toil projects diagram list
 toil projects diagram remove card-payments
@@ -495,9 +495,9 @@ toil projects diagram remove card-payments
 
 | Command | What it does |
 |---------|--------------|
-| `toil projects diagram check [file] [--text <json>] [--view <key>] [--not-mapped <path>]` | Runs every check `save` runs and keeps nothing: the model's own checks, then the stored-diagram checks. Returns the views, the counts (elements, relationships, `observed`, `inferred`, `unmarked`) and, with `--view`, that view as computed. Fix a model here before asking for a save |
-| `toil projects diagram save <toil-project> [file] [--text <json>] [--not-mapped <path>] [--replace]` | Keeps the diagram. A toil project that has one is refused, naming it, unless `--replace`, which replaces only a valid diagram and raises the revision by one. A local write: no `--allow-write`, and an agent may run it over MCP, on your yes |
-| `toil projects diagram show <toil-project> [--view <key>]` | The stored model with its revision, views and counts, and with `--view` that view computed. `toil projects diagram show card-payments --select model` feeds `toil util c4 render -` |
+| `toil projects diagram check [--input-file <path>] [--text <json>] [--view <key>] [--not-mapped <path>]` | Runs every check `save` runs and keeps nothing: the model's own checks, then the stored-diagram checks. Returns the views, the counts (elements, relationships, `observed`, `inferred`, `unmarked`) and, with `--view`, that view as computed. Fix a model here before asking for a save |
+| `toil projects diagram save <toil-project> [--input-file <path>] [--text <json>] [--not-mapped <path>] [--replace]` | Keeps the diagram. A toil project that has one is refused, naming it, unless `--replace`, which replaces only a valid diagram and raises the revision by one. A local write: no `--allow-write`, and an agent may run it over MCP, on your yes |
+| `toil projects diagram show <toil-project> [--view <key>]` | The stored model with its revision, views and counts, and with `--view` that view computed. `toil projects diagram show card-payments --select model` feeds `toil util c4 render` |
 | `toil projects diagram list` | Every diagram kept, with whether its toil project still resolves (`known`). A file that isn't a valid diagram is a `DIAGRAM_SKIPPED` warning naming the file and why, and is skipped |
 | `toil projects diagram remove <toil-project>` | Deletes a diagram, only a valid one. CLI only: a delete is never an MCP tool. `toil projects remove` keeps the diagram and says so |
 

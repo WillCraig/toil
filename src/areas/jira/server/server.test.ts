@@ -432,7 +432,7 @@ describe('fields', () => {
 
 describe('attachments', () => {
   it('issue attach: POSTs one multipart file part with no-check, and a boundary fixed by the content', async () => {
-    const { envelope, calls } = await run(addAttachment, { key: 'PROJ-1', file: 'dir/report.pdf', ...write }, [
+    const { envelope, calls } = await run(addAttachment, { key: 'PROJ-1', inputFile: 'dir/report.pdf', ...write }, [
       { method: 'POST', url: `${JIRA}/rest/api/2/issue/PROJ-1/attachments`, respond: { json: [{ id: '1', filename: 'report.pdf' }] } },
     ], { files: { 'dir/report.pdf': '%PDF' } });
     const { body, contentType } = multipartFile('report.pdf', new TextEncoder().encode('%PDF'));
@@ -447,7 +447,7 @@ describe('attachments', () => {
   });
 
   it('issue attach: a missing file is INVALID_INPUT before any request', async () => {
-    const { envelope, calls } = await run(addAttachment, { key: 'PROJ-1', file: 'nope.png', ...write }, []);
+    const { envelope, calls } = await run(addAttachment, { key: 'PROJ-1', inputFile: 'nope.png', ...write }, []);
     expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('nope.png') });
     expect(calls).toHaveLength(0);
   });

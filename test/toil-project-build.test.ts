@@ -241,7 +241,7 @@ describe('an agent never points a toil project at a connection with writes on', 
     expect(bypass.envelope.error).toMatchObject({ code: 'WRITE_DISABLED', message: expect.stringContaining('connection prod, which has writes on') });
     // A person can, on the CLI; then import and export of it over MCP are refused for the same reason.
     ok(await cli(d, ['projects', 'env', 'payments', 'production', 'demo-context', '--default'], { config }));
-    const exported = await mcp(d, 'projects_export', { toilProject: 'payments', file: 'payments.json' }, { config });
+    const exported = await mcp(d, 'projects_export', { toilProject: 'payments', out: 'payments.json' }, { config });
     expect(exported.envelope.error).toMatchObject({ code: 'WRITE_DISABLED', message: expect.stringContaining('makes demo-context calls use connection prod') });
     // And a call from that toil project really does go to prod, so the rule judged what a call does.
     const used = await cli(d, ['demo-context', 'get-widget', 'W-1', '--toil-project', 'payments'], { config });
@@ -320,9 +320,9 @@ describe('where export may write', () => {
     const api = clone(d, 'payments-api');
     ok(await cli(d, ['projects', 'init', 'payments']));
     expect((await cli(d, ['projects', 'export', 'payments', '--repo', join(api, '.git', '..', '..')])).envelope.error?.message).toContain("isn't the root of a git repository");
-    expect((await cli(d, ['projects', 'export', 'payments', '--file', 'notes.json', '--replace'])).envelope.error?.message).toContain("isn't a valid toil project");
-    expect((await cli(d, ['projects', 'export', 'payments', '--file', join(d.home, '.toil', 'config.json')])).envelope.error?.message).toContain("one of toil's own files");
-    expect((await cli(d, ['projects', 'export', 'payments', '--file', join(d.root, 'elsewhere.json')])).envelope.error?.message).toContain('outside the workspace');
+    expect((await cli(d, ['projects', 'export', 'payments', '--out', 'notes.json', '--replace'])).envelope.error?.message).toContain("isn't a valid toil project");
+    expect((await cli(d, ['projects', 'export', 'payments', '--out', join(d.home, '.toil', 'config.json')])).envelope.error?.message).toContain("one of toil's own files");
+    expect((await cli(d, ['projects', 'export', 'payments', '--out', join(d.root, 'elsewhere.json')])).envelope.error?.message).toContain('outside the workspace');
     ok(await cli(d, ['projects', 'export', 'payments', '--repo', api]));
     expect((await cli(d, ['projects', 'export', 'payments', '--repo', api])).envelope.error?.message).toContain('a file is already there');
     ok(await cli(d, ['projects', 'export', 'payments', '--repo', api, '--replace']));
@@ -332,7 +332,7 @@ describe('where export may write', () => {
     const d = disk();
     ok(await cli(d, ['projects', 'init', 'payments']));
     ok(await cli(d, ['projects', 'link', 'payments', 'demo-context', '--connection', 'stage']));
-    const out = ok(await cli(d, ['projects', 'export', 'payments', '--file', 'payments.json']));
+    const out = ok(await cli(d, ['projects', 'export', 'payments', '--out', 'payments.json']));
     expect(out.hosts).toEqual([{ area: 'demo-context', env: null, connection: 'stage', host: 'demo-stage.imagile.dev' }]);
     expect(JSON.parse(readFileSync(join(d.workspace, 'payments.json'), 'utf8'))['demo-context']).toEqual({ host: 'demo-stage.imagile.dev' });
   });
@@ -664,7 +664,7 @@ describe('archiving a toil project (#561)', () => {
   it('is left out of a file shared with a team', async () => {
     const d = disk({ 'home/.toil/projects/pay.json': { name: 'pay', archived: true } });
     d.write('work/.git/HEAD', 'ref: refs/heads/main\n');
-    ok(await cli(d, ['projects', 'export', 'pay', '--file', 'shared/pay.json']));
+    ok(await cli(d, ['projects', 'export', 'pay', '--out', 'shared/pay.json']));
     expect(JSON.parse(readFileSync(join(d.workspace, 'shared', 'pay.json'), 'utf8'))).not.toHaveProperty('archived');
   });
 });

@@ -345,7 +345,7 @@ describe('attachments', () => {
   });
 
   it('page attach: v1 multipart with the XSRF header, named by the last path segment on any platform', async () => {
-    const { envelope, calls } = await run(uploadAttachment, { id: '12345', file: 'sub\\diagram.png', comment: 'First draft', ...write }, fixtureRoutes, { files: { 'sub\\diagram.png': 'PNG!' } });
+    const { envelope, calls } = await run(uploadAttachment, { id: '12345', inputFile: 'sub\\diagram.png', comment: 'First draft', ...write }, fixtureRoutes, { files: { 'sub\\diagram.png': 'PNG!' } });
     expect(calls[0]).toMatchObject({ method: 'POST', url: `${V1}/content/12345/child/attachment`, headers: { authorization: AUTH, 'x-atlassian-token': 'nocheck' } });
     expect(calls[0]!.headers['content-type']).toMatch(/^multipart\/form-data; boundary=/);
     expect(calls[0]!.body).toContain('filename="diagram.png"');
@@ -354,7 +354,7 @@ describe('attachments', () => {
   });
 
   it('page attach: a missing file is INVALID_INPUT, before anything is sent', async () => {
-    const { envelope, calls } = await run(uploadAttachment, { id: '12345', file: 'nope.png', ...write });
+    const { envelope, calls } = await run(uploadAttachment, { id: '12345', inputFile: 'nope.png', ...write });
     expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'File not found: nope.png' });
     expect(calls).toHaveLength(0);
   });

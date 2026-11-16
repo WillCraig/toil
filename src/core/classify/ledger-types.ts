@@ -105,7 +105,7 @@ export interface ClassifyStats {
   changedTwice: Array<{ item: string; title: string; corrections: number }>;
   /** Corrections by door; `mcp` is the count an AI agent recorded for a person. */
   byDoor: Record<LedgerDoor, number>;
-  /** Present with `--backtest`: the same held-back corrections scored under the scheme as it was and as revised. */
+  /** Present with `--backtest-file`: the same held-back corrections scored under the scheme as it was and as revised. */
   backtest?: Backtest;
 }
 
@@ -113,7 +113,7 @@ export interface ClassifyStats {
  * A third of the corrections is held back from the tune prompt, so a revised
  * scheme is scored on items it never saw. Which third is fixed by the item's
  * id (`heldBack()` in ledger.ts), so `classify tune` and `classify stats
- * --backtest` agree without passing a list.
+ * --backtest-file` agree without passing a list.
  */
 export interface Backtest {
   heldBack: number;

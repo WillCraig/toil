@@ -26,13 +26,13 @@ inside the workspace.
    came from.
 
    ```bash
-   toil util size . --depth 2 --top 20
-   toil util size <source-folder> --top 20
-   toil util size <one-of-the-largest-source-files>
+   toil util size --input-file . --depth 2 --top 20
+   toil util size --input-file <source-folder> --top 20
+   toil util size --input-file <one-of-the-largest-source-files>
    toil util deps scan
    toil git log --count 200 --since "3 months ago"
    toil projects show
-   toil util openapi list <spec-file>
+   toil util openapi list --input-file <spec-file>
    ```
 
    - **Tree and sizes.** `util size .` shows the folders. Its largest files will often be
@@ -95,9 +95,9 @@ inside the workspace.
 3. **Draw and place.** One view at a time.
 
    ```bash
-   toil util c4 render <model.json> --view containers --out <new-file>.svg
-   toil util c4 mermaid <model.json> --view context --select text
-   toil util c4 d2 <model.json> --view components
+   toil util c4 render --input-file <model.json> --view containers --out <new-file>.svg
+   toil util c4 mermaid --input-file <model.json> --view context --select text
+   toil util c4 d2 --input-file <model.json> --view components
    ```
 
    `render --out` never overwrites a file, so a refresh needs a new name, and the
@@ -108,8 +108,8 @@ inside the workspace.
    and diagrams in another folder and pass that as `--workspace` for the `c4`
    commands. For Confluence, Data Center takes
    `toil confluence page update <id> --body-file <file> --markdown --allow-write`;
-   Cloud takes storage format, from `toil util md <file> --to storage`, saved and sent as
-   `--body-file`. Attach the SVG with `toil confluence page attach <id> --file <svg> --allow-write`.
+   Cloud takes storage format, from `toil util md --input-file <file> --to storage`, saved and sent as
+   `--body-file`. Attach the SVG with `toil confluence page attach <id> --input-file <svg> --allow-write`.
 
 4. **Keep the map.** Write one JSON file at a path the person picks, inside the
    repository or the workspace they chose (propose `docs/map/map.json`, with the
@@ -158,8 +158,8 @@ inside the workspace.
    cite a file and line or a command, never an address):
 
    ```bash
-   toil projects diagram check <model.json> --not-mapped dist/
-   toil projects diagram save <toil-project> <model.json> --not-mapped dist/
+   toil projects diagram check --input-file <model.json> --not-mapped dist/
+   toil projects diagram save <toil-project> --input-file <model.json> --not-mapped dist/
    toil projects diagram show <toil-project> --view containers
    ```
 

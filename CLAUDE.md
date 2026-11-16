@@ -79,8 +79,13 @@ gets made again in the next place it applies.
    merges triage's PRs, any PR for an issue filed from outside, and the release PR.
    → Writes; the `databases`, `mcp`, `automation` and `ship` skills.
 3. **One command does one thing against one source; the caller composes.** No
-   aggregate command that decides on the caller's behalf which services to ask. →
-   dependency analysis split by source, stdin / `--from` composition (`integrations`
+   aggregate command that decides on the caller's behalf which services to ask. Options
+   stay few for the same reason: a flag earns its place only when the caller can't get
+   the result from what's already there (`--select`, a pipe, a file, a second call).
+   No second way to do the same thing, and no mode that makes the choice for one kind
+   of caller; when two options overlap, they fold into one, through principle 7's
+   deprecation path (the maintainer's call, 2026-11-16, #622). → dependency analysis
+   split by source, stdin / `--input-file` composition, one flag per idea (`integrations`
    skill).
 4. **Honest and obvious.** Every result says where it came from and how precise it
    is; every integration says how far it has been verified. Errors are unmistakable:

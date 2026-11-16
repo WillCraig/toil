@@ -16,12 +16,12 @@ import { ToilError } from '../errors.js';
 import { STDIN_OVER_MCP, type FileAccess } from '../files.js';
 import { CATEGORY_ID, CLASSIFY_AREAS, type ClassifyArea, type ClassifyPlan, type PlanGroup } from './types.js';
 
-/** What `--from` (MCP: `from`) says on every `categorize` command. */
+/** What `--input-file` (MCP: `inputFile`) says on every `categorize` command. */
 export const PLAN_FROM_DESCRIPTION =
   'The plan to apply: a file holding toil classify run output (its envelope or its data). Omitted, it is read from stdin on the CLI';
 
 /** The fix every unreadable plan gets. */
-const PLAN_FIX = 'Pass the output of toil classify run, e.g. toil classify run … > plan.json, then --from plan.json.';
+const PLAN_FIX = 'Pass the output of toil classify run, e.g. toil classify run … > plan.json, then --input-file plan.json.';
 
 const text = z.string().min(1);
 const categoryId = z.string().regex(CATEGORY_ID);
@@ -112,8 +112,8 @@ export async function readPlanFrom(ctx: { files: FileAccess }, from: string | un
     source = await ctx.files.readText(from ?? '-');
   } catch (err) {
     if (err === STDIN_OVER_MCP && from === undefined) {
-      throw new ToilError('INVALID_INPUT', 'No plan to apply: pass from, a file holding toil classify run output. Over MCP there is no stdin to read it from.', {
-        fix: 'Write the classify run result to a file in the workspace (its summaryFile does that), then pass its path as from.',
+      throw new ToilError('INVALID_INPUT', 'No plan to apply: pass inputFile, a file holding toil classify run output. Over MCP there is no stdin to read it from.', {
+        fix: 'Write the classify run result to a file in the workspace (its summaryFile does that), then pass its path as inputFile.',
       });
     }
     throw err;

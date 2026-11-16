@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineCommand } from '../../core/command.js';
 import { ECOSYSTEMS } from '../../core/versions.js';
-import { fileArgument, inputFields, textOption } from './kit/input.js';
+import { fileArgument, inputFields, inputFileOption, textOption } from './kit/input.js';
 import * as work from './semver-run.js';
 
 /**
@@ -71,7 +71,7 @@ export const semverSatisfiesCommand = defineCommand({
 export const semverSortCommand = defineCommand({
   path: ['util', 'semver', 'sort'],
   description: 'Sort versions, and find the highest that satisfies a range (local only, no network)',
-  toolDescription: `Sorts a list of versions (one per line or separated by spaces, from file or text) lowest first, in the chosen ecosystem's grammar (npm, the default; nuget; maven). Returns { ecosystem, count, sorted[], invalid[] of { value, line, reason }, ${VERIFIED} }; with range, also { range, normalizedRange, satisfying[], highest }. An entry that doesn't parse is listed in invalid and warned about, never coerced. The sort is checked pair by pair for consistency (up to 2,000 versions; neighbours only past that), and each range answer against the range's intervals. Local only.`,
+  toolDescription: `Sorts a list of versions (one per line or separated by spaces, from inputFile or text) lowest first, in the chosen ecosystem's grammar (npm, the default; nuget; maven). Returns { ecosystem, count, sorted[], invalid[] of { value, line, reason }, ${VERIFIED} }; with range, also { range, normalizedRange, satisfying[], highest }. An entry that doesn't parse is listed in invalid and warned about, never coerced. The sort is checked pair by pair for consistency (up to 2,000 versions; neighbours only past that), and each range answer against the range's intervals. Local only.`,
   input: z.object({
     ...inputFields,
     ...ecosystemField,
@@ -80,12 +80,12 @@ export const semverSortCommand = defineCommand({
   }),
   writes: false,
   args: [fileArgument],
-  options: [textOption, ecosystemOption, { flags: '--range <range>', field: 'range', description: 'Also list the versions that satisfy this range, and the highest of them' }, includePrereleaseOption],
+  options: [inputFileOption, textOption, ecosystemOption, { flags: '--range <range>', field: 'range', description: 'Also list the versions that satisfy this range, and the highest of them' }, includePrereleaseOption],
   examples: [
-    { file: 'versions/npm.txt' },
-    { file: 'versions/npm.txt', range: '^5.0.0' },
-    { file: 'versions/npm.txt', range: '>=5.4.0', includePrerelease: true },
-    { file: 'versions/nuget.txt', ecosystem: 'nuget', range: '[12.0,13.0)' },
+    { inputFile: 'versions/npm.txt' },
+    { inputFile: 'versions/npm.txt', range: '^5.0.0' },
+    { inputFile: 'versions/npm.txt', range: '>=5.4.0', includePrerelease: true },
+    { inputFile: 'versions/nuget.txt', ecosystem: 'nuget', range: '[12.0,13.0)' },
     { text: '2.17.1 2.14.1 2.17.0-rc1 2.0-beta9 2.17.1.Final 2.17.2-SNAPSHOT', ecosystem: 'maven' },
   ],
   run: (input, ctx) => work.sort({ ...input, ecosystem: input.ecosystem ?? 'npm' }, ctx),

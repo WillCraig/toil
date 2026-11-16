@@ -96,7 +96,7 @@ export function classifySchemeCommands(): AnyCommand[] {
       const name = validName(input.name);
       const file = catalog.userFile(name);
       if (existsSync(file)) {
-        throw new ToilError('INVALID_INPUT', `You already have a scheme named "${name}" (${forwardSlashes(file)}).`, { fix: `Change it with toil classify scheme set ${name} --from <file>, or choose another name.` });
+        throw new ToilError('INVALID_INPUT', `You already have a scheme named "${name}" (${forwardSlashes(file)}).`, { fix: `Change it with toil classify scheme set ${name} --input-file <path>, or choose another name.` });
       }
       const source = catalog.resolve({ scheme: input.from ?? 'ktlo-feature', cwd: input.cwd });
       for (const w of source.warnings) ctx.warn(w);
@@ -109,11 +109,11 @@ export function classifySchemeCommands(): AnyCommand[] {
     path: ['classify', 'scheme', 'export'],
     description: "Write a scheme for sharing: into a repository's .toil/classify, or to one file",
     toolDescription:
-      "Writes a scheme for others to use. With repo, it writes <repo>/.toil/classify/<name>.json, where repo must be a working tree's root; with file, it writes that .json file inside the workspace. It never stages or commits. Refuses to overwrite anything but a scheme, and a scheme without replace. A scheme holds no connection, host or secret, so there is nothing to strip.",
+      "Writes a scheme for others to use. With repo, it writes <repo>/.toil/classify/<name>.json, where repo must be a working tree's root; with out, it writes that .json file inside the workspace. It never stages or commits. Refuses to overwrite anything but a scheme, and a scheme without replace. A scheme holds no connection, host or secret, so there is nothing to strip.",
     input: z.object({
       name: z.string().min(1).describe('The scheme to export: a name, or the path to a scheme file'),
       repo: z.string().min(1).optional().describe('The root of a working tree to write .toil/classify/<name>.json into'),
-      file: z.string().min(1).optional().describe('A .json file to write instead'),
+      out: z.string().min(1).optional().describe('A .json file to write instead'),
       replace: replaceField,
       cwd: cwdField,
     }),
@@ -122,17 +122,17 @@ export function classifySchemeCommands(): AnyCommand[] {
     args: [{ name: 'name', field: 'name', description: 'The scheme to export: a name, or a scheme file' }],
     options: [
       { flags: '--repo <dir>', field: 'repo', description: "A working tree's root; writes .toil/classify/<name>.json there" },
-      { flags: '--file <path>', field: 'file', description: 'Write one .json file instead' },
+      { flags: '--out <path>', field: 'out', description: 'Write one .json file instead', deprecated: ['--file <path>'] },
       replaceOption,
       cwdOption,
     ],
-    examples: [{ name: 'ktlo-feature', file: 'shared/ktlo-feature.json' }, { name: 'balance', repo: '.', replace: true, cwd: '.' }],
+    examples: [{ name: 'ktlo-feature', out: 'shared/ktlo-feature.json' }, { name: 'balance', repo: '.', replace: true, cwd: '.' }],
     run: async (input, ctx) => {
       const catalog = catalogOf(ctx);
-      if ((input.repo === undefined) === (input.file === undefined)) throw new ToilError('INVALID_INPUT', 'Pass exactly one of --repo and --file.', { fix: 'toil classify scheme export <name> --repo <dir>, or --file <path>.' });
+      if ((input.repo === undefined) === (input.out === undefined)) throw new ToilError('INVALID_INPUT', 'Pass exactly one of --repo and --out.', { fix: 'toil classify scheme export <name> --repo <dir>, or --out <path>.' });
       const found = catalog.resolve({ scheme: input.name, cwd: input.cwd });
       for (const w of found.warnings) ctx.warn(w);
-      const target = input.repo !== undefined ? join(catalog.repoFolder(input.repo), `${found.scheme.name}.json`) : catalog.pathFor(input.file!, 'The export file');
+      const target = input.repo !== undefined ? join(catalog.repoFolder(input.repo), `${found.scheme.name}.json`) : catalog.pathFor(input.out!, 'The export file');
       const file = catalog.save(target, found.scheme, input.replace ? 'replace' : 'create');
       return { name: found.scheme.name, revision: found.scheme.revision, file, scheme: found.scheme };
     },
@@ -143,7 +143,7 @@ export function classifySchemeCommands(): AnyCommand[] {
     description: "Change a scheme from a revised file, raising its revision (a person's command)",
     input: z.object({
       name: z.string().min(1).optional().describe('The scheme to change: a name, or the path to a scheme file. Required unless toilProject is given.'),
-      from: z.string().min(1).describe('A file holding the revised scheme, inside the workspace'),
+      inputFile: z.string().min(1).describe('A file holding the revised scheme, inside the workspace'),
       toilProject: toilProjectField,
       cwd: cwdField,
     }),
@@ -152,15 +152,15 @@ export function classifySchemeCommands(): AnyCommand[] {
     // The scheme is the rulebook an agent's verdicts are held to, and agents never loosen the rules that constrain them (principle 2).
     kind: 'cli-only',
     args: [{ name: 'name', field: 'name', description: 'The scheme to change: a name, or a scheme file (omit with --toil-project)', required: false }],
-    options: [{ flags: '--from <file>', field: 'from', description: 'A file holding the revised scheme' }, toilProjectOption, cwdOption],
-    examples: [{ name: 'team', from: 'schemes/team-v2.json', cwd: '.' }, { name: 'ktlo-feature', from: 'schemes/ktlo-feature-v2.json' }, { toilProject: 'payments', from: 'schemes/team-v2.json', cwd: '.' }],
+    options: [{ flags: '--input-file <path>', field: 'inputFile', description: 'A file holding the revised scheme', deprecated: ['--from <file>'] }, toilProjectOption, cwdOption],
+    examples: [{ name: 'team', inputFile: 'schemes/team-v2.json', cwd: '.' }, { name: 'ktlo-feature', inputFile: 'schemes/ktlo-feature-v2.json' }, { toilProject: 'payments', inputFile: 'schemes/team-v2.json', cwd: '.' }],
     run: async (input, ctx) => {
       if (input.name === undefined && input.toilProject === undefined) {
-        throw new ToilError('INVALID_INPUT', 'Name the scheme to change, or a toil project whose scheme to change.', { fix: 'toil classify scheme set <name> --from <file>, or toil classify scheme set --toil-project <name> --from <file>.' });
+        throw new ToilError('INVALID_INPUT', 'Name the scheme to change, or a toil project whose scheme to change.', { fix: 'toil classify scheme set <name> --input-file <path>, or toil classify scheme set --toil-project <name> --input-file <path>.' });
       }
       const catalog = catalogOf(ctx);
       const current = currentScheme(ctx, input);
-      const incoming = catalog.readFile(input.from, input.cwd, current.scheme.name);
+      const incoming = catalog.readFile(input.inputFile, input.cwd, current.scheme.name);
       for (const w of [...current.warnings, ...incoming.warnings]) ctx.warn(w);
       if (incoming.scheme.name !== current.scheme.name) {
         throw new ToilError('INVALID_INPUT', `${forwardSlashes(incoming.file!)} holds a scheme named "${incoming.scheme.name}", and ${input.name ?? "the toil project's scheme"} is "${current.scheme.name}".`, {

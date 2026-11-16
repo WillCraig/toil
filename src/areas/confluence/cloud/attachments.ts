@@ -41,30 +41,30 @@ export const uploadAttachment = confluenceArea.command({
   path: ['confluence', 'page', 'attach'],
   description: 'Upload a file as an attachment to a Confluence Cloud page',
   toolDescription:
-    'Uploads a local file to a page as a new attachment and returns what Confluence created. file is a path inside the workspace. A file name already on the page is refused by Confluence, not versioned.',
+    'Uploads a local file to a page as a new attachment and returns what Confluence created. inputFile is a path inside the workspace. A file name already on the page is refused by Confluence, not versioned.',
   input: z.object({
     id: z.string().min(1).describe('Page ID'),
-    file: z.string().min(1).describe('Path to the file to upload'),
+    inputFile: z.string().min(1).describe('Path to the file to upload'),
     comment: z.string().optional().describe('Optional comment to attach to the file version'),
     ...allowWriteField,
   }),
   writes: true,
   args: [pageArg],
   options: [
-    { flags: '--file <path>', field: 'file', description: 'Path to the file to upload' },
+    { flags: '--input-file <path>', field: 'inputFile', description: 'Path to the file to upload', deprecated: ['--file <path>'] },
     { flags: '--comment <text>', field: 'comment', description: 'Optional comment to attach to the file version' },
   ],
   examples: [
-    { id: '12345', file: 'diagram.png', allowWrite: true },
-    { id: '12345', file: 'notes.txt', comment: 'First draft', allowWrite: true },
+    { id: '12345', inputFile: 'diagram.png', allowWrite: true },
+    { id: '12345', inputFile: 'notes.txt', comment: 'First draft', allowWrite: true },
   ],
   run: async (input, ctx) => {
-    if (!ctx.files.exists(input.file)) {
-      throw new ToilError('INVALID_INPUT', `File not found: ${input.file}`, { fix: 'Check the path. Relative paths resolve against the workspace.' });
+    if (!ctx.files.exists(input.inputFile)) {
+      throw new ToilError('INVALID_INPUT', `File not found: ${input.inputFile}`, { fix: 'Check the path. Relative paths resolve against the workspace.' });
     }
-    const data = await ctx.files.readBytes(input.file);
+    const data = await ctx.files.readBytes(input.inputFile);
     // The same file name on every platform: a backslash separates, as on Windows.
-    return client.uploadAttachment(ctx, input.id, attachmentFileName(input.file), data, input.comment);
+    return client.uploadAttachment(ctx, input.id, attachmentFileName(input.inputFile), data, input.comment);
   },
 });
 

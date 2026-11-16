@@ -26,8 +26,8 @@ export const workCategorizeCommand = adoArea.command({
   timeLimitMs: CATEGORIZE_TIME_LIMIT_MS,
   options: categorizeOptions,
   examples: [
-    { from: 'categorize-plan-cloud.json', allowWrite: true },
-    { project: 'Imagile', repo: 'imagile-api', from: 'categorize-plan-cloud.json', allowWrite: true },
+    { inputFile: 'categorize-plan-cloud.json', allowWrite: true },
+    { project: 'Imagile', repo: 'imagile-api', inputFile: 'categorize-plan-cloud.json', allowWrite: true },
   ],
   run: (input, ctx) => categorize(ctx, input, wire(ctx)),
 });

@@ -220,7 +220,7 @@ function hashFor(scheme: HashScheme): Hash {
 
 export interface EncodeInput {
   scheme: Scheme;
-  file?: string | undefined;
+  inputFile?: string | undefined;
   text?: string | undefined;
   decode?: boolean | undefined;
   out?: string | undefined;
@@ -249,7 +249,7 @@ export async function runEncode(input: EncodeInput, ctx: InputContext, codecs: R
     if (input.out !== undefined) throw new ToilError('INVALID_INPUT', `A ${scheme} digest is returned in the output, not written to a file.`, { fix: 'Drop --out.' });
     const hash = hashFor(scheme);
     // A file streams in constant memory, so it has no size cap; stdin is held in memory, so it keeps the reader's.
-    const fromFile = input.file !== undefined && input.file !== '-';
+    const fromFile = input.inputFile !== undefined && input.inputFile !== '-';
     const src = await openInput(ctx, input, { binary: 'allow', utf8: 'skip', ...(fromFile ? { maxBytes: Number.POSITIVE_INFINITY } : {}) });
     for await (const chunk of src.chunks()) hash.update(chunk);
     // The digest is only of what was read: a read that stopped short fails here, whatever the digest says.

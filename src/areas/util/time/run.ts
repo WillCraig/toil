@@ -214,7 +214,7 @@ export function checkDuration(v: Verifier, data: Omit<DurationData, 'verified'>,
 
 export interface HolidayFields {
   zone?: string | undefined;
-  holidays?: string | undefined;
+  holidaysFile?: string | undefined;
   holiday?: string[] | undefined;
 }
 

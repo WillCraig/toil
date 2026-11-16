@@ -246,7 +246,7 @@ describe('@imagile-dev/toil/api (src/api.ts)', () => {
 
   it('exports the version, the contract version and a registry of what execute() serves', () => {
     expect(version).toBe('0.0.0-test');
-    expect(contractVersion).toBe(3);
+    expect(contractVersion).toBe(4);
     const names = registry.commands.map((c) => c.name);
     expect(names).toContain('version');
     expect(names).toContain('connections list');

@@ -61,7 +61,7 @@
     "connection": false,
     "flags": [
       "[toil-project]",
-      "--file <path>",
+      "--input-file <path>",
       "--text <text>",
       "--as-of <time>",
       "--cwd <dir>"
@@ -98,7 +98,7 @@
     "connection": false,
     "flags": [
       "[toil-project]",
-      "--file <path>",
+      "--input-file <path>",
       "--text <text>",
       "--measure <id>",
       "--split <dimension>",
@@ -280,7 +280,7 @@
     "connection": false,
     "flags": [
       "<toil-project>",
-      "--file <path>",
+      "--input-file <path>",
       "--text <text>"
     ]
   },
@@ -351,7 +351,7 @@
     "flags": [
       "<toil-project>",
       "--repo <dir>",
-      "--file <path>",
+      "--out <path>",
       "--replace"
     ]
   },
@@ -416,7 +416,7 @@
     "writes": false,
     "connection": false,
     "flags": [
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--view <key>",
       "--not-mapped <path>"
@@ -430,7 +430,7 @@
     "connection": false,
     "flags": [
       "<toil-project>",
-      "[file]",
+      "--input-file <path>",
       "--text <text>",
       "--not-mapped <path>",
       "--replace"

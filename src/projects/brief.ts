@@ -37,7 +37,7 @@ export function toilProjectBriefCommands(): AnyCommand[] {
     path: ['projects', 'brief'],
     description: "Brief one toil project by code: what needs a person, under one reason each, and what to do first, from OWI records you pass (local only)",
     toolDescription:
-      "Briefs one toil project from Open Work Item records you pass (what util owi map printed for the toil project's work items and pull requests, as file or text; several envelopes, one per line, are fine). Asks no service: read each tracker and code host with its own command first. Applies the toil project's lenses in order (failing checks, blocked, waiting on review, sprint at risk, stale, over the WIP limit, ticket and pull request disagree) and puts each item that needs a person under the first lens that flags it. Returns { toil project, asOf, by, recommendation { text, items }, reasons [{ lens, label, severity, line, text, items [{ id, key, source, title, url, status, statusCategory, assignee, points, why, evidence, holds { items, points }, changes [{ id, repo, title, url, state, checks }] }] }], onTrack { open, done }, sprint, lenses [{ id, label, on, threshold, unit, test, checked, untested, note }], skipped }. Sentences cite items and pull requests as [[<owi id>]]; each item's url opens it in its tracker. A lens it can't check, or items it couldn't test for a missing field (untested), it says why in lenses[].note. Use it as the starting point for an analysis, then weigh what it found.",
+      "Briefs one toil project from Open Work Item records you pass (what util owi map printed for the toil project's work items and pull requests, as inputFile or text; several envelopes, one per line, are fine). Asks no service: read each tracker and code host with its own command first. Applies the toil project's lenses in order (failing checks, blocked, waiting on review, sprint at risk, stale, over the WIP limit, ticket and pull request disagree) and puts each item that needs a person under the first lens that flags it. Returns { toil project, asOf, by, recommendation { text, items }, reasons [{ lens, label, severity, line, text, items [{ id, key, source, title, url, status, statusCategory, assignee, points, why, evidence, holds { items, points }, changes [{ id, repo, title, url, state, checks }] }] }], onTrack { open, done }, sprint, lenses [{ id, label, on, threshold, unit, test, checked, untested, note }], skipped }. Sentences cite items and pull requests as [[<owi id>]]; each item's url opens it in its tracker. A lens it can't check, or items it couldn't test for a missing field (untested), it says why in lenses[].note. Use it as the starting point for an analysis, then weigh what it found.",
     input: z.object({
       toilProject: z.string().min(1).optional().describe('A toil project name, or the path to a toil project file. Defaults to the toil project that applies to the folder.'),
       cwd: z.string().min(1).optional().describe('The folder to look from; its repository decides which checked-in toil projects apply. Defaults to the workspace.'),
@@ -48,14 +48,14 @@ export function toilProjectBriefCommands(): AnyCommand[] {
     writesLocal: false,
     args: [{ name: 'toil-project', field: 'toilProject', description: 'A toil project name or file (default: the one the folder matches)', required: false }],
     options: [
-      { flags: '--file <path>', field: 'file', description: 'The OWI records: a file inside the workspace, or - for stdin (the default when no --text is given)' },
+      { flags: '--input-file <path>', field: 'inputFile', description: 'The OWI records: a file inside the workspace, or - for stdin (the default when no --text is given)', deprecated: ['--file <path>'] },
       textOption,
       { flags: '--as-of <time>', field: 'asOf', description: 'Brief as of this ISO 8601 time (default: now)' },
       { flags: '--cwd <dir>', field: 'cwd', description: 'The folder to look from (default: the working directory)' },
     ],
     examples: [
       { toilProject: 'payments', text: EXAMPLE_BRIEF_RECORDS, asOf: '2026-10-13T08:00:00Z' },
-      { toilProject: 'payments', cwd: '.', file: 'owi/brief.owi.json', asOf: '2026-10-16T08:00:00Z' },
+      { toilProject: 'payments', cwd: '.', inputFile: 'owi/brief.owi.json', asOf: '2026-10-16T08:00:00Z' },
     ],
     run: async (input, ctx) => {
       const applied = chosen(ctx.manage!.toilProjects!, input, ctx);

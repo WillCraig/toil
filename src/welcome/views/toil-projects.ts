@@ -1102,7 +1102,7 @@ export const exportFileView: View = {
     initial: (p) => `${shownOf(p)?.name ?? 'toil-project'}.json`,
     submit: (text, p): Action | { error: string } => {
       if (!/\.json$/i.test(text)) return { error: 'The file must end in .json.' };
-      return { run: exportRun(refOf(p), ['projects', 'export', refOf(p), '--file', text]) };
+      return { run: exportRun(refOf(p), ['projects', 'export', refOf(p), '--out', text]) };
     },
   },
 };

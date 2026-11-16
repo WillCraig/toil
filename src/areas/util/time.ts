@@ -22,13 +22,13 @@ const TIME = 'ISO 8601 (2026-03-08, 2026-03-08T02:30, 2026-03-08T07:30:00Z, 2026
 
 const holidayFields = {
   zone: zoneField('The zone whose calendar days count, and the zone of any time given without an offset'),
-  holidays: z.string().optional().describe('A file inside the workspace listing holidays, one YYYY-MM-DD per line, optionally followed by a name; # starts a comment'),
+  holidaysFile: z.string().optional().describe('A file inside the workspace listing holidays, one YYYY-MM-DD per line, optionally followed by a name; # starts a comment'),
   holiday: z.array(z.string()).optional().describe('A holiday as YYYY-MM-DD (repeatable)'),
 };
 
 const holidayOptions = [
   { flags: '--zone <zone>', field: 'zone', description: 'The zone whose calendar days count (default: UTC)' },
-  { flags: '--holidays <file>', field: 'holidays', description: 'A file of holidays, one YYYY-MM-DD per line' },
+  { flags: '--holidays-file <path>', field: 'holidaysFile', description: 'A file of holidays, one YYYY-MM-DD per line', deprecated: ['--holidays <file>'] },
   { flags: '--holiday <date>', field: 'holiday', description: 'A holiday as YYYY-MM-DD (repeatable)' },
 ];
 
@@ -41,7 +41,7 @@ const now = () => Date.now();
  */
 async function holidayFile(ctx: CommandContext<unknown>, file: string | undefined) {
   if (file === undefined) return undefined;
-  const input = await openInput(ctx, { file }, { maxBytes: 1024 * 1024 });
+  const input = await openInput(ctx, { inputFile: file }, { maxBytes: 1024 * 1024 });
   const lines: Array<{ number: number; text: string }> = [];
   for await (const line of input.lines()) lines.push({ number: line.number, text: line.text });
   return { label: input.label, lines, read: { source: input.source, expectedBytes: input.expectedBytes, bytesRead: input.bytesRead, truncated: input.truncated } };
@@ -109,12 +109,12 @@ export const timeBusinessAddCommand = defineCommand({
   ],
   options: holidayOptions,
   examples: [
-    { start: '2026-12-23', days: 3, holidays: 'holidays-2026.txt' },
+    { start: '2026-12-23', days: 3, holidaysFile: 'holidays-2026.txt' },
     { start: '2026-03-06T02:30', days: 1, zone: 'America/New_York', holiday: ['2026-01-01'] },
   ],
   run: async (input, ctx) => {
     const { addDays } = await import('./time/run.js');
-    return addDays(input, now(), { warn: ctx.warn, holidayFile: await holidayFile(ctx, input.holidays) });
+    return addDays(input, now(), { warn: ctx.warn, holidayFile: await holidayFile(ctx, input.holidaysFile) });
   },
 });
 
@@ -135,12 +135,12 @@ export const timeBusinessDiffCommand = defineCommand({
   ],
   options: holidayOptions,
   examples: [
-    { start: '2026-12-24T15:00', end: '2026-12-29T10:00', zone: 'America/Chicago', holidays: 'holidays-2026.txt' },
+    { start: '2026-12-24T15:00', end: '2026-12-29T10:00', zone: 'America/Chicago', holidaysFile: 'holidays-2026.txt' },
     { start: '2026-10-30T17:00:00Z', end: '2026-11-02T09:00:00Z', zone: 'Europe/Berlin', holiday: ['2026-11-02'] },
   ],
   run: async (input, ctx) => {
     const { diffDays } = await import('./time/run.js');
-    return diffDays(input, now(), { warn: ctx.warn, holidayFile: await holidayFile(ctx, input.holidays) });
+    return diffDays(input, now(), { warn: ctx.warn, holidayFile: await holidayFile(ctx, input.holidaysFile) });
   },
 });
 

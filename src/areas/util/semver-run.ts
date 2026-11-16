@@ -194,7 +194,7 @@ export function sortEntries(g: AnyGrammar, entries: Entry[], v: Verifier): { sor
   return { sorted, invalid };
 }
 
-export async function sort(input: SemverOptions & { file?: string | undefined; text?: string | undefined; range?: string | undefined }, ctx: Ctx) {
+export async function sort(input: SemverOptions & { inputFile?: string | undefined; text?: string | undefined; range?: string | undefined }, ctx: Ctx) {
   const options = rangeOptions(input);
   if (input.includePrerelease && input.range === undefined) {
     throw new ToilError('INVALID_INPUT', 'includePrerelease changes what a range matches, and no range was given.', { fix: 'Pass --range too, or drop --include-prerelease.' });

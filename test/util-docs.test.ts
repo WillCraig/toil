@@ -199,7 +199,7 @@ describe('util docs coverage catches a broken copy', () => {
 
   it('util.md with a stale example or a stale alias', () => {
     const doc = read(skillFile);
-    expect(skillProblems(doc.replace('toil util log console.log --level error --context 3', 'toil util log console.log --level error --contxt 3'), utilDefs).join('\n')).toMatch(/--contxt/);
+    expect(skillProblems(doc.replace('toil util log --input-file console.log --level error --context 3', 'toil util log --input-file console.log --level error --contxt 3'), utilDefs).join('\n')).toMatch(/--contxt/);
     expect(skillProblems(doc.replace('| `toil util jwt decode` | `toil jwt decode` |', '| `toil util jwt decode` | none |'), utilDefs).join('\n')).toMatch(/alias cell is "none"/);
   });
 });

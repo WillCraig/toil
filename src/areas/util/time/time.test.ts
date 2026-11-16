@@ -314,7 +314,7 @@ describe('util time business-days', () => {
 
   it('adds over Christmas with the holiday file, and checks the count again', async () => {
     const { ctx, warnings } = ctxWith({ name: 'holidays-2026.txt', text: HOLIDAYS_2026 });
-    const data = addDays({ start: '2026-12-23', days: 3, holidays: 'holidays-2026.txt' }, 0, ctx);
+    const data = addDays({ start: '2026-12-23', days: 3, holidaysFile: 'holidays-2026.txt' }, 0, ctx);
     expect(data).toMatchObject({ result: '2026-12-29', weekday: 'Tuesday', skipped: { weekendDays: 2, holidays: ['2026-12-25'] }, holidaysListed: 11 });
     expect(data.verified.checks.map((c) => [c.check, c.status])).toEqual([
       ['input.complete', 'passed'],
@@ -342,7 +342,7 @@ describe('util time business-days', () => {
 
   it('fails the completeness check on a holiday file cut short at the cap', async () => {
     const big = `${'# padding\n'.repeat(110_000)}2026-12-25\n`;
-    const envelope = await execute(timeBusinessAddCommand, { start: '2026-12-24', days: 1, holidays: 'big.txt' }, testContext({ files: { 'big.txt': big } }).context);
+    const envelope = await execute(timeBusinessAddCommand, { start: '2026-12-24', days: 1, holidaysFile: 'big.txt' }, testContext({ files: { 'big.txt': big } }).context);
     const data = envelope.data as { result: string; verified: { passed: boolean } };
     // The Christmas line past the cap was never read, so the 25th counted as a business day, and the check says the file wasn't whole.
     expect([data.result, data.verified.passed]).toEqual(['2026-12-25', false]);
@@ -351,7 +351,7 @@ describe('util time business-days', () => {
 
   it('refuses a holiday line that is not a date, naming the line', async () => {
     const files = { 'bad.txt': '# holidays\n2026-12-25 Christmas\n25/12/2026 Boxing Day\n' };
-    const envelope = await execute(timeBusinessAddCommand, { start: '2026-12-23', days: 1, holidays: 'bad.txt' }, testContext({ files }).context);
+    const envelope = await execute(timeBusinessAddCommand, { start: '2026-12-23', days: 1, holidaysFile: 'bad.txt' }, testContext({ files }).context);
     expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: 'the file "bad.txt", line 3, is not a holiday date: "25/12/2026 Boxing Day".' });
     const { ctx } = ctxWith();
     expect(() => addDays({ start: '2026-12-23', days: 1, holiday: ['2026-02-30'] }, 0, ctx)).toThrow(/has day 30/);
@@ -371,7 +371,7 @@ describe('util time business-days', () => {
 
   it('measures business time across a weekend and a holiday, in days and hours', async () => {
     const { ctx } = ctxWith({ name: 'holidays-2026.txt', text: HOLIDAYS_2026 });
-    const data = diffDays({ start: '2026-12-24T15:00', end: '2026-12-29T10:00', zone: 'America/Chicago', holidays: 'holidays-2026.txt' }, 0, ctx);
+    const data = diffDays({ start: '2026-12-24T15:00', end: '2026-12-29T10:00', zone: 'America/Chicago', holidaysFile: 'holidays-2026.txt' }, 0, ctx);
     // Thursday 15:00-24:00, Monday all day, Tuesday 00:00-10:00: 9 + 24 + 10 hours.
     expect(data).toMatchObject({ businessDays: 1, hours: 19, duration: 'PT43H', totalBusinessSeconds: 43 * 3600, elapsedSeconds: 115 * 3600, holidays: ['2026-12-25'], negative: false });
     expect(data.verified.passed).toBe(true);
@@ -410,7 +410,7 @@ describe('util time business-days', () => {
   it('runs diff through execute()', async () => {
     const envelope = await execute(timeBusinessDiffCommand, { start: '2026-10-30T17:00:00Z', end: '2026-11-02T09:00:00Z', zone: 'Europe/Berlin', holiday: ['2026-11-02'] }, testContext().context);
     expect(envelope.data).toMatchObject({ businessDays: 0, hours: 6, holidays: ['2026-11-02'] });
-    const added = await execute(timeBusinessAddCommand, { start: '2026-12-23', days: 3, holidays: 'missing.txt' }, testContext().context);
+    const added = await execute(timeBusinessAddCommand, { start: '2026-12-23', days: 3, holidaysFile: 'missing.txt' }, testContext().context);
     expect(added.error?.message).toContain('missing.txt');
   });
 });

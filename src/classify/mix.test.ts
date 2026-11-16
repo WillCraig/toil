@@ -4,7 +4,7 @@ import { AS_OF, cleanup, cli, codes, data, disk, done, item, mcp, records } from
 
 afterEach(cleanup);
 
-const mixArgs = ['classify', 'mix', '--file', 'work.json', '--as-of', AS_OF];
+const mixArgs = ['classify', 'mix', '--input-file', 'work.json', '--as-of', AS_OF];
 const share = (line: any, category: string) => line.shares.find((s: any) => s.category === category);
 
 describe('classify mix', () => {
@@ -73,7 +73,7 @@ describe('classify mix', () => {
     const d = disk();
     const out = data(await cli(d, mixArgs));
     const s = await mcp(d);
-    const viaMcp = data((await s.call('classify_mix', { file: 'work.json', asOf: AS_OF })).envelope);
+    const viaMcp = data((await s.call('classify_mix', { inputFile: 'work.json', asOf: AS_OF })).envelope);
     expect(viaMcp.overall).toEqual(out.overall);
     expect(viaMcp.periods).toEqual(out.periods);
   });
@@ -91,7 +91,7 @@ describe('a ledger toil cannot read', () => {
     const mix = await cli(d, mixArgs);
     expect(data(mix).overall).toHaveLength(3);
     expect(codes(mix)).toContain('LEDGER_UNREADABLE');
-    const pivot = await cli(d, ['projects', 'pivot', 'payments', '--file', 'work.json', '--as-of', AS_OF, '--split', 'category']);
+    const pivot = await cli(d, ['projects', 'pivot', 'payments', '--input-file', 'work.json', '--as-of', AS_OF, '--split', 'category']);
     expect(data(pivot).total).toBeDefined();
     expect(codes(pivot)).toContain('LEDGER_UNREADABLE');
   });

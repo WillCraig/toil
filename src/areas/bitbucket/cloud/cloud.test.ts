@@ -408,7 +408,7 @@ describe('pull requests', () => {
 
 describe('review', () => {
   it('pr diff <id> diffs the PR source against its destination with topic=true, passing file and context', async () => {
-    const { calls, envelope } = await run(diffCommand, { ...at, id: 42, file: 'src/retry.ts', contextLines: 0 });
+    const { calls, envelope } = await run(diffCommand, { ...at, id: 42, path: 'src/retry.ts', contextLines: 0 });
     expect(urls(calls)).toEqual([`${R}/pullrequests/42`, `${R}/diff/${SPEC}?topic=true&path=src%2Fretry.ts&context=0`]);
     expect(envelope.data).toEqual({ diff: DIFF });
   });
@@ -471,9 +471,9 @@ describe('comments', () => {
     expect(body(add.calls[0]!)).toEqual({ content: { raw: 'Hi' } });
     const reply = await run(replyCommentCommand, { ...at, id: 42, commentId: 1001, body: 'Done', ...write });
     expect(body(reply.calls[0]!)).toEqual({ content: { raw: 'Done' }, parent: { id: 1001 } });
-    const added = await run(addInlineCommentCommand, { ...at, id: 42, file: 'src/retry.ts', line: 12, body: 'x', ...write });
+    const added = await run(addInlineCommentCommand, { ...at, id: 42, path: 'src/retry.ts', line: 12, body: 'x', ...write });
     expect(body(added.calls[0]!)).toEqual({ content: { raw: 'x' }, inline: { path: 'src/retry.ts', to: 12 } });
-    const removed = await run(addInlineCommentCommand, { ...at, id: 42, file: 'src/old.ts', line: 3, body: 'y', lineType: 'REMOVED', ...write });
+    const removed = await run(addInlineCommentCommand, { ...at, id: 42, path: 'src/old.ts', line: 3, body: 'y', lineType: 'REMOVED', ...write });
     expect(body(removed.calls[0]!)).toEqual({ content: { raw: 'y' }, inline: { path: 'src/old.ts', from: 3 } });
   });
 

@@ -20,7 +20,7 @@ import { readTrx } from './trx.js';
  */
 
 export interface ReportInput {
-  file?: string | undefined;
+  inputFile?: string | undefined;
   text?: string | undefined;
   format?: ReportFormat | undefined;
   lowest?: number | undefined;

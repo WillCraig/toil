@@ -67,7 +67,7 @@ const FROM_DESCRIPTION = 'Inventory to evaluate: a file holding toil deps scan o
 function readInventory(ctx: SonatypeIqContext, from: string | undefined): Promise<InventoryPackage[]> {
   return readCoreInventory(ctx, from, {
     verb: 'evaluate',
-    fix: 'Pass the output of toil deps scan, e.g. toil deps scan --include-transitive | toil sonatypeiq evaluate --application-id <id>, or --from <file> holding it.',
+    fix: 'Pass the output of toil deps scan, e.g. toil deps scan --include-transitive | toil sonatypeiq evaluate --application-id <id>, or --input-file <path> holding it.',
   });
 }
 
@@ -270,7 +270,7 @@ export const evaluateCommand = sonatypeiqArea.command({
   toolDescription:
     "Sonatype IQ policy evaluation of an inventory from toil deps scan, against one application (applicationId is its public ID; see sonatypeiq_application_list). Returns { tier, source, sourcesQueried, sourceErrors, scanned, vulnerable, packages: [{ name, version, ecosystem, ..., vulnerabilities }] }. Only SECURITY policy violations count.",
   input: z.object({
-    from: z.string().optional().describe(FROM_DESCRIPTION),
+    inputFile: z.string().optional().describe(FROM_DESCRIPTION),
     applicationId: z.string().optional().describe('Sonatype IQ Server application public ID (required)'),
     ecosystem: z.string().optional().describe('Filter to one ecosystem: npm, nuget, maven, all (default: "all")'),
     directOnly: z.boolean().optional().describe('Only scan direct dependencies (default: include transitive) (default: false)'),
@@ -281,15 +281,15 @@ export const evaluateCommand = sonatypeiqArea.command({
   queryByPost: true,
   timeLimitMs: TIME_LIMIT_MS,
   options: [
-    { flags: '--from <file>', field: 'from', description: FROM_DESCRIPTION },
+    { flags: '--input-file <path>', field: 'inputFile', description: FROM_DESCRIPTION, deprecated: ['--from <file>'] },
     { flags: '--application-id <id>', field: 'applicationId', description: 'Sonatype IQ Server application public ID (required)' },
     { flags: '--ecosystem <ecosystem>', field: 'ecosystem', description: 'Filter to one ecosystem: npm, nuget, maven, all (default: "all")' },
     { flags: '--direct-only', field: 'directOnly', description: 'Only scan direct dependencies (default: include transitive) (default: false)' },
     { flags: '--include-dev', field: 'includeDev', description: 'Include dev/test dependencies (default: false)' },
   ],
   examples: [
-    { from: 'inventory.json', applicationId: 'imagile-api' },
-    { from: 'inventory.json', applicationId: 'imagile-api', ecosystem: 'npm', directOnly: true, includeDev: true },
+    { inputFile: 'inventory.json', applicationId: 'imagile-api' },
+    { inputFile: 'inventory.json', applicationId: 'imagile-api', ecosystem: 'npm', directOnly: true, includeDev: true },
   ],
   run: async (input, ctx) => {
     if (!input.applicationId) {
@@ -297,7 +297,7 @@ export const evaluateCommand = sonatypeiqArea.command({
         fix: 'Pass --application-id <public ID>; toil sonatypeiq application list shows each application\'s publicId.',
       });
     }
-    const packages = selected(await readInventory(ctx, input.from), input.ecosystem, input.directOnly === true, input.includeDev === true);
+    const packages = selected(await readInventory(ctx, input.inputFile), input.ecosystem, input.directOnly === true, input.includeDev === true);
     // tier used to come from pinging OSV.dev and Artifactory; this command asks only IQ.
     const result = { tier: 'full', source: 'sonatypeiq', sourcesQueried: ['sonatypeiq'], sourceErrors: [] as Array<{ source: string; error: string }> };
     if (packages.length === 0) return { ...result, scanned: 0, vulnerable: 0, packages: [] };

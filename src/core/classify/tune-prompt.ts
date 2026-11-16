@@ -89,7 +89,7 @@ export function tunePrompt(input: TuneInput): string {
     'Then, in words, the steps for you to take next:',
     '1. Save the revised scheme to a file in the workspace, for example revised-scheme.json.',
     "2. Classify the held-back items under it. Their ids are in this result's corrections.heldBackItems; read those items through toil's own reads into OWI records, then run toil classify prompt --scheme revised-scheme.json --recheck over them (recheck, so a label already on an item does not answer for it), and save your answers, a JSON array of { id, category, reason }, to a file.",
-    '3. Score both schemes against what people said: toil classify stats --backtest <your answers file> --revised revised-scheme.json.',
+    '3. Score both schemes against what people said: toil classify stats --backtest-file <your answers file> --revised-file revised-scheme.json.',
     '4. Show the person both scores, and every change with the corrections behind it, and say plainly if the revision scores worse.',
     '5. Stop there. Only a person applies a revision, with toil classify scheme set, which is a person\'s command. Do not run it, and do not edit a scheme file in place.',
   ];

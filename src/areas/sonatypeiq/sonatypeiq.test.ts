@@ -107,7 +107,7 @@ describe('read commands', () => {
 
 describe('evaluate: the request', () => {
   it('looks up the internal ID, POSTs the inventory as purls, and returns the deps frisk shape', async () => {
-    const { envelope, calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate(evaluation)], { files: { 'inventory.json': JSON.stringify(scanEnvelope) } });
+    const { envelope, calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate(evaluation)], { files: { 'inventory.json': JSON.stringify(scanEnvelope) } });
     expect(calls).toEqual([
       { method: 'GET', url: `${IQ}/api/v2/applications?publicId=${PUBLIC_ID}`, headers: EVAL_GET_HEADERS, body: undefined },
       {
@@ -147,12 +147,12 @@ describe('evaluate: the request', () => {
 
   it('filters the inventory: --direct-only drops transitive, --include-dev keeps dev, --ecosystem keeps one', async () => {
     const files = inventory([pkg('a'), pkg('b', { type: 'transitive' }), pkg('c', { scope: 'dev' }), pkg('d', { ecosystem: 'nuget' })]);
-    const { calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID, directOnly: true, includeDev: true, ecosystem: 'npm' }, [lookup(), evaluate({ components: [] })], { files });
+    const { calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID, directOnly: true, includeDev: true, ecosystem: 'npm' }, [lookup(), evaluate({ components: [] })], { files });
     expect(JSON.parse(calls[1]!.body!)).toEqual({ components: [{ packageUrl: 'pkg:npm/a@1.0.0' }, { packageUrl: 'pkg:npm/c@1.0.0' }] });
   });
 
   it('with nothing left after filtering (an unknown --ecosystem included), returns zeros and asks IQ nothing', async () => {
-    const { envelope, calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID, ecosystem: 'pypi' }, [], { files: inventory([pkg('a')]) });
+    const { envelope, calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID, ecosystem: 'pypi' }, [], { files: inventory([pkg('a')]) });
     expect(calls).toEqual([]);
     expect(envelope.data).toEqual({ tier: 'full', source: 'sonatypeiq', sourcesQueried: ['sonatypeiq'], sourceErrors: [], scanned: 0, vulnerable: 0, packages: [] });
   });
@@ -169,12 +169,12 @@ describe('evaluate: the request', () => {
 
   it('sends 128 packages per evaluation, one batch after another', async () => {
     const many = Array.from({ length: 130 }, (_, i) => pkg(`p${i}`));
-    const { envelope, calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate({ components: [] })], { files: inventory(many) });
+    const { envelope, calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate({ components: [] })], { files: inventory(many) });
     const posts = calls.filter((c) => c.method === 'POST').map((c) => (JSON.parse(c.body!) as { components: unknown[] }).components.length);
     expect(posts).toEqual([128, 2]);
     expect(envelope.data).toMatchObject({ scanned: 130, vulnerable: 0 });
 
-    const unread = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate({ resultId: 'abc12345' })], { files: inventory(many) });
+    const unread = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate({ resultId: 'abc12345' })], { files: inventory(many) });
     expect(unread.envelope.meta.warnings).toEqual([expect.objectContaining({ code: 'SONATYPEIQ_NO_COMPONENTS', message: expect.stringContaining('2 of 2 batch(es)') })]);
   });
 
@@ -194,7 +194,7 @@ describe('evaluate: the inventory', () => {
 
   it("takes deps scan's envelope, its data, or a bare list", async () => {
     for (const body of [scanEnvelope, scanEnvelope.data, scanEnvelope.data.packages]) {
-      const { envelope } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, routes(), { files: { 'inventory.json': JSON.stringify(body) } });
+      const { envelope } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, routes(), { files: { 'inventory.json': JSON.stringify(body) } });
       expect(envelope.data).toMatchObject({ scanned: 2 });
     }
   });
@@ -207,15 +207,15 @@ describe('evaluate: the inventory', () => {
       [JSON.stringify([{ name: 'a', ecosystem: 'npm' }]), 'without a usable version (packages[0])'],
     ];
     for (const [text, message] of cases) {
-      const { envelope, calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [], { files: { 'inventory.json': text } });
+      const { envelope, calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [], { files: { 'inventory.json': text } });
       expect(calls).toEqual([]);
       expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining(message) });
     }
   });
 
-  it('with no from and no stdin (MCP), says to pass from', async () => {
+  it('with no inputFile and no stdin (MCP), says to pass inputFile', async () => {
     const { envelope } = await run(evaluateCommand, { applicationId: PUBLIC_ID }, []);
-    expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('No inventory to evaluate: pass from') });
+    expect(envelope.error).toMatchObject({ code: 'INVALID_INPUT', message: expect.stringContaining('No inventory to evaluate: pass inputFile') });
   });
 
   it('reads stdin on the CLI, through the deps frisk --source sonatypeiq route with --application-id, and meta.command names the command', async () => {
@@ -243,7 +243,7 @@ describe('evaluate: the internal ID lookup (suspected bug #91 item 4)', () => {
 
   it('falls back to the public ID, silently, on a 500, a 401 or an empty list', async () => {
     for (const respond of [{ status: 500, text: '' }, { status: 401, text: '' }, { json: { applications: [] } }]) {
-      const { envelope, calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [{ method: 'GET', path: '/api/v2/applications', respond }, evaluate({ components: [] }, PUBLIC_ID)], { files });
+      const { envelope, calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [{ method: 'GET', path: '/api/v2/applications', respond }, evaluate({ components: [] }, PUBLIC_ID)], { files });
       expect(envelope.ok).toBe(true);
       expect(posted(calls)).toBe(`${IQ}/api/v2/evaluation/applications/${PUBLIC_ID}`);
       expect(envelope.meta.warnings).toBeUndefined();
@@ -251,7 +251,7 @@ describe('evaluate: the internal ID lookup (suspected bug #91 item 4)', () => {
   });
 
   it('so an unknown application ends in the evaluation 404, with its documented message', async () => {
-    const { envelope } = await run(evaluateCommand, { from: 'inventory.json', applicationId: 'does-not-exist' }, [
+    const { envelope } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: 'does-not-exist' }, [
       { method: 'GET', path: '/api/v2/applications', respond: { json: { applications: [] } } },
       { method: 'POST', path: '/api/v2/evaluation/applications/does-not-exist', respond: { status: 404, json: { message: 'Application not found' } } },
     ], { files });
@@ -259,26 +259,26 @@ describe('evaluate: the internal ID lookup (suspected bug #91 item 4)', () => {
   });
 
   it('encodes the public ID with encodeURIComponent', async () => {
-    const { calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: 'a b' }, [{ method: 'GET', path: '/api/v2/applications', respond: { json: { applications: [] } } }, { method: 'POST', url: /.*/, respond: { json: { components: [] } } }], { files });
+    const { calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: 'a b' }, [{ method: 'GET', path: '/api/v2/applications', respond: { json: { applications: [] } } }, { method: 'POST', url: /.*/, respond: { json: { components: [] } } }], { files });
     expect(calls[0]!.url).toBe(`${IQ}/api/v2/applications?publicId=a%20b`);
     expect(calls[1]!.url).toBe(`${IQ}/api/v2/evaluation/applications/a%20b`);
   });
 
   it('POSTs to an encoded evaluation path: a # in the public ID is part of the ID', async () => {
-    const { calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: 'p1#hot' }, [{ method: 'GET', path: '/api/v2/applications', respond: { json: { applications: [] } } }, { method: 'POST', url: /.*/, respond: { json: { components: [] } } }], { files });
+    const { calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: 'p1#hot' }, [{ method: 'GET', path: '/api/v2/applications', respond: { json: { applications: [] } } }, { method: 'POST', url: /.*/, respond: { json: { components: [] } } }], { files });
     expect(calls[0]!.url).toBe(`${IQ}/api/v2/applications?publicId=p1%23hot`);
     expect(calls[1]).toMatchObject({ method: 'POST', url: `${IQ}/api/v2/evaluation/applications/p1%23hot` });
   });
 
   it('an empty lookup body is an error, as a failed parse was', async () => {
-    const { envelope } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [{ method: 'GET', path: '/api/v2/applications', respond: { text: '' } }], { files });
+    const { envelope } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [{ method: 'GET', path: '/api/v2/applications', respond: { text: '' } }], { files });
     expect(envelope.error).toMatchObject({ code: 'HTTP', message: expect.stringContaining('empty body') });
   });
 });
 
 describe('evaluate: reading the answer', () => {
   const files = inventory([pkg('a'), pkg('b'), pkg('c')]);
-  const answer = async (components: unknown[]) => run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate({ isQueued: false, components })], { files });
+  const answer = async (components: unknown[]) => run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate({ isQueued: false, components })], { files });
   const severity = async (level: number) => {
     const { envelope } = await answer([component('pkg:npm/a@1.0.0', { policyData: { policyViolations: [securityViolation(level)] } })]);
     return (envelope.data as { packages: Array<{ vulnerabilities: Array<{ severity: string }> }> }).packages[0]!.vulnerabilities[0]!.severity;
@@ -320,7 +320,7 @@ describe('evaluate: reading the answer', () => {
 
   it("IQ's documented answer has no components, so it reads as nothing found, with a warning (suspected bug #91 item 2)", async () => {
     const documented = { resultId: 'abc12345', submittedDate: '2026-10-17T12:00:00.000Z', applicationId: INTERNAL_ID, resultsUrl: `api/v2/evaluation/applications/${INTERNAL_ID}/results/abc12345` };
-    const { envelope, calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate(documented)], { files });
+    const { envelope, calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), evaluate(documented)], { files });
     expect(calls).toHaveLength(2);
     expect(envelope.data).toMatchObject({ scanned: 3, vulnerable: 0, packages: [] });
     expect(envelope.meta.warnings).toEqual([expect.objectContaining({ code: 'SONATYPEIQ_NO_COMPONENTS' })]);
@@ -338,9 +338,9 @@ describe('evaluate: reading the answer', () => {
   });
 
   it('a failed evaluation keeps its documented message and core\'s code: a 500 is HTTP, a 401 AUTH', async () => {
-    const failed = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), { method: 'POST', url: /.*/, respond: { status: 500, text: '' } }], { files });
+    const failed = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), { method: 'POST', url: /.*/, respond: { status: 500, text: '' } }], { files });
     expect(failed.envelope.error).toMatchObject({ code: 'HTTP', message: 'Sonatype IQ Server returned HTTP 500 Internal Server Error' });
-    const denied = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), { method: 'POST', url: /.*/, respond: { status: 401, text: '' } }], { files });
+    const denied = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), { method: 'POST', url: /.*/, respond: { status: 401, text: '' } }], { files });
     expect(denied.envelope.error).toMatchObject({ code: 'AUTH', message: 'Sonatype IQ Server returned HTTP 401 Unauthorized', fix: expect.stringContaining('User Token') });
   });
 });
@@ -352,7 +352,7 @@ describe('evaluate: polling a queued evaluation', () => {
   afterEach(() => vi.useRealTimers());
 
   it('polls a relative resultsUrl with a slash under the base URL, context path kept, and reads the finished answer', async () => {
-    const { envelope, calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [
+    const { envelope, calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [
       { method: 'GET', path: '/iq/api/v2/applications', respond: { json: applications } },
       { method: 'POST', url: /.*/, respond: { json: { isQueued: true, resultsUrl: '/api/v2/results/r1' } } },
       { method: 'GET', path: '/iq/api/v2/results/r1', respond: { json: done } },
@@ -362,32 +362,32 @@ describe('evaluate: polling a queued evaluation', () => {
   });
 
   it('glues a slash-less relative resultsUrl onto the base URL as text (suspected bug #91 item 3), then re-points the mangled host at the connection', async () => {
-    const { envelope, calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), queued('api/v2/results/r1'), { method: 'GET', url: `${IQ}/v2/results/r1`, respond: { json: done } }], { files });
+    const { envelope, calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), queued('api/v2/results/r1'), { method: 'GET', url: `${IQ}/v2/results/r1`, respond: { json: done } }], { files });
     expect(calls[2]!.url).toBe(`${IQ}/v2/results/r1`);
     expect(envelope.meta.warnings).toEqual([expect.objectContaining({ code: 'SONATYPEIQ_RESULTS_HOST', message: expect.stringContaining('https://iq.imagile.devapi') })]);
   });
 
   it('Security (#91 item 1): an absolute resultsUrl on another host is fetched from the connection\'s host instead, with a warning', async () => {
-    const { envelope, calls } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), queued('https://other.example.com/api/v2/results/r1?x=1'), { method: 'GET', url: `${IQ}/api/v2/results/r1?x=1`, respond: { json: done } }], { files });
+    const { envelope, calls } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), queued('https://other.example.com/api/v2/results/r1?x=1'), { method: 'GET', url: `${IQ}/api/v2/results/r1?x=1`, respond: { json: done } }], { files });
     expect(calls.map((c) => new URL(c.url).origin)).toEqual([IQ, IQ, IQ]);
     expect(envelope.meta.warnings).toEqual([expect.objectContaining({ code: 'SONATYPEIQ_RESULTS_HOST', message: expect.stringContaining('https://other.example.com') })]);
     expect(envelope.data).toMatchObject({ vulnerable: 1 });
   });
 
   it('an absolute resultsUrl on the same host is kept, with no warning', async () => {
-    const { envelope } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), queued(`${IQ}/api/v2/results/r1`), { method: 'GET', url: `${IQ}/api/v2/results/r1`, respond: { json: done } }], { files });
+    const { envelope } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), queued(`${IQ}/api/v2/results/r1`), { method: 'GET', url: `${IQ}/api/v2/results/r1`, respond: { json: done } }], { files });
     expect(envelope.meta.warnings).toBeUndefined();
   });
 
   it('any non-2xx while polling fails, IQ\'s documented "not ready" 404 included (suspected bug #91 item 3)', async () => {
-    const { envelope } = await run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), queued('/api/v2/results/r1'), { method: 'GET', path: '/api/v2/results/r1', respond: { status: 404, text: '' } }], { files });
+    const { envelope } = await run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [lookup(), queued('/api/v2/results/r1'), { method: 'GET', path: '/api/v2/results/r1', respond: { status: 404, text: '' } }], { files });
     expect(envelope.error).toMatchObject({ code: 'NOT_FOUND', message: 'Sonatype IQ Server returned HTTP 404 Not Found polling results' });
   });
 
   it('waits 2 s, 4 s, 6 s ... between polls and gives up after the tenth queued answer with its documented message', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     const times: number[] = [];
-    const pending = run(evaluateCommand, { from: 'inventory.json', applicationId: PUBLIC_ID }, [
+    const pending = run(evaluateCommand, { inputFile: 'inventory.json', applicationId: PUBLIC_ID }, [
       lookup(),
       queued('/api/v2/results/r1'),
       { method: 'GET', path: '/api/v2/results/r1', respond: () => (times.push(Date.now()), { json: { isQueued: true } }) },

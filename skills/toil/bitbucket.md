@@ -206,11 +206,11 @@ a flag listed for one deployment is refused on the other.
 | `pr current` | | The open pull request from the current git branch, or `null` (`toil git current-pr` is the same command) |
 | `pr comments` | `<id> --no-with-replies --inline-only --general-only` | Comments, oldest first, replies included |
 | `pr comment` ✎ | `<id> --body` | The comment |
-| `pr comment-inline` ✎ | `<id> --file --line --body --line-type` | The comment |
+| `pr comment-inline` ✎ | `<id> --path --line --body --line-type` | The comment |
 | `pr reply` ✎ | `<id> <comment-id> --body` | The reply |
 | `pr resolve` ✎ | `<id> <comment-id> --comment-version` | Data Center: `{ resolved }`, at `--comment-version`. Cloud: the resolution record |
 | `pr delete-comment` ✎ | `<id> <comment-id> --comment-version` | `{ deleted }`, at `--comment-version` on Data Center |
-| `pr diff` | `[id] --spec --file --context-lines` | `{ diff }`. Data Center needs `<id>`; `--spec` is Cloud's |
+| `pr diff` | `[id] --spec --path --context-lines` | `{ diff }`. Data Center needs `<id>`; `--spec` is Cloud's |
 | `pr files` | `<id>` | Paths the pull request changes |
 | `pr approve` ✎ / `pr unapprove` ✎ | `<id>` | The participant record (Cloud's `unapprove` returns `{ unapproved }`) |
 | `pr needs-work` ✎ | `<id>` | The participant record; also `pr request-changes` |
@@ -235,7 +235,7 @@ toil bitbucket pr comments 42 --no-with-replies
 # Cloud
 toil bitbucket --ws imagile --repo toil pr list --state ALL --limit 20 --connection imagile-bbc
 toil bitbucket --ws imagile --repo toil file get src/retry.ts --ref feature/retries --connection imagile-bbc
-toil bitbucket --ws imagile --repo toil pr diff 42 --file src/retry.ts --connection imagile-bbc
+toil bitbucket --ws imagile --repo toil pr diff 42 --path src/retry.ts --connection imagile-bbc
 toil bitbucket --ws imagile --repo toil pipeline list --branch main --limit 5 --connection imagile-bbc
 ```
 
@@ -361,7 +361,7 @@ and `bitbucket api` doesn't.
   file comes back as text; read a folder with `file list`, not `file get`.
 - `pr diff <id>` and `pr files` read the pull request first and diff its source commit
   against its destination with `topic=true`, the three-dot diff Bitbucket shows on
-  the pull request, so `--file` and `--context-lines` apply. `pr diff --spec` takes one
+  the pull request, so `--path` and `--context-lines` apply. `pr diff --spec` takes one
   commit (against its first parent) or `a..b`. Pass exactly one of an id and `--spec`.
   A pull request from a fork isn't diffed this way: use `--spec` in the fork, or `api`.
 - `pr update` reads the pull request first and sends back its current title,

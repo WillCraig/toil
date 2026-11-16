@@ -38,18 +38,19 @@ machine and talk to nothing else. Each one follows the same rules, which are on 
 ## Reading input: `kit/input.ts`
 
 A command that reads one document spreads `inputFields` into its zod object, and
-takes `fileArgument` and `textOption` on the CLI:
+takes `inputFileOption` and `textOption` on the CLI (`fileArgument` is the retired
+`[file]` positional, still read with a `DEPRECATED_FLAG` warning, #622):
 
 ```ts
 input: z.object({ ...inputFields, since: z.string().optional() }),
 args: [fileArgument],
-options: [textOption, { flags: '--since <time>', field: 'since', description: '…' }],
+options: [inputFileOption, textOption, { flags: '--since <time>', field: 'since', description: '…' }],
 ```
 
-That gives `toil util log build.log`, `toil util log - < build.log` (or no file at
-all, which also reads stdin) and `--text '…'`, and over MCP `{ file }` or
+That gives `toil util log --input-file build.log`, `toil util log < build.log` (or no file at
+all, which also reads stdin) and `--text '…'`, and over MCP `{ inputFile }` or
 `{ text }`. `openInput(ctx, input, options)` opens whichever was given. It refuses
-both at once, stdin over MCP (naming `file` and `text`), a folder, and binary content
+both at once, stdin over MCP (naming `inputFile` and `text`), a folder, and binary content
 (a NUL byte in the first 8,000 bytes) unless `binary: 'allow'`, which a command that
 takes bytes sets. That lifts only the NUL check; the UTF-8 warning is `utf8`'s
 (below), so a command reading bytes such as DER passes both.

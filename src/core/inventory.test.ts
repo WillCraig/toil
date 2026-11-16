@@ -28,7 +28,7 @@ describe('the shared inventory reader', () => {
   it("keeps a source's own wording when it gives one", async () => {
     const words = { verb: 'evaluate', holds: 'a package list', missingFix: 'Write one.', fix: 'Pipe one in.', packageFix: 'Name it.' };
     await expect(readInventory({ files: memoryFiles() }, undefined, words)).rejects.toThrow(
-      expect.objectContaining({ message: 'No inventory to evaluate: pass from, a package list. Over MCP there is no stdin to read it from.', fix: 'Write one.' }),
+      expect.objectContaining({ message: 'No inventory to evaluate: pass inputFile, a package list. Over MCP there is no stdin to read it from.', fix: 'Write one.' }),
     );
     await expect(readInventory({ files: memoryFiles({}, { stdin: 'nope' }) }, '-', words)).rejects.toThrow(expect.objectContaining({ fix: 'Pipe one in.' }));
     await expect(readInventory({ files: memoryFiles({}, { stdin: '[{"name":"x"}]' }) }, '-', words)).rejects.toThrow(expect.objectContaining({ fix: 'Name it.' }));

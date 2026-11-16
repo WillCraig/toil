@@ -22,15 +22,15 @@ export const baseName = (path: string): string => basename(path);
 export const addAttachment = jiraArea.command({
   path: ['jira', 'issue', 'attach'],
   description: 'Upload a file as an attachment to a Jira issue',
-  toolDescription: 'Uploads a local file to a Jira issue and returns the attachments Jira created. file is a path on the machine toil runs on.',
-  input: z.object({ key, file: z.string().describe('Path to the file to upload'), ...allowWriteField }),
+  toolDescription: 'Uploads a local file to a Jira issue and returns the attachments Jira created. inputFile is a path on the machine toil runs on.',
+  input: z.object({ key, inputFile: z.string().describe('Path to the file to upload'), ...allowWriteField }),
   writes: true,
   args: [keyArg],
-  options: [{ flags: '--file <path>', field: 'file', description: 'Path to the file to upload' }],
-  examples: [{ key: 'PROJ-123', file: 'screenshot.png', allowWrite: true }],
+  options: [{ flags: '--input-file <path>', field: 'inputFile', description: 'Path to the file to upload', deprecated: ['--file <path>'] }],
+  examples: [{ key: 'PROJ-123', inputFile: 'screenshot.png', allowWrite: true }],
   run: async (input, ctx) => {
-    const data = await ctx.files.readBytes(input.file);
-    return client.uploadAttachment(ctx, input.key, baseName(input.file), data);
+    const data = await ctx.files.readBytes(input.inputFile);
+    return client.uploadAttachment(ctx, input.key, baseName(input.inputFile), data);
   },
 });
 

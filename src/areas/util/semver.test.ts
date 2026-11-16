@@ -73,7 +73,7 @@ describe('util semver satisfies', () => {
 
 describe('util semver sort', () => {
   it('sorts the sample npm list, reports what is not a version, and finds the highest in a range', async () => {
-    const envelope = await run(semverSortCommand, { file: 'versions/npm.txt', range: '^5.0.0' });
+    const envelope = await run(semverSortCommand, { inputFile: 'versions/npm.txt', range: '^5.0.0' });
     expect(envelope.data).toMatchObject({
       sorted: ['4.9.5', '5.0.4', '5.3.3', '5.4.0-beta', '5.4.1-rc', '5.4.2', '5.4.5', '5.5.0-dev.20240308'],
       invalid: [
@@ -97,7 +97,7 @@ describe('util semver sort', () => {
   });
 
   it('sorts NuGet and Maven lists in their own order', async () => {
-    expect((await run(semverSortCommand, { file: 'versions/nuget.txt', ecosystem: 'nuget', range: '[12.0,13.0)' })).data).toMatchObject({
+    expect((await run(semverSortCommand, { inputFile: 'versions/nuget.txt', ecosystem: 'nuget', range: '[12.0,13.0)' })).data).toMatchObject({
       sorted: ['9.0.1', '10.0.3', '11.0.2', '12.0.1', '12.0.2', '12.0.3', '13.0.1-beta1', '13.0.1', '13.0.2', '13.0.3'],
       highest: '12.0.3',
     });
@@ -209,7 +209,7 @@ describe('util semver on the CLI', () => {
   it('takes positionals and flags, and reads the list from stdin', async () => {
     const compare = await runCli(['util', 'semver', 'compare', '1.2.3', '1.10.0', '--ecosystem', 'nuget'], { commands, context: ctx() });
     expect(compare.envelope?.data).toMatchObject({ ecosystem: 'nuget', order: -1, difference: 'minor' });
-    const sort = await runCli(['util', 'semver', 'sort', '-', '--range', '~1.2'], { commands, context: testContext({ stdin: '1.2.9\n1.3.0\r\n1.2.0\n' }).context });
+    const sort = await runCli(['util', 'semver', 'sort', '--input-file', '-', '--range', '~1.2'], { commands, context: testContext({ stdin: '1.2.9\n1.3.0\r\n1.2.0\n' }).context });
     expect(sort.envelope?.data).toMatchObject({ sorted: ['1.2.0', '1.2.9', '1.3.0'], highest: '1.2.9' });
     // stdin has no size to compare the bytes read with, and says so.
     expect(sort.envelope?.meta.warnings?.map((w) => w.code)).toEqual(['UNVERIFIED']);

@@ -210,7 +210,7 @@
     "connection": true,
     "flags": [
       "<key>",
-      "--file <path>",
+      "--input-file <path>",
       "--allow-write"
     ]
   },
@@ -341,7 +341,7 @@
     "writes": true,
     "connection": true,
     "flags": [
-      "--from <file>",
+      "--input-file <path>",
       "--allow-write"
     ]
   },
