@@ -1,0 +1,11 @@
+<p><strong>Severity:</strong> 2. <strong>Duration:</strong> 9 hours. <strong>Facilitator:</strong> Mei.</p>
+<h2>What happened</h2>
+<p>Settlement batches for merchants on Eastern time were cut at UTC midnight instead of the
+merchant's own, so a day's late-evening payments were settled and paid out a day early.
+Northwind Coffee's finance team noticed the totals didn't match their own report.</p>
+<h2>Why</h2>
+<p>The batch job converts the cut-off to UTC once, at the start of the run, using the
+server's zone. A daylight-saving change that weekend moved it by an hour, and the merchant's
+zone was never consulted.</p>
+<h2>Actions</h2>
+<table><tbody><tr><th>Action</th><th>Owner</th><th>Tracked as</th></tr><tr><td>Cut batches at each merchant's local midnight</td><td>Mei</td><td>ADO #176 (PR 1 in review)</td></tr><tr><td>Alert when a settlement total differs from the processor's by more than 0.5%</td><td>Mei</td><td>Not tracked yet</td></tr><tr><td>Add an Eastern-time merchant to the settlement tests</td><td>Settlement</td><td>ADO #176</td></tr></tbody></table>

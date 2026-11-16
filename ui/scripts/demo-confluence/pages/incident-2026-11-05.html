@@ -1,0 +1,6 @@
+<p><strong>Severity:</strong> 3. <strong>Duration:</strong> 4 hours. <strong>Facilitator:</strong> Sam Rivera.</p>
+<p>Reconciliation failed on the export's lock (see <em>Nightly reconciliation failed</em>),
+nobody re-ran it, and the 6:00 a.m. ET payout run waited for it until 10:10. Merchants with daily
+payouts were paid four hours late.</p>
+<h2>Actions</h2>
+<table><tbody><tr><th>Action</th><th>Owner</th><th>Tracked as</th></tr><tr><td>Runbook for the lock timeout</td><td>Mei</td><td>Done: <em>Nightly reconciliation failed</em></td></tr><tr><td>Page the on-call when reconciliation fails, not just log it</td><td>Platform</td><td>GitHub #22</td></tr><tr><td>Move the export or snapshot the ledger</td><td>Settlement</td><td>GitHub #22</td></tr></tbody></table>

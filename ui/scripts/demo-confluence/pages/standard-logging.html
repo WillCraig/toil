@@ -1,0 +1,3 @@
+<p><strong>Owner:</strong> Diego.</p>
+<ac:structured-macro ac:name="warning"><ac:rich-text-body><p>A card number in a log is a reportable PCI DSS incident. Some turned up in debug logs (GitHub #25); the quarterly PCI audit evidence is GitHub #33.</p></ac:rich-text-body></ac:structured-macro>
+<ul><li>Never log a full card number (PAN), a CVC or a full track. Not at debug level, not in a test.</li><li>Mask a PAN to its last four digits with <code>maskPan()</code> (<code>src/mask.js</code>, Jira SCRUM-55), e.g. <code>************4242</code>.</li><li>Log the token or the payment id instead. They are enough to find anything.</li><li>Request and response bodies from the processor are never logged whole.</li></ul>

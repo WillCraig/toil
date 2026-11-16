@@ -1,0 +1,227 @@
+{
+  "space": {
+    "key": "OD",
+    "name": "Overdraft Federal Engineering",
+    "description": "How Overdraft Federal builds and runs card payments: teams, runbooks, decisions, standards and releases. Demo data: Overdraft Federal and Deliverables Unlimited are made up."
+  },
+  "pages": [
+    {
+      "title": "Overdraft Federal Engineering",
+      "parent": null,
+      "file": "pages/home.html",
+      "labels": [
+        "kb"
+      ]
+    },
+    {
+      "title": "Teams and ownership",
+      "parent": null,
+      "file": "pages/teams.html",
+      "labels": [
+        "kb"
+      ]
+    },
+    {
+      "title": "Working with Deliverables Unlimited",
+      "parent": null,
+      "file": "pages/consultants.html",
+      "labels": [
+        "kb",
+        "engagement"
+      ]
+    },
+    {
+      "title": "How money moves",
+      "parent": null,
+      "file": "pages/money-flow.html",
+      "labels": [
+        "kb",
+        "payments"
+      ]
+    },
+    {
+      "title": "Runbooks",
+      "parent": null,
+      "file": "pages/runbooks.html",
+      "labels": [
+        "kb",
+        "runbook"
+      ]
+    },
+    {
+      "title": "Nightly reconciliation failed",
+      "parent": "Runbooks",
+      "file": "pages/runbook-reconciliation.html",
+      "labels": [
+        "kb",
+        "runbook",
+        "settlement"
+      ]
+    },
+    {
+      "title": "Customers charged twice",
+      "parent": "Runbooks",
+      "file": "pages/runbook-double-charge.html",
+      "labels": [
+        "kb",
+        "runbook",
+        "platform"
+      ]
+    },
+    {
+      "title": "A merchant changed payout schedule",
+      "parent": "Runbooks",
+      "file": "pages/runbook-payout-schedule.html",
+      "labels": [
+        "kb",
+        "runbook",
+        "settlement"
+      ]
+    },
+    {
+      "title": "Decisions",
+      "parent": null,
+      "file": "pages/decisions.html",
+      "labels": [
+        "kb",
+        "adr"
+      ]
+    },
+    {
+      "title": "ADR-007: Check the idempotency key before calling the processor",
+      "parent": "Decisions",
+      "file": "pages/adr-007.html",
+      "labels": [
+        "kb",
+        "adr",
+        "platform"
+      ]
+    },
+    {
+      "title": "ADR-009: Tokenize cards at the edge",
+      "parent": "Decisions",
+      "file": "pages/adr-009.html",
+      "labels": [
+        "kb",
+        "adr",
+        "platform",
+        "checkout"
+      ]
+    },
+    {
+      "title": "ADR-011: Weekly payouts and a rolling reserve",
+      "parent": "Decisions",
+      "file": "pages/adr-011.html",
+      "labels": [
+        "kb",
+        "adr",
+        "settlement"
+      ]
+    },
+    {
+      "title": "Engineering standards",
+      "parent": null,
+      "file": "pages/standards.html",
+      "labels": [
+        "kb",
+        "standard"
+      ]
+    },
+    {
+      "title": "Money and currencies",
+      "parent": "Engineering standards",
+      "file": "pages/standard-money.html",
+      "labels": [
+        "kb",
+        "standard",
+        "payments"
+      ]
+    },
+    {
+      "title": "Logging and PCI",
+      "parent": "Engineering standards",
+      "file": "pages/standard-logging.html",
+      "labels": [
+        "kb",
+        "standard",
+        "checkout"
+      ]
+    },
+    {
+      "title": "Refund reason codes",
+      "parent": "Engineering standards",
+      "file": "pages/standard-refund-reasons.html",
+      "labels": [
+        "kb",
+        "standard",
+        "settlement"
+      ]
+    },
+    {
+      "title": "Releases",
+      "parent": null,
+      "file": "pages/releases.html",
+      "labels": [
+        "kb",
+        "release"
+      ]
+    },
+    {
+      "title": "Release checklist",
+      "parent": "Releases",
+      "file": "pages/release-checklist.html",
+      "labels": [
+        "kb",
+        "release",
+        "template"
+      ]
+    },
+    {
+      "title": "Black Friday change freeze",
+      "parent": "Releases",
+      "file": "pages/black-friday-freeze.html",
+      "labels": [
+        "kb",
+        "release"
+      ]
+    },
+    {
+      "title": "Incident reviews",
+      "parent": null,
+      "file": "pages/incidents.html",
+      "labels": [
+        "kb",
+        "incident"
+      ]
+    },
+    {
+      "title": "2026-10-28: Payouts sent a day early for Eastern-time merchants",
+      "parent": "Incident reviews",
+      "file": "pages/incident-2026-10-28.html",
+      "labels": [
+        "kb",
+        "incident",
+        "settlement"
+      ]
+    },
+    {
+      "title": "2026-11-05: Reconciliation missed, payouts delayed",
+      "parent": "Incident reviews",
+      "file": "pages/incident-2026-11-05.html",
+      "labels": [
+        "kb",
+        "incident",
+        "settlement"
+      ]
+    },
+    {
+      "title": "Glossary",
+      "parent": null,
+      "file": "pages/glossary.html",
+      "labels": [
+        "kb",
+        "reference"
+      ]
+    }
+  ]
+}

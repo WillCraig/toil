@@ -1,0 +1,10 @@
+<p><strong>Status:</strong> Accepted, October 20. <strong>Owner:</strong> Priya.</p>
+<h2>Context</h2>
+<p>Stored cards (save at checkout, charge later) need somewhere to keep card data. Keeping
+PANs in the payments service puts all of it in PCI scope.</p>
+<h2>Decision</h2>
+<ul><li>Card numbers are exchanged for tokens at the edge, before they reach the payments service.</li><li>The vault stores tokens and their encrypted cards, and nothing else touches a PAN.</li><li>Vault keys rotate quarterly without re-tokenizing (GitHub #8).</li></ul>
+<h2>Consequences</h2>
+<p>This is the critical path for stored cards. Jira SCRUM-14 (store tokens in the vault)
+blocks SCRUM-17 (tokenize at the edge), which blocks SCRUM-18, SCRUM-21 and SCRUM-30; SCRUM-14
+also blocks SCRUM-15 (charge a stored token). The same work: ADO #152 → #169, GitHub #7 → #8.</p>

@@ -1,0 +1,10 @@
+<p>Payments engineering at Overdraft Federal is three teams. Each tracks work in a different
+tool, a legacy of three reorganizations that nobody wants to relitigate.</p>
+<table><tbody><tr><th>Team</th><th>Owns</th><th>Tracks work in</th><th>Code</th><th>Lead</th></tr><tr><td>Checkout</td><td>Hosted checkout, saved cards, 3-D Secure</td><td>Jira project SCRUM</td><td>(hosted pages)</td><td>Diego</td></tr><tr><td>Platform</td><td>Payments service: capture, idempotency, the card vault</td><td>GitHub toil-sandbox issues and milestones</td><td>GitHub toil-sandbox</td><td>Priya</td></tr><tr><td>Settlement</td><td>Batches, payouts, the ledger, reconciliation</td><td>Azure DevOps project Toil Sandbox</td><td>ADO repo settlement-service</td><td>Mei</td></tr></tbody></table>
+<p>From Deliverables Unlimited: Sam Rivera, engagement lead across all three teams, and Ana,
+design (Figma).</p>
+<h2>Where data lives</h2>
+<ul><li><strong>Read replica</strong> (Postgres, schema <code>payments</code>): payments, refunds, disputes, payouts, job_runs. Read-only for everyone; nobody writes to it by hand.</li><li><strong>Finance ledger</strong> (SQLite, the old one): merchants, settlements, chargebacks. Finance still reconciles against it monthly.</li><li><strong>Designs</strong>: Figma. <strong>Release checklist and this knowledge base</strong>: Confluence.</li></ul>
+<h2>On-call</h2>
+<p>One primary per week, rotating Platform, Settlement, Checkout. The primary owns the nightly
+jobs (reconciliation at 02:00 UTC, statement export at 01:55 UTC) and the dispute webhook.</p>

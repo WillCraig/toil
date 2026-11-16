@@ -1,0 +1,14 @@
+<p><strong>Owner:</strong> Priya (Platform). <strong>Tracked as:</strong> GitHub #11 (fix in
+review as PR #37), Jira SCRUM-20 (the checkout side).</p>
+<h2>How you know</h2>
+<p>A shopper or merchant reports two charges about 30 seconds apart. In the replica, two
+<code>captured</code> rows in <code>payments.payments</code> share one
+<code>idempotency_key</code>. It happens roughly once a day, nearly always after a double
+click or a client retry on a slow 3-D Secure challenge.</p>
+<h2>What to do now</h2>
+<ol><li>Find both rows by idempotency key and confirm the amounts and merchant match.</li><li>Refund the later capture in full. Use reason <code>duplicate</code> (see <em>Refund reason codes</em>).</li><li>Reply to the merchant with the refund reference. Do not promise a timeline for the fix.</li></ol>
+<h2>Why it happens</h2>
+<p>The service records the idempotency key <em>after</em> the processor call returns. Two
+requests that arrive inside that window both call the processor. ADR-007 moves the check
+before the call; PR #37 implements it; GitHub #12 makes the key store shared across
+instances.</p>

@@ -1,0 +1,16 @@
+<p><strong>Owner:</strong> Mei (Settlement). <strong>Tracked as:</strong> GitHub #22.</p>
+<h2>How you know</h2>
+<p>The 02:00 UTC reconciliation job ends <code>failed</code> in <code>payments.job_runs</code> with
+<code>canceling statement due to lock timeout: waiting for AccessExclusiveLock on relation
+ledger_entries held by statement-export</code>. It happens about once a week, always on a
+night the statement export runs long.</p>
+<h2>Why it happens</h2>
+<p>The merchant statement export starts at 01:55 UTC and holds <code>ledger_entries</code> until
+about 02:20. Reconciliation starts at 02:00 and waits for the same lock for 15 minutes before
+giving up. On a slow night the export is still holding it.</p>
+<h2>What to do</h2>
+<ol><li>Check the export finished: the <code>statement-export</code> row for tonight in <code>payments.job_runs</code> is <code>succeeded</code>.</li><li>Re-run reconciliation by hand once it has. It takes about four minutes.</li><li>If the re-run fails on anything other than the lock, page the Settlement on-call.</li><li>Add a comment to GitHub #22 with the date, so we can see the frequency.</li></ol>
+<h2>The real fix</h2>
+<p>Move the export to 01:30 UTC, or have reconciliation read from a snapshot. Neither has been
+scheduled; #22 has the discussion. Do not raise the lock timeout: it only moves the failure
+into the morning payout run.</p>

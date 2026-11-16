@@ -1,0 +1,6 @@
+<p><strong>Status:</strong> Accepted, September 30. <strong>Owner:</strong> Mei.</p>
+<h2>Decision</h2>
+<ul><li>Merchants choose daily or weekly payouts. Weekly payouts go out on Fridays by ACH.</li><li>High-risk merchants keep a rolling reserve of 10% of each settlement for 14 days (GitHub #18).</li><li>Merchants see the next payout before it happens: the Payout preview (GitHub #17, Figma &quot;Overdraft Federal: Payout preview&quot;).</li></ul>
+<h2>Consequences</h2>
+<p>Schedule changes need care (see <em>A merchant changed payout schedule</em>). The preview
+waits on a shared idempotency store (#12), so a preview can never show a payment twice.</p>

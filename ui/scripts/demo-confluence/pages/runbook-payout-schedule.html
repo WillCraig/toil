@@ -1,0 +1,11 @@
+<p><strong>Owner:</strong> Mei (Settlement). <strong>Tracked as:</strong> GitHub #15.</p>
+<p>When a merchant moves between daily and weekly payouts, the balance already settled under
+the old schedule must be paid out once, under the new period. Today it isn't: the pending
+balance splits into two payouts and the second still carries the old daily period label.</p>
+<h2>The case on everyone's mind</h2>
+<p>Lumen Games moved from daily to weekly on November 12. Their pending balance is
+$2,649.00, holds are −$346.15, and the next payout should be one payment of
+<strong>$2,302.85 on Friday, November 20</strong>. The replica (<code>payments.payouts</code>,
+merchant 4) shows two.</p>
+<h2>Until #15 is fixed</h2>
+<ol><li>Before the merchant's first payout on the new schedule, check <code>payments.payouts</code> for two pending rows.</li><li>If there are two, ask Settlement to merge them by hand before the 6:00 a.m. ET payout run.</li><li>Tell the merchant what they'll receive and when. The Payout preview (GitHub #17) will show this to merchants once it ships.</li></ol>

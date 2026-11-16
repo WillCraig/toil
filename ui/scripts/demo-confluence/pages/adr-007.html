@@ -1,0 +1,10 @@
+<p><strong>Status:</strong> Accepted, November 3. <strong>Owner:</strong> Priya.</p>
+<h2>Context</h2>
+<p>Captures are recorded with their idempotency key after the processor answers. A retry that
+arrives in that window captures again (see <em>Customers charged twice</em>).</p>
+<h2>Decision</h2>
+<ul><li>Reserve the key in a shared store <em>before</em> calling the processor; a second request with the same key waits for the first, then returns its result.</li><li>Keys live 24 hours. A key reused with a different amount is a client error (409), never a second capture.</li><li>The store is shared across instances (GitHub #12), so two pods can't both win.</li></ul>
+<h2>Consequences</h2>
+<p>One more round trip per capture (about 3 ms). The shared store becomes something Checkout
+depends on, so it gets its own alert. Work: GitHub #11 (PR #37 in review), #12; Jira
+SCRUM-20 for the double click.</p>
