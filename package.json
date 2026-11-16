@@ -63,7 +63,7 @@
     "@cfworker/json-schema": "4.1.4",
     "@eslint/js": "10.0.1",
     "@modelcontextprotocol/sdk": "1.32.2",
-    "@types/node": "24.19.0",
+    "@types/node": "24.19.2",
     "@types/oracledb": "7.0.3",
     "@types/pg": "8.23.1",
     "commander": "15.0.0",

@@ -22,7 +22,7 @@
     "@azure/identity": "4.14.1"
   },
   "devDependencies": {
-    "@types/node": "24.19.0",
+    "@types/node": "24.19.2",
     "typescript": "6.0.3",
     "vitest": "4.1.12"
   }
