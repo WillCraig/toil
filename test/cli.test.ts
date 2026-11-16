@@ -102,6 +102,32 @@ describe('toil CLI', () => {
     expect(JSON.parse(run.files['err.json']!)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' }, meta: { command: 'demo rename-thing' } });
   });
 
+  it('prints a failure envelope, never nothing, when the result is too deeply nested to print as JSON', async () => {
+    // A placeholder token whose payload nests far past the CLI stringify
+    // cliff (depth 5,000 prints, 6,000 overflowed the action stack on the
+    // main this was written against): data this deep reaches emit() from
+    // any command, and printing it must not lose the envelope.
+    const depth = 20_000;
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(`{"a":${'['.repeat(depth)}1${']'.repeat(depth)}}`).toString('base64url');
+    const token = `${header}.${payload}.c2lnbmF0dXJlLW5vdC1jaGVja2Vk`;
+    const { context } = testContext();
+    for (const argv of [['util', 'jwt', 'decode', token], ['--pretty', 'util', 'jwt', 'decode', token], ['--output-file', 'deep.json', 'util', 'jwt', 'decode', token]]) {
+      const run = await runCli(argv, { commands, context });
+      expect(run.exitCode, argv.slice(0, 2).join(' ')).toBe(1);
+      expect(run.envelope, argv.slice(0, 2).join(' ')).toMatchObject({
+        ok: false,
+        data: null,
+        error: { code: 'INTERNAL', message: expect.stringContaining("couldn't be printed as JSON"), fix: expect.stringContaining('--select') },
+        meta: { command: 'util jwt decode' },
+      });
+      expect(run.stderr).not.toContain('Maximum call stack size exceeded');
+      expect(run.files['deep.json']).toBeUndefined();
+    }
+    const compact = await runCli(['util', 'jwt', 'decode', token], { commands, context });
+    expect(compact.stdout.trim().split('\n')).toHaveLength(1);
+  });
+
   it('honours --output-file=path on a usage error too', async () => {
     const { context } = testContext();
     const run = await runCli(['--output-file=err.json', 'nope'], { commands, context });

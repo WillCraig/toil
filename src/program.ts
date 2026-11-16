@@ -358,18 +358,59 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
 }
 
 /**
- * Prints the envelope, or writes it to --output-file. False when that write
- * failed; the error envelope then goes to stdout. For a write command the
- * command has already run by then, so the error says so.
+ * Prints the envelope, or writes it to --output-file. False when the envelope
+ * as produced couldn't be printed or written; a small failure envelope then
+ * goes to stdout instead. For a write command the command has already run
+ * by then, so the error says so.
  */
 function emit(envelope: Envelope, globals: GlobalOptions, io: CliIO, writes = false): boolean {
   const json = (e: Envelope) => `${JSON.stringify(e, null, globals.pretty ? 2 : undefined)}\n`;
+  // A result JSON.stringify refuses (nested past the stack, circular, a
+  // BigInt) still leaves exactly one envelope: this small failure drops
+  // data (and a failure's details), so it is shallow enough to print itself.
+  const unprintable = (err: unknown): Envelope => {
+    const cause = toToilError(err);
+    if (!envelope.ok) return failure(new ToilError(envelope.error.code, envelope.error.message, envelope.error.fix ? { fix: envelope.error.fix } : {}), envelope.meta);
+    if (writes) {
+      return failure(
+        new ToilError('INTERNAL', `${envelope.meta.command} ran, and the change may already have been applied, but its result couldn't be printed as JSON: ${cause.message}`, {
+          fix: 'Check whether the change was made before retrying. Then narrow the result, for example with --select, so it can be printed.',
+        }),
+        envelope.meta,
+      );
+    }
+    return failure(new ToilError('INTERNAL', `The result of ${envelope.meta.command} couldn't be printed as JSON: ${cause.message}`, { fix: 'Narrow the result, for example with --select, so it can be printed.' }), envelope.meta);
+  };
+  const printUnprintable = (err: unknown): void => {
+    try {
+      io.stdout(json(unprintable(err)));
+    } catch {
+      // Meta itself refused: this last resort names only the command.
+      io.stdout(
+        json(
+          failure(new ToilError('INTERNAL', `The result of ${envelope.meta.command} couldn't be printed as JSON.`, { fix: 'Narrow the result, for example with --select, so it can be printed.' }), {
+            command: envelope.meta.command,
+            durationMs: envelope.meta.durationMs,
+            version: envelope.meta.version,
+          }),
+        ),
+      );
+    }
+  };
+  let text: string;
+  try {
+    text = json(envelope);
+  } catch (err) {
+    // Nothing has reached stdout or --output-file yet, so say so on stdout.
+    printUnprintable(err);
+    return false;
+  }
   if (!globals.outputFile) {
-    io.stdout(json(envelope));
+    io.stdout(text);
     return true;
   }
   try {
-    io.writeFile(globals.outputFile, json(envelope), globals);
+    io.writeFile(globals.outputFile, text, globals);
     return true;
   } catch (err) {
     // The result never reached the file, so say so where the caller is looking.
