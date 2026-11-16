@@ -22,7 +22,8 @@ import { renamedArea, renamedAreaFix, renamedAreaOfTool, renamedToolTarget } fro
 import { shownToPeople, type ProgressEvent } from '../core/progress.js';
 import { OUTPUT_FORMAT_DESCRIPTION, OUTPUT_FORMAT_FIELD, OUTPUT_FORMATS, SUMMARY_FILE_DESCRIPTION, SUMMARY_FILE_FIELD } from '../core/output/fields.js';
 import { SELECT_DESCRIPTION, SELECT_FIELD } from '../core/query/select.js';
-import { runCommand } from '../core/run.js';
+import { runCommand, writesForInput } from '../core/run.js';
+import { serializable } from '../core/unprintable.js';
 import { waitable } from '../core/wait.js';
 import { listResources, listTemplates, readResource, ResourceError, type ResourceHost } from './resources.js';
 
@@ -266,12 +267,18 @@ export function createMcpServer(options: {
     };
     const progress = token === undefined ? undefined : (p: { attempt: number; message: string }) => notify(p.message);
     const events = token === undefined ? undefined : (event: ProgressEvent) => (shownToPeople(event) ? notify(event.message) : undefined);
-    const envelope = await runCommand(def, request.params.arguments ?? {}, (d) => options.context(d, extra.signal, shared, events), startup.version, 'mcp', {
+    const args = request.params.arguments ?? {};
+    const result = await runCommand(def, args, (d) => options.context(d, extra.signal, shared, events), startup.version, 'mcp', {
       targets: selected,
       ...(progress ? { progress } : {}),
     });
+    // A result JSON can't hold (nested past the stack, circular, a BigInt)
+    // becomes a tool error carrying a small INTERNAL envelope, never a
+    // JSON-RPC protocol error (src/core/unprintable.ts). The text is checked
+    // here; structuredContent is the same envelope, so the transport can send it.
+    const { envelope, text } = serializable(result, writesForInput(def, args));
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify(envelope) }],
+      content: [{ type: 'text' as const, text }],
       structuredContent: envelope as unknown as Record<string, unknown>,
       isError: !envelope.ok,
     };

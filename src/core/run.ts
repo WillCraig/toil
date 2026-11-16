@@ -113,8 +113,8 @@ export async function runCommand(
   return via === 'cli' ? envelope : inFieldNames(def, envelope);
 }
 
-/** Whether this call changes data, read from its input as the CLI reads it for --output-file. */
-function writesForInput(def: AnyCommand, rawInput: unknown): boolean {
+/** Whether this call changes data, read from its raw input as the CLI reads it for --output-file. */
+export function writesForInput(def: AnyCommand, rawInput: unknown): boolean {
   try {
     return writesFor(def, rawInput);
   } catch {

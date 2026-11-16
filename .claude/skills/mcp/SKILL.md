@@ -42,7 +42,8 @@ bad input gets the same envelope through MCP as on the CLI. The server takes a
 context *factory*, called per tool call with the command and that call's cancel
 signal; never share one context across calls. Both front doors run commands through
 `runCommand()`, which turns a failure building the context (config that broke while
-the server was up) into an envelope too. The MCP server passes `'mcp'` to it, and
+the server was up) into an envelope too. A result `JSON.stringify` refuses (too deep, circular, a BigInt) becomes a small
+`INTERNAL` envelope sent as a tool error, never a JSON-RPC error (`src/core/unprintable.ts`). The MCP server passes `'mcp'` to it, and
 an `INVALID_INPUT` envelope then names each of the command's flags as its field
 (`--updated-since` becomes `updatedSince`) in the message and fix, so areas word their
 input errors once, for the CLI, and nothing else changes. A quoted command line
