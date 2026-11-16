@@ -118,7 +118,9 @@ the signature segment as the text it is, once that segment has passed the base64
 - A header, payload or signature that isn't base64url fails with `Invalid JWT: header is not
   valid base64url` (or `payload`, or `signature`). Letters, digits, `-` and `_` only. `=` is accepted
   as padding at the end. `+`, `/`, whitespace and any other character are rejected,
-  and so is a segment whose length can't be whole bytes. An empty signature is allowed,
+  and so is a segment whose length can't be whole bytes. A segment whose last character
+  carries unused bits that aren't zero (`e31` where an encoder writes `e30`) fails with
+  `Invalid JWT: header is not canonical base64url` (or `payload`, or `signature`). An empty signature is allowed,
   which is how `alg: none` is written. A signature that passes comes back as the text it is.
 - One that isn't UTF-8 fails with `Invalid JWT: header is not valid UTF-8` (or
   `payload`). A real U+FFFD character, which is valid UTF-8, still decodes. The signature
@@ -126,7 +128,8 @@ the signature segment as the text it is, once that segment has passed the base64
 - One that isn't JSON fails with `Invalid JWT: header is not valid JSON` (or
   `payload`). One that is JSON but not an object (`null`, a number, a string, a
   list) fails with `Invalid JWT: header is not a JSON object` (or `payload`).
-- A token that starts with `Bearer `, in any case, fails with `Invalid JWT: remove the 'Bearer ' prefix`.
+- A token that starts with `Bearer` and whitespace, in any case, fails with `Invalid JWT: remove the 'Bearer ' prefix`.
+  A pasted header line, starting `Authorization:`, fails with `Invalid JWT: remove the 'Authorization: Bearer ' header name and prefix`.
   The prefix stays in place. The message does not include the token.
 - A token with leading or trailing whitespace fails with `Invalid JWT: token has surrounding whitespace`.
   Reading with `-` still drops one trailing line ending before that check.

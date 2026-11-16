@@ -145,6 +145,20 @@ describe('util jwt decode', () => {
       const none = `${b64('{"alg":"none"}')}.${b64('{}')}`;
       expect(decodeJwt(`${none}.`)).toMatchObject({ header: { alg: 'none' }, signature: '' });
       expect(decodeJwt(`${none}.YQ==`).signature).toBe('YQ==');
+      // Unused low bits have to be zero (RFC 4648 §3.5): e31 and QR decode to the same bytes as e30 and QQ,
+      // so they are a different token for the same claims, and refused. Every canonical last character passes.
+      expect(decodeJwt(`e30.e30.QQ`).signature).toBe('QQ');
+      for (const token of ['e31.e30.', 'e30.e3_.', 'e30.e30.QR', 'e30.e30.QR==', 'e30.e30.YWJ', `${b64('{"a":1}').slice(0, -1)}B.e30.`]) {
+        expect(() => decodeJwt(token), token).toThrow(/Invalid JWT: (header|payload|signature) is not canonical base64url/);
+      }
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+      for (let byte = 0; byte < 256; byte++) {
+        const one = Buffer.from([byte]).toString('base64url');
+        const two = Buffer.from([0x61, byte]).toString('base64url');
+        expect(decodeJwt(`e30.e30.${one}`).signature).toBe(one);
+        expect(decodeJwt(`e30.e30.${two}`).signature).toBe(two);
+        expect(alphabet.indexOf(one[1]!) & 0b1111).toBe(0);
+      }
       for (const signature of ['!!', 'ab+c', 'ab/c', 'ab=cd', 's', 'abc\ndef', 'YQ=']) {
         expect(() => decodeJwt(`${none}.${signature}`), JSON.stringify(signature)).toThrow('Invalid JWT: signature is not valid base64url');
       }
@@ -182,8 +196,13 @@ describe('util jwt decode', () => {
       for (const token of [` ${EXAMPLE_TOKEN}`, `${EXAMPLE_TOKEN} `, `${EXAMPLE_TOKEN}\n`, `${EXAMPLE_TOKEN}\t`, `\t${EXAMPLE_TOKEN}`, `${EXAMPLE_TOKEN}\r\n`]) refuse(token, space);
       // A prefix wins over a trailing newline, and a leading space wins over a prefix behind it.
       refuse(`Bearer ${EXAMPLE_TOKEN}\n`, prefix);
-      refuse(` ${EXAMPLE_TOKEN}`, space);
       refuse(` bearer ${EXAMPLE_TOKEN}`, space);
+      // Any whitespace after "Bearer" is the prefix, and a pasted header line is named as one.
+      for (const token of [`Bearer\t${EXAMPLE_TOKEN}`, `Bearer  ${EXAMPLE_TOKEN}`, `bearer\n${EXAMPLE_TOKEN}`]) refuse(token, prefix);
+      const header = "Invalid JWT: remove the 'Authorization: Bearer ' header name and prefix";
+      for (const token of [`Authorization: Bearer ${EXAMPLE_TOKEN}`, `authorization:Bearer ${EXAMPLE_TOKEN}`, `AUTHORIZATION : bearer ${EXAMPLE_TOKEN}`, `Authorization: Bearer ${EXAMPLE_TOKEN}\n`]) refuse(token, header);
+      // "Bearer" with no whitespace after it is not the prefix, so the header segment is what fails.
+      expect(() => decodeJwt(`Bearer${EXAMPLE_TOKEN}`)).toThrow(/^Invalid JWT: header /);
     });
   });
 });

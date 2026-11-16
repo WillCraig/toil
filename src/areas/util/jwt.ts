@@ -14,9 +14,11 @@ import { ToilError } from '../../core/errors.js';
  * The signature has to be base64url too, and is still returned as text: it
  * is not decoded and not verified. An empty signature is valid base64url,
  * which is how `alg: none` is written (#75 items 1 to 3). A token that
- * starts with "Bearer " (any case), or that has leading or trailing
+ * starts with "Bearer " (any case, any whitespace after it), or with a
+ * pasted "Authorization:" header name, or that has leading or trailing
  * whitespace, is refused with an error that names that, and the message
- * does not repeat the token. The prefix is not stripped (#75 item 4, partly
+ * does not repeat the token. A segment whose unused low bits are not zero
+ * is not canonical base64url and is refused too. The prefix is not stripped (#75 item 4, partly
  * confirmed). Verifying the signature would need the key, and a key would
  * need a form, so the form was not issued.
  */
@@ -34,8 +36,11 @@ const OBJECT_FIX = `A JOSE header and a claims set are each a JSON object. ${FIX
 
 /** Letters, digits, "-" and "_", then at most two "=". Whitespace is not skipped: a JWT segment has none. The empty string passes, which is an unsecured JWT's signature. */
 const BASE64URL = /^[A-Za-z0-9_-]*={0,2}$/;
-/** "Bearer " at the start, any case. The space is part of the prefix. */
-const BEARER_PREFIX = /^bearer /i;
+/** "Bearer" and whitespace at the start, any case. The whitespace is part of the prefix. */
+const BEARER_PREFIX = /^bearer\s/i;
+/** A whole pasted header line, "Authorization:" at the start, any case. */
+const AUTHORIZATION_HEADER = /^authorization\s*:/i;
+const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 type Segment = 'header' | 'payload' | 'signature';
 
@@ -55,6 +60,10 @@ function assertBase64Url(segment: string, name: Segment): void {
   const padding = segment.length - data.length;
   // One character short of a quantum can't be whole bytes. Padding has to finish the quantum it starts.
   if (data.length % 4 === 1 || (padding > 0 && (data.length + padding) % 4 !== 0)) invalid(name, 'is not valid base64url', BASE64URL_FIX);
+  // The last character of a short quantum carries bits no byte uses. An encoder writes them as zero,
+  // so a token that differs there decodes to the same bytes and is not the one that was signed (RFC 4648 §3.5).
+  const unused = data.length % 4 === 2 ? 0b1111 : data.length % 4 === 3 ? 0b11 : 0;
+  if (unused !== 0 && (BASE64URL_ALPHABET.indexOf(data[data.length - 1]!) & unused) !== 0) invalid(name, 'is not canonical base64url', BASE64URL_FIX);
 }
 
 /** The bytes of a header or payload. The signature is not decoded. */
@@ -84,6 +93,7 @@ function jsonObject(bytes: Buffer, name: Segment): Record<string, unknown> {
 export function decodeJwt(token: string): DecodedJwt {
   // Named before the segment checks, so a prefix or surrounding whitespace is
   // not reported as a bad header. The token is not copied into the message.
+  if (AUTHORIZATION_HEADER.test(token)) throw new ToilError('INVALID_INPUT', "Invalid JWT: remove the 'Authorization: Bearer ' header name and prefix", { fix: FIX });
   if (BEARER_PREFIX.test(token)) throw new ToilError('INVALID_INPUT', "Invalid JWT: remove the 'Bearer ' prefix", { fix: FIX });
   if (token.trim() !== token) throw new ToilError('INVALID_INPUT', 'Invalid JWT: token has surrounding whitespace', { fix: FIX });
   const parts = token.split('.');
@@ -105,7 +115,7 @@ export const jwtDecodeCommand = defineCommand({
   path: ['util', 'jwt', 'decode'],
   description: 'Decode a JWT token and output header, payload, and signature as JSON',
   toolDescription:
-    'Decodes a JWT (header.payload.signature, base64url) without verifying the signature: returns { header, payload, signature }, the header and claims as JSON objects and the signature segment as the text it is. A header or payload that is not base64url, not UTF-8, or not a JSON object is INVALID_INPUT, and so is a signature that is not base64url (an empty signature is allowed, which is how alg none is written). A token that starts with "Bearer " (any case) or has surrounding whitespace is INVALID_INPUT naming that, and the message does not repeat the token. Local only, no key and no network; it says nothing about whether the signature is valid or the token is expired or trusted. A 5-part JWE is refused.',
+    'Decodes a JWT (header.payload.signature, base64url) without verifying the signature: returns { header, payload, signature }, the header and claims as JSON objects and the signature segment as the text it is. A header or payload that is not base64url, not UTF-8, or not a JSON object is INVALID_INPUT, and so is a signature that is not base64url (an empty signature is allowed, which is how alg none is written). A segment that is not canonical base64url (unused bits that are not zero) is INVALID_INPUT too. A token that starts with "Bearer " (any case) or a pasted "Authorization:" header name, or has surrounding whitespace, is INVALID_INPUT naming that, and the message does not repeat the token. Local only, no key and no network; it says nothing about whether the signature is valid or the token is expired or trusted. A 5-part JWE is refused.',
   input: z.object({ token: z.string().describe('The JWT to decode. On the CLI, - reads it from stdin') }),
   writes: false,
   args: [{ name: 'token', field: 'token', description: 'The JWT to decode, or - to read it from stdin' }],
