@@ -13,9 +13,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Pull requests and main run on Linux, on the supported Node floor, in two
-  # jobs side by side: toil's gate and Toil UI's (which a docs-and-config PR
-  # skips, see `changes`). Windows, macOS and Node 26 run
+  # Pull requests and main run on Linux, on the supported Node floor, with
+  # toil's gate and Toil UI's side by side (Toil UI's is its checks and its
+  # eight layout shards, which a docs-and-config PR skips, see `changes`).
+  # Windows, macOS and Node 26 run
   # daily and on the release PR (platforms.yml), so a platform break shows within
   # a day and always before a release (#376). The floor was 24.14, the first
   # release where both the OS certificate store and the proxy env vars can be
@@ -89,11 +90,10 @@ jobs:
   # Toil UI (ui/, @imagile-dev/toil-ui), the root's npm workspace: never in
   # toil's tarball, but held to the same gate. check:package is its check:pure
   # (one dependency, toil pinned exactly, no install scripts, no native addon,
-  # the server imports only built-ins and toil, a tarball allowlist); its smoke
-  # installs both tarballs offline, opens the UI, and runs the layout check in
-  # the runner's Chrome (ui/scripts/layout-check.mjs), one Chrome per core.
+  # the server imports only built-ins and toil, a tarball allowlist). Its smoke
+  # runs in ui-layout below, beside this job.
   ui:
-    name: Toil UI gate
+    name: Toil UI checks
     needs: [changes]
     if: needs.changes.outputs.full != 'false'
     runs-on: ubuntu-latest
@@ -104,7 +104,7 @@ jobs:
           node-version: '24.22.1'
           cache: npm
       - run: npm ci --ignore-scripts
-      # The UI's smoke installs toil's packed tarball, so toil is built first.
+      # toil's build writes the generated sources (src/*.generated.ts) that Toil UI imports.
       - run: npm run build
       - run: npm run typecheck -w ui
       - run: npm run lint -w ui
@@ -116,7 +116,39 @@ jobs:
       # new pin over the previous toil's tarball, passes with a warning until
       # release.yml's lockfile PR merges (ui/scripts/package-rules.mjs, lockfileLag).
       - run: npm run check:lockfile -w ui
-      - run: npm run smoke -w ui
+
+  # Toil UI's smoke, in eight jobs side by side (#640). Each installs both
+  # tarballs offline, opens the UI and runs its security checks, holds its
+  # eighth of the layout check to the runner's Chrome
+  # (ui/scripts/layout-check.mjs), one Chrome per core, then runs the live and
+  # wipe checks. A unit of the layout check is one theme
+  # scheme on one view, and shard k takes every unit whose count modulo 8 is
+  # k - 1, so a new theme or view lands in a shard by existing. Run as one job
+  # the layout check took about 42 minutes. Each shard builds its own tarballs
+  # from the same commit, which takes seconds, rather than wait on a build job
+  # and an artifact. platforms.yml still runs the whole smoke unsharded on
+  # Windows and macOS. fail-fast is off so one round shows every shard's problems.
+  ui-layout:
+    name: Toil UI layout (${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: [changes]
+    if: needs.changes.outputs.full != 'false'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # The UI's smoke installs toil's packed tarball and its own, so both are built first.
+      - run: npm run build
+      - run: npm run build -w ui
+      # strategy.job-total is the matrix's length, so N is said once, in the list.
+      - run: npm run smoke -w ui -- --shard ${{ matrix.shard }}/${{ strategy.job-total }}
 
   # The committed dist/toil.js is the last released toil, and only the release
   # PR rebuilds it, so any other PR that changes dist/ fails here. The head
@@ -239,16 +271,17 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run test:integration
 
-  # The one check the ruleset on main requires, over both gates and the database
-  # integration job, so a database regression blocks a merge. Requiring one job
-  # by name, rather than each gate, keeps the ruleset right when jobs change.
+  # The one check the ruleset on main requires, over both gates (Toil UI's is its
+  # checks and its eight layout shards) and the database integration job, so a
+  # database regression blocks a merge. Requiring one job by name, rather than
+  # each gate, keeps the ruleset right when jobs change.
   # always() matters: a skipped required check counts as a pass, so this job
   # must run, and fail, when any of them fails. A long job may be skipped only
   # when the scope check itself passed and said full=false; if the scope check
   # fails, the long jobs skip and this fails, so nothing merges unchecked.
   ci-ok:
     name: CI ok
-    needs: [changes, gate, ui, integration, dist-guard]
+    needs: [changes, gate, ui, ui-layout, integration, dist-guard]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -268,20 +301,35 @@ jobs:
             exit 1
           fi
           echo "toil's gate passed."
-      - name: Toil UI's gate passed
+      - name: Toil UI's checks passed
         env:
           RESULT: ${{ needs.ui.result }}
           FULL: ${{ needs.changes.outputs.full }}
         run: |
           if [ "$RESULT" = "skipped" ] && [ "$FULL" = "false" ]; then
-            echo "Toil UI's gate was skipped: this PR changes only docs and config."
+            echo "Toil UI's checks were skipped: this PR changes only docs and config."
             exit 0
           fi
           if [ "$RESULT" != "success" ]; then
-            echo "::error::Toil UI's gate finished as '$RESULT', not 'success'."
+            echo "::error::Toil UI's checks finished as '$RESULT', not 'success'."
             exit 1
           fi
-          echo "Toil UI's gate passed."
+          echo "Toil UI's checks passed."
+      # A matrix job's result is every shard's together: success only when all eight passed.
+      - name: Toil UI's layout shards passed
+        env:
+          RESULT: ${{ needs.ui-layout.result }}
+          FULL: ${{ needs.changes.outputs.full }}
+        run: |
+          if [ "$RESULT" = "skipped" ] && [ "$FULL" = "false" ]; then
+            echo "Toil UI's layout shards were skipped: this PR changes only docs and config."
+            exit 0
+          fi
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::Toil UI's layout shards finished as '$RESULT', not 'success'."
+            exit 1
+          fi
+          echo "Toil UI's layout shards passed."
       - name: The database integration job passed
         env:
           RESULT: ${{ needs.integration.result }}

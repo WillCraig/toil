@@ -689,8 +689,9 @@ All six pass before a PR opens. A PR that touches `ui/` also passes Toil UI's ga
 checks Toil UI on sample and real data and writes `ui/.verify/report.md`, whose table
 goes in the PR, so the work is verified before the review bot sees it (`ui/README.md`,
 Verify before you open a PR). On a PR and on `main`, CI (`ci.yml`) runs them on
-Linux on Node 24.22.1, as two jobs side by side, toil's gate and Toil UI's. Its `CI ok`
-job passes only when both passed, along with the database integration job and the
+Linux on Node 24.22.1, side by side: toil's gate, and Toil UI's as one job of checks
+plus its smoke split into eight layout shards (#640). Its `CI ok`
+job passes only when all of them passed, along with the database integration job and the
 `dist/` guard (below), and it's the one check `main`'s ruleset requires, so nothing
 merges on a red gate. A PR against `main` that changes only docs and config (the list in
 `scripts/ci-scope.mjs`, read from `main`) skips Toil UI's gate and the database job,

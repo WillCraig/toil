@@ -1604,7 +1604,14 @@ npm run verify:ui -- --no-build --starter standup
   shown with no loading placeholder, a busy button free again). A layout still changing
   3s after a step fails the run, naming the step. Theme schemes
   run side by side, one Chrome per core; `LAYOUT_WORKERS` changes that, though more than
-  the core count starves the states that wait on a streamed answer.
+  the core count starves the states that wait on a streamed answer. The smoke
+  (`npm run smoke -w ui`) runs the same layout check, and CI splits it into eight jobs
+  (`npm run smoke -w ui -- --shard 3/8`): a unit is one theme scheme on one view, and
+  shard k checks every unit whose count modulo 8 is k - 1, so a new theme or view lands
+  in a shard without a list to edit. Each shard still runs the smoke's install,
+  security, live and wipe checks. `verify:ui` is never sharded, and without `--shard`
+  the smoke checks everything, as it does locally and in the daily Windows and macOS
+  run.
 - **First run:** `toil-ui` on an empty home, with no connections, no Toil projects and no
   `TOIL_*` variable from your shell, through the same check: its Toil projects view must
   show the three-step checklist, and the palette and the shortcuts sheet open over it.

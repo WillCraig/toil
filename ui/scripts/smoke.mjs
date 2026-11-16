@@ -7,15 +7,28 @@
 // after `npm run build` at the root (toil's tarball) and in ui/ (its own).
 // Stops every process it starts.
 // Then it opens every view of the sample app in every theme in headless Chrome
-// and holds the layout to scripts/layout-check.mjs.
+// and holds the layout to scripts/layout-check.mjs. With `--shard k/N` (CI runs
+// eight side by side) it checks only shard k's part of the layout, and still
+// runs everything else, which takes seconds; without it, all of it.
 // The tour of the building now takes in every floor, in every livery.
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MOTION_ROUTES, WIDTHS, checkLayout, themeRuns } from './layout-check.mjs';
+import { MOTION_ROUTES, ROUTES, WIDTHS, checkLayout, parseShard, shardRuns, themeRuns } from './layout-check.mjs';
 import { npmCli } from './package-rules.mjs';
+
+const argv = process.argv.slice(2);
+let shard = null;
+try {
+  if (argv.filter((a) => a === '--shard').length > 1 || argv.some((a, i) => a !== '--shard' && argv[i - 1] !== '--shard')) throw new Error(`smoke takes only --shard k/N, not ${argv.join(' ')}.`);
+  shard = parseShard(argv.includes('--shard') ? (argv[argv.indexOf('--shard') + 1] ?? '') : undefined);
+} catch (e) {
+  console.error(e.message);
+  process.exit(2);
+}
+const part = shard ? `shard ${shard.index}/${shard.count}: ` : '';
 
 const ui = join(import.meta.dirname, '..');
 const repo = join(ui, '..');
@@ -146,18 +159,22 @@ try {
   steps.push(`--sample on ${origin}: plain URL, foreign Host 403 (page and API), foreign Origin 403, text/plain POST 415, no cookie 401, cross-site with the cookie 403, app and script 200 and the API answering to the navigation cookie alone, 4 Toil projects over the API, a write refused, no CORS header`);
 
   // Every view in every theme, at 375, 768 and 1440, in real Chrome (scripts/layout-check.mjs).
+  const layoutRuns = shardRuns(themeRuns(), ROUTES, shard);
   const layout = await checkLayout({
     urlFor: (theme, scheme, route) => `${sampleUrl}?theme=${theme}&scheme=${scheme}${route}`,
+    runs: layoutRuns,
     log: (line) => process.stderr.write(`  layout: ${line}
 `),
   });
   problems.push(...layout.problems);
   for (const r of layout.reported) console.log(`  report-only (decorative theme): ${r}`);
-  steps.push(`layout: ${layout.checked} views and states in ${themeRuns().length} theme schemes at ${WIDTHS.join(', ')}px, ${layout.problems.length} problem(s) (no sideways scroll, no overflow outside a declared scroller, nothing past its card, nothing fixed covering the page's end, one-row headers, a full header row at 1440px, a dimming backdrop, a board card dragged with real mouse and touch input that follows the pointer and lands as a ghost in its target column, and no axe violation in Plain or Crate), ${layout.reported.length} report-only axe finding(s) in the decorative themes`);
+  steps.push(`${part}layout: ${layout.checked} views and states in ${layoutRuns.length} theme schemes at ${WIDTHS.join(', ')}px, ${layout.problems.length} problem(s) (no sideways scroll, no overflow outside a declared scroller, nothing past its card, nothing fixed covering the page's end, one-row headers, a full header row at 1440px, a dimming backdrop, a board card dragged with real mouse and touch input that follows the pointer and lands as a ghost in its target column, and no axe violation in Plain or Crate), ${layout.reported.length} report-only axe finding(s) in the decorative themes`);
 
   // Motion on (#419): the views where the theme moments play, again, with the system allowing motion and Theme motion at full.
+  const movingRuns = shardRuns(themeRuns(), MOTION_ROUTES, shard);
   const moving = await checkLayout({
     urlFor: (theme, scheme, route) => `${sampleUrl}?theme=${theme}&scheme=${scheme}${route}`,
+    runs: movingRuns,
     routes: MOTION_ROUTES,
     motion: 'no-preference',
     log: (line) => process.stderr.write(`  layout (motion on): ${line}
@@ -165,7 +182,7 @@ try {
   });
   problems.push(...moving.problems.map((p) => `motion on: ${p}`));
   for (const r of moving.reported) console.log(`  report-only (decorative theme, motion on): ${r}`);
-  steps.push(`layout with motion on: ${moving.checked} views and states (${MOTION_ROUTES.join(', ')}) in ${themeRuns().length} theme schemes at ${WIDTHS.join(', ')}px, the splash, a loading screen and the sprint recap playing, ${moving.problems.length} problem(s), ${moving.reported.length} report-only axe finding(s)`);
+  steps.push(`${part}layout with motion on: ${moving.checked} views and states (${MOTION_ROUTES.join(', ')}) in ${movingRuns.length} theme schemes at ${WIDTHS.join(', ')}px, the splash, a loading screen and the sprint recap playing, ${moving.problems.length} problem(s), ${moving.reported.length} report-only axe finding(s)`);
 
   // toil's own execute(), from the installed package, with an empty home, behind the SQLite cache.
   const live = launch(bin, []);

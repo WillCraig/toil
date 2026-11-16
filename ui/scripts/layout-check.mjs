@@ -792,6 +792,34 @@ export function layoutWorkers(runs) {
 }
 
 /**
+ * Reads `--shard k/N` (CI's Toil UI layout matrix, 1-based): shard k of N, or null for the whole check. Anything else
+ * is an error saying what it takes, never a quiet run of everything.
+ */
+export function parseShard(text) {
+  if (text === undefined) return null;
+  const m = /^(\d+)\/(\d+)$/.exec(text);
+  const index = m ? Number(m[1]) : 0;
+  const count = m ? Number(m[2]) : 0;
+  if (!m || count < 1 || index < 1 || index > count) throw new Error(`--shard takes k/N with 1 <= k <= N, such as 3/8, not ${JSON.stringify(text)}.`);
+  return { index, count };
+}
+
+/**
+ * The part of the check one shard runs. A unit is one theme scheme on one view, counted in `runs` × `routes` order, and
+ * unit i belongs to shard (i mod N) + 1, the way the root parity suite's shards claim their work: no list of themes or
+ * views is kept anywhere, so a new one lands in a shard by existing. Returns the runs with any unit in the shard, each
+ * carrying its own `routes`; with no shard, the runs as given. Splitting by unit rather than by theme keeps the shards
+ * even, since a theme is nine minutes of work and a view a few seconds.
+ */
+export function shardRuns(runs, routes, shard) {
+  if (!shard) return runs;
+  let unit = 0;
+  return runs
+    .map((run) => ({ ...run, routes: routes.filter(() => unit++ % shard.count === shard.index - 1) }))
+    .filter((run) => run.routes.length);
+}
+
+/**
  * Runs the check. `urlFor(theme, scheme, route)` is the address of one view
  * in one theme. Resolves with the problems that fail the run, the report-only
  * axe findings, and a count of what was checked.
@@ -801,6 +829,7 @@ export function layoutWorkers(runs) {
  * Each scheme's findings are kept apart and joined in scheme order, so the
  * report reads the same however many workers ran.
  *
+ * A run may carry its own `routes` (shardRuns), which it checks instead of `routes`.
  * `shotsFor(run)` says which schemes are shot into `shots` (all, unless set), so a caller can mix strict and other schemes in one call.
  * `sample` (on unless set false) says the data is the sample's, whose states always have something to open; real data may not (see `states`).
  * `headerFits` (on unless set false) fails a header folded into its Menu at
@@ -847,7 +876,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
   let checked = 0;
   const shoot = async (name) => shots && writeFileSync(join(shots, `${name}.png`), await page.screenshot());
   const label = `${run.theme} ${run.scheme}`;
-  for (const route of routes) {
+  for (const route of run.routes ?? routes) {
     await page.size(widths[0]);
     await page.goto(urlFor(run.theme, run.scheme, route));
     if (!(await page.evaluate(SETTLED))) problems.push(`${label} ${route}: the layout was still changing 3s after the view had its heading`);
