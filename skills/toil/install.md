@@ -1,5 +1,5 @@
 ---
-description: Installing toil from npm or from a clone with no npm install, the toil alias for a clone, trying unreleased changes from a clone, and installing this skill for Codex, GitHub Copilot or Claude Code
+description: Installing toil from npm or from a clone with no npm install, the toil alias for a clone, trying unreleased changes from a clone, sending a fix back from a clone through a fork, and installing this skill for Codex, GitHub Copilot or Claude Code
 ---
 
 # Installing toil
@@ -128,6 +128,58 @@ node ui/scripts/dev-mine.mjs
   `git pull` and run it again to get newer changes.
 - **Unreleased means unfinished.** Anything on `main` may change before it's released.
   Report what you find with `toil feedback bug`.
+
+## Sending a fix back
+
+Anyone running toil from a clone can contribute a fix or a feature without becoming a
+maintainer: fork `imagile-dev/toil` on GitHub, push a branch to the fork, and open a
+pull request against `main`. A maintainer reviews it and merges it; contributing
+needs no maintainer rights.
+
+The clone's `CLAUDE.md` holds the rules for people and agents alike, and
+`.claude/skills/` holds the guidance for each kind of work (`ship` for the pull request,
+`integrations` for an integration, `databases` for the `db` area). `.github/CONTRIBUTING.md`
+is the short version. In brief:
+
+- **A major item starts with an issue.** A new integration or database provider gets
+  an issue before the branch; a fix inside an area doesn't need one.
+- **Commits are Conventional Commits** (`fix:`, `feat:`, `docs:`). Name the branch in
+  the fork `<issue#>-<description>` after the issue it refers to.
+- **Decisions made by default** go in `docs/decisions/<issue#>-<description>.md`, named
+  after the branch; the gate checks the number. A pull request that records decisions
+  therefore needs an issue, even for a fix inside an area. One with no issue writes
+  no file and makes no decision by default.
+- **The gate passes before the pull request opens:** typecheck, lint, test, build,
+  `check:pure` and `smoke` (and Toil UI's gate for a change under `ui/`). Never commit
+  a rebuilt `dist/`.
+- **The description carries proof:** the gate's summary lines with the OS and Node
+  version, real runs of the commands the change touches, screenshots for anything
+  visual, and what wasn't verified.
+- **A pull request is public.** It holds no real hostnames, ticket keys, account names
+  or credentials: hosts are `<service>.imagile.dev`, IDs `abc12345`, email
+  `you@example.com`.
+
+**An agent offering to send a change back follows these steps, in order:**
+
+1. **Ask first.** Before filing an issue, forking, pushing or opening a pull request,
+   ask the person whether they want to contribute the change, and check that they have
+   a GitHub account that can create repositories (a fork is a repository in their
+   account, and some organizations' accounts can't make one). Without a yes, keep the
+   change on a local branch. Every later push, after a review, needs their yes too.
+2. **Follow the rules above,** reading `CLAUDE.md` and the skills under
+   `.claude/skills/` that the change touches before writing code.
+3. **Show it.** Show the person the issue text, the commits, and the pull request's
+   title and description, scrubbed of company data. Get their yes to that exact
+   content; a yes to an earlier draft isn't one.
+4. **Fork and open it** with git and the person's own GitHub sign-in, already set up in
+   their GitHub tooling, never through toil: toil sends nothing to Imagile here, and
+   this isn't `toil feedback`. Never ask for a token, type one, or put one in a command
+   or file.
+5. **Then wait for a maintainer.** CI runs on the pull request; an outside
+   contributor's run may wait for a maintainer to approve it. The automated review covers only
+   branches of `imagile-dev/toil`, so a maintainer reviews a fork's pull request. Fix
+   every finding and reply in its thread with what changed. A maintainer merges it;
+   never ask for merge rights or auto-merge.
 
 ## Installing this skill
 

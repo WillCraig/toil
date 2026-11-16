@@ -224,6 +224,15 @@ the gate and how review works. Questions and bug reports go through
 [SUPPORT.md](.github/SUPPORT.md), and security reports through
 [SECURITY.md](.github/SECURITY.md), never a public issue.
 
+### From your clone
+
+You don't need to be a maintainer to send a fix. Fork
+[imagile-dev/toil](https://github.com/imagile-dev/toil), push a branch to your fork
+and open a pull request against `main`, following CLAUDE.md. A maintainer reviews it
+and merges it. An agent
+working in your clone asks you before it forks or opens anything for you
+([`skills/toil/install.md`](skills/toil/install.md), **Sending a fix back**).
+
 ## License
 
 Apache License 2.0 © Imagile. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

@@ -38,6 +38,38 @@ Say so to the user each time.
 
 Auto-merge relies on `main`'s ruleset counting only an approval of the head commit: `dismiss_stale_reviews_on_push` and `require_last_push_approval` both on (`docs/repo-settings-proposal.md`, item 4). Check with `gh api repos/imagile-dev/toil/rulesets/<id>` before turning it on; while either is off, leave auto-merge off and say why, because GitHub would merge a later push on an earlier approval.
 
+## From a fork
+
+Someone who isn't a maintainer ships from a fork of `imagile-dev/toil`
+(`skills/toil/install.md`, **Sending a fix back**). Everything below applies, with
+these differences:
+
+- **Ask the person first.** Filing the issue, forking, pushing and opening the PR each
+  happen only on their yes, with their own GitHub sign-in, after they've seen the
+  exact issue and PR text. Check they have a GitHub account that can create
+  repositories before planning around a fork.
+- **Branch** in the fork as `<issue#>-<description>`; `kolatts/` is for maintainers.
+  The decisions file is named after it and the gate checks its number
+  (`test/repo-hygiene.test.ts`), so a fork PR that records decisions needs an issue. Open the PR with `gh pr create --repo
+  imagile-dev/toil --base main --head <user>:<branch>`, and run `gh repo set-default
+  imagile-dev/toil` first so the watcher reads the PR from the right repository.
+- **`origin/main` means upstream's `main`.** After `gh repo fork --remote`, `origin` is
+  the fork and `upstream` is `imagile-dev/toil`: read `upstream/main` wherever this
+  skill says `origin/main`, and merge it, not the fork's `main`.
+- **Never auto-merge.** A maintainer merges every fork PR, and a contributor can't
+  turn auto-merge on anyway.
+- **No Imagile Bot review.** `claude-review.yml` skips a head from a fork, so a
+  maintainer reviews it. CI (`ci.yml`) runs on `pull_request` with a read-only token
+  and no secrets, and an outside contributor's run may wait for a maintainer to
+  approve it. `npm run verify:ui`'s real-data part needs access to the sandbox
+  repository; without it the report says that part was skipped, and the PR says so.
+- **Watch with `--once`** until its `rollup` is `SUCCESS` (green checks without an
+  approval are never `ready`), then tell the person the PR waits for a maintainer and
+  stop. A contributor adds no labels (`no-auto-fix`, `needs-human`, `cli` or `ui`); a
+  maintainer does. On `round-limit` post the comment and stop. Every push needs the
+  person's yes. A maintainer's review arrives as `review`
+  from the allowlist and is handled the same way.
+
 ## 1. Before anything
 
 - **Nothing stray.** Run `git status --porcelain` and `git diff --stat origin/main...HEAD`.
