@@ -77,7 +77,7 @@ const statusOf = (err: unknown): number | undefined => {
  * (the word "revision", or "rev" next to a dot) also catches rule errors about
  * `System.Rev` and retries what no retry can fix.
  */
-function isConflict(err: unknown): boolean {
+export function isConflict(err: unknown): boolean {
   const status = statusOf(err);
   if (status === 409 || status === 412) return true;
   return status === 400 && err instanceof ToilError && /test operation|\/rev\b/i.test(err.message);

@@ -68,6 +68,14 @@ export const overrides: Record<string, DeploymentOverride> = {
     toolDescription:
       'Adds a relation from one work item to another (target; related by default, or parent, child, duplicate, duplicate-of, or a raw relation name) and returns the source item. On Services, pr links a pull request in the repository instead (give target or pr, not both), and no project is needed for a link between work items.',
   },
+  'ado work-item tag': {
+    toolDescription:
+      'Adds tags to a work item, keeping the ones it has (matched ignoring case), and returns the item. It reads the tags, then writes the list: on Server with no revision check; on Services with a test of the revision it read, so a change made in between is refused rather than lost (run it again), and tags it already has change nothing. Services needs no project.',
+  },
+  'ado work-item untag': {
+    toolDescription:
+      'Removes tags from a work item (matched ignoring case), keeping the rest, and returns the item. It reads the tags, then writes what is left: on Server with no revision check; on Services with a test of the revision it read, so a change made in between is refused rather than lost (run it again), a tag the item does not have changes nothing, and no project is needed.',
+  },
   'ado work-item iterations': {
     description: 'List the iteration tree for the project, with start and finish dates',
     toolDescription: "Returns the project's iteration tree (classification nodes) with start and finish dates, to the given depth (10 by default).",

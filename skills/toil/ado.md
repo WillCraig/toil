@@ -48,7 +48,7 @@ default) or `cloud` for Azure DevOps Services. The two keep separate API code, a
 | `pr resolve` | marks it fixed | `--status` |
 | `pr create` | | `--work-item` |
 | `work-item link` | `--target` | `--target` or `--pr` |
-| Only here | `connection-data`, `collection list`, `work-item tag untag attachments attach download types fields schema`, `repo default-reviewers`, `commit status`, `pr files diff builds delete-comment`, `pipeline` and `run` commands, `check-toil-project` | `pr threads`, `sprint`, `backlog` and `board` commands, `commit create`, `work-item delete-comment`, `api` |
+| Only here | `connection-data`, `collection list`, `work-item attachments attach download types fields schema`, `repo default-reviewers`, `commit status`, `pr files diff builds delete-comment`, `pipeline` and `run` commands, `check-toil-project` | `pr threads`, `sprint`, `backlog` and `board` commands, `commit create`, `work-item delete-comment`, `api` |
 
 A call the connection's deployment can't serve fails **before any request** with
 `UNSUPPORTED`, saying which deployment and what to do: `ado pipeline list` or
@@ -282,10 +282,12 @@ Work items (`<id>` is the work item id):
 - `work-item comments <id>`, `work-item comment <id>` (`--body`): Comments. Listing
   reads the first page only on Server; on Services it returns every comment, following
   continuation tokens, or with `--limit` at most that many and `meta.page.nextCursor`.
-- `work-item tag <id>`, `work-item untag <id>` (Server): `--tags a;b` or `a,b`, matched
-  ignoring case. The tag list is read and written back, with no revision check. `tag`
-  adds to the list; `untag` replaces it with the tags that remain (`add` would keep the
-  removed one), and clears the field when the last tag comes off.
+- `work-item tag <id>`, `work-item untag <id>`: `--tags a;b` or `a,b`, matched
+  ignoring case. The tag list is read and written back: on Server with no revision
+  check; on Services with a test of the revision it read, so a tag someone added in
+  between makes the change fail rather than vanish, and a call that changes nothing
+  sends nothing. `tag` adds to the list; `untag` replaces it with the tags that remain
+  (`add` would keep the removed one), and clears the field when the last tag comes off.
 - `work-item categorize` (`--from <file>`): Apply a classification plan: tag work items with
   their category, and set a field when the plan names one. See **Categorizing work items**.
 - `work-item attachments <id>` (Server): The attached files (id, name, url, size, dates).
@@ -621,7 +623,7 @@ made only on the person's yes.
   data, which names the token's own user, on Services.
 - A 429 is retried after the delay Azure DevOps asks for, as in every area.
 - Not covered on Services yet: pipelines and builds, attachments, work item types and
-  fields, links to anything but a work item or pull request, tags, team capacity and
+  fields, links to anything but a work item or pull request, team capacity and
   settings changes, and PR files and diffs. `ado api` reaches all of them.
 
 ## Moving from `ado-cloud`

@@ -3,7 +3,8 @@ import { ToilError } from '../../../core/errors.js';
 import { allowWriteField } from '../../../core/run.js';
 import { adoMoves, intentOf, oneOfTransition, resolveTransition, type AdoState, type TransitionReport } from '../../../core/transition-intent.js';
 import { adoArea } from '../area.js';
-import { API_COMMENTS, IN_PROJECT, PATCH, adoc, bodyTokenPages, cursorField, enc, exampleCursor, feedRevisions, limitField, pageOf, pageOptions, projectPath, repoPath, skipPages } from './client.js';
+import { isConflict } from '../categorize.js';
+import { API_COMMENTS, IN_PROJECT, PATCH, adoc, bodyTokenPages, cursorField, enc, exampleCursor, feedRevisions, limitField, pageOf, pageOptions, projectPath, repoPath, skipPages, type AdoCloudContext } from './client.js';
 import { FEED_FIELDS, FEED_SINCE, REVISIONS_DESCRIPTION, fieldList, revisionsInput } from '../feed.js';
 import { fieldPatch, parseFieldArgs, type JsonPatchOp } from './fields.js';
 import { andWhere, checkFlat, wiqlInstant } from './wiql.js';
@@ -493,4 +494,89 @@ export const workDeleteCommentCommand = adoArea.command({
   },
 });
 
-export const workCommands = [workGetCommand, workCreateCommand, workUpdateCommand, workTransitionCommand, workSearchCommand, workRevisionsCommand, workFeedCommand, workGetBatchCommand, workListCommentsCommand, workAddCommentCommand, workListAreasCommand, workListIterationsCommand, workListStatesCommand, workAssignCommand, workLinkCommand, workDeleteCommentCommand];
+const tagList = (tags: string) =>
+  tags
+    .split(/[;,]/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+const TAGS = 'System.Tags';
+
+/** The tags a call names, refused when it names none: an empty list would quietly change nothing. */
+function tagsAsked(text: string): string[] {
+  const tags = tagList(text);
+  if (tags.length === 0) throw new ToilError('INVALID_INPUT', 'No tags given.', { fix: 'Pass --tags with one or more tags, separated by ; or , (--tags "ui; backend").' });
+  return tags;
+}
+
+/** A work item as it stands, with its tags and the revision a change is tested against. The whole item, so a call that changes nothing returns what a write would. */
+async function tagsOf(ctx: AdoCloudContext, n: number): Promise<{ rev: number; tags: string[]; item: WorkItem }> {
+  const item = await adoc<WorkItem>(ctx, workItemPath(n));
+  if (typeof item.rev !== 'number') throw new ToilError('HTTP', `Azure DevOps returned work item ${n} with no revision, so a tag change can't be checked against it.`, { fix: 'Run it again; if it keeps happening, change the tags with ado work-item update.' });
+  const tags = String(item.fields?.[TAGS] ?? '')
+    .split(';')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return { rev: item.rev, tags, item };
+}
+
+/**
+ * Writes a work item's whole tag list in one JSON Patch, after a `test` of the revision it was read at, so a tag
+ * someone added in between makes the server refuse the change rather than lose it. Azure DevOps reads `add` on
+ * System.Tags as "add these", so taking a tag off needs `replace`, and the last one off needs `remove`. Nothing to
+ * change sends nothing, and returns the item as read: a revision for no change is a form filed to say nothing happened.
+ */
+async function writeTags(ctx: AdoCloudContext, n: number, read: { rev: number; tags: string[]; item: WorkItem }, next: string[], removing: boolean): Promise<WorkItem> {
+  if (next.length === read.tags.length && next.every((t, i) => t === read.tags[i])) return read.item;
+  const op: JsonPatchOp = !removing ? { op: 'add', path: `/fields/${TAGS}`, value: next.join('; ') }
+    : next.length === 0 ? { op: 'remove', path: `/fields/${TAGS}` }
+    : { op: 'replace', path: `/fields/${TAGS}`, value: next.join('; ') };
+  try {
+    return await adoc<WorkItem>(ctx, workItemPath(n), { method: 'PATCH', json: [{ op: 'test', path: '/rev', value: read.rev }, op], headers: PATCH });
+  } catch (err) {
+    if (!isConflict(err)) throw err;
+    throw new ToilError('HTTP', `Work item ${n} changed after toil read its tags (revision ${read.rev}), so the tag change wasn't made.`, { fix: 'Run the same command again: it reads the item afresh.' });
+  }
+}
+
+export const workAddTagCommand = adoArea.command({
+  path: ['ado', 'work-item', 'tag'],
+  description: 'Add one or more tags to a work item (non-destructive)',
+  toolDescription:
+    "Adds tags to a work item, keeping the ones it has (matched ignoring case), and returns the item. It reads the tags, then writes the list with a test of the revision it read, so a change made in between is refused rather than lost. Tags it already has change nothing. Needs no project.",
+  input: z.object({ id, tags: z.string().describe('Semicolon- or comma-separated tags to add'), ...allowWriteField }),
+  writes: true,
+  args: [idArg],
+  options: [{ flags: '--tags <tags>', field: 'tags', description: 'Semicolon- or comma-separated tags to add' }],
+  examples: [{ ...W, repo: 'imagile-api', id: 42, tags: 'ui; Backend,urgent' }],
+  run: async (input, ctx) => {
+    const asked = tagsAsked(input.tags);
+    const read = await tagsOf(ctx, input.id);
+    const have = new Set(read.tags.map((t) => t.toLowerCase()));
+    const added: string[] = [];
+    for (const t of asked) {
+      if (have.has(t.toLowerCase())) continue;
+      have.add(t.toLowerCase());
+      added.push(t);
+    }
+    return writeTags(ctx, input.id, read, [...read.tags, ...added], false);
+  },
+});
+
+export const workRemoveTagCommand = adoArea.command({
+  path: ['ado', 'work-item', 'untag'],
+  description: 'Remove one or more tags from a work item (non-destructive)',
+  toolDescription:
+    'Removes tags from a work item (matched ignoring case), keeping the rest, and returns the item. It reads the tags, then writes what is left with a test of the revision it read, so a change made in between is refused rather than lost. A tag the item does not have changes nothing. Needs no project.',
+  input: z.object({ id, tags: z.string().describe('Semicolon- or comma-separated tags to remove'), ...allowWriteField }),
+  writes: true,
+  args: [idArg],
+  options: [{ flags: '--tags <tags>', field: 'tags', description: 'Semicolon- or comma-separated tags to remove' }],
+  examples: [{ ...W, repo: 'imagile-api', id: 42, tags: 'UI' }],
+  run: async (input, ctx) => {
+    const drop = new Set(tagsAsked(input.tags).map((t) => t.toLowerCase()));
+    const read = await tagsOf(ctx, input.id);
+    return writeTags(ctx, input.id, read, read.tags.filter((t) => !drop.has(t.toLowerCase())), true);
+  },
+});
+
+export const workCommands = [workGetCommand, workCreateCommand, workUpdateCommand, workTransitionCommand, workSearchCommand, workRevisionsCommand, workFeedCommand, workGetBatchCommand, workListCommentsCommand, workAddCommentCommand, workListAreasCommand, workListIterationsCommand, workListStatesCommand, workAssignCommand, workLinkCommand, workDeleteCommentCommand, workAddTagCommand, workRemoveTagCommand];
