@@ -244,6 +244,26 @@ export interface SharedSettings {
    * An explicit `<key>From` pairing is the user's call and isn't asked.
    */
   fallbackWhen?: (other: Record<string, unknown>, own: Record<string, unknown>) => boolean;
+  /**
+   * When `toil connections add` and `login`, and Toil UI's Settings, offer to
+   * borrow the other area's secret instead of asking for one. It's offered from
+   * a connection of the other area only when both connections hold every value
+   * in `when` (as they resolve, defaults included), both base URLs are on one
+   * host if `sameHost`, and that connection's secret resolves. `match` names the
+   * settings the borrowed secret only works with (an Atlassian API token, with
+   * its account's email): the other connection's value is the default answer,
+   * and a different one is said to break it. The person answers; nothing is
+   * borrowed on their behalf. Left out, nothing is offered, and `<key>From` is
+   * asked for like any setting.
+   */
+  offer?: SharedOffer;
+}
+
+/** See {@link SharedSettings.offer}. Plain data, so the registry can hand it to a form. */
+export interface SharedOffer {
+  when?: Readonly<Record<string, string>>;
+  sameHost?: boolean;
+  match?: readonly string[];
 }
 
 /** The setting that pairs `key` with another area's connection: `apiKey` -> `apiKeyFrom`. */
@@ -566,6 +586,14 @@ function withPairing(spec: AreaSpec<z.ZodObject, string>, secretKinds: Record<st
       throw new Error(`Area ${spec.name}: shared setting "${key}" must be a secret in both ${spec.name} and ${shares.area.name}, or in neither.`);
     }
     if (pairingKey(key) in spec.connection.shape) throw new Error(`Area ${spec.name}: "${pairingKey(key)}" is added by core for the shared setting "${key}".`);
+    for (const other of [...Object.keys(shares.offer?.when ?? {}), ...(shares.offer?.match ?? [])]) {
+      if (!(other in spec.connection.shape) || !(other in shares.area.connection.shape) || other in secretKinds) {
+        throw new Error(`Area ${spec.name}: the offer to borrow "${key}" checks "${other}", which must be a non-secret connection key of both ${spec.name} and ${shares.area.name}.`);
+      }
+    }
+    if (shares.offer?.sameHost && (!('baseUrl' in spec.connection.shape) || !('baseUrl' in shares.area.connection.shape))) {
+      throw new Error(`Area ${spec.name}: the offer to borrow "${key}" compares hosts, so both areas need a baseUrl.`);
+    }
     pairing[pairingKey(key)] = z
       .string()
       .min(1)

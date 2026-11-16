@@ -64,7 +64,17 @@ export const confluenceArea = defineArea({
   // deployment: a Data Center token is never lent to the Atlassian cloud, nor a
   // Cloud one to a server. Any connection can name a Jira connection to borrow
   // from with apiTokenFrom, which is the user's call. The email is never borrowed.
-  shares: { area: jiraArea, keys: ['apiToken'], fallbackWhen: (jira, own) => String(jira.deployment ?? 'server') === String(own.deployment ?? 'server') },
+  // `connections add` and `login` offer that pairing only where it can work: an
+  // Atlassian API token belongs to the account, so it signs in to Jira Cloud and
+  // Confluence Cloud on the same site with the same email (Basic auth, below). A
+  // Data Center personal access token belongs to one server, so Jira's is never
+  // offered to a Confluence server, which issues its own.
+  shares: {
+    area: jiraArea,
+    keys: ['apiToken'],
+    fallbackWhen: (jira, own) => String(jira.deployment ?? 'server') === String(own.deployment ?? 'server'),
+    offer: { when: { deployment: 'cloud' }, sameHost: true, match: ['email'] },
+  },
   examples: { email: 'you@example.com' },
   // The current user; Confluence answers an anonymous caller with a 200 and type "anonymous".
   probe: (connection) => ({

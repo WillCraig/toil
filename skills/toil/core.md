@@ -256,7 +256,8 @@ Configuration comes from environment variables, which always win, or from
 instance of an area; `--connection <name>` picks one when there are several.
 `toil connections list` names them (never a secret), with `definedIn`: `file` for one
 in your config file, `env` for one made by env vars alone, which the connections
-commands can't change. `toil connections test
+commands can't change. A connection to an area with a Data Center and a Cloud deployment
+also says which, as `deployment` (`server` or `cloud`). `toil connections test
 <name>` checks one with a single authenticated read, failing with the `AUTH`,
 `NETWORK` or config error a real command would. Setting up a connection, signing
 in, turning writes on and choosing a default are for a person: a bare `toil` in a
@@ -264,6 +265,10 @@ terminal opens a menu for them. An agent may create a connection on the person's
 `toil connections add <name> --area <area> --set key=value` (repeatable, non-secret
 settings only; a secret key is refused), which asks nothing and leaves writes off; the
 person then enters the secret with `toil connections login <name>` or in Toil UI.
+Where another connection already holds a secret that works here (Jira Cloud's API token, for
+Confluence Cloud on the same site), the `SECRET_NEEDED` warning says so and
+`data.secretReusable` names it: tell the person `toil connections login <name>` will offer to
+reuse it. Never set the pairing (`apiTokenFrom`) yourself; `--set` refuses it.
 `setup.md` is that walkthrough. `toil connections migrate` saves the config file in the
 current version, with retired areas folded into the areas that replaced them; it reports
 what it wrote (names and keys, never a value) and writes nothing if the file is current.
@@ -510,7 +515,10 @@ const envelope = await execute('jira issue search', { jql: 'project = PAY', limi
   `confirm-name` (the connection's name, typed to turn writes on), `unwrap:<key>`
   (the secret is in quotes or starts with `Bearer ` or `token `: `y` stores it
   without them, `n` as typed; call `checkSecret` first to know whether it will be
-  asked), for `toil projects onboard` `create:<section>` (`y` adds the connection that
+  asked), `borrow:<key>` (`y` uses the secret for `<key>` from the other area's
+  connection the question names, such as Jira Cloud's API token for Confluence Cloud on
+  the same site, and stores none; `n` asks for one; the area's `connection` field
+  `borrows` says when it is asked), for `toil projects onboard` `create:<section>` (`y` adds the connection that
   section needs), `name:<section>` (its name) and `pin:<section>` (the matching
   connection their own copy uses), or `consent` (`yes` sends the feedback report and
   disclaimer the question shows, **Feedback**, above). A secret is checked as on a
@@ -525,7 +533,8 @@ const envelope = await execute('jira issue search', { jql: 'project = PAY', limi
   whether it writes to a service (`writes`) or on this machine (`writesLocal`), and
   its input's JSON Schema. It also lists the areas, each with `connection`: the
   fields `connections add` asks for, in order, each with `secret`, `password`,
-  `default` and `required`.
+  `default` and `required`, and on a pairing setting such as `apiTokenFrom`, `borrows`:
+  when `connections add` and `login` offer to reuse another area's secret (`borrow:<key>`).
 - **`version`** and **`contractVersion`** are what `toil version` reports. Check
   `contractVersion` before relying on anything else. `toil version` also reports
   `commit`, the 40-character hash of the commit the build came from (`null` when the

@@ -5,7 +5,7 @@
   "order": 1,
   "covers": "Pages, spaces, search, comments, labels, attachments",
   "credential": "Personal access token (Data Center) or Atlassian account email and API token (Cloud)",
-  "credentialNote": "One area for both: a Cloud connection sets deployment to cloud and an email, sent as Basic auth with the token. The default connection uses TOIL_JIRA_API_TOKEN when no Confluence token is set, only if the default Jira connection is the same deployment; another connection can borrow a Jira connection's token with apiTokenFrom. Both deployments are verified at the unit level, so the board shows one",
+  "credentialNote": "One area for both: a Cloud connection sets deployment to cloud and an email, sent as Basic auth with the token. The default connection uses TOIL_JIRA_API_TOKEN when no Confluence token is set, only if the default Jira connection is the same deployment; another connection can borrow a Jira connection's token with apiTokenFrom. On Cloud, toil connections add and login offer to reuse a Jira Cloud connection's token on the same site. Both deployments are verified at the unit level, so the board shows one",
   "credentialWhere": "Data Center: your profile picture → Settings → Personal Access Tokens. Cloud: id.atlassian.com → Security → API tokens",
   "status": "unit",
   "keys": [

@@ -549,7 +549,8 @@ makes that binding on the CLI (`ConfigAccess.via` says which door).
 **Cross-area credentials are paired explicitly** (*principle 9*). `defineArea({
 shares: { area, keys } })` only declares which keys may be paired; core adds a
 `<key>From` setting, and a connection borrows only when the user set it (a Kibana
-connection with `"apiKeyFrom": "es-prod"`), and only from that connection. Between
+connection with `"apiKeyFrom": "es-prod"`), and only from that connection. With `offer`, it also says when `connections add`
+and `login` offer the pairing (`borrow:<key>`), which only a person answers (#635). Between
 the two, the env tier beats the file tier, and the own connection wins a tie. With
 no pairing a connection uses only its own key, with one exception that keeps the contract's
 env chain: the area's default connection takes the other area's default

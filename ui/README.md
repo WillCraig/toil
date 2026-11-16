@@ -824,6 +824,12 @@ running those commands through `@imagile-dev/toil/api`, never by editing a file:
   CLI's words: a line break (or, for a token, a space) in the middle is
   refused, and quotes or a `Bearer ` / `token ` prefix ask Remove it or Keep
   it before anything is saved.
+  On a Confluence Cloud connection, where a Jira Cloud connection on the same
+  site holds a token, the add and Update login forms ask **Which API token?**:
+  **A token of its own** or **Reuse <jira>'s token**, which hides the token box
+  and stores nothing. The add form starts on reuse; the login form starts on
+  the connection's own token when it has one. The page answers toil's
+  `borrow:apiToken` question either way.
   Turning writes on asks you to type the connection's name, as the CLI does. A
   connection made by `TOIL_*` env vars alone is shown read-only, with where it
   came from.

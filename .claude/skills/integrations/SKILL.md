@@ -154,7 +154,11 @@ versions.
   the env chain the contract records does, unless the area's `shares.fallbackWhen` refuses
   the other connection (a pair shares a credential only between like deployments:
   Confluence takes Jira's token only from a Jira of the same deployment). An explicit
-  `<key>From` is the user's call and isn't asked. Document the `<key>From` setting in the area's skill file.
+  `<key>From` is the user's call. `connections add` and `login` offer it as the question
+  `borrow:<key>` only where the area declares `shares.offer: { when, sameHost, match }`
+  (Confluence: `{ when: { deployment: 'cloud' }, sameHost: true, match: ['email'] }`),
+  plain data the registry hands to forms as the field's `borrows`; with no offer it is
+  asked like any setting, never offered. Document the `<key>From` setting in the area's skill file.
   `ctx.resolved.shared` says whether the key came from the other area, for an auth
   error that names which key was sent.
 - **`--env` means which environment**, and it's the same input the toil project supplies.
