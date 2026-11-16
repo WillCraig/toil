@@ -1,25 +1,46 @@
 # Dependabot version updates (#586). Security updates are a separate repository
-# setting ("Dependabot security updates"), which a file cannot turn on.
+# setting ("Dependabot security updates"), which a file cannot turn on; the
+# `security` groups below only say how those arrive.
 #
-# Every npm entry waits 14 days after a release before proposing it (CLAUDE.md,
-# Secrets: the 14-day rule). A security update can bypass a cooldown, so a
-# patched release younger than 14 days may still arrive as a PR; the review
-# decides whether to take it early.
+# The aim is few pull requests: at most one per group per week, not one per
+# package. A dependency goes into the first group that takes it, so the order
+# of the groups matters.
 #
-# What ships is kept out of the dev-tooling group, so each bundled package gets
-# its own PR and its own review: everything esbuild folds into dist/toil-lib.js
-# (the MCP SDK, zod, ajv's tree, the database drivers, commander) and the
-# libraries Toil UI's front end is built from (React and friends). Everything
-# else never reaches a user, and its minor and patch updates arrive as one PR.
-# Majors are never grouped.
+#   npm (the root, which covers the `ui` workspace through the one root
+#   lockfile; the site; the feedback function), one entry for all three, so a
+#   package bumped in two of them is one pull request:
+#     security  every security update
+#     shipped   minor and patch updates of what reaches a user: what esbuild
+#               folds into dist/toil-lib.js, the libraries Toil UI's front end
+#               and the site's pages are built from, and the deployed
+#               function's runtime
+#     tooling   minor and patch updates of everything else
+#     majors    every major update, of anything
 #
-# The root entry covers the `ui` workspace through the one root lockfile.
+#   github-actions: one pull request for every action, majors included, and
+#   one for its security updates.
+#
+# `shipped` is a list, and a package missing from it is not lost: it arrives
+# with `tooling`. Add a new bundled dependency here so its bump is reviewed as
+# something users get.
+#
+# A grouped pull request passes or fails as one. To take the rest without one
+# package, comment `@dependabot ignore <package> major version` (or `minor`,
+# `patch`) on it.
+#
+# Every npm version update waits 14 days after a release (CLAUDE.md, Secrets:
+# the 14-day rule). A cooldown never applies to a security update, so a patched
+# release younger than 14 days may still arrive; the review decides whether to
+# take it early.
 
 version: 2
 
 updates:
   - package-ecosystem: npm
-    directory: /
+    directories:
+      - /
+      - /site
+      - /functions/feedback
     schedule:
       interval: weekly
       day: monday
@@ -35,10 +56,12 @@ updates:
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
     groups:
-      dev-tooling:
+      security:
+        applies-to: security-updates
         patterns:
           - '*'
-        exclude-patterns:
+      shipped:
+        patterns:
           # Bundled into the published package (dist/toil-lib.js).
           - '@cfworker/json-schema'
           - '@modelcontextprotocol/sdk'
@@ -54,65 +77,29 @@ updates:
           - 'tedious'
           - 'thrift'
           - 'zod'
-          # Built into Toil UI's front end (ui/dist/app).
+          # Built into Toil UI's front end (ui/dist/app) and the site's pages.
           - '@dnd-kit/*'
           - '@fontsource/*'
           - '@xyflow/react'
           - 'react'
           - 'react-aria-components'
           - 'react-dom'
+          # The feedback function's runtime, which is deployed.
+          - '@azure/*'
         update-types:
           - minor
           - patch
-
-  - package-ecosystem: npm
-    directory: /site
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 3
-    cooldown:
-      default-days: 14
-    commit-message:
-      prefix: chore(deps)
-    labels:
-      - dependencies
-    ignore:
-      - dependency-name: '@types/node'
-        update-types: ['version-update:semver-major']
-    groups:
-      site-tooling:
+      tooling:
         patterns:
           - '*'
         update-types:
           - minor
           - patch
-
-  - package-ecosystem: npm
-    directory: /functions/feedback
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 3
-    cooldown:
-      default-days: 14
-    commit-message:
-      prefix: chore(deps)
-    labels:
-      - dependencies
-    ignore:
-      - dependency-name: '@types/node'
-        update-types: ['version-update:semver-major']
-    groups:
-      # The function's runtime dependencies (the @azure packages) are deployed,
-      # so they keep their own PRs; only its dev tooling is grouped.
-      function-dev-tooling:
-        dependency-type: development
+      majors:
         patterns:
           - '*'
         update-types:
-          - minor
-          - patch
+          - major
 
   - package-ecosystem: github-actions
     directory: /
@@ -128,9 +115,10 @@ updates:
     labels:
       - dependencies
     groups:
+      actions-security:
+        applies-to: security-updates
+        patterns:
+          - '*'
       actions:
         patterns:
           - '*'
-        update-types:
-          - minor
-          - patch
