@@ -46,6 +46,16 @@ const until = <T extends Element>(selector: string) =>
     if (!el) throw new Error(`no ${selector} yet`);
     return el;
   });
+// How it's doing shows a "not read yet" panel until the record loads, then a new
+// one in its place. A slow runner can catch the first, which never fills, so wait
+// for the panel whose summary (or, with `whole`, whose text) says what a test expects.
+const doingWith = (expected: RegExp, whole = false) =>
+  waitFor(() => {
+    const el = document.querySelector<HTMLDetailsElement>('[data-how-its-doing]');
+    const text = (whole ? el?.textContent : el?.querySelector('summary')?.textContent) ?? '';
+    if (!el || !expected.test(text)) throw new Error(`How it's doing reads "${text}" so far`);
+    return el;
+  });
 const rows = () => [...document.querySelectorAll<HTMLElement>('[data-row]')];
 const choiceButtons = (row: Element) => [...row.querySelectorAll<HTMLElement>('[data-choice]')];
 const choiceIn = (row: Element, id: string) => row.querySelector<HTMLElement>(`[data-choice="${id}"]`)!;
@@ -557,8 +567,7 @@ describe('Apply', () => {
 describe("How it's doing", () => {
   it('opens on the figures, in plain words, and offers to improve the categories once there are ten corrections', async () => {
     open(`${TEAM}/board/classify`);
-    const doing = await until<HTMLDetailsElement>('[data-how-its-doing]');
-    expect(doing.querySelector('summary')!.textContent).toMatch(/^How it's doing: people agreed with 55% of 22 checked$/);
+    const doing = await doingWith(/^How it's doing: people agreed with 55% of 22 checked$/);
     expect(doing.querySelector('[data-share="agreement"]')!.textContent).toBe('55%');
     expect(doing.querySelector('[data-overruled]')!.textContent).toBe('The bug or incident type was overruled 4 of 4 times, all to Feature.');
     expect(doing.textContent).not.toMatch(/signal:/);
@@ -571,8 +580,7 @@ describe("How it's doing", () => {
     const base = await api.ledger('sample-team');
     const empty: LedgerView = { ...base, stats: { ...SAMPLE_SCHEME_STATS, agreement: { ...SAMPLE_SCHEME_STATS.agreement, overall: null, checked: 0 }, sources: [{ source: 'parent', checked: 0, confirmed: 0, overruled: 0, overruledTo: {}, agreement: null }], sinceLastTune: 2 } };
     open(`${TEAM}/board/classify`, { ...api, ledger: async () => empty });
-    const doing = await until<HTMLDetailsElement>('[data-how-its-doing]');
-    expect(doing.querySelector('summary')!.textContent).toBe("How it's doing: nothing has been checked yet");
+    const doing = await doingWith(/^How it's doing: nothing has been checked yet$/);
     expect(doing.querySelector('[data-share="agreement"]')!.textContent).toBe('—');
     expect(doing.querySelector('[data-share="source"]')!.textContent).toBe('—');
     expect(doing.textContent).toMatch(/Nobody has checked an answer yet, so there is no figure/);
@@ -584,16 +592,18 @@ describe("How it's doing", () => {
     const api = fixtureClassify();
     const base = await api.ledger('sample-team');
     open(`${TEAM}/board/classify`, { ...api, ledger: async () => ({ ...base, stats: null, notes: ["The ledger couldn't be read, so how it's doing is not read yet: nope."] }) });
-    const doing = await until<HTMLDetailsElement>('[data-how-its-doing]');
+    // Before the record loads the panel already reads as a failed read, so wait for the
+    // ledger's own note, which only the loaded view shows.
+    const doing = await doingWith(/how it's doing is not read yet: nope\./, true);
+    expect(doing.textContent).toMatch(/The record could not be read, so this is not read yet/);
     expect(doing.querySelector('[data-share="agreement"]')!.textContent).toBe('—');
     expect(doing.querySelector('summary')!.textContent).toBe("How it's doing: not read yet");
-    expect(doing.textContent).toMatch(/The record could not be read, so this is not read yet/);
     expect(doing.querySelector('[data-since-tune]')!.textContent).toMatch(/not read yet/);
   });
 
   it("shows the agent's proposed changes beside the scores, and Use this version is a press that the sample refuses in words", async () => {
     open(`${TEAM}/board/classify`);
-    const doing = await until<HTMLDetailsElement>('[data-how-its-doing]');
+    const doing = await doingWith(/people agreed with/);
     await act(async () => void fireEvent.click(await within(doing).findByRole('button', { name: 'Improve with your AI agent' })));
     const tune = await until<HTMLElement>('[data-tune]');
     expect(tune.textContent).toMatch(/Adds the rule "new-exports": when its title contains export, the category is Feature\./);
@@ -614,7 +624,7 @@ describe("How it's doing", () => {
       tune: async () => ({ id: 'rev-1', by: 'a scripted sample', before: scheme, after: sampleRevision(scheme), changes: ['Adds the guidance: Be careful.'], backtest: { heldBack: 5, before: { agreed: 4, agreement: 0.8 }, after: { agreed: 2, agreement: 0.4 }, worse: true }, warnings: [] }),
       applyRevision,
     });
-    const doing = await until<HTMLDetailsElement>('[data-how-its-doing]');
+    const doing = await doingWith(/people agreed with/);
     await act(async () => void fireEvent.click(await within(doing).findByRole('button', { name: 'Improve with your AI agent' })));
     const tune = await until<HTMLElement>('[data-tune]');
     const score = tune.querySelector<HTMLElement>('[data-backtest="worse"]')!;
