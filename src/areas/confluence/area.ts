@@ -114,5 +114,5 @@ export const confluenceSupported: SupportedVersion = {
   product: 'Confluence Data Center',
   minimum: '7.9',
   api: 'Server REST API',
-  note: 'toil authenticates to Data Center with a personal access token, which Confluence Data Center added in 7.9. No release has been verified yet. Confluence Cloud (a connection with deployment cloud) is always current: toil calls REST API v2 (/wiki/api/v2) and, where v2 has no endpoint, v1 (/wiki/rest/api: CQL search, adding and removing labels, attachment uploads), with an Atlassian account email and API token sent as Basic auth. Nothing has been run against a live Cloud site yet.',
+  note: 'toil authenticates to Data Center with a personal access token, which Confluence Data Center added in 7.9. No release has been verified yet. Confluence Cloud (a connection with deployment cloud) is always current: toil calls REST API v2 (/wiki/api/v2) and, where v2 has no endpoint, v1 (/wiki/rest/api: CQL search, adding and removing labels, attachment uploads), with an Atlassian account email and API token sent as Basic auth. Run live against a Confluence Cloud site on 16 November 2026: space create and get, page create, update, find and list, page labels, label and unlabel, and connections test. Data Center has not been run.',
 };

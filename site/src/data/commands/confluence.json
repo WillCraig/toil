@@ -193,6 +193,19 @@
     ]
   },
   {
+    "name": "space create",
+    "tool": "confluence_space_create",
+    "description": "Create a Confluence space",
+    "writes": true,
+    "connection": true,
+    "flags": [
+      "<key>",
+      "--name <name>",
+      "--description <text>",
+      "--allow-write"
+    ]
+  },
+  {
     "name": "page attachments",
     "tool": "confluence_page_attachments",
     "description": "List attachments on a Confluence page",

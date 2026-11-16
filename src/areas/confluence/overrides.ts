@@ -16,6 +16,11 @@ export const overrides: Record<string, DeploymentOverride> = {
     toolDescription:
       'Returns a Confluence page by id, with its storage-format body. Data Center returns it as the Server REST API does, with the fields named in expand (default body.storage, version, space, ancestors). Cloud returns it as REST API v2 does (title, spaceId, parentId, version, body.storage), plus bodyText, the body as plain text; expand is Data Center only.',
   },
+  'confluence space create': {
+    description: 'Create a Confluence space',
+    toolDescription:
+      'Creates a global space with a key, a name and an optional plain-text description, and returns the space Confluence created. Confluence adds the space homepage itself; put pages under it with page create. Data Center returns the space as the Server REST API does; Cloud returns it as REST API v2 does, adding homepageId.',
+  },
   'confluence page find': {
     description: 'Find a Confluence page by space key and exact title',
   },

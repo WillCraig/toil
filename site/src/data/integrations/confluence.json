@@ -5,7 +5,7 @@
   "order": 1,
   "covers": "Pages, spaces, search, comments, labels, attachments",
   "credential": "Personal access token (Data Center) or Atlassian account email and API token (Cloud)",
-  "credentialNote": "One area for both: a Cloud connection sets deployment to cloud and an email, sent as Basic auth with the token. The default connection uses TOIL_JIRA_API_TOKEN when no Confluence token is set, only if the default Jira connection is the same deployment; another connection can borrow a Jira connection's token with apiTokenFrom. On Cloud, toil connections add and login offer to reuse a Jira Cloud connection's token on the same site. Both deployments are verified at the unit level, so the board shows one",
+  "credentialNote": "One area for both: a Cloud connection sets deployment to cloud and an email, sent as Basic auth with the token. The default connection uses TOIL_JIRA_API_TOKEN when no Confluence token is set, only if the default Jira connection is the same deployment; another connection can borrow a Jira connection's token with apiTokenFrom. On Cloud, toil connections add and login offer to reuse a Jira Cloud connection's token on the same site. The board shows one status for both, unit, held back by Data Center, which has never run against a real instance; Cloud's common commands have run against a live site (see Supported versions)",
   "credentialWhere": "Data Center: your profile picture → Settings → Personal Access Tokens. Cloud: id.atlassian.com → Security → API tokens",
   "status": "unit",
   "keys": [
@@ -16,6 +16,6 @@
     "product": "Confluence Data Center",
     "minimum": "7.9",
     "api": "Server REST API",
-    "note": "toil authenticates to Data Center with a personal access token, which Confluence Data Center added in 7.9. No release has been verified yet. Confluence Cloud (a connection with deployment cloud) is always current: toil calls REST API v2 (/wiki/api/v2) and, where v2 has no endpoint, v1 (/wiki/rest/api: CQL search, adding and removing labels, attachment uploads), with an Atlassian account email and API token sent as Basic auth. Nothing has been run against a live Cloud site yet."
+    "note": "toil authenticates to Data Center with a personal access token, which Confluence Data Center added in 7.9. No release has been verified yet. Confluence Cloud (a connection with deployment cloud) is always current: toil calls REST API v2 (/wiki/api/v2) and, where v2 has no endpoint, v1 (/wiki/rest/api: CQL search, adding and removing labels, attachment uploads), with an Atlassian account email and API token sent as Basic auth. Run live against a Confluence Cloud site on 16 November 2026: space create and get, page create, update, find and list, page labels, label and unlabel, and connections test. Data Center has not been run."
   }
 }

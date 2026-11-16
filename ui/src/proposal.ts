@@ -193,7 +193,7 @@ export const POSITIONAL_FIELDS: ReadonlyMap<string, readonly string[]> = new Map
     'jira issue download',
   ),
   ...positional(['key'],
-    'confluence space get', 'jira issue assign', 'jira issue attach',
+    'confluence space create', 'confluence space get', 'jira issue assign', 'jira issue attach',
     'jira issue attachments', 'jira issue comment', 'jira issue comments', 'jira issue get',
     'jira issue history', 'jira issue label', 'jira issue link', 'jira issue log-work',
     'jira issue set-sprint', 'jira issue transition', 'jira issue transitions', 'jira issue unlabel',

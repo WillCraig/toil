@@ -8,7 +8,7 @@ import { attachmentFileName, deleteAttachment, downloadAttachment, listAttachmen
 import { cursorOf, seg } from './client.js';
 import { addComment, addLabel, getLabels, listComments, removeLabel } from './discussion.js';
 import { createPage, deletePage, getPage, getPageByTitle, getPageChildren, getPageHistory, listPages, search, updatePage } from './pages.js';
-import { getSpace, listSpaces } from './spaces.js';
+import { createSpace, getSpace, listSpaces } from './spaces.js';
 import { storageToText } from './storage.js';
 
 /**
@@ -213,6 +213,24 @@ describe('pages', () => {
     expect(cursorOf('https://confluence-cloud.imagile.dev/wiki/api/v2/pages?cursor=x#frag')).toBe('x');
     expect(cursorOf('/wiki/api/v2/pages?limit=25')).toBeUndefined();
     expect(cursorOf(undefined)).toBeUndefined();
+  });
+
+  it('space create: one POST to v2 spaces with the key, name and a plain description, returning the space with its homepage', async () => {
+    const { envelope, calls } = await run(createSpace, { key: 'KW', name: 'Kettlewell Engineering', description: 'How we build payments.', ...write });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ method: 'POST', url: `${V2}/spaces`, headers: JSON_HEADERS });
+    expect(body(calls[0]!)).toEqual({ key: 'KW', name: 'Kettlewell Engineering', description: { value: 'How we build payments.', representation: 'plain' } });
+    expect(envelope.data).toMatchObject({ id: '98310', key: 'KW', homepageId: '10010' });
+    const bare = await run(createSpace, { key: 'KW', name: 'Kettlewell Engineering', ...write });
+    expect(body(bare.calls[0]!)).toEqual({ key: 'KW', name: 'Kettlewell Engineering' });
+  });
+
+  it('space create: a key with anything but letters and digits is INVALID_INPUT before any request', async () => {
+    for (const key of ['K-W', 'k w', '~jsmith', '']) {
+      const { envelope, calls } = await run(createSpace, { key, name: 'X', ...write });
+      expect(envelope.error?.code, key).toBe('INVALID_INPUT');
+      expect(calls, key).toEqual([]);
+    }
   });
 
   it('page create: looks up the space id, then POSTs a published page with a storage body under the parent', async () => {

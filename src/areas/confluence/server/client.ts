@@ -199,6 +199,14 @@ export function getSpace(ctx: ConfluenceContext, key: string): Promise<unknown> 
   return confluence(ctx, apiPath`/space/${key}`, { params: { expand: 'description.plain' } });
 }
 
+// POST /rest/api/space: a global space, with an optional plain-text description.
+export function createSpace(ctx: ConfluenceContext, opts: { key: string; name: string; description?: string | undefined }): Promise<unknown> {
+  return confluence(ctx, '/space', {
+    method: 'POST',
+    body: { key: opts.key, name: opts.name, ...(opts.description !== undefined ? { description: { plain: { value: opts.description, representation: 'plain' } } } : {}) },
+  });
+}
+
 export function listAttachments(ctx: ConfluenceContext, pageId: string): Promise<unknown[]> {
   return every(`Confluence attachments on ${pageId}`, (start, limit) => confluence(ctx, apiPath`/content/${pageId}/child/attachment`, { params: { start, limit } }));
 }

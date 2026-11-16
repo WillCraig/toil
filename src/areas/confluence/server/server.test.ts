@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testContext } from '../../../../test/harness/context.js';
 import type { Route } from '../../../../test/harness/fake-fetch.js';
-import { attachment, CONFLUENCE, config as fixtureConfig, page } from '../../../../test/fixtures/confluence.fixture.js';
+import { attachment, CONFLUENCE, config as fixtureConfig, page, routes as fixtureRoutes } from '../../../../test/fixtures/confluence.fixture.js';
 import type { AnyCommand } from '../../../core/command.js';
 import { ToilError } from '../../../core/errors.js';
 import { multipart } from '../../../core/multipart.js';
@@ -10,7 +10,7 @@ import { attachmentFileName, deleteAttachment, downloadAttachment, uploadAttachm
 import { addComment, addLabel, listComments, removeLabel } from './discussion.js';
 import { storageFormatHint, xmlParseHint } from './hints.js';
 import { createPage, deletePage, getPage, getPageByTitle, listPages, search, updatePage } from './pages.js';
-import { getSpace, listSpaces } from './spaces.js';
+import { createSpace, getSpace, listSpaces } from './spaces.js';
 
 /**
  * Request building and response reshaping, command by command: the exact
@@ -347,6 +347,24 @@ describe('spaces', () => {
     for (const [key, sent] of [['~jsmith', '~jsmith'], ['a/b?c=d', 'a%2Fb%3Fc%3Dd'], ['p1#hot', 'p1%23hot']] as const) {
       const { calls } = await run(getSpace, { key }, [{ url: /space\//, respond: { json: { key } } }]);
       expect(calls.map((c) => c.url), key).toEqual([`${API}/space/${sent}?expand=description.plain`]);
+    }
+  });
+
+  it('space create: POSTs the key, name and a plain description to /space, and returns the space', async () => {
+    const { envelope, calls } = await run(createSpace, { key: 'KW', name: 'Kettlewell Engineering', description: 'How we build payments.', ...write }, fixtureRoutes);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ method: 'POST', url: `${API}/space`, headers: JSON_HEADERS });
+    expect(JSON.parse(calls[0]!.body!)).toEqual({ key: 'KW', name: 'Kettlewell Engineering', description: { plain: { value: 'How we build payments.', representation: 'plain' } } });
+    expect(envelope.data).toMatchObject({ key: 'KW', name: 'Kettlewell Engineering', type: 'global' });
+    const bare = await run(createSpace, { key: 'KW', name: 'Kettlewell Engineering', ...write }, fixtureRoutes);
+    expect(JSON.parse(bare.calls[0]!.body!)).toEqual({ key: 'KW', name: 'Kettlewell Engineering' });
+  });
+
+  it('space create: a key with anything but letters and digits is INVALID_INPUT before any request', async () => {
+    for (const key of ['K-W', 'k w', '~jsmith', '']) {
+      const { envelope, calls } = await run(createSpace, { key, name: 'X', ...write }, fixtureRoutes);
+      expect(envelope.error?.code, key).toBe('INVALID_INPUT');
+      expect(calls, key).toEqual([]);
     }
   });
 });
