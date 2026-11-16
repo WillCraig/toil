@@ -44,7 +44,10 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    # Counts every open npm version pull request, including ones left from an
+    # earlier grouping. The groups make at most three, so this only has to stay
+    # above what is left open while a new group replaces them.
+    open-pull-requests-limit: 10
     cooldown:
       default-days: 14
     commit-message:
