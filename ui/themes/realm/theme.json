@@ -132,6 +132,7 @@
     "empty.toilProjects": "The ledgers are empty: toil sees no Toil projects yet.",
     "empty.sprint": "No sprint is entered in this Toil project's work items, so there are no hit points to count.",
     "empty.burnup": "No sprint is entered, so there is no experience to reckon.",
+    "empty.points": "No points were read for this sprint's quests, so there is no experience to reckon.",
     "empty.column": "None stand here.",
     "empty.prs": "No pull requests have come before the table for this Toil project.",
     "empty.builds": "No builds are recorded for this Toil project's pull requests: no saving throw has been rolled.",

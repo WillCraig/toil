@@ -34,6 +34,7 @@ import { useData, useDerived } from '../data.ts';
 import { analysesHref, analysisHref, boardHref, dependenciesHref, diagramHref, itemHref, peekHref, peopleHref, personText, prsHref, shortKey, sourceLabel, standupHref, toilProjectEditHref, worklogHref } from '../format.ts';
 import { Empty, TrackerAction } from '../components/empty.tsx';
 import { burnup } from '../model/burnup.ts';
+import { sprintPoints } from '../model/sprint.ts';
 import { aging, cycleTimes, throughput } from '../model/flow.ts';
 import { WAITING_LABEL, daysText, openQueue } from '../model/prs.ts';
 import type { BriefingReason } from '../model/briefing.ts';
@@ -438,7 +439,9 @@ function MetricStrip() {
     }),
     [h, toilProject, now, byId],
   );
-  const last = b?.days.at(-1);
+  // A sprint whose items have no points read has no burn-up figure: a dash, not 0 of 0 (#652).
+  const read = h ? sprintPoints(h) !== null : false;
+  const last = read ? b?.days.at(-1) : undefined;
   const full = t.weeks.filter((w) => !w.partial);
   const mean = full.length ? full.reduce((n, w) => n + w.items.length, 0) / full.length : 0;
   const waits = queue.map((r) => r.wait.days ?? 0);
@@ -452,9 +455,9 @@ function MetricStrip() {
         <Metric
           id="burnup"
           label={pw('Burn-up', 'Points done')}
-          value={last ? `${last.done} of ${last.scope}` : 'No sprint'}
-          unit={last ? 'points' : ''}
-          spark={<Sparkline values={b?.days.map((d) => d.done) ?? []} against={b?.days.map((d) => d.scope) ?? []} />}
+          value={last ? `${last.done} of ${last.scope}` : h ? '–' : 'No sprint'}
+          unit={last ? 'points' : h ? 'no points read' : ''}
+          spark={<Sparkline values={read ? (b?.days.map((d) => d.done) ?? []) : []} against={read ? (b?.days.map((d) => d.scope) ?? []) : []} />}
           title={h ? `${h.sprint.name}: day ${h.days.gone} of ${h.days.total}` : 'Sprint'}
         >
           {h ? (

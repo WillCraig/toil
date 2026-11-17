@@ -15,6 +15,7 @@
  * drawn after the fact, which is when project plans are most accurate.
  */
 
+import { pointsOf } from '../../../src/core/brief/points.ts';
 import type { ChangeRef, WorkItem } from '../toil.ts';
 import { blockerOrder, heldBy } from './blockers.ts';
 import { doneAt } from './flow.ts';
@@ -71,7 +72,10 @@ export interface Arrow {
 export interface Chain {
   /** Head first: each blocks the next. */
   ids: string[];
+  /** Points of the items on it that have them. */
   points: number;
+  /** Items on it with no points read, left out of `points` and said beside it (#652). */
+  unestimated: number;
   /** True when no item on any chain has points, so the longest chain was taken instead. */
   byCount: boolean;
 }
@@ -100,7 +104,6 @@ type Span = [number, number];
 const t = (iso: string | null | undefined) => (iso ? Date.parse(iso) : NaN);
 const ok = (n: number) => Number.isFinite(n);
 const at = (ms: number) => new Date(ms).toISOString();
-const pointsOf = (item: WorkItem | undefined) => (item?.estimate?.unit === 'points' ? item.estimate.value : null);
 
 /** When an item finished: its last move into Done, else its resolution, else its last update (estimated). */
 function finished(item: WorkItem): { at: number; estimated: boolean } | null {
@@ -160,7 +163,8 @@ function union(spans: Span[]): Span[] {
 function criticalChain(held: Map<string, string[]>, p: Prepared): Chain | null {
   if (!held.size) return null;
   const pts = (id: string) => pointsOf(p.byId.get(id)) ?? 0;
-  const anyPoints = [...held.keys(), ...[...held.values()].flat()].some((id) => pts(id) > 0);
+  // Points read at all, real zeros included: a chain of 0-point items was read, not unestimated (#652).
+  const anyPoints = [...held.keys(), ...[...held.values()].flat()].some((id) => pointsOf(p.byId.get(id)) !== null);
   const weight = (id: string) => (anyPoints ? pts(id) : 1);
   const best = new Map<string, string[]>();
   // The heaviest path from `id` down; a loop is cut where it comes back round.
@@ -188,7 +192,7 @@ function criticalChain(held: Map<string, string[]>, p: Prepared): Chain | null {
     const cw = c.reduce((n, x) => n + weight(x), 0);
     if (cw > w || (cw === w && c.length > chain.length)) [chain, w] = [c, cw];
   }
-  return { ids: chain, points: chain.reduce((n, id) => n + pts(id), 0), byCount: !anyPoints };
+  return { ids: chain, points: chain.reduce((n, id) => n + pts(id), 0), unestimated: chain.filter((id) => pointsOf(p.byId.get(id)) === null).length, byCount: !anyPoints };
 }
 
 /** Each pull request's builds that fail now, as one span from the first of its latest run of failures. */

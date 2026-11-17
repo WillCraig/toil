@@ -22,8 +22,8 @@ describe('card-payments: Jira, Bitbucket, Jenkins, OpenShift', () => {
     expect(h.items).toHaveLength(7); // The epic sits outside any sprint.
     expect(ids(h, 'carried')).toEqual(['corp-jira:PAY-104']);
     expect(ids(h, 'added')).toEqual(['corp-jira:PAY-107']);
-    expect(h.done).toEqual({ count: 2, points: 3 });
-    expect(h.remaining).toEqual({ count: 5, points: 18 });
+    expect(h.done).toEqual({ count: 2, points: 3, unestimated: 1 });
+    expect(h.remaining).toEqual({ count: 5, points: 18, unestimated: 1 });
   });
 
   it('flags each risk, the failing Jenkins build included', async () => {
@@ -58,8 +58,8 @@ describe('settlement: Azure DevOps Server Boards, Repos and Pipelines', () => {
     // 2305 is a task created inside the sprint, which is scope added.
     expect(ids(h, 'added')).toEqual(['corp-ado:2305', 'corp-ado:2306']);
     expect(h.otherUnits).toEqual(['corp-ado:2305']);
-    expect(h.done).toEqual({ count: 2, points: 1 });
-    expect(h.remaining).toEqual({ count: 4, points: 15 });
+    expect(h.done).toEqual({ count: 2, points: 1, unestimated: 1 });
+    expect(h.remaining).toEqual({ count: 4, points: 15, unestimated: 0 });
     expect(reasons(h)).toEqual({ 'corp-ado:2303': ['blocked'], 'corp-ado:2304': ['carried'] });
   });
 

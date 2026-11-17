@@ -121,6 +121,7 @@
     "empty.toilProjects": "No jobs on the wire: toil sees no Toil projects yet.",
     "empty.sprint": "No run is live in this Toil project's work items. The street is quiet.",
     "empty.burnup": "No run is live, so there is nothing to burn up.",
+    "empty.points": "No points were read for this run's jobs, so there is nothing to burn up.",
     "empty.column": "Dead channel.",
     "empty.prs": "No payloads waiting on the fixer for this Toil project.",
     "empty.builds": "No ICE checks logged for this Toil project's pull requests.",

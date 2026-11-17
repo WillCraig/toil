@@ -22,6 +22,7 @@ import { flows } from './flow.ts';
 import type { Prepared } from './insights.ts';
 import { isPerson } from './people.ts';
 import { PICKUP_DAYS, openQueue, type OpenRow } from './prs.ts';
+import { pointsPhrase, sumPoints, unreadItems, type PointsSum } from '../../../src/core/brief/points.ts';
 import { readiness, type Readiness } from './readiness.ts';
 import { daysLeft, type Health } from './sprint.ts';
 import { AT_RISK_FROM, statusOf, type Status } from './status.ts';
@@ -33,7 +34,6 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const pts = (n: number) => plural(round1(n), 'point');
 const q = (s: string) => `“${s}”`;
-const points = (i: WorkItem) => (i.estimate?.unit === 'points' ? i.estimate.value : 0);
 const isDone = (i: WorkItem) => i.statusCategory === 'DONE';
 const nameOf = (p: Person | null | undefined) => (p ? (p.name ?? p.id) : null);
 const cap = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
@@ -85,10 +85,16 @@ export function contextOf(input: { d: ToilProjectData; now: string; byId: Map<st
 }
 
 /** The open stories that wait behind an item, directly or down a chain, and their points: worked out from the blockers model, so it holds whichever briefing is on screen. */
-function holdsOf(c: Ctx, id: string): { items: number; points: number } {
+function holdsOf(c: Ctx, id: string): { items: number; points: PointsSum } {
   const waiting = [...behindAll(c.held, id)].map((x) => c.byId.get(x)).filter((i): i is WorkItem => !!i && !isDone(i));
-  return { items: waiting.length, points: waiting.reduce((n, i) => n + points(i), 0) };
+  return { items: waiting.length, points: sumPoints(waiting) };
 }
+
+/** " (5 points)" after a count of stories, or nothing when none of them has points read: a figure nobody read is left out, never said as 0 (#652). */
+const ptsAfter = (s: PointsSum) => {
+  const p = pointsPhrase(s);
+  return p ? ` (${p})` : '';
+};
 
 /** A person as the toil project's `people` names them ("Ada D."), else as the tracker does: a GitHub login is not a name anyone says out loud. */
 function personIn(c: Ctx, p: Person | null | undefined, area: string): Person | null {
@@ -104,6 +110,15 @@ function plainCites(text: string, c: Ctx): string {
     if (i) return q(i.title);
     return c.prById.has(id) ? `the ${reviewWord(c)} ${prName(id)}` : id;
   });
+}
+
+/** What the stories that can't start add up to, after the sentence that names their blocker: no points read is said as that, never as 0 points (#652). */
+function waitingPoints(waiting: WorkItem[]): string {
+  const s = sumPoints(waiting);
+  const one = waiting.length === 1;
+  if (s.points === null) return one ? 'No points were read for it.' : 'No points were read for them.';
+  const total = `Together ${one ? 'it is' : 'they are'} ${pts(s.points)}`;
+  return s.unestimated ? `${total}; no points were read for ${s.unestimated} of them.` : `${total}.`;
 }
 
 const itemHref = (c: Ctx, id: string) => peekHref(toilProjectHref(c.name), id);
@@ -150,7 +165,7 @@ function whyOf(c: Ctx, status: Status): string {
   const first = c.byId.get(top.items[0]?.id ?? '');
   const title = first ? q(first.title) : 'one item';
   const holds = first ? holdsOf(c, first.id) : null;
-  const behind = holds && holds.items > 0 ? `, and ${plural(holds.items, 'story', 'stories')} (${pts(holds.points)}) ${holds.items === 1 ? 'waits' : 'wait'} behind it` : '';
+  const behind = holds && holds.items > 0 ? `, and ${plural(holds.items, 'story', 'stories')}${ptsAfter(holds.points)} ${holds.items === 1 ? 'waits' : 'wait'} behind it` : '';
   switch (top.lens) {
     case 'failing':
       return `Mostly because the tests for ${title} are failing${behind}.`;
@@ -159,7 +174,7 @@ function whyOf(c: Ctx, status: Status): string {
     case 'waiting':
       return `Mostly because ${plural(top.items.length, reviewWord(c))} ${top.items.length === 1 ? 'has' : 'have'} waited past ${PICKUP_DAYS} working days for a first review.`;
     case 'sprint':
-      return c.view.code.sprint ? `Mostly because only ${pts(c.view.code.sprint.points.done)} ${c.view.code.sprint.points.done === 1 ? 'is' : 'are'} done so far, and the pace is too slow to finish the rest.` : `${top.label}: ${plainCites(top.line, c)}.`;
+      return c.view.code.sprint?.points.done != null ? `Mostly because only ${pts(c.view.code.sprint.points.done)} ${c.view.code.sprint.points.done === 1 ? 'is' : 'are'} done so far, and the pace is too slow to finish the rest.` : `${top.label}: ${plainCites(top.line, c)}.`;
     case 'stale':
       return `Mostly because ${plural(top.items.length, 'item')} in progress ${top.items.length === 1 ? 'has' : 'have'} had no update for days.`;
     case 'load':
@@ -177,24 +192,36 @@ export function answerOf(c: Ctx): Answer {
   if (!s || !h) {
     return { status: 'none', word: 'No sprint', sentence: 'No sprint is running right now.', why: 'No sprint with dates was found, so there is nothing to measure the work against.', how: [`Sprints are read from ${sourcesText(c.d)}.`], basis: null, bare: true };
   }
-  if (s.points.total === 0) {
-    // Nothing is estimated, so "all 0 points are done" would be a claim with nothing under it.
+  const { total, done, left } = s.points;
+  if (h.scope.count === 0 || total === null || done === null || left === null) {
+    // No points were read, so "all 0 points are done" would be a claim with nothing under it (#652). The tracker
+    // may hold none, or the toil project may not name the field: "none read" is true of both. Real zeros are next.
     const n = h.items.length;
     return {
       status: 'none',
-      word: 'No estimates',
-      sentence: n === 0 ? 'the sprint has no stories yet, so there is no progress to measure.' : `${plural(n, 'story', 'stories')} in the sprint ${n === 1 ? 'has' : 'have'} no points, so progress can’t be measured.`,
-      why: 'Add points to the stories and this reads the pace against them.',
-      how: [`Points come from ${sourcesText(c.d)}. This sprint has none to add up.`],
+      word: 'No points read',
+      sentence: n === 0 ? 'the sprint has no stories yet, so there is no progress to measure.' : `progress can’t be measured for the ${n === 1 ? 'story' : `${n} stories`} in the sprint.`,
+      why: 'Add points to the stories, or name the field they are kept in, and this reads the pace against them.',
+      how: [`Points come from ${sourcesText(c.d)}. None were read for this sprint.`],
       basis: 'A status needs points to measure against',
     };
   }
-  const left = s.points.left;
+  if (total === 0) {
+    // Real estimates of 0 were read, but there is nothing to pace against: "all 0 points are done" would call a sprint of open stories finished.
+    return {
+      status: 'none',
+      word: 'No points to measure',
+      sentence: 'the stories in the sprint are estimated at 0 points, so progress can’t be measured.',
+      why: 'Give the stories points above 0 and this reads the pace against them.',
+      how: [`Points come from ${sourcesText(c.d)}.`],
+      basis: 'A status needs points to measure against',
+    };
+  }
   const days = daysLeft(h.days);
   const result = statusOf({ sprint: { left, projected: s.projected }, red: c.view.reasons.some((r) => r.severity === 'danger') });
   const remain = days === 0 ? 'no working days remain' : `${plural(days, 'working day')} ${days === 1 ? 'remains' : 'remain'}`;
-  const sentence = left <= 0 ? `all ${pts(s.points.total)} in the sprint are done.` : `${left} of ${s.points.total} points are left, and ${remain}.`;
-  const skipped = h.unestimated.length;
+  const sentence = left <= 0 ? `all ${pts(total)} in the sprint are done.` : `${left} of ${total} points are left, and ${remain}.`;
+  const skipped = h.scope.unestimated;
   const pct = Math.round(AT_RISK_FROM * 100);
   return {
     status: result.status,
@@ -203,11 +230,11 @@ export function answerOf(c: Ctx): Answer {
     why: whyOf(c, result.status),
     how: [
       ...(left > 0 && !result.early ? ['The status word is an estimate from the pace so far.'] : []),
-      `${pts(s.points.done)} done out of ${s.points.total} after ${h.days.gone} of ${h.days.total} working days${s.pace !== null ? `, about ${s.pace} a day` : ''}. Working days left do not count today.`,
+      `${pts(done)} done out of ${total} after ${h.days.gone} of ${h.days.total} working days${s.pace !== null ? `, about ${s.pace} a day` : ''}. Working days left do not count today.`,
       s.projected === null ? 'It is too early to read a pace: that needs a quarter of the sprint to have passed.' : `At that pace about ${round1(s.projected)} of the ${left} points left would be done by the end. That is an estimate, not a promise.`,
       `The ${pct}% line is the app’s own rule of thumb, not a standard.`,
       `On track means the points left should fit at that pace. At risk means at least ${pct}% of them should, or something red is holding work up. Behind means fewer than ${pct}%.`,
-      ...(skipped ? [`${plural(skipped, 'story', 'stories')} with no estimate ${skipped === 1 ? 'is' : 'are'} left out of these points.`] : []),
+      ...(skipped ? [`${cap(unreadItems(skipped))} ${skipped === 1 ? 'is' : 'are'} left out of these points.`] : []),
       `Points and dates come from ${sourcesText(c.d)}.`,
     ],
     basis: left > 0 && result.early ? 'Too early in the sprint to judge a pace' : null,
@@ -240,7 +267,7 @@ export interface Card {
   tone: Tone;
 }
 
-const holdText = (h: { items: number; points: number } | undefined) => (h && h.items > 0 ? ` ${plural(h.items, 'other story', 'other stories')} (${pts(h.points)}) ${h.items === 1 ? 'waits' : 'wait'} behind it.` : '');
+const holdText = (h: { items: number; points: PointsSum } | undefined) => (h && h.items > 0 ? ` ${plural(h.items, 'other story', 'other stories')}${ptsAfter(h.points)} ${h.items === 1 ? 'waits' : 'wait'} behind it.` : '');
 
 /** The biggest risk: the briefing's top reason, its first item and what waits behind it. */
 /** The first reason, and in it the first item that is still open: a story already finished is no risk to anything. */
@@ -289,7 +316,7 @@ function blockedCard(c: Ctx, covered: string | null): Card | null {
   const blocker = c.byId.get(headId);
   const waiting = [...behindAll(c.held, headId)].map((id) => c.byId.get(id)).filter((i): i is WorkItem => !!i && !isDone(i));
   if (!blocker || !waiting.length || waiting.some((i) => i.id === covered)) return null;
-  const total = waiting.reduce((n, i) => n + points(i), 0);
+  const total = waitingPoints(waiting);
   const first = waiting[0]!;
   const owner = nameOf(personIn(c, blocker.assignee, blocker.source.area));
   return {
@@ -297,7 +324,7 @@ function blockedCard(c: Ctx, covered: string | null): Card | null {
     kicker: 'Stories that can’t start',
     title: waiting.length === 1 ? `${q(first.title)} can’t start yet` : `${waiting.length} stories can’t start yet`,
     key: waiting.length === 1 ? keyOf(first) : null,
-    why: `${waiting.length === 1 ? 'It waits' : 'They wait'} on ${q(blocker.title)}, which is still ${(blocker.status ?? 'open').toLowerCase()}. Together ${waiting.length === 1 ? 'it is' : 'they are'} ${pts(total)}.`,
+    why: `${waiting.length === 1 ? 'It waits' : 'They wait'} on ${q(blocker.title)}, which is still ${(blocker.status ?? 'open').toLowerCase()}. ${total}`,
     named: [{ text: owner ? `Waiting on ${owner}` : 'Waiting on nobody yet', meta: blocker.title }],
     action: { label: 'Open', href: itemHref(c, blocker.id), item: blocker.id },
     tone: 'warn',

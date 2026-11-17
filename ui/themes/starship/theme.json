@@ -118,6 +118,7 @@
     "empty.toilProjects": "No missions on the board: toil sees no Toil projects yet.",
     "empty.sprint": "No sprint is under way in this Toil project's work items. All stations standing by.",
     "empty.burnup": "No sprint is under way, so there is no burn to plot.",
+    "empty.points": "No points were read for this sprint's missions, so there is no burn to plot.",
     "empty.column": "Sector clear.",
     "empty.prs": "No pull requests on the scanner for this Toil project.",
     "empty.builds": "No builds logged for this Toil project's pull requests.",

@@ -122,6 +122,7 @@
     "empty.toilProjects": "The fields are fallow: toil sees no Toil projects yet.",
     "empty.sprint": "No season is under way in this Toil project's work items.",
     "empty.burnup": "No season is under way, so there is no harvest to chart.",
+    "empty.points": "No points were read for this season's crops, so there is no harvest to chart.",
     "empty.column": "Bare soil.",
     "empty.prs": "No pull requests in the basket for this Toil project.",
     "empty.builds": "No builds have come up for this Toil project's pull requests.",

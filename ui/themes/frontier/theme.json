@@ -123,6 +123,7 @@
     "empty.toilProjects": "Nothing staked yet: toil sees no Toil projects.",
     "empty.sprint": "No cattle drive is under way in this Toil project's work items.",
     "empty.burnup": "No drive is under way, so there are no head to count.",
+    "empty.points": "No points were read for this drive's herd, so there are no head to count.",
     "empty.column": "Nobody's staked a claim here.",
     "empty.prs": "No telegrams are waiting on the sheriff's signature for this Toil project.",
     "empty.builds": "No boiler tests on record for this Toil project's pull requests.",

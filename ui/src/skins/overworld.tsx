@@ -16,6 +16,7 @@ import { DataContext, useDerived } from '../data.ts';
 import type { Skins } from '../skins.tsx';
 import { useTerm } from '../theme-context.ts';
 import type { StatusCategory } from '../toil.ts';
+import { sprintPoints } from '../model/sprint.ts';
 
 const art = (file: string) => new URL(`../../themes/overworld/assets/${file}`, import.meta.url).href;
 
@@ -39,7 +40,7 @@ function Hud() {
   const { health: h } = useDerived();
   if (!h) return null;
   const left = Math.max(0, h.days.total - h.days.gone);
-  const scope = h.done.points + h.remaining.points;
+  const pts = sprintPoints(h);
   return (
     <p className="ow-hud" aria-hidden="true">
       <span className="ow-hearts">
@@ -49,7 +50,7 @@ function Hud() {
       </span>
       <span className="ow-gems">
         <img src={art('gem.svg')} alt="" width={14} height={12} />
-        {h.done.points}/{scope}
+        {pts ? `${pts.done}/${pts.total}` : '–'}
       </span>
     </p>
   );

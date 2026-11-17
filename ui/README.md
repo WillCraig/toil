@@ -159,7 +159,7 @@ filled, plus `projects list` and `projects show` for the Toil projects themselve
   changed since this browser last opened its dashboard.
 - **Unknown is not zero (principle 12):** a Toil project that has never synced has
   read nothing, so its counts show a dash (`–`, spoken as "not read yet") instead of
-  `0`, and the sprint and "since you last looked" lines stay off until a sync has
+  `0`, points nobody read say "no points read" instead of 0 of 0 (#652), and the sprint and "since you last looked" lines stay off until a sync has
   read something. Once it has synced, a `0` is a real count.
 - **Card order:** the Toil project opened most recently in this browser, or, before
   any was opened, the one with the most in motion (in progress, blocked and waiting on
@@ -257,7 +257,7 @@ A Toil project opens on its briefing: one column to read top to bottom, each par
 further in, and each step one you choose (#494). The tab's top is the answer (#552):
 
 - **The status sentence**, the biggest text on the tab: a word with a shape (On
-  track, At risk, Behind, No sprint, or No estimates when no story in the sprint has points) and the rest of the sentence ("Behind: 18 of
+  track, At risk, Behind, No sprint, or No points read when no points were read for any story in the sprint) and the rest of the sentence ("Behind: 18 of
   21 points are left, and 3 working days remain."), with an (i). That it is an estimate is the first line of the fold; "Too early in the sprint to judge a pace" stays on the page. One rule
   picks the word (`ui/src/model/status.ts`): On track when the points left fit at
   the pace so far, At risk when at least 75% of them would land or a red reason holds
@@ -290,7 +290,10 @@ further in, and each step one you choose (#494). The tab's top is the answer (#5
    code flagged that Analyze didn't mention, so nothing drops off the page unsaid. An
    id Analyze named that isn't the Toil project's is shown in red.
 4. **The numbers**, folded: burn-up, throughput, cycle time, aging work in progress
-   and pull request wait, each opening its full chart.
+   and pull request wait, each opening its full chart. Points are counted only where
+   they were read (#652): a sprint figure with none read is a dash, one with some
+   read says how many items it leaves out, and a burn-up with none read is an empty
+   panel whose action is **Name the points field**.
 5. **Go to:** every other view, as well as its tab.
 
 A row, or any item link on the briefing, opens the item's **drawer** at the page's
@@ -344,7 +347,8 @@ how each part is estimated, and which way the graph's arrows run, are in an (i) 
 - **Arrows join each blocker to what waits on it**, pointing at the item that waits.
   A dashed arrow is a wait that is over: the blocker is done. A dotted line marks today.
 - **The critical chain** is the chain of open blockers holding the most points (the
-  longest chain when nothing on any chain has points). Its rows carry a diamond and
+  longest chain when nothing on any chain has points, and it says how many of its items
+  had no points read). Its rows carry a diamond and
   its arrows are drawn heavy, and it is named above the chart. The briefing's
   **Blocked** reason names the same items.
 - **What is estimated is said, in the chart's note and on each table cell.** No tracker
@@ -729,7 +733,8 @@ A page has:
 
 - **Work items** that changed status (from, to, who and when), were added to or
   dropped from a sprint, got a new blocker or had one cleared, and each sprint that
-  ended, with how many of its items and points were done.
+  ended, with how many of its items and points were done (and how many had no points
+  read; with none read, the points are left out).
 - **Pull requests** opened, reviewed (approved, changes requested, commented), merged
   or declined.
 - **Builds and deployments** that failed or recovered (deployments from OpenShift,

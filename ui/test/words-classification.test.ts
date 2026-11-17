@@ -68,6 +68,7 @@ const FLAVOUR_LIST = [
   'empty.column',
   'empty.deployments',
   'empty.links',
+  'empty.points',
   'empty.prs',
   'empty.sprint',
   'empty.toilProjects',

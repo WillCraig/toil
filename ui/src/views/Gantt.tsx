@@ -22,6 +22,7 @@ import { STATUS_CATEGORY_LABEL, day, shortKey } from '../format.ts';
 import { blockerGantt, type Bar, type Gantt, type Segment } from '../model/gantt.ts';
 import { VERDICT_LABEL } from '../model/readiness.ts';
 import './gantt.css';
+import { unreadItems } from '../../../src/core/brief/points.ts';
 
 const DAY = 86_400_000;
 const t = (iso: string) => Date.parse(iso);
@@ -112,7 +113,7 @@ function Drawing({ g }: { g: Gantt }) {
   const nowX = x(t(g.now));
   const chain = g.chain;
   const summary = `Blocker timeline${g.sprint ? ` for ${g.sprint}` : ''}: ${plural(g.bars.length, 'item')} and ${plural(g.arrows.length, 'waits-on arrow')}.${
-    chain ? ` Critical chain: ${chain.ids.map(key).join(' blocks ')}${chain.byCount ? '' : `, ${plural(chain.points, 'point')}`}.` : ''
+    chain ? ` Critical chain: ${chain.ids.map(key).join(' blocks ')}${chain.byCount ? '' : `, ${plural(chain.points, 'point')}${chain.unestimated ? ` (${unreadItems(chain.unestimated)})` : ''}`}.` : ''
   } The table lists every bar and arrow.`;
   const maxChars = Math.floor((L.label - 24) / 7);
   const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, Math.max(1, n - 1))}…` : s);
@@ -319,7 +320,7 @@ function ChainLine({ g }: { g: Gantt }) {
           <ItemLink id={id} />
         </span>
       ))}
-      , {c.byCount ? `${plural(c.ids.length, 'item')} (no item on a chain has points, so the longest)` : `${plural(c.points, 'point')} in ${plural(c.ids.length, 'item')}`}.
+      , {c.byCount ? `${plural(c.ids.length, 'item')} (no item on a chain has points, so the longest)` : `${plural(c.points, 'point')} in ${plural(c.ids.length, 'item')}${c.unestimated ? `, ${c.unestimated} of them with no points read` : ''}`}.
     </p>
   );
 }

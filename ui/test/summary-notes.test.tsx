@@ -75,7 +75,8 @@ describe('plainNote', () => {
   const cases: Array<[string, Partial<Lens>, string]> = [
     ['no limit', { id: 'load', checked: false, note: 'The toil project sets no WIP limit (toil projects wip-limit).' }, 'No work-in-progress limit is set.'],
     ['no sprint', { id: 'sprint', checked: false, note: 'No item is in a sprint running now.' }, 'No item is in a sprint running now.'],
-    ['no points', { id: 'sprint', checked: false, note: 'No item in the sprint has a points estimate.' }, 'No item in the sprint has a points estimate.'],
+    ['no points', { id: 'sprint', checked: false, note: 'No points were read for any item in the sprint.' }, 'No points were read for any item in the sprint.'],
+    ['no points, an older note', { id: 'sprint', checked: false, note: 'No item in the sprint has a points estimate.' }, 'No points were read for any item in the sprint.'],
     ['readiness', { id: 'ready', checked: false, note: 'Readiness is worked out in Toil UI, not from OWI records.' }, "Readiness isn't worked out in this summary."],
     ['unassigned, many', { id: 'load', untested: 3, note: "3 items couldn't be tested: no assignee." }, '3 items in progress have nobody assigned.'],
     ['unassigned, one', { id: 'load', untested: 1, note: "1 item couldn't be tested: no assignee." }, '1 item in progress has nobody assigned.'],

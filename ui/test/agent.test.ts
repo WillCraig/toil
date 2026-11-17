@@ -79,7 +79,7 @@ describe.each(NAMES)('the %s script agrees with the model', (name) => {
   it('quotes the sprint figures health() computes', async () => {
     const { h } = await healthOf(name);
     const risk = await text(name, 'risk');
-    const total = h.done.points + h.remaining.points;
+    const total = h.scope.points!;
     expect(risk).toContain(`day ${h.days.gone} of ${h.days.total}`);
     expect(risk).toMatch(new RegExp(`${h.done.points} of ${total} points (is|are) done and ${h.remaining.points} remain`));
     for (const id of h.otherUnits) expect(cites(risk)).toContain(id);

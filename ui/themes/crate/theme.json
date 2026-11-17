@@ -106,6 +106,7 @@
     "empty.toilProjects": "No consignments on the floor: toil sees no Toil projects yet.",
     "empty.sprint": "No sprint is on the loading schedule for this Toil project's work items.",
     "empty.burnup": "No sprint is on the schedule, so there is nothing to tally.",
+    "empty.points": "No points were read for this sprint's crates, so there is nothing to tally.",
     "empty.column": "Bay empty.",
     "empty.prs": "No pull requests waiting at the dock for this Toil project.",
     "empty.builds": "No builds on record for this Toil project's pull requests.",

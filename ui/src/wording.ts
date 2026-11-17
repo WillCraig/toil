@@ -97,6 +97,7 @@ export const FLAVOUR = {
   'empty.toilProjects': 'toil sees no Toil projects yet.',
   'empty.sprint': "No sprint is running in this Toil project's work items.",
   'empty.burnup': 'No sprint is running, so there is nothing to burn up.',
+  'empty.points': "No points were read for this sprint's stories, so there is nothing to burn up.",
   'empty.column': 'Nothing here.',
   'empty.prs': 'No code reviews for this Toil project.',
   'empty.builds': "No builds for this Toil project's code reviews.",

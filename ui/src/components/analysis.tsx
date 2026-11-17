@@ -183,7 +183,7 @@ function Chips({ ids }: { ids: readonly string[] }) {
 export function ChangesDetail({ changes: c }: { changes: AnalysisChanges }) {
   if (!c.previous) return <p className="note">{changesLine(c)}</p>;
   if (unchanged(c)) return <p className="note">{changesLine(c)}</p>;
-  const sprintText = (s: NonNullable<AnalysisChanges['sprint']>['from']) => (s ? `${s.name}: ${s.done} done, ${s.remaining} left` : 'no sprint running');
+  const sprintText = (s: NonNullable<AnalysisChanges['sprint']>['from']) => (s ? (s.done === null || s.remaining === null ? `${s.name}: no points read` : `${s.name}: ${s.done} done, ${s.remaining} left`) : 'no sprint running');
   return (
     <>
     <p className="note analysis-changes__since">Compared with the briefing of {dateTime(c.previous.at)}, by the Toil project's items then and now.</p>

@@ -354,7 +354,7 @@ once:
 | Failing checks | Checks on an open pull request for an open item have failed for more than 24 hours |
 | Blocked | An open item waits on another open item |
 | Waiting on review | An open pull request has had no first review for more than 2 working days |
-| Sprint at risk | At the pace so far, the current sprint won't finish the points in it |
+| Sprint at risk | At the pace so far, the current sprint won't finish the points in it. Skipped when no points were read for any item in it |
 | Stale | An item in progress has had no update for more than 5 days |
 | Over the WIP limit | Someone has more items in progress than the toil project's `wipLimit` |
 | Ticket and pull request disagree | An item is done while its pull request is open, or its pull request merged while it's still open |
@@ -368,6 +368,14 @@ which opens it in its tracker. Sentences cite items and pull requests as
 `[[<owi id>]]`, the id each one has in the result. Each lens in `lenses` says
 whether it ran, how many items it couldn't test for a missing field (`untested`),
 and why in `note`. `--as-of` briefs as of another moment.
+
+Points are counted only where they were read. `holds` is `{ items, points,
+unestimated }`: `points` adds up the held items that have points, and `unestimated`
+of them have none read, so they're left out. When none of them has points read,
+`points` is `null`, never 0; a real estimate of 0 stays 0. `sprint.points` works the
+same way: `total`, `done` and `left` are `null` when no item in the sprint has points
+read, and `unestimated` counts the items left out. Sentences name what they left out, as in
+"(5 points, and 2 items with no points read)".
 
 The menu a bare `toil` opens does all of this for you: **Toil projects**, a toil project,
 **Brief this toil project** runs each read (an Azure DevOps project's work items as a WIQL

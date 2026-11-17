@@ -54,7 +54,7 @@ describe('the briefing on Sprint 42', () => {
       source: { area: 'jira', connection: 'corp-jira', key: 'PAY-101' },
       why: 'Checks fail on [[corp-bitbucket:PAY/payments-core#311]], for 1.7 days.',
       evidence: ['corp-bitbucket:PAY/payments-core#311'],
-      holds: { items: 2, points: 11 },
+      holds: { items: 2, points: 11, unestimated: 0 },
     });
     expect(pay101.changes[0]).toMatchObject({ id: 'corp-bitbucket:PAY/payments-core#311', repo: 'PAY/payments-core', state: 'OPEN', checks: 'FAILING' });
     expect(b.reasons[2]!.items[0]!.why).toBe('[[corp-bitbucket:PAY/payments-core#305]] has waited 4.9 working days for its first review.');
@@ -63,7 +63,7 @@ describe('the briefing on Sprint 42', () => {
 
   it("weighs the sprint's pace against what is left", () => {
     expect(b.sprint).toMatchObject({ name: 'Sprint 42', points: { total: 21, done: 3, left: 18 }, pace: 0.4, projected: 1 });
-    expect(b.reasons[3]!.text).toBe('Sprint 42 has done 3 points of 21 in 7 working days, 0.4 a day. At that pace about 1 of the 18 points left land by 2026-10-16.');
+    expect(b.reasons[3]!.text).toBe('Sprint 42 has done 3 points of 21 in 7 working days, 0.4 a day. At that pace about 1 of the 18 points left land by 2026-10-16. 2 items with no points read are left out.');
   });
 
   it("doesn't judge the pace until a quarter of the sprint has gone", () => {
@@ -153,9 +153,17 @@ describe('each lens', () => {
     expect(notes.load).toEqual([1, "1 item couldn't be tested: no assignee."]);
   });
 
-  it('says so when no item in the sprint has a points estimate', () => {
+  it('says so when no points were read for any item in the sprint (#652)', () => {
     const b = run([item('corp-jira:A-1', { iteration: sprint('Sprint 42', '2026-10-05T09:00:00Z', '2026-10-16T17:00:00Z') })]);
-    expect(b.lenses.find((l) => l.id === 'sprint')).toMatchObject({ checked: false, note: 'No item in the sprint has a points estimate.' });
+    expect(b.lenses.find((l) => l.id === 'sprint')).toMatchObject({ checked: false, note: 'No points were read for any item in the sprint.' });
+    expect(b.sprint!.points).toEqual({ total: null, done: null, left: null, unestimated: 1 });
+  });
+
+  it('runs the sprint lens on real estimates of 0, which were read (#652)', () => {
+    const zero = { value: 0, unit: 'points' as const, field: 'Story Points' };
+    const b = run([item('corp-jira:A-1', { estimate: zero, iteration: sprint('Sprint 42', '2026-10-05T09:00:00Z', '2026-10-16T17:00:00Z') })]);
+    expect(b.lenses.find((l) => l.id === 'sprint')).toMatchObject({ checked: true });
+    expect(b.sprint!.points).toEqual({ total: 0, done: 0, left: 0, unestimated: 0 });
   });
 
   it('recommends nothing when nothing needs anyone', () => {
@@ -199,4 +207,34 @@ it('counts working days Monday to Friday, to the fraction', () => {
   expect(workingDays('2026-10-09T12:00:00Z', '2026-10-12T12:00:00Z')).toBe(1);
   expect(workingDays('2026-10-12T00:00:00Z', '2026-10-12T06:00:00Z')).toBe(0.25);
   expect(workingDays('2026-10-12T00:00:00Z', '2026-10-11T00:00:00Z')).toBe(0);
+});
+
+describe('what a blocker holds up, in points (#652)', () => {
+  const pts = (value: number) => ({ value, unit: 'points' as const, field: 'Story Points' });
+  const briefOf = (held: Array<WorkItem['estimate']>) => {
+    const head = item('corp-jira:PAY-1', { links: held.map((_, n) => blocks(`corp-jira:PAY-${n + 2}`)) });
+    const rest = held.map((estimate, n) => item(`corp-jira:PAY-${n + 2}`, { estimate, links: [blockedBy('corp-jira:PAY-1')], status: 'To Do', statusCategory: 'TODO' }));
+    const changes = [change('corp-bitbucket:PAY/core#1', { checks: 'FAILING', checksAt: '2026-10-09T08:00:00Z', workItems: ['corp-jira:PAY-1'] })];
+    return brief({ items: [head, ...rest], changes, asOf: AS_OF, settings: standardSettings(2) });
+  };
+  const run = (held: Array<WorkItem['estimate']>) => briefOf(held).recommendation!.text;
+  const holds = (held: Array<WorkItem['estimate']>) => briefOf(held).reasons[0]!.items[0]!.holds;
+
+  it('reads what it holds as null points, not 0, when none has points read', () => {
+    expect(holds([null, null])).toEqual({ items: 2, points: null, unestimated: 2 });
+    expect(holds([pts(5), null])).toEqual({ items: 2, points: 5, unestimated: 1 });
+    expect(holds([pts(0), pts(0)])).toEqual({ items: 2, points: 0, unestimated: 0 });
+  });
+
+  it('leaves the figure out when none of them has points read', () => {
+    expect(run([null, null])).toBe('Fix the failing checks on [[corp-jira:PAY-1]] first: it holds up 2 items.');
+  });
+
+  it('says how many have no points read when only some do', () => {
+    expect(run([pts(5), null])).toBe('Fix the failing checks on [[corp-jira:PAY-1]] first: it holds up 2 items (5 points, and 1 item with no points read).');
+  });
+
+  it('says a real 0 as 0', () => {
+    expect(run([pts(0), pts(0)])).toBe('Fix the failing checks on [[corp-jira:PAY-1]] first: it holds up 2 items (0 points).');
+  });
 });

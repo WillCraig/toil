@@ -127,6 +127,7 @@
     "empty.toilProjects": "The map is blank: toil sees no Toil projects yet.",
     "empty.sprint": "No journey is under way in this Toil project's work items.",
     "empty.burnup": "No journey is under way, so there is no trail to chart.",
+    "empty.points": "No points were read for this journey's quests, so there is no trail to chart.",
     "empty.column": "An empty room.",
     "empty.prs": "No items wait to be appraised at the shop for this Toil project.",
     "empty.builds": "No dungeon trials have run for this Toil project's pull requests.",

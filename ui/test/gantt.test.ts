@@ -112,13 +112,23 @@ describe('blockerGantt', () => {
       item('B-1', { estimate: pts(8), links: [blocks('B-2')] }),
       item('B-2', { estimate: pts(5), links: [blockedBy('B-1')] }),
     ]);
-    expect(g.chain).toEqual({ ids: ['jira:B-1', 'jira:B-2'], points: 13, byCount: false });
+    expect(g.chain).toEqual({ ids: ['jira:B-1', 'jira:B-2'], points: 13, unestimated: 0, byCount: false });
     expect(g.arrows.filter((a) => a.onChain)).toEqual([{ from: 'jira:B-1', to: 'jira:B-2', live: true, onChain: true }]);
   });
 
   it('takes the longest chain when nothing on it has points, and says so', () => {
     const g = gantt([item('A-1', { links: [blocks('A-2')] }), item('A-2', { links: [blockedBy('A-1'), blocks('A-3')] }), item('A-3', { links: [blockedBy('A-2')] }), item('B-1', { links: [blocks('B-2')] }), item('B-2', { links: [blockedBy('B-1')] })]);
-    expect(g.chain).toEqual({ ids: ['jira:A-1', 'jira:A-2', 'jira:A-3'], points: 0, byCount: true });
+    expect(g.chain).toEqual({ ids: ['jira:A-1', 'jira:A-2', 'jira:A-3'], points: 0, unestimated: 3, byCount: true });
+  });
+
+  it('reads a chain of real 0-point estimates as points, not as nothing read (#652)', () => {
+    const g = gantt([item('A-1', { estimate: pts(0), links: [blocks('A-2')] }), item('A-2', { estimate: pts(0), links: [blockedBy('A-1')] })]);
+    expect(g.chain).toEqual({ ids: ['jira:A-1', 'jira:A-2'], points: 0, unestimated: 0, byCount: false });
+  });
+
+  it('says how many items on the chain have no points read, rather than count them as 0 (#652)', () => {
+    const g = gantt([item('A-1', { estimate: pts(3), links: [blocks('A-2')] }), item('A-2', { links: [blockedBy('A-1')] })]);
+    expect(g.chain).toEqual({ ids: ['jira:A-1', 'jira:A-2'], points: 3, unestimated: 1, byCount: false });
   });
 
   it('survives a loop of blocks links', () => {

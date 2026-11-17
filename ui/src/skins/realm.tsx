@@ -13,10 +13,12 @@
 
 import { useContext, type ReactNode } from 'react';
 import { Help } from '../components/help.tsx';
+import { Unread } from '../components/unread.tsx';
 import { DataContext, useDerived } from '../data.ts';
 import type { Skins } from '../skins.tsx';
 import { useTerm, useThemeChoiceContext } from '../theme-context.ts';
 import type { WorkItem } from '../toil.ts';
+import { sprintPoints } from '../model/sprint.ts';
 
 const art = (file: string) => new URL(`../../themes/realm/assets/${file}`, import.meta.url).href;
 
@@ -45,16 +47,20 @@ function Vitals() {
   const term = useTerm();
   const { wording } = useThemeChoiceContext();
   if (!h || !wording) return null;
-  const left = h.remaining.points;
-  const total = h.done.points + left;
+  // No points read is unknown, not an empty bar (#652): the dash says "not read yet" and the bar stays away.
+  const pts = sprintPoints(h);
+  const left = pts?.left ?? null;
+  const total = pts?.total ?? 0;
   return (
     <div className="realm-vitals">
       <p className="realm-vital">
-        <span className="realm-vital__name">{term('pointsLeft', 'Points left')}</span> <span className="realm-vital__value">{left} of {total}</span>
+        <span className="realm-vital__name">{term('pointsLeft', 'Points left')}</span> <span className="realm-vital__value">{left === null ? <Unread /> : `${left} of ${total}`}</span>
       </p>
-      <span className="realm-hp" aria-hidden="true">
-        <span style={{ width: `${total ? (100 * left) / total : 0}%` }} />
-      </span>
+      {left !== null && (
+        <span className="realm-hp" aria-hidden="true">
+          <span style={{ width: `${total ? (100 * left) / total : 0}%` }} />
+        </span>
+      )}
     </div>
   );
 }

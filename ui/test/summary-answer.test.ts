@@ -23,13 +23,17 @@ interface Over {
   plain?: boolean;
   title?: string;
   done?: boolean;
+  /** Items in the sprint with no points read. */
+  unread?: number;
+  /** The sprint's points were read and are all 0. */
+  zero?: boolean;
 }
 
 function ctx(o: Over = {}): Ctx {
   const total = o.total ?? 21;
   const item = { id: 'jira:PAY-1', title: o.title ?? 'A story', source: { area: 'jira', key: 'PAY-1' }, assignee: null, status: 'In progress', statusCategory: o.done ? 'DONE' : 'IN_PROGRESS' };
   const reasons = o.title ? [{ lens: 'failing', label: 'Failing checks', line: 'x', severity: 'danger', items: [{ id: item.id, why: 'Fails.' }] }] : [];
-  const health = { days: { gone: o.gone ?? 7, total: 10 }, items: Array.from({ length: o.stories ?? 3 }, () => ({})), unestimated: [] };
+  const health = { days: { gone: o.gone ?? 7, total: 10 }, items: Array.from({ length: o.stories ?? 3 }, () => ({})), unestimated: [], scope: { count: o.stories ?? 3, points: o.zero ? 0 : total === 0 ? null : total, unestimated: o.unread ?? 0 } };
   return {
     d: { name: 'p', sources: [{ area: 'jira' }], items: [], people: [], calls: { work: o.failed ? [{ ok: false }] : [{ ok: true }], prs: [] } },
     name: 'p',
@@ -37,7 +41,7 @@ function ctx(o: Over = {}): Ctx {
     byId: new Map([[item.id, item]]),
     prById: new Map(),
     h: o.noSprint ? null : health,
-    view: { reasons, code: { sprint: o.noSprint ? null : { points: { total, left: o.left ?? total, done: total - (o.left ?? total) }, projected: o.projected === undefined ? null : o.projected, pace: null } } },
+    view: { reasons, code: { sprint: o.noSprint ? null : { points: o.zero ? { total: 0, left: 0, done: 0 } : total === 0 ? { total: null, left: null, done: null } : { total, left: o.left ?? total, done: total - (o.left ?? total) }, projected: o.projected === undefined ? null : o.projected, pace: null } } },
     queue: [],
     held: new Map(),
     ready: new Map(),
@@ -54,14 +58,24 @@ describe('the answer at its edges', () => {
     expect(a.why).not.toMatch(/team/i);
   });
 
-  it('is not On track when no story has points: it says progress cannot be measured', () => {
+  it('is not On track when no points were read: it says progress cannot be measured, not that there are none (#652)', () => {
     const a = answerOf(ctx({ total: 0, left: 0, stories: 3 }));
     expect(a.status).toBe('none');
-    expect(a.word).toBe('No estimates');
-    expect(a.sentence).toBe('3 stories in the sprint have no points, so progress can’t be measured.');
+    expect(a.word).toBe('No points read');
+    expect(a.sentence).toBe('progress can’t be measured for the 3 stories in the sprint.');
     expect(a.sentence).not.toContain('0 points');
     expect(a.basis).toBeTruthy();
-    expect(answerOf(ctx({ total: 0, left: 0, stories: 1 })).sentence).toBe('1 story in the sprint has no points, so progress can’t be measured.');
+    expect(answerOf(ctx({ total: 0, left: 0, stories: 1 })).sentence).toBe('progress can’t be measured for the story in the sprint.');
+  });
+
+  it('does not call a sprint of real 0-point estimates done: there is nothing to pace against', () => {
+    const a = answerOf(ctx({ zero: true }));
+    expect([a.status, a.word, a.sentence]).toEqual(['none', 'No points to measure', 'the stories in the sprint are estimated at 0 points, so progress can’t be measured.']);
+  });
+
+  it('counts every item with no points read as left out of the points, not only the open ones (#652)', () => {
+    expect(answerOf(ctx({ left: 18, projected: 18, unread: 2 })).how).toContain('2 items with no points read are left out of these points.');
+    expect(answerOf(ctx({ left: 18, projected: 18, unread: 1 })).how).toContain('1 item with no points read is left out of these points.');
   });
 
   it('says no working days remain when the sprint is on its last day', () => {
