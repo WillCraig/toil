@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { defineCommand } from '../src/core/command.js';
+import { allowWriteField } from '../src/core/run.js';
 import { argvFor } from '../src/program.js';
 import { commands } from '../src/registry.js';
-import { demoCommands, demoRoutes } from './fixtures/demo-commands.js';
+import { demoArea, demoCommands, demoRoutes } from './fixtures/demo-commands.js';
 import { runCli } from './harness/cli.js';
 import { TEST_VERSION, testContext } from './harness/context.js';
 
@@ -100,6 +101,54 @@ describe('toil CLI', () => {
     expect(run.exitCode).toBe(1);
     expect(run.stdout).toBe('');
     expect(JSON.parse(run.files['err.json']!)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' }, meta: { command: 'demo rename-thing' } });
+  });
+
+  it('prints a failure envelope, never nothing, when the result is too deeply nested to print as JSON', async () => {
+    // A placeholder token whose payload nests far past the CLI stringify
+    // cliff (depth 5,000 prints, 6,000 overflowed the action stack on the
+    // main this was written against): data this deep reaches emit() from
+    // any command, and printing it must not lose the envelope.
+    const depth = 20_000;
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(`{"a":${'['.repeat(depth)}1${']'.repeat(depth)}}`).toString('base64url');
+    const token = `${header}.${payload}.c2lnbmF0dXJlLW5vdC1jaGVja2Vk`;
+    const { context } = testContext();
+    for (const argv of [['util', 'jwt', 'decode', token], ['--pretty', 'util', 'jwt', 'decode', token], ['--output-file', 'deep.json', 'util', 'jwt', 'decode', token]]) {
+      const run = await runCli(argv, { commands, context });
+      expect(run.exitCode, argv.slice(0, 2).join(' ')).toBe(1);
+      expect(run.envelope, argv.slice(0, 2).join(' ')).toMatchObject({
+        ok: false,
+        data: null,
+        error: { code: 'INTERNAL', message: expect.stringContaining("couldn't be printed as JSON"), fix: expect.stringContaining('--select') },
+        meta: { command: 'util jwt decode' },
+      });
+      expect(run.stderr).not.toContain('Maximum call stack size exceeded');
+      expect(run.files['deep.json']).toBeUndefined();
+    }
+    const compact = await runCli(['util', 'jwt', 'decode', token], { commands, context });
+    expect(compact.stdout.trim().split('\n')).toHaveLength(1);
+  });
+
+  it('prints a failure envelope when the result is circular, and says a write may already have been applied', async () => {
+    const circular = () => {
+      const value: Record<string, unknown> = { name: 'loop' };
+      value['self'] = value;
+      return value;
+    };
+    const readCircular = defineCommand({ path: ['read-circular'], description: 'read returning a circular result', input: z.object({}), writes: false, examples: [{}], run: async () => circular() });
+    const writeCircular = demoArea.command({ path: ['demo', 'write-circular'], description: 'write returning a circular result', input: z.object({ ...allowWriteField }), writes: true, examples: [{ allowWrite: true }], run: async () => circular() });
+    const { context } = testContext();
+    const read = await runCli(['read-circular'], { commands: [readCircular], context });
+    expect(read.exitCode).toBe(1);
+    expect(read.envelope).toMatchObject({ ok: false, data: null, error: { code: 'INTERNAL', message: expect.stringContaining("couldn't be printed as JSON") } });
+    expect(read.stdout.trim().split('\n')).toHaveLength(1);
+    const write = await runCli(['demo', 'write-circular', '--allow-write'], { commands: [writeCircular], context: testContext({ config: { demo: { token: 't', writes: true } }, routes: demoRoutes }).context });
+    expect(write.exitCode).toBe(1);
+    expect(write.envelope).toMatchObject({
+      ok: false,
+      data: null,
+      error: { code: 'INTERNAL', message: expect.stringContaining('may already have been applied'), fix: expect.stringContaining('Check whether the change was made before retrying') },
+    });
   });
 
   it('honours --output-file=path on a usage error too', async () => {
