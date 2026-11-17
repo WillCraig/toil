@@ -25,6 +25,7 @@ import { useChatScope } from '../components/ask.tsx';
 import { StaleChip, StaleNote } from '../components/stale.tsx';
 import { usePlain } from '../plain-words.ts';
 import './assign.css';
+import { homeShort } from '../home-path.ts';
 
 export const assignmentHref = (toilProject: string, id: string) => `${toilProjectHref(toilProject)}/assignment/${encodeURIComponent(id)}`;
 
@@ -189,7 +190,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
           {list.repos.map((r) => (
             <Radio key={r.name} value={r.name} className="agent-choice">
               <strong>{r.name}</strong>
-              <span className="note any-break">{r.path}</span>
+              <span className="note any-break">{homeShort(r.path)}</span>
             </Radio>
           ))}
         </RadioGroup>

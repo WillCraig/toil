@@ -52,6 +52,7 @@ import { ThinkingIcon, useNow, useThinkingPhrases } from './thinking.tsx';
 import { AnswerChecks, GuidedStart, PHONE } from './guided.tsx';
 import { DiagramCard, FoldedCode } from './diagram-card.tsx';
 import { GROUPS, QUESTIONS, type GuidedQuestion } from '../guided-questions.ts';
+import { homeText } from '../home-path.ts';
 
 /** A new chat's id: one per toil project's conversation, so the server can add up the chat (#295). */
 const newChatId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
@@ -568,7 +569,7 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
           </p>
         )}
         <div className="log" role="log" aria-live="polite" aria-busy={busy} aria-label="Conversation">
-          {entries.length === 0 && <GuidedStart noAgent={noAgent} {...(unfinished ? { notice: `${unfinished.label} is installed but can't start yet.`, details: `${unfinished.problem ?? ''} ${unfinished.fix ?? ''}`.trim(), link: 'Finish setting it up' } : { ...(noAgent && agent.notice ? { notice: agent.notice } : {}), ...(noAgent && agent.noticeDetails ? { details: agent.noticeDetails } : {}) })} busy={busy} onPick={pick} />}
+          {entries.length === 0 && <GuidedStart noAgent={noAgent} {...(unfinished ? { notice: `${unfinished.label} is installed but can't start yet.`, details: homeText(`${unfinished.problem ?? ''} ${unfinished.fix ?? ''}`.trim()), link: 'Finish setting it up' } : { ...(noAgent && agent.notice ? { notice: agent.notice } : {}), ...(noAgent && agent.noticeDetails ? { details: agent.noticeDetails } : {}) })} busy={busy} onPick={pick} />}
           {entries.map((e) =>
             e.kind === 'renew' ? (
               <p key={`r${e.id}`} className="ask-switch note">
@@ -780,8 +781,8 @@ function AgentSwitch({ label, list, current, onPick, compact = false }: { label:
                         </Button>
                         {!o.ready && (
                           <p className="note agent-pick__why">
-                            {o.problem}
-                            {o.fix ? ` ${o.fix}` : ''}
+                            {homeText(o.problem ?? '')}
+                            {o.fix ? ` ${homeText(o.fix)}` : ''}
                             {o.action && (
                               <>
                                 {' '}

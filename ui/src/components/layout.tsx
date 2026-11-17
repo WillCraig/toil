@@ -26,6 +26,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ComponentPropsWithoutRef, type ElementType, type ReactNode } from 'react';
 import './layout.css';
+import { homeShort } from '../home-path.ts';
 
 type Space = 'xs' | 'sm' | 'md' | 'lg';
 const cx = (...names: Array<string | false | undefined | null>) => names.filter(Boolean).join(' ');
@@ -205,15 +206,17 @@ export function Copy({ value, what }: { value: string; what: string }) {
 
 /**
  * A file path, middle-truncated to fit: the start gives way to an ellipsis
- * and the end (the file's name) always shows. The whole path is its text, so
- * a screen reader and a selection get all of it, and it's in the tooltip and
- * on the copy button.
+ * and the end (the file's name) always shows. A path under the home folder is
+ * shown from `~` (#653), tooltip included, so the account name stays off
+ * screen. A screen reader and a selection get the path as shown; the copy
+ * button copies all of it.
  */
 export function Path({ value, what = 'path', copy = true }: { value: string; what?: string; copy?: boolean }) {
-  const [head, tail] = splitTail(value);
+  const shown = homeShort(value);
+  const [head, tail] = splitTail(shown);
   return (
     <span className="l-path">
-      <code className="l-path__text" title={value} data-truncate="">
+      <code className="l-path__text" title={shown} data-truncate="">
         <span className="l-path__head">{head}</span>
         <span className="l-path__tail">{tail}</span>
       </code>

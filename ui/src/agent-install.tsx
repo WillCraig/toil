@@ -18,13 +18,14 @@ import { RegistryHelp, type RegistryClient } from './registry-help.tsx';
 import type { AdapterStatus, AgentSettingsClient, InstallPlan } from './server-client.ts';
 import { Card } from './components/layout.tsx';
 import { usePlain } from './plain-words.ts';
+import { homeShort, homeText } from './home-path.ts';
 
 /** What the preview's Install shows instead of running anything. */
 export const INSTALL_PREVIEW = 'This is the preview, so nothing is installed. Toil UI on your own machine runs this command when you press Install.';
 
 /** Two plain lines on where one helper stands. Package names, file locations and npm's own notes stay out of sight; what must be fixed is said above, and what Install will do is shown before it runs. */
 export function statusLines(a: AdapterStatus): string[] {
-  return [a.installed ? `${a.label} is connected to Toil UI.` : `${a.label} isn't connected to Toil UI yet.`, a.cli.path ? `Toil UI can start ${a.label}.` : `${a.cli.problem ?? `Toil UI can't start ${a.label} yet.`}${a.cli.fix ? ` ${a.cli.fix}` : ''}`];
+  return [a.installed ? `${a.label} is connected to Toil UI.` : `${a.label} isn't connected to Toil UI yet.`, a.cli.path ? `Toil UI can start ${a.label}.` : homeText(`${a.cli.problem ?? `Toil UI can't start ${a.label} yet.`}${a.cli.fix ? ` ${a.cli.fix}` : ''}`)];
 }
 
 /**
@@ -37,7 +38,7 @@ export const STATE_WORD = { ready: 'Ready', new: 'Not set up yet', fix: 'Needs o
 
 /** In plain words, what pressing Install will do for one helper: every package, where it lands, and the rules it runs under. */
 export function willDo(a: AdapterStatus, plan: InstallPlan): string[] {
-  const where = plan.folder ? `in ${plan.folder}` : 'beside Toil UI';
+  const where = plan.folder ? `in ${homeShort(plan.folder)}` : 'beside Toil UI';
   return [
     `Download ${a.package} ${a.tested}, the SDK Toil UI uses to talk to ${a.label}, and put it ${where}.`,
     ...(plan.cli ? [`Download ${plan.cli}, ${a.label}'s own command-line program, which the SDK starts, and put it in the same place. This is a program from the vendor, so it is shown here before it runs.`] : []),
@@ -57,9 +58,9 @@ export function wontDo(a: AdapterStatus): string[] {
 /** After a successful install: what is now on disk and the step that is still yours. */
 export function changed(a: AdapterStatus, plan: InstallPlan): string[] {
   return [
-    `${a.package} is installed${a.version ? ` (${a.version})` : ''}${plan.folder ? ` in ${plan.folder}` : ''}, and Toil UI loaded it.`,
+    `${a.package} is installed${a.version ? ` (${a.version})` : ''}${plan.folder ? ` in ${homeShort(plan.folder)}` : ''}, and Toil UI loaded it.`,
     ...(plan.cli ? [`${plan.cli} is installed beside it.`] : []),
-    a.cli.path ? `Toil UI will start ${a.cli.path}.` : `Toil UI still can't start ${a.label}: ${a.cli.problem ?? 'its program was not found'}`,
+    a.cli.path ? `Toil UI will start ${homeShort(a.cli.path)}.` : `Toil UI still can't start ${a.label}: ${homeText(a.cli.problem ?? 'its program was not found')}`,
     `Still yours: ${a.label} must be signed in with your own account (run ${a.name} once in a terminal if it asks). Then choose it under Which one answers and press Save.`,
   ];
 }
@@ -89,7 +90,7 @@ export function AdaptersCard({ adapters, client, onInstalled }: { adapters: Adap
               </div>
               {state === 'fix' && (
                 <p className="agent-notice" data-needs-fix="">
-                  {a.cli.problem ?? 'Its command-line program was not found.'}
+                  {homeText(a.cli.problem ?? 'Its command-line program was not found.')}
                   {a.cli.fix ? ` ${a.cli.fix}` : ''}
                 </p>
               )}
@@ -147,7 +148,7 @@ export function InstallDialog({ adapter, plan, client, onClose, onInstalled }: {
       const next = await client.install(adapter.name, plan.command, (line) => setLines((ls) => [...ls.slice(-400), line]), controller.signal);
       setAfter(next);
       setState('done');
-      setMessage(`Installed ${adapter.package} ${next.version ?? ''}, and Toil UI loaded it.${next.cli.path ? ` ${adapter.label} is ready.` : ` ${next.cli.problem ?? ''} ${next.cli.fix ?? ''}`}`.replace(/\s+/g, ' ').trim());
+      setMessage(`Installed ${adapter.package} ${next.version ?? ''}, and Toil UI loaded it.${next.cli.path ? ` ${adapter.label} is ready.` : ` ${homeText(next.cli.problem ?? '')} ${homeText(next.cli.fix ?? '')}`}`.replace(/\s+/g, ' ').trim());
       onInstalled(next);
     } catch (e) {
       setState('failed');
@@ -184,13 +185,13 @@ export function InstallDialog({ adapter, plan, client, onClose, onInstalled }: {
                 <li key={line}>{line}</li>
               ))}
             </ul>
-            <p className="note">The exact command, run without a shell:</p>
+            <p className="note">The exact command, run without a shell{homeText(plan.command) === plan.command ? '' : '; ~ stands for your home folder, and Copy command copies it written out'}:</p>
             <pre className="install-command" data-scroller="" tabIndex={0} role="region" aria-label="The command">
-              {plan.command}
+              {homeText(plan.command)}
             </pre>
             {plan.problem && (
               <p className="failure">
-                {plan.problem} {plan.fix}
+                {homeText(plan.problem)} {homeText(plan.fix ?? '')}
               </p>
             )}
             {!client && <p className="config-off">{INSTALL_PREVIEW}</p>}

@@ -33,6 +33,7 @@ import type { InstallPlan } from '../server/agents/install.ts';
 import type { AnswerUsage, ModelUsageApi, UsageView } from './model-usage.ts';
 export type { ModelUsageApi, UsageView } from './model-usage.ts';
 import type { AgentSettings } from '../server/agents/settings.ts';
+import { homeText } from './home-path.ts';
 export type { AdapterStatus, AgentStatus } from '../server/agents/host.ts';
 export type { InstallPlan } from '../server/agents/install.ts';
 export type { AgentSettings } from '../server/agents/settings.ts';
@@ -52,6 +53,8 @@ export interface ServerInfo {
   assignments?: boolean;
   sample: boolean;
   now: string;
+  /** The home folders, in forward slashes, that the paths a screen shows start from as `~` (#653): HOME's and the account's own. */
+  homes?: string[];
 }
 
 /** An agent's failure as the page has it: the message, and what the run used before it ended (#295). */
@@ -68,7 +71,7 @@ export class AnswerError extends Error {
 async function failure(res: Response, what: string): Promise<Error> {
   try {
     const body = (await res.json()) as { error?: { message?: string; fix?: string; usage?: AnswerUsage } };
-    if (body.error?.message) return new AnswerError(`${body.error.message}${body.error.fix ? ` ${body.error.fix}` : ''}`, body.error.usage);
+    if (body.error?.message) return new AnswerError(homeText(`${body.error.message}${body.error.fix ? ` ${body.error.fix}` : ''}`), body.error.usage);
   } catch {
     // Not JSON: fall through to the status.
   }
@@ -107,9 +110,19 @@ export function httpExecute(base = './'): Execute {
     } catch {
       body = undefined;
     }
-    if (isEnvelope(body)) return body;
+    if (isEnvelope(body)) return homeEnvelope(body);
     throw await failure(res, "Asking the server");
   };
+}
+
+/**
+ * An envelope with every path under a home folder in its error and warnings written from `~` (#653):
+ * that text is for a screen, and the account name in a home folder's path isn't. `data` is left alone.
+ */
+function homeEnvelope(e: Envelope): Envelope {
+  const error = e.error ? { ...e.error, message: homeText(e.error.message), ...(e.error.fix ? { fix: homeText(e.error.fix) } : {}) } : e.error;
+  const warnings = e.meta.warnings?.map((w) => ({ ...w, message: homeText(w.message) }));
+  return { ...e, error, meta: { ...e.meta, ...(warnings ? { warnings } : {}) } } as Envelope;
 }
 
 /** The sync job over the server (#250): its status, a start, and the wipe. Each throws with the server's message. */
@@ -156,7 +169,7 @@ export function httpConfig(base = './'): ConfigApi {
       } catch {
         body = undefined;
       }
-      if (isEnvelope(body)) return body;
+      if (isEnvelope(body)) return homeEnvelope(body);
       throw await failure(res, "Asking the server");
     },
   };
@@ -178,7 +191,7 @@ export function httpFeedback(info: ServerInfo, base = './'): FeedbackApi {
     } catch {
       body = undefined;
     }
-    if (isEnvelope(body)) return body;
+    if (isEnvelope(body)) return homeEnvelope(body);
     throw await failure(res, 'Sending the feedback');
   };
   return {

@@ -15,6 +15,7 @@ import './app.css';
 import './views.css';
 import { Local } from './local-app.tsx';
 import { httpAgent, httpExecute, httpSync, readServerInfo } from './server-client.ts';
+import { setHomes } from './home-path.ts';
 import { CALL_OPTIONS } from './toil.ts';
 import { leaveSample, sampleAsked } from './sample-mode.tsx';
 
@@ -32,6 +33,7 @@ async function start() {
     return;
   }
   const session = await readServerInfo();
+  setHomes(session.homes);
   const execute = httpExecute();
   const list = await execute('projects list', {}, CALL_OPTIONS);
   const names = list.ok ? ((list.data as { toilProjects?: Array<{ name?: unknown }> }).toilProjects ?? []).map((d) => String(d.name)) : [];

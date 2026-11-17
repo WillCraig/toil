@@ -43,6 +43,7 @@ import { usePlain } from '../plain-words.ts';
 import { StandupCard } from '../components/standup-card.tsx';
 import { Aging, CycleTime, SprintDetail, Throughput } from './Flow.tsx';
 import { Splittable } from './split-modal.tsx';
+import { homeShort } from '../home-path.ts';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -158,7 +159,7 @@ export function Overview() {
         {tuned && (
           <p className="briefing__meta">
             <span className="source" data-focus-from="">
-              {plain.pw('Analyze settings', 'Briefing settings')} from {tuned.file}, {tuned.adopted ? 'your own Toil project' : "a Toil project you haven't adopted"}
+              {plain.pw('Analyze settings', 'Briefing settings')} from {homeShort(tuned.file)}, {tuned.adopted ? 'your own Toil project' : "a Toil project you haven't adopted"}
             </span>
           </p>
         )}

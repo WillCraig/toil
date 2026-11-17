@@ -39,6 +39,7 @@ import { addRepos, linkTools, withJiraKey, type RepoResult } from './project-cre
 import { LookAround } from '../sample-mode.tsx';
 import { JiraKeyField, NamedJiraLine, useNamedJira } from './jira-key.tsx';
 import './setup.css';
+import { homeShort } from '../home-path.ts';
 
 /** Where the wizard lives, and what opens it from the first run, the palette and Settings. */
 export const SETUP_HREF = '#/setup';
@@ -527,7 +528,7 @@ function NewProject({ config, link, onChosen, reload, onCreated, jiraKey }: { co
             <ul className="plain" data-setup-repo-results="">
               {results.map((r) => (
                 <li key={r.location} className={r.ok ? 'note' : 'failure'}>
-                  <code>{r.location}</code>: {r.message}
+                  <code>{homeShort(r.location)}</code>: {r.message}
                 </li>
               ))}
             </ul>

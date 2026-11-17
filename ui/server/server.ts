@@ -59,7 +59,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { homedir } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import { checkRegistry, npmrcPath, RegistryError, setRegistry } from './agents/npmrc.ts';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
@@ -140,6 +140,8 @@ export interface UiServerOptions {
   /** The 32 bytes that sign the browser's cookie (machine-secret.ts). A real start reads the file in the data folder; a test without one gets a fresh secret. */
   machineSecret?: Buffer;
   viewer?: Viewer;
+  /** The home folders the page writes as `~` in the paths it shows (#653): `homeFolders()`, unless a test names them. */
+  homes?: readonly string[];
 }
 
 export interface ToilProjectRenames {
@@ -147,6 +149,22 @@ export interface ToilProjectRenames {
   hold(): () => void;
   blocked(toilProject: string): { message: string; fix: string } | null;
   moved(from: string, to: string): Promise<string[]>;
+}
+
+/**
+ * The home folders a path on screen is shortened from (#653): HOME's (USERPROFILE's on
+ * Windows), which a demo or scratch home moves, and the account's own from the OS, which
+ * it doesn't, so a clone under the real home is shortened too. Either may be missing.
+ */
+export function homeFolders(home: () => string = homedir, account: () => string = () => userInfo().homedir): string[] {
+  const read = (f: () => string) => {
+    try {
+      return f();
+    } catch {
+      return '';
+    }
+  };
+  return [...new Set([read(home), read(account)].filter((h) => h !== ''))];
 }
 
 /** toil's toil project names: lowercase letters, digits and single hyphens. */
@@ -410,6 +428,8 @@ export function createUiServer(options: UiServerOptions): UiServer {
     assignments: options.assignments !== undefined,
     sample: store.sample,
     now: store.now(),
+    // So a screen can show `~/.toil-ui/…` and keep the account name in the home folder's path off screen (#653).
+    homes: (options.homes ?? homeFolders()).map((h) => h.replace(/\\/g, '/')),
   });
 
   /** The agent's settings, or a 404 saying the sample always uses the scripted agent. */

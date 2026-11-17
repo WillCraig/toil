@@ -2,10 +2,11 @@
 // The worklog is rebuilt from the cache on request, a convenience timesheets have never offered.
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FIXTURE_NOW } from '../src/fixtures/execute.ts';
 import { fixtureWorklog } from '../src/fixtures/worklog.ts';
 import { parseRoute } from '../src/App.tsx';
+import { setHomes } from '../src/home-path.ts';
 import type { WorklogApi, WorklogDay } from '../src/worklog.ts';
 import { open, AXE_TIMEOUT, violations, tabs, resetBrowserState } from './views-kit.tsx';
 
@@ -134,5 +135,26 @@ describe('the stand-up (#345)', () => {
     // One day is a one-day stand-up; anything that isn't a day is named on the page, never dropped quietly.
     expect(parseRoute('#/project/card-payments/standup/2026-10-09')).toEqual({ view: 'standup', toilProject: 'card-payments', from: '2026-10-09', to: '2026-10-09' });
     expect(parseRoute('#/project/card-payments/standup/2026-10-09/monday')).toEqual({ view: 'standup', toilProject: 'card-payments', from: null, to: null, ignored: 'monday' });
+  });
+});
+
+describe("the worklog page's own path (#653)", () => {
+  afterEach(() => setHomes(null));
+
+  it('is shown from ~, tooltip included, so the account name stays off screen, and copies whole', async () => {
+    setHomes(['/Users/someone']);
+    const file = '/Users/someone/toil-demo-home/.toil-ui/cache/worklog/card-payments/2026-10/2026-10-13.md';
+    const base = fixtureWorklog();
+    const worklog: WorklogApi = { ...base, day: async (toilProject, day) => ({ ...(await base.day(toilProject, day)), file }) };
+    const writes: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => void writes.push(t) }, configurable: true });
+    const { container } = await open('#/project/card-payments/worklog', { worklog });
+    await screen.findByText(/and kept at/);
+    const path = container.querySelector<HTMLElement>('.worklog-page .l-path__text')!;
+    expect(path.textContent).toBe('~/toil-demo-home/.toil-ui/cache/worklog/card-payments/2026-10/2026-10-13.md');
+    expect(path.title).toBe(path.textContent);
+    expect(container.textContent).not.toContain('someone');
+    await userEvent.click(screen.getByRole('button', { name: "Copy page's path" }));
+    await waitFor(() => expect(writes).toEqual([file]));
   });
 });

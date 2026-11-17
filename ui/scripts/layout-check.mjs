@@ -36,6 +36,10 @@
 // is on, so an animation caught mid-flight can't fail a run; `npm run smoke` then runs
 // MOTION_ROUTES again with motion on, where the moments play.
 //
+// Every view and state is also read for this machine's account (#653): its
+// home folders, or its name as a home folder in a path, in the text, a title or an
+// aria-label fail the run, so a full local path can't come back onto a screen.
+//
 // On a toil project's Board tab the board is also dragged as a hand drags it
 // (#393): real mouse input through the DevTools protocol, a finger at 375
 // pixels, with moves in between. Mid-drag the copy of the card must be under
@@ -51,10 +55,10 @@
 //   node scripts/layout-check.mjs --base http://127.0.0.1:4173/ [--theme crate] [--route '#/settings/projects'] [--width 375] [--font <pair id>] [--motion full] [--shots <dir>] [--json <file>]
 //
 // Repo tooling only; nothing here ships. It measures twice and files once.
-/* global document, window, getComputedStyle, CSS -- inspect(), covered(), dragPlan(), hitTest() and dragMid() run in the page */
+/* global document, window, getComputedStyle, CSS -- inspect(), covered(), personal(), dragPlan(), hitTest() and dragMid() run in the page */
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { availableParallelism } from 'node:os';
+import { availableParallelism, homedir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { findChrome, openBrowser } from './chrome.mjs';
@@ -186,6 +190,10 @@ export const FIRST_RUN_ROUTE = '#/?first-run';
 /** What counts as a card. LAYOUT_CARDS widens it, to measure a build from before the Card primitive. */
 const CARDS = process.env.LAYOUT_CARDS ?? '[data-card]';
 
+/** Read once: the account the check runs as (personalNeedles, below). */
+let PERSONAL_CACHE = null;
+const personalOnce = () => (PERSONAL_CACHE ??= personalNeedles());
+
 /**
  * What runs in the page: one pass over the layout, returning findings. It is
  * sent as source, so it may use only what the page has.
@@ -283,6 +291,49 @@ function inspect(cards, headerFits) {
     const bg = getComputedStyle(overlay).backgroundColor;
     const alpha = /rgba?\(([^)]+)\)/.exec(bg)?.[1].split(/[ ,/]+/).filter(Boolean)[3];
     if (bg === 'transparent' || (alpha !== undefined && Number(alpha) < 0.3)) add('backdrop', overlay, `the backdrop is ${bg}, which doesn't dim the page`);
+  }
+  return findings;
+}
+
+/**
+ * What would say on screen who is signed in to this machine (#653): the home
+ * folder of the account running the check, in either slash, and the account
+ * name as a home folder in a path (`/Users/<name>`, `/home/<name>`,
+ * `C:\\Users\\<name>`), whatever the home is. The name elsewhere is not
+ * looked for: it may also be a person's name, a login in a URL or a branch
+ * prefix that the data rightly shows.
+ * Read from the OS, not HOME, so a demo or scratch home doesn't hide it.
+ */
+export function personalNeedles(info = safeUserInfo(), home = homedir()) {
+  const homes = [...new Set([info?.homedir, home].filter((h) => h && h.length > 3))];
+  const name = info?.username && info.username.length > 1 ? info.username : null;
+  return {
+    texts: homes.flatMap((h) => [h.replace(/\\/g, '/'), h.replace(/\//g, '\\')]),
+    segment: name ? `(^|[\\\\/])(Users|home)[\\\\/]${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\\\/]|$)` : null,
+  };
+}
+
+function safeUserInfo() {
+  try {
+    return userInfo();
+  } catch {
+    // An account with no entry in the password file has no name to leak, and no form to file about it.
+    return null;
+  }
+}
+
+/** Every place on the page's text or tooltips that names the account (personalNeedles). */
+function personal(needles) {
+  const findings = [];
+  const re = needles.segment ? new RegExp(needles.segment, 'i') : null;
+  const hit = (t) => needles.texts.some((n) => t.toLowerCase().includes(n.toLowerCase())) || (re !== null && re.test(t));
+  const text = document.body.innerText ?? '';
+  for (const line of text.split('\n')) if (hit(line)) findings.push({ kind: 'personal', at: 'page text', detail: `names this machine's account: "${line.trim().slice(0, 80)}"` });
+  for (const el of document.querySelectorAll('[title], [aria-label]')) {
+    for (const a of ['title', 'aria-label']) {
+      const v = el.getAttribute(a);
+      if (v && hit(v)) findings.push({ kind: 'personal', at: `${el.tagName.toLowerCase()}[${a}]`, detail: `names this machine's account: "${v.slice(0, 80)}"` });
+    }
   }
   return findings;
 }
@@ -900,6 +951,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
       if (!(await page.evaluate(STABLE()))) problems.push(`${where}: the layout was still changing 3s after every <details> was opened`);
       record('', await page.evaluate(`(${inspect})(${JSON.stringify(CARDS)}, ${headerFits})`));
       record('', await page.evaluate(`(${covered})()`));
+      record('', await page.evaluate(`(${personal})(${JSON.stringify(personalOnce())})`));
       checked++;
       const violations = await axeRun(page, axeSource);
       for (const v of violations) {
@@ -935,6 +987,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
         await page.evaluate(ANIMATIONS_DONE);
         await shoot(`${slug}__${state.name}`);
         record(state.name, await page.evaluate(`(${inspect})(${JSON.stringify(CARDS)}, ${headerFits})`));
+        record(state.name, await page.evaluate(`(${personal})(${JSON.stringify(personalOnce())})`));
         // An open sheet covers the page on purpose, like a dialog; only the page's own states must clear the dock.
         if (state.name === 'shown') record(state.name, await page.evaluate(`(${covered})()`));
         const stateViolations = run.strict && state.name !== 'shown' ? await axeRun(page, axeSource) : [];

@@ -16,7 +16,7 @@ import { AgentError } from '../server/agents/cli.ts';
 import type { AnalysisKeeper } from '../server/analyses.ts';
 import type { RequestContext } from '../server/context.ts';
 import { PRESSABLE_STYLE_HASH } from '../server/csp.ts';
-import { CSP, MAX_BODY, createUiServer, type UiServerOptions } from '../server/server.ts';
+import { CSP, MAX_BODY, createUiServer, homeFolders, type UiServerOptions } from '../server/server.ts';
 import { parseSettings, SettingsError, themesNotice, type Settings } from '../server/settings.ts';
 import { mapOwi } from '@imagile-dev/toil/api';
 import { Cache, CacheError, RUNNING_MESSAGE, cachePaths, liveLock, pidAlive, wipeCacheFiles } from '../server/cache.ts';
@@ -389,7 +389,7 @@ describe('every POST', () => {
 describe('the API', () => {
   it('reports what the server is: versions, viewer, Store, Agent and the clock, and no credential', async () => {
     const viewer = { id: 'local', name: 'you', via: 'loopback' as const };
-    const { origin } = await start({ viewer });
+    const { origin } = await start({ viewer, homes: ['/home/you'] });
     const { info: session } = await info(origin);
     expect(session).toEqual({
       version: '0.0.0-test',
@@ -402,7 +402,19 @@ describe('the API', () => {
       assignments: false,
       sample: true,
       now: '2026-10-13T08:00:00.000Z',
+      homes: ['/home/you'],
     });
+  });
+
+  it("names the home folders in forward slashes, so a screen can show a path under one from ~ (#653)", async () => {
+    const { origin } = await start({ homes: ['C:\\Users\\you'] });
+    expect((await info(origin)).info.homes).toEqual(['C:/Users/you']);
+  });
+
+  it('takes HOME\'s folder and the account\'s own, once each, and skips one the OS cannot read (#653)', () => {
+    expect(homeFolders(() => '/Users/you/toil-demo-home', () => '/Users/you')).toEqual(['/Users/you/toil-demo-home', '/Users/you']);
+    expect(homeFolders(() => '/home/you', () => '/home/you')).toEqual(['/home/you']);
+    expect(homeFolders(() => '/home/you', () => { throw new Error('no passwd entry'); })).toEqual(['/home/you']);
   });
 
   it('runs a read from the allowlist read-only, with the viewer in its context', async () => {

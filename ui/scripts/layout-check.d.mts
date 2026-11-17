@@ -16,3 +16,8 @@ export declare function themeRuns(): ThemeRun[];
 export declare function parseShard(text: string | undefined): Shard | null;
 export declare function shardRuns(runs: ThemeRun[], routes: string[], shard: Shard | null): ThemeRun[];
 export declare function layoutWorkers(runs: ThemeRun[]): number;
+export interface PersonalNeedles {
+  texts: string[];
+  segment: string | null;
+}
+export declare function personalNeedles(info?: { username: string; homedir: string } | null, home?: string): PersonalNeedles;

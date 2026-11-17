@@ -24,6 +24,7 @@ import { addRepos, createProject, JIRA_KEY_LABEL, linkTools, nameProblem, withJi
 import { JiraKeyField } from './jira-key.tsx';
 import { OutcomeLine, TextField, type Outcome } from './settings/parts.tsx';
 import './setup.css';
+import { homeShort } from '../home-path.ts';
 
 /** Where the wizard lives, and what the Toil projects page, the checklist and the palette open. */
 export const NEW_PROJECT_HREF = '#/new-project';
@@ -359,7 +360,7 @@ function Result({ result, retrying, onRetry }: { result: { name: string; links: 
     <>
       <ul className="setup__summary" aria-label="What was saved" data-new-project-saved="">
         <li>{result.name} was created.</li>
-        {result.repos.filter((r) => r.ok).length > 0 && <li>Added: {result.repos.filter((r) => r.ok).map((r) => r.location).join(', ')}.</li>}
+        {result.repos.filter((r) => r.ok).length > 0 && <li>Added: {result.repos.filter((r) => r.ok).map((r) => homeShort(r.location)).join(', ')}.</li>}
         {result.linked.ok && <li>{result.linked.message}</li>}
         <li className="note">Nothing in any repository or folder.</li>
       </ul>
@@ -373,7 +374,7 @@ function Result({ result, retrying, onRetry }: { result: { name: string; links: 
               <ul className="plain">
                 {failedRepos.map((r) => (
                   <li key={r.location}>
-                    <code>{r.location}</code>: {r.message}
+                    <code>{homeShort(r.location)}</code>: {r.message}
                   </li>
                 ))}
               </ul>
