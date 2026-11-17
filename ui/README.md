@@ -1611,14 +1611,17 @@ npm run verify:ui -- --no-build --starter standup
   run side by side, one Chrome per core; `LAYOUT_WORKERS` changes that, though more than
   the core count starves the states that wait on a streamed answer. The smoke
   (`npm run smoke -w ui`) runs the same layout check, and CI splits it into eight jobs
-  (`npm run smoke -w ui -- --shard 3/8`): a unit is one theme scheme on one view, and
+  (`npm run smoke -w ui -- --include-tests layout:3/8`): a unit is one theme scheme on one view, and
   shard k checks every unit whose count modulo 8 is k - 1, so a new theme or view lands
   in a shard without a list to edit. Each shard still runs the smoke's install,
-  security, live and wipe checks. `verify:ui` is never sharded, and without `--shard`
-  the smoke checks everything, as it does locally and in the daily Windows and macOS
-  run. On every view and state the check also fails text, a `title` or an
-  `aria-label` that names the account running it: its home folder, or its name as a
-  home folder in a path (#653). Paths under a home show from `~`.
+  security, live and wipe checks. `verify:ui` is never sharded. With `--include-tests
+  none` (CI's Windows, macOS and Node 26 jobs) the smoke skips the layout check and
+  Chrome, and runs only the install, the server's gates, the live store and the wipe.
+  With no flag, or `--include-tests layout`, the smoke checks everything, as it does
+  locally and in the daily run on every OS. On every view and state the check also
+  fails text, a `title` or an `aria-label` that names the account running it: its
+  home folder, or its name as a home folder in a path (#653). Paths under a home show
+  from `~`.
 - **First run:** `toil-ui` on an empty home, with no connections, no Toil projects and no
   `TOIL_*` variable from your shell, through the same check: its Toil projects view must
   show the three-step checklist, and the palette and the shortcuts sheet open over it.

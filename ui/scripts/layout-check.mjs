@@ -844,17 +844,25 @@ export function layoutWorkers(runs) {
   return Math.max(1, Math.min(want, runs.length));
 }
 
+const INCLUDE_TESTS = 'the smoke takes --include-tests layout, layout:k/N with 1 <= k <= N (such as layout:3/8) or none';
+
 /**
- * Reads `--shard k/N` (CI's Toil UI layout matrix, 1-based): shard k of N, or null for the whole check. Anything else
- * is an error saying what it takes, never a quiet run of everything.
+ * Reads the smoke's arguments: nothing or `--include-tests layout` for the whole layout check, `--include-tests
+ * layout:k/N` for shard k of N (CI's Linux layout matrix, 1-based), `--include-tests none` for no layout check (CI's
+ * Windows, macOS and Node 26 jobs). The install, gate, live and wipe checks run whichever it says. Anything else is
+ * an error saying what it takes, never a quiet run of everything.
  */
-export function parseShard(text) {
-  if (text === undefined) return null;
-  const m = /^(\d+)\/(\d+)$/.exec(text);
+export function parseIncludeTests(argv) {
+  if (argv.length === 0) return { layout: true, shard: null };
+  const [flag, value, ...rest] = argv;
+  if (flag !== '--include-tests' || value === undefined || rest.length) throw new Error(`${INCLUDE_TESTS}, not ${JSON.stringify(argv.join(' '))}.`);
+  if (value === 'none') return { layout: false, shard: null };
+  if (value === 'layout') return { layout: true, shard: null };
+  const m = /^layout:(\d+)\/(\d+)$/.exec(value);
   const index = m ? Number(m[1]) : 0;
   const count = m ? Number(m[2]) : 0;
-  if (!m || count < 1 || index < 1 || index > count) throw new Error(`--shard takes k/N with 1 <= k <= N, such as 3/8, not ${JSON.stringify(text)}.`);
-  return { index, count };
+  if (!m || count < 1 || index < 1 || index > count) throw new Error(`${INCLUDE_TESTS}, not ${JSON.stringify(value)}.`);
+  return { layout: true, shard: { index, count } };
 }
 
 /**

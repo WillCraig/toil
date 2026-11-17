@@ -129,8 +129,11 @@ gets made again in the next place it applies.
    with the command contract (the `integrations` skill) is a separate requirement
    and still applies.
 8. **Same behavior on Windows, macOS and Linux.** None is second-class; a feature
-   that works on one and not the others is not done. → Cross-Platform; the site
-   is mobile responsive for the same reason (`site` skill).
+   that works on one and not the others is not done. Every OS gates every merge. A
+   check too costly to run on every OS for every PR runs per PR on one and daily on
+   all, and a release waits while the daily run is failing (the maintainer's call,
+   2026-11-17, #605). → Cross-Platform; the site is mobile responsive for the same
+   reason (`site` skill).
 9. **toil talks only to what the user pointed it at.** No telemetry, no update checks,
    no call home. The only network traffic is to hosts in the user's config, or to a
    public API that a command the user ran names in its own name (`toil osv vulns`),
@@ -688,21 +691,27 @@ All six pass before a PR opens. A PR that touches `ui/` also passes Toil UI's ga
 `npm run verify:ui`, adding `-- --ask` when it changes the agent: one command that
 checks Toil UI on sample and real data and writes `ui/.verify/report.md`, whose table
 goes in the PR, so the work is verified before the review bot sees it (`ui/README.md`,
-Verify before you open a PR). On a PR and on `main`, CI (`ci.yml`) runs them on
-Linux on Node 24.22.1, side by side: toil's gate, and Toil UI's as one job of checks
-plus its smoke split into eight layout shards (#640). Its `CI ok`
+Verify before you open a PR). On a PR and on `main`, CI (`ci.yml`) runs them side by
+side: on Linux on Node 24.22.1, toil's gate, and Toil UI's as one job of checks plus
+its smoke split into eight layout shards (#640); and on Windows and macOS on Node
+24.22.1 and 26.12.1, and Linux on 26.12.1, one job each running both gates except
+lint and `check:lockfile`, which read the same files on every OS, with Toil UI's
+smoke under `--include-tests none`: its layout check runs per PR on Linux only, a trade of
+cost for a day's delay, and on every OS in the daily run. Every job has a time limit. Its `CI ok`
 job passes only when all of them passed, along with the database integration job and the
 `dist/` guard (below), and it's the one check `main`'s ruleset requires, so nothing
-merges on a red gate. A PR against `main` that changes only docs and config (the list in
+merges on a red gate on any OS (the maintainer's call, 2026-11-17). A PR against `main` that changes only docs and config (the list in
 `scripts/ci-scope.mjs`, read from `main`) skips Toil UI's gate and the database job,
 and `CI ok` accepts that skip only when the scope check passed and said so; toil's
-gate still runs (the maintainer's call, 2026-11-16). Windows, macOS and Node 26 run in `platforms.yml`: daily, on
-demand, and on the release PR, whose merger checks it passed, so a platform break
-shows within a day and is looked at before a release. A failed daily run files a `platforms-failure` issue (#376).
-Principle 8 still holds: a platform failure gets fixed like any other, it just
-doesn't hold every PR behind macOS and Windows runners. Other checks stay optional:
+gate still runs (the maintainer's call, 2026-11-16). `platforms.yml` runs the
+whole smoke, layout included, on every OS and both Node lines, plus the skill install,
+daily and on demand; a failed or timed-out daily run files a `platforms-failure`
+issue (#376), and a passing run on `main` closes it. It doesn't run on pull requests,
+the release PR included; instead `CI ok` on the release PR fails while that issue is
+open, so nothing ships over a known break on any OS (the maintainer's call,
+2026-11-17). Other checks stay optional:
 the review job (approval is required separately, and it skips the release PR), the
-platforms run, and path-filtered jobs, which would block PRs they never run on.
+daily platforms run, and path-filtered jobs, which would block PRs they never run on.
 
 **`dist/toil.js` and the bundle it runs, `dist/toil-lib.js`, are committed and are
 the last released toil** (the maintainer's decision, 2026-10-17), so a clone runs

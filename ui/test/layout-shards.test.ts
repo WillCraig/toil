@@ -1,11 +1,11 @@
 /**
- * CI splits the layout check across parallel jobs (`npm run smoke -w ui -- --shard k/N`, #640). A shard that drops a
+ * CI splits the layout check across parallel jobs (`npm run smoke -w ui -- --include-tests layout:k/N`, #640). A shard that drops a
  * unit would pass a view nobody looked at, so this holds the split to the one rule that matters: every theme scheme on
  * every view is checked by exactly one shard, for any number of shards, and no shard at all means the whole check.
  * Splitting an inspection eight ways is efficient right up until a floor turns up that no inspector was assigned.
  */
 import { describe, expect, it } from 'vitest';
-import { MOTION_ROUTES, ROUTES, parseShard, shardRuns, themeRuns } from '../scripts/layout-check.mjs';
+import { MOTION_ROUTES, ROUTES, parseIncludeTests, shardRuns, themeRuns } from '../scripts/layout-check.mjs';
 
 type Run = { theme: string; scheme: string; routes?: string[] };
 const units = (runs: Run[], routes: string[]) => runs.flatMap((r) => (r.routes ?? routes).map((route) => `${r.theme}-${r.scheme} ${route}`));
@@ -28,11 +28,18 @@ describe('the layout check split into shards', () => {
 
   it('runs the whole check with no shard', () => {
     expect(shardRuns(themeRuns(), ROUTES, null)).toEqual(themeRuns());
-    expect(parseShard(undefined)).toBeNull();
+    expect(parseIncludeTests([])).toEqual({ layout: true, shard: null });
+    expect(parseIncludeTests(['--include-tests', 'layout'])).toEqual({ layout: true, shard: null });
   });
 
-  it('reads k/N and refuses anything else', () => {
-    expect(parseShard('3/8')).toEqual({ index: 3, count: 8 });
-    for (const bad of ['', '0/8', '9/8', '3', 'a/b', '3/0', '-1/8']) expect(() => parseShard(bad), bad).toThrow(/--shard takes k\/N/);
+  it('reads layout:k/N and none, and refuses anything else', () => {
+    expect(parseIncludeTests(['--include-tests', 'layout:3/8'])).toEqual({ layout: true, shard: { index: 3, count: 8 } });
+    expect(parseIncludeTests(['--include-tests', 'none'])).toEqual({ layout: false, shard: null });
+    for (const bad of ['', 'layout:0/8', 'layout:9/8', 'layout:3', 'layout:a/b', 'layout:3/0', '3/8', 'all', 'Layout']) {
+      expect(() => parseIncludeTests(['--include-tests', bad]), bad).toThrow(/--include-tests layout, layout:k\/N/);
+    }
+    for (const bad of [['--include-tests'], ['--shard', '3/8'], ['--no-layout'], ['--include-tests', 'none', '--include-tests', 'layout'], ['none']]) {
+      expect(() => parseIncludeTests(bad), bad.join(' ')).toThrow(/--include-tests layout, layout:k\/N/);
+    }
   });
 });
