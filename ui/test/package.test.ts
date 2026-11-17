@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { allowed, lockfileLag, lockfileProblems, npmCli, packageProblems, REQUIRED } from '../scripts/package-rules.mjs';
@@ -109,5 +110,27 @@ describe('the lockfile check (#299)', () => {
     expect(lockfileProblems({ packages: { ui: { dependencies: { '@imagile-dev/toil': PIN } } } }, PIN, PIN)).toEqual([expect.stringContaining('has no node_modules/@imagile-dev/toil entry')]);
     expect(lockfileProblems(lock({ version: PIN, resolved: tgz(PIN) }), PIN, PIN)).toEqual([expect.stringContaining('has no sha512 integrity')]);
     expect(lockfileProblems(lock(good), PIN, null)).toEqual([expect.stringContaining("isn't installed")]);
+  });
+});
+
+describe("npmCli, npm's own CLI to run through node", () => {
+  it('takes npm_execpath when npm run set it', () => {
+    expect(npmCli({ npm_execpath: '/x/npm/bin/npm-cli.js' }, '/nowhere/node')).toBe('/x/npm/bin/npm-cli.js');
+  });
+
+  it.skipIf(process.platform === 'win32')('follows the npm on PATH through its symlink when node lives elsewhere, as Homebrew lays it out (symlinks need no admin rights off Windows)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'npmcli-'));
+    try {
+      const cli = join(root, 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js');
+      mkdirSync(join(root, 'lib', 'node_modules', 'npm', 'bin'), { recursive: true });
+      writeFileSync(cli, '');
+      mkdirSync(join(root, 'bin'));
+      symlinkSync(cli, join(root, 'bin', 'npm'));
+      const cellarNode = join(root, 'Cellar', 'node', 'bin', 'node');
+      expect(npmCli({ PATH: ['relative/bin', join(root, 'bin')].join(':') }, cellarNode)).toMatch(/lib\/node_modules\/npm\/bin\/npm-cli\.js$/);
+      expect(() => npmCli({ PATH: 'relative/bin' }, cellarNode)).toThrow(/on PATH/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

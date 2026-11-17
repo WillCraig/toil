@@ -55,6 +55,8 @@ export interface Board {
   pullRequests: Rec[];
   /** How many batches of the reporting feed were asked for. */
   feedRequests: number;
+  /** The number of the board's first sprint: 1 as ado-seed names them, 44 once demo-week has renamed them. */
+  firstSprint: number;
   fetch: typeof fetch;
 }
 
@@ -64,7 +66,7 @@ const FEED_BATCH = 7;
 export function adoBoard(): Board {
   const items = new Map<number, Item>();
   let next = 2;
-  const board: Board = { items, feedRequests: 0, requests: [], writes: [], refuseBypass: false, others: () => 0, pullRequests: [], fetch: undefined as never };
+  const board: Board = { items, feedRequests: 0, requests: [], writes: [], refuseBypass: false, others: () => 0, pullRequests: [], firstSprint: 1, fetch: undefined as never };
   const url = (id: number) => `${ORG}/_apis/wit/workItems/${id}`;
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   const fail = (status: number, message: string) => json({ message, typeKey: 'Error' }, status);
@@ -126,7 +128,7 @@ export function adoBoard(): Board {
     if (method === 'GET' && path === `${p}/_apis/wit/tags`) return json({ count: 0, value: [] });
     if (method === 'GET' && path === `${p}/_apis/wit/classificationnodes/iterations`) {
       const sprint = (n: number) => ({ id: n + 2, identifier: `abc12345-0000-0000-0000-00000000000${n}`, name: `Sprint ${n}`, structureType: 'iteration', hasChildren: false, path: `\\${PROJECT}\\Iteration\\Sprint ${n}` });
-      return json({ id: 1, identifier: 'abc12345-0000-0000-0000-000000000009', name: PROJECT, structureType: 'iteration', hasChildren: true, path: `\\${PROJECT}\\Iteration`, children: [1, 2, 3].map(sprint) });
+      return json({ id: 1, identifier: 'abc12345-0000-0000-0000-000000000009', name: PROJECT, structureType: 'iteration', hasChildren: true, path: `\\${PROJECT}\\Iteration`, children: [0, 1, 2].map((k) => sprint(board.firstSprint + k)) });
     }
     if (method === 'POST' && path === `${p}/_apis/wit/wiql`) {
       const query = String(body.query);

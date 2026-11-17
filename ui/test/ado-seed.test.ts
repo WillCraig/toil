@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { client, createPatch, findSeeded, missingLinks, seedKey, TITLE_PREFIX } from '../scripts/ado-seed/ado.mjs';
-import { apply, inOrder } from '../scripts/ado-seed/apply.mjs';
+import { apply, inOrder, sprintOffset } from '../scripts/ado-seed/apply.mjs';
 import { cleanup, confirmationCode } from '../scripts/ado-seed/cleanup.mjs';
 import { compare } from '../scripts/ado-seed/compare.mjs';
 import { ANCHOR, check, DEFAULT_OUT, DEFAULT_SEED, generate, render, type SeedRecord } from '../scripts/ado-seed/generate.mjs';
@@ -71,6 +71,22 @@ describe('items.owi.json', () => {
 });
 
 describe('apply.mjs', () => {
+  it("finds the file's sprints on a board demo-week renumbered (Sprint 1 now Sprint 44), and puts each item in its renumbered sprint", async () => {
+    const board = adoBoard();
+    board.firstSprint = 44;
+    const first = await seed(board);
+    expect(first.created).toHaveLength(45);
+    const paths = new Set([...board.items.values()].map((i) => String(i.fields['System.IterationPath'])));
+    expect([...paths].filter((p) => /Sprint/.test(p)).every((p) => /\\Sprint 4[4-6]$/.test(p))).toBe(true);
+    expect([...paths].some((p) => /\\Sprint [1-3]$/.test(p))).toBe(false);
+  });
+
+  it('reads the offset from the lowest numbered sprint, and none while a Sprint 1 is there', () => {
+    expect(sprintOffset(new Set(['imagile\\sprint 1', 'imagile\\sprint 2']), 'Imagile')).toBe(0);
+    expect(sprintOffset(new Set(['imagile\\sprint 44', 'imagile\\sprint 45']), 'Imagile')).toBe(43);
+    expect(sprintOffset(new Set(['imagile']), 'Imagile')).toBe(0);
+  });
+
   it('creates every item backdated, with its revisions, links and tags, and a second run changes nothing', async () => {
     const board = adoBoard();
     const first = await seed(board);

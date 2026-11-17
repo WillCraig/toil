@@ -17,10 +17,13 @@
 //     relative to today.
 //   - .toil-demo-home, a marker: --fresh deletes a folder only when it carries it.
 // toil runs in the home with every TOIL_* variable of your shell removed, so none
-// can turn writes back on or pick another toil project. --launch starts Toil UI
-// the same way, with HOME and USERPROFILE both set (Windows goes by the second)
-// and the GitHub token read from `gh auth token` into that one process: run it
-// yourself, since it hands a token over. Nothing is printed or written.
+// can turn writes back on or pick another toil project. --launch starts this
+// checkout's Toil UI (ui/dist, so run npm run build -w ui first) on toil built from
+// this checkout into .scratch/toil, as dev-real.mjs does, so the two always match
+// (the published toil may lack a field the checkout's UI sends). It runs with HOME
+// and USERPROFILE both set (Windows goes by the second) and the GitHub token read
+// from `gh auth token` into that one process: run it yourself, since it hands a
+// token over. Nothing is printed or written.
 //   - the toil project `payments-team`, made with toil's own projects commands,
 //     tying Jira SCRUM, GitHub imagile-dev/toil-sandbox, Azure DevOps "Toil
 //     Sandbox" and the ledger together.
@@ -32,7 +35,7 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { npmCli } from './package-rules.mjs';
+import { buildToil, RealHomeError, toilCli, toilUi, toilUiNodeArgs } from './real-home.mjs';
 
 /** The connections the demo uses; nothing else of yours is copied. */
 export const DEMO_CONNECTIONS = ['jira', 'confluence', 'ado', 'figma', 'payments-db'];
@@ -51,8 +54,10 @@ const home = resolve(take('--home', join(homedir(), 'toil-demo-home')));
 const fresh = flag('--fresh');
 const launch = flag('--launch');
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const toilJs = resolve(take('--toil', join(root, 'dist', 'toil.js')));
+const toilFlag = take('--toil');
+let toilJs = resolve(toilFlag ?? join(root, 'dist', 'toil.js'));
 if (args.length) fail(`Unknown argument: ${args.join(' ')}`, 'Use --home <dir>, --fresh, --launch and --toil <path>.');
+if (launch && toilFlag) fail("--toil and --launch can't be used together.", '--launch builds toil from this checkout itself; leave out --toil.');
 // The demo home is never your home, a folder holding it, or anything in or around this repository.
 const fold = (path) => (process.platform === 'win32' ? path.toLowerCase() : path);
 const inside = (child, parent) => {
@@ -67,6 +72,20 @@ function fail(message, fix) {
   process.exit(1);
 }
 const say = (line) => process.stdout.write(`${line}\n`);
+
+// With --launch the home is built, and Toil UI then runs, on one toil: this checkout's,
+// built into .scratch/toil, so the toil project it writes is the one Toil UI reads.
+let built;
+if (launch) {
+  if (!existsSync(toilUi)) fail(`${toilUi} isn't built.`, 'Run npm run build -w ui first.');
+  try {
+    built = buildToil();
+  } catch (e) {
+    if (e instanceof RealHomeError) fail(e.message, e.fix);
+    throw e;
+  }
+  toilJs = toilCli;
+}
 
 // The marker goes only on a folder this script makes, or one that already carries it,
 // so --fresh can never delete a folder of someone's files.
@@ -167,7 +186,19 @@ if (!toil('projects', 'show', P).ok) must(toil('projects', 'init', P, '--descrip
 must(toil('projects', 'add-repo', P, 'https://github.com/imagile-dev/toil-sandbox', '--name', 'toil-sandbox', '--replace'), 'projects add-repo');
 must(toil('projects', 'link', P, 'github', '--connection', 'github', '--set', 'owner=imagile-dev', '--set', 'repo=toil-sandbox', '--replace'), 'projects link github');
 if (config.connections.jira) must(toil('projects', 'link', P, 'jira', '--connection', 'jira', '--set', 'project=SCRUM', '--replace'), 'projects link jira');
-if (config.connections.ado) must(toil('projects', 'link', P, 'ado', '--connection', 'ado', '--set', 'project=Toil Sandbox', '--replace'), 'projects link ado');
+// Which Jira fields hold story points and the sprint (the sandbox site's ids, Jira Cloud's usual ones), or
+// Toil UI reads neither and a chain of estimated stories shows no points.
+if (config.connections.jira) {
+  must(toil('projects', 'field', P, 'jira', 'estimate', 'customfield_10016', '--replace'), 'projects field estimate');
+  must(toil('projects', 'field', P, 'jira', 'iteration', 'customfield_10020', '--replace'), 'projects field iteration');
+  // Jira numbers custom fields per site, so read them back from a seeded story: a
+  // wrong id would leave Toil UI with no points and no word of why.
+  const probe = toil('jira', 'issue', 'get', 'SCRUM-14', '--select', '{points: fields.customfield_10016, sprint: fields.customfield_10020[0].name}');
+  if (!probe.ok) say(`warning: couldn't read SCRUM-14 to check the Jira field ids: ${probe.error.message}`);
+  else if (typeof probe.data?.points !== 'number' || !probe.data?.sprint) say('warning: SCRUM-14 has no story points in customfield_10016 or no sprint in customfield_10020; find this site\'s ids with toil jira issue fields --discover --custom-only and set them with toil projects field.');
+}
+// The repository too, or Toil UI has no ADO repository to read code reviews from.
+if (config.connections.ado) must(toil('projects', 'link', P, 'ado', '--connection', 'ado', '--set', 'project=Toil Sandbox', '--set', 'repo=settlement-service', '--replace'), 'projects link ado');
 // The Postgres replica (demo-db.mjs) when it's configured, else the SQLite ledger.
 must(toil('projects', 'link', P, 'db', '--connection', config.connections['payments-db'] ? 'payments-db' : 'ledger', '--replace'), 'projects link db');
 if (config.connections.confluence) must(toil('projects', 'link', P, 'confluence', '--connection', 'confluence', '--set', 'space=OD', '--replace'), 'projects link confluence');
@@ -181,7 +212,7 @@ if (launch) {
   // gh reads its login with your real environment; the token goes only to Toil UI's process.
   const token = spawnSync('gh', ['auth', 'token'], { encoding: 'utf8' });
   if (token.status !== 0 || !token.stdout.trim()) fail("couldn't read a GitHub token from gh.", 'Sign in with gh auth login, then run this again.');
-  say('starting Toil UI in the demo home (Ctrl+C to stop)');
-  const ui = spawnSync(process.execPath, [npmCli(), 'exec', '--yes', '--', '@imagile-dev/toil-ui'], { stdio: 'inherit', env: demoEnv({ TOIL_GITHUB_TOKEN: token.stdout.trim() }) });
+  say(`starting Toil UI in the demo home on ${built.describe} (Ctrl+C to stop)`);
+  const ui = spawnSync(process.execPath, [...toilUiNodeArgs, toilUi], { stdio: 'inherit', env: demoEnv({ TOIL_GITHUB_TOKEN: token.stdout.trim() }) });
   process.exit(ui.status ?? 1);
 }

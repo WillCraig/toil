@@ -1,5 +1,5 @@
-// The Azure DevOps half of demo-week.mjs: dates the board's sprints so Sprint 1 is
-// the current one (ending on --ends), makes a day of movement on items the
+// The Azure DevOps half of demo-week.mjs: names and dates the board's sprints so
+// --sprint is the current one (ending on --ends), makes a day of movement on items the
 // ado-seed created (found by title among items tagged toil-seed, so a re-seed with
 // new ids still works, and nothing without the seed mark is touched), adds
 // the repository `settlement-service` with the demo code and one pull request
@@ -42,15 +42,32 @@ export function ado({ toil, say, fail, sprint, ends, project, item, skeleton, no
       if (!['GET', 'HEAD'].includes(method)) argv.push('--allow-write');
       return toil(argv, { soft });
     };
-    say(`Azure DevOps project ${project} (current sprint: Sprint 1, ending ${ends}; GitHub and Jira call it ${sprint})`);
+    // The board's sprints carry the same numbers as GitHub's and Jira's, so every
+    // tool's sprint badge reads the same: ado-seed's Sprint 1 to 6 become --sprint and
+    // the five after it. Only while ado-seed's Sprint 1 is still there, so a renamed
+    // board is never renumbered again, and a rename that stopped halfway carries on.
+    const base = Number(/^Sprint (\d+)$/.exec(sprint)?.[1]);
+    if (!base) fail(`"${sprint}" isn't named "Sprint <n>".`, 'Pass --sprint "Sprint 44" (the board numbers its sprints the same way).');
+    const num = (name) => Number(/^Sprint (\d+)$/.exec(name)?.[1]);
+    let sprints = toil(['ado', 'sprint', 'list', ...p]).data;
+    if (!sprints.some((s) => s.name === sprint) && sprints.some((s) => num(s.name) === 1)) {
+      // Highest first, so a new name never meets an old one still waiting to move.
+      for (const s of [...sprints].filter((x) => num(x.name) && num(x.name) < base).sort((a, b) => num(b.name) - num(a.name))) {
+        const name = `Sprint ${num(s.name) + base - 1}`;
+        api('PATCH', `/${enc}/_apis/wit/classificationnodes/Iterations/${encodeURIComponent(s.name)}?api-version=7.1`, { name });
+        say(`  ${s.name}: renamed ${name}`);
+      }
+      sprints = toil(['ado', 'sprint', 'list', ...p]).data;
+    }
+    if (!sprints.some((s) => s.name === sprint)) fail(`the board has no sprint named "${sprint}".`, 'Name the sprints on the board "Sprint <n>" in Project settings → Boards, or pass a --sprint the board has.');
+    say(`Azure DevOps project ${project} (current sprint: ${sprint}, ending ${ends})`);
 
-    // Sprint dates: Sprint 1 is this two-week sprint, each later one follows.
-    const sprints = toil(['ado', 'sprint', 'list', ...p]).data;
+    // Sprint dates: --sprint is this two-week sprint, the others before and after it.
     const end1 = Date.parse(`${ends}T00:00:00Z`);
     for (const s of sprints) {
-      const k = Number(/^Sprint (\d+)$/.exec(s.name)?.[1]);
+      const k = num(s.name);
       if (!k) continue;
-      const finish = end1 + (k - 1) * 14 * day;
+      const finish = end1 + (k - base) * 14 * day;
       const start = finish - 11 * day;
       if (s.attributes?.startDate?.startsWith(isoDay(start)) && s.attributes?.finishDate?.startsWith(isoDay(finish))) continue;
       api('PATCH', `/${enc}/_apis/wit/classificationnodes/Iterations/${encodeURIComponent(s.name)}?api-version=7.1`, { attributes: { startDate: `${isoDay(start)}T00:00:00Z`, finishDate: `${isoDay(finish)}T00:00:00Z` } });
@@ -161,7 +178,7 @@ export function ado({ toil, say, fail, sprint, ends, project, item, skeleton, no
     // seed key (so cleanup.mjs knows it too), and open even after a recording closed it.
     const agent = items.find((w) => tagsOf(w).includes('seed:agent-refund-reasons'));
     if (!agent) {
-      const created = toil(['ado', 'work-item', 'create', '--type', 'Product Backlog Item', '--title', item.title, '--description', item.description, '--priority', '2', '--field', `System.IterationPath=${project}\\Sprint 1`, '--field', 'System.Tags=agent-ready; toil-seed; seed:agent-refund-reasons', '--field', 'Microsoft.VSTS.Scheduling.Effort=1', ...p, '--allow-write']).data;
+      const created = toil(['ado', 'work-item', 'create', '--type', 'Product Backlog Item', '--title', item.title, '--description', item.description, '--priority', '2', '--field', `System.IterationPath=${project}\\${sprint}`, '--field', 'System.Tags=agent-ready; toil-seed; seed:agent-refund-reasons', '--field', 'Microsoft.VSTS.Scheduling.Effort=1', ...p, '--allow-write']).data;
       say(`  #${created.id}: agent-ready item created`);
     } else {
       if (agent.state === 'Done') {

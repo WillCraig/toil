@@ -77,6 +77,17 @@ const bypassRefused = (error) => error instanceof SeedError && /bypass/i.test(er
 /** The sprint paths a file names, as `@project\…` paths. */
 const sprintsOf = (items) => [...new Set(items.flatMap((i) => native(i).timeline.map((e) => e.iteration).filter((p) => p && p !== '@project')))];
 
+/**
+ * How far the board's sprint numbers sit from the file's: 0 while the board has a
+ * Sprint 1 (or no numbered sprints at all), else its lowest Sprint n minus 1.
+ */
+export function sprintOffset(paths, project) {
+  const prefix = `${project.toLowerCase()}\\sprint `;
+  const numbers = [...paths].filter((p) => p.startsWith(prefix)).map((p) => Number(p.slice(prefix.length))).filter((n) => Number.isInteger(n) && n > 0);
+  if (!numbers.length || numbers.includes(1)) return 0;
+  return Math.min(...numbers) - 1;
+}
+
 /** Every iteration path in the project's tree, lower-cased, as System.IterationPath writes it. */
 function iterationPaths(tree) {
   const out = new Set();
@@ -103,8 +114,14 @@ export async function apply({ items, api, identity = 'tags', dryRun = false, bac
   const info = await api.projectInfo();
   if (info?.name !== project) throw new SeedError(`The organization has no project named "${project}" (it answered "${info?.name}").`, 'Pass --project exactly as the project is named.');
   const paths = iterationPaths(await api.iterations());
-  const missing = sprintsOf(items).filter((p) => !paths.has(projectPath(p, project).toLowerCase()));
-  if (missing.length) throw new SeedError(`The project has no ${missing.map((p) => projectPath(p, project)).join(', ')}.`, 'Create the sprints in the project yourself, or regenerate items.owi.json without them; this script never creates iterations.');
+  // demo-week.mjs renames the board's Sprint 1, 2, … to the demo's own numbers
+  // (Sprint 44, 45, …), keeping their order. With no Sprint 1 left, the file's
+  // Sprint n is the board's lowest-numbered sprint plus n - 1.
+  const offset = sprintOffset(paths, project);
+  const sprintPath = (p) => projectPath(p, project).replace(/\\Sprint (\d+)$/i, (_, n) => `\\Sprint ${Number(n) + offset}`);
+  const missing = sprintsOf(items).filter((p) => !paths.has(sprintPath(p).toLowerCase()));
+  if (missing.length) throw new SeedError(`The project has no ${missing.map((p) => sprintPath(p)).join(', ')}.`, 'Create the sprints in the project yourself, or regenerate items.owi.json without them; this script never creates iterations. If demo-week.mjs renamed the sprints and stopped part-way, run it again to finish the rename first.');
+  if (offset) log(`The board's sprints are renumbered: the file's Sprint 1 is its Sprint ${1 + offset}.`);
   const latest = Math.max(...items.flatMap((i) => native(i).timeline.map((e) => Date.parse(e.at))));
   if (backdate && latest > now()) throw new SeedError(`The timeline reaches ${new Date(latest).toISOString()}, which is in the future.`, 'Run with --no-backdate, or regenerate items.owi.json with a later ANCHOR.');
   const me = items.some((i) => i.assignee) ? await api.me() : null;
@@ -118,7 +135,7 @@ export async function apply({ items, api, identity = 'tags', dryRun = false, bac
   for (const record of inOrder(items)) {
     const key = keyOf(record.id);
     const timeline = native(record).timeline;
-    const last = { state: statesOf(record).at(-1), iteration: projectPath(timeline.filter((e) => e.iteration).at(-1).iteration, project) };
+    const last = { state: statesOf(record).at(-1), iteration: sprintPath(timeline.filter((e) => e.iteration).at(-1).iteration) };
     const existing = known.get(key);
     if (existing) {
       // Made by an earlier run: walk it on if that run stopped part-way. These moves are dated now.
@@ -163,7 +180,7 @@ export async function apply({ items, api, identity = 'tags', dryRun = false, bac
       if (event.state && STARTED.has(event.state)) activated = true;
       const step = [
         ...(event.state ? [add('System.State', event.state)] : []),
-        ...(event.iteration ? [add('System.IterationPath', projectPath(event.iteration, project))] : []),
+        ...(event.iteration ? [add('System.IterationPath', sprintPath(event.iteration))] : []),
         ...dated(event.at),
         ...stamps,
       ];
