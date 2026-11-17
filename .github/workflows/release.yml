@@ -38,8 +38,10 @@ jobs:
       ui_tag_name: ${{ steps.rp.outputs['ui--tag_name'] }}
       ui_version: ${{ steps.rp.outputs['ui--version'] }}
     steps:
-      - name: Generate Imagile Bot token
-        id: imagile-token
+      # Two tokens, so the one that can write workflow files never reaches the
+      # build. This one is for release-please alone.
+      - name: Generate Imagile Bot token for release-please
+        id: release-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.IMAGILE_BOT_APP_ID }}
@@ -48,18 +50,37 @@ jobs:
           # merge tags and creates the GitHub release. Nothing else.
           permission-contents: write
           permission-pull-requests: write
+          # The tag goes on the release PR's merge commit. Once main has moved
+          # on and changed a workflow, GitHub counts tagging that older commit
+          # as writing workflow files, and refuses it without this (beta.6,
+          # #619). Only the release-please step sees this token.
+          permission-workflows: write
 
       - id: rp
         uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         with:
-          token: ${{ steps.imagile-token.outputs.token }}
+          token: ${{ steps.release-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      # The checkout, the build and the push of dist/ get a second token without
+      # workflows, so a build-time dependency gone wrong can push code to the
+      # release PR, as before, but never a workflow. Still an App token, so CI
+      # runs on the push.
+      - name: Generate Imagile Bot token for the dist/ rebuild
+        id: imagile-token
+        if: steps.rp.outputs.pr
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.IMAGILE_BOT_APP_ID }}
+          private-key: ${{ secrets.IMAGILE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       # dist/toil.js (with dist/toil-lib.js) is committed so a clone of main runs the last released
       # toil, and only the release PR changes it: rebuild it on the release
-      # PR's branch and commit it there, as the Imagile Bot App (the same token
-      # release-please used, so CI runs on the push). CI's check:dist then
+      # PR's branch and commit it there, as the Imagile Bot App (an App token,
+      # so CI runs on the push). CI's check:dist then
       # verifies it on that PR, on every OS. release-please rewrites its branch
       # on each run, so this runs whenever it opened or updated the PR.
       - name: Check out the release PR

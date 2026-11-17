@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
@@ -93,6 +93,32 @@ describe('release-please', () => {
     expect(json('package.json').name).toBe(toil['package-name']);
     expect(json('ui/package.json').name).toBe(ui['package-name']);
     expect(json('package.json').workspaces).toEqual(['ui']);
+  });
+});
+
+describe('the Imagile Bot token and workflow files', () => {
+  type TokenStep = { uses?: string; with?: Record<string, string> };
+  const tokenSteps = readdirSync(join(root, '.github', 'workflows'))
+    .filter((f) => f.endsWith('.yml'))
+    .flatMap((file) => {
+      const wf = load(readFileSync(join(root, '.github', 'workflows', file), 'utf8')) as { jobs: Record<string, { steps?: TokenStep[] }> };
+      return Object.entries(wf.jobs).flatMap(([job, j]) => (j.steps ?? []).filter((st) => st.uses?.startsWith('actions/create-github-app-token@')).map((st) => ({ where: `${file} ${job}`, st })));
+    });
+
+  it('only the token the release-please step uses asks for workflows, which tagging a merge commit older than main needs (#619)', () => {
+    const asking = tokenSteps.filter(({ st }) => st.with?.['permission-workflows'] !== undefined);
+    expect(asking.map(({ where }) => where)).toEqual(['release.yml release-please']);
+    const steps = jobs['release-please']!.steps as (TokenStep & { id?: string })[];
+    const tokenStep = asking[0]!.st as TokenStep & { id?: string };
+    expect(tokenStep.with!['permission-workflows']).toBe('write');
+    // That token goes to release-please and nowhere else, by `with:` or `env:`: the checkout, build and push use another.
+    const uses = steps.filter((st) => JSON.stringify(st).includes(`steps.${tokenStep.id}.outputs.token`));
+    expect(uses.map((st) => (st as { id?: string }).id)).toEqual(['rp']);
+  });
+
+  it("every bot token names its permissions, so none inherits the installation's workflows: write", () => {
+    const unscoped = tokenSteps.filter(({ st }) => !Object.keys(st.with ?? {}).some((k) => k.startsWith('permission-'))).map(({ where }) => where);
+    expect(unscoped).toEqual([]);
   });
 });
 
