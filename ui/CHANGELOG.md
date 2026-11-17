@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.1.0-beta.6](https://github.com/imagile-dev/toil/compare/toil-ui-v0.1.0-beta.5...toil-ui-v0.1.0-beta.6) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* MCP tools and the ./api take only the new field names (inputFile, holidaysFile, verdictsFile, backtestFile, revisedFile, path, out), and the MCP classify prompt's argument is inputFile. The CLI still reads every old spelling for at least one beta, with a DEPRECATED_FLAG warning naming the new one. Migrate by renaming the field or flag as docs/command-contract.md, version 4, lists. The contract version is 4.
+
+### Features
+
+* **ado:** the Azure DevOps Services commands demo seeding needed the raw API for ([#618](https://github.com/imagile-dev/toil/issues/618)) ([#621](https://github.com/imagile-dev/toil/issues/621)) ([344667e](https://github.com/imagile-dev/toil/commit/344667e4411ed70aaf58e555d8a43210a39f4a2e))
+* **confluence:** create a space with confluence space create ([#21](https://github.com/imagile-dev/toil/issues/21)) ([#646](https://github.com/imagile-dev/toil/issues/646)) ([de6df7b](https://github.com/imagile-dev/toil/commit/de6df7b4f62bff808fe39d547ba3d67675da9db1))
+* **connections:** offer Jira Cloud's API token to Confluence Cloud on the same site ([#635](https://github.com/imagile-dev/toil/issues/635)) ([#639](https://github.com/imagile-dev/toil/issues/639)) ([6782f55](https://github.com/imagile-dev/toil/commit/6782f55acf823abbbace20d2e96f157f935f45c3))
+* one flag per file idea: --input-file, --&lt;flag&gt;-file, --path, --out ([#622](https://github.com/imagile-dev/toil/issues/622)) ([#637](https://github.com/imagile-dev/toil/issues/637)) ([eee7c35](https://github.com/imagile-dev/toil/commit/eee7c35e0056fbbda0fdccd1356e594c98d9af12))
+* **ui:** show usage without caps ([#572](https://github.com/imagile-dev/toil/issues/572)) ([321d59b](https://github.com/imagile-dev/toil/commit/321d59b2d08650453c79b25f8f5d42a9fca26ca3))
+* work classification, work insights and stored architecture diagrams ([#566](https://github.com/imagile-dev/toil/issues/566), [#567](https://github.com/imagile-dev/toil/issues/567), [#582](https://github.com/imagile-dev/toil/issues/582)) ([#585](https://github.com/imagile-dev/toil/issues/585)) ([250d33c](https://github.com/imagile-dev/toil/commit/250d33c2a0c7c995540a4cd9329d7f5630326487))
+
+
+### Bug Fixes
+
+* **deps:** clear the open dependency advisories, upgrade the site to Astro 7, add Dependabot version updates ([#586](https://github.com/imagile-dev/toil/issues/586)) ([#591](https://github.com/imagile-dev/toil/issues/591)) ([fde850a](https://github.com/imagile-dev/toil/commit/fde850a4751e728fc6403966c4c59a5cd5153f54))
+* **test:** How it's doing tests wait for the loaded panel, not the first one ([#605](https://github.com/imagile-dev/toil/issues/605)) ([#626](https://github.com/imagile-dev/toil/issues/626)) ([6055fc1](https://github.com/imagile-dev/toil/commit/6055fc16e9175103bff6c68264ceffde976fa56a))
+* **test:** two tests that fail on macOS and on a slow runner ([#605](https://github.com/imagile-dev/toil/issues/605)) ([#611](https://github.com/imagile-dev/toil/issues/611)) ([7a4144e](https://github.com/imagile-dev/toil/commit/7a4144e7123e6a021bec17cc58f38bcc62ba15fa))
+* **ui:** close leftover overlays before opening the compact header menu ([#583](https://github.com/imagile-dev/toil/issues/583)) ([ccd5b9d](https://github.com/imagile-dev/toil/commit/ccd5b9db65aceb13c666dbcbef7355392257b15f))
+* **ui:** date the cache migration test's seeded rows from the clock ([#575](https://github.com/imagile-dev/toil/issues/575)) ([6871d0b](https://github.com/imagile-dev/toil/commit/6871d0b798c2fe39951416c35cbc3e20524c2c73)), closes [#574](https://github.com/imagile-dev/toil/issues/574)
+* **ui:** pin the clock in tests that seed fixed dates ([#578](https://github.com/imagile-dev/toil/issues/578)) ([3f871b5](https://github.com/imagile-dev/toil/commit/3f871b50223eeb39f1c1276432f089146d2343dd)), closes [#577](https://github.com/imagile-dev/toil/issues/577)
+* **ui:** stand-up team chips cut long sprint moves inside their box ([#644](https://github.com/imagile-dev/toil/issues/644)) ([#650](https://github.com/imagile-dev/toil/issues/650)) ([f017efc](https://github.com/imagile-dev/toil/commit/f017efcba8ebde3b95176c8ad8b1d55110dc3f87))
+* **ui:** the install dialog no longer widens its overlay past a 375px screen ([#569](https://github.com/imagile-dev/toil/issues/569)) ([a317a22](https://github.com/imagile-dev/toil/commit/a317a22f57709b8733fb4f19d1974477ba69d2e2))
+* **ui:** the setup wizard sets Jira up fully, and two screens report honestly ([#576](https://github.com/imagile-dev/toil/issues/576)) ([111b710](https://github.com/imagile-dev/toil/commit/111b7108dda5b53c1b5277f71aeaf576aaebb2a1))
+* unread points are not zero ([#652](https://github.com/imagile-dev/toil/issues/652)) ([#656](https://github.com/imagile-dev/toil/issues/656)) ([44d9a89](https://github.com/imagile-dev/toil/commit/44d9a895ad659df984f8f037b3230ecde72ad223))
+
+
+### Performance Improvements
+
+* tests and CI run faster without dropping a check ([#581](https://github.com/imagile-dev/toil/issues/581)) ([eff76f1](https://github.com/imagile-dev/toil/commit/eff76f1f005daed8a933eede0c0fc96d7ab6f8ae))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @imagile-dev/toil bumped from 0.1.0-beta.5 to 0.1.0-beta.6
+
 ## [0.1.0-beta.5](https://github.com/imagile-dev/toil/compare/toil-ui-v0.1.0-beta.4...toil-ui-v0.1.0-beta.5) (2026-11-09)
 
 
