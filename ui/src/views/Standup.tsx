@@ -380,9 +380,9 @@ function TeamLine({ report, cited }: { report: StandupReport; cited: Set<string>
     <div className="standup-team" id="standup-team" data-standup-team="">
       <span className="standup-team__sprint">{report.sprintLine ?? (report.asOf ? 'No current sprint' : 'Sprint not read yet')}</span>
       {shown.map((c) => (
-        <span key={c.key} className="standup-chip" id={`fact-${c.key}`} data-cited={c.lines.some((l) => cited.has(l.fact)) || undefined} title={chipTitle(report, c)}>
+        <span key={c.key} className="standup-chip" data-truncate="" id={`fact-${c.key}`} data-cited={c.lines.some((l) => cited.has(l.fact)) || undefined} title={chipTitle(report, c)}>
           <SubjectLink chip={c} />
-          <span className="standup-title">{shorten(c.texts[0] ?? '', 40)}</span>
+          <span className="standup-title">{c.texts[0] ?? ''}</span>
         </span>
       ))}
       {chips.length > ROW_CHIPS && (

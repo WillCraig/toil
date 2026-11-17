@@ -152,6 +152,8 @@ export const ROUTES = [
   '#/project/sample-team/standup',
   '#/project/card-payments/standup',
   '#/project/settlement/standup/2026-10-12',
+  // The sprint's first day: the team line's sprint moves are long (the whole iteration path and who moved it), and a chip has to cut inside a phone's width (#644).
+  '#/project/settlement/standup/2026-10-05',
   '#/project/checkout-web/standup/yesterday',
   item('card-payments', 'corp-jira:PAY-100'),
   item('settlement', 'corp-ado:2304'),

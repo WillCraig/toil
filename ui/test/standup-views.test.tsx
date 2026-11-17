@@ -221,6 +221,17 @@ describe('write it up and export, folded below', () => {
     expect(document.querySelector('[data-standup-team]')!.textContent).toContain('Sprint 42: moved by a sync');
   });
 
+  it("cuts the team line's chips inside their box, never in the text, and keeps the whole fact on hover (#644)", async () => {
+    window.location.hash = standupHref('settlement', { from: '2026-10-05', to: '2026-10-05' });
+    render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview worklog={fixtureWorklog()} />);
+    await waitFor(() => expect(document.querySelector('[data-standup-team] .standup-chip')).toBeTruthy());
+    const chips = [...document.querySelectorAll<HTMLElement>('[data-standup-team] .standup-chip')];
+    const long = chips.find((c) => c.querySelector('.standup-title')!.textContent === 'moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura')!;
+    expect(long).toBeTruthy();
+    expect(long.hasAttribute('data-truncate')).toBe(true);
+    expect(long.title).toContain('moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura');
+  });
+
   it('exports the range as a Markdown file through the API', async () => {
     const sample = fixtureWorklog();
     const exported: unknown[] = [];
