@@ -20,6 +20,13 @@ describe('escapeTagLike', () => {
     expect(countTagLike(tags)).toBe(0);
   });
 
+  it('escapes a `<` release-please already wrote as `&lt;`, which its first parse turns back into a tag (#619)', () => {
+    const line = '* one flag per file idea: --input-file, --&lt;flag&gt;-file, --path';
+    expect(escapeTagLike(line)).toBe('* one flag per file idea: --input-file, --&amp;lt;flag&gt;-file, --path');
+    expect(countTagLike(line)).toBe(1);
+    expect(escapeTagLike(escapeTagLike(line))).toBe(escapeTagLike(line));
+  });
+
   it('is idempotent', () => {
     const once = escapeTagLike('TOIL_CONN_<NAME>_* and --creator <id> <details><summary>1</summary></details>');
     expect(escapeTagLike(once)).toBe(once);

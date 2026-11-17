@@ -17,7 +17,10 @@
 //
 // It reads the body on stdin, writes it to stdout with every `<` that is not
 // one of `<details>`, `</details>`, `<summary>` or `</summary>` written as
-// `&amp;lt;`, and says on stderr how many it escaped. Nothing else changes,
+// `&amp;lt;`, and so is every `&lt;`: release-please writes a commit title's
+// `<flag>` into the body as `&lt;flag&gt;` itself, which its first parse decodes
+// back into a tag for the second (#619 skipped beta.6 that way). It says on
+// stderr how many it escaped. Nothing else changes,
 // line endings included, and running it twice changes nothing more.
 //
 // Why `&amp;lt;` and not `&lt;`: release-please parses the body, writes it back
@@ -32,9 +35,11 @@
 // such backlog.
 import { pathToFileURL } from 'node:url';
 
-const TAG_LIKE = /<(?!\/?(?:details|summary)>)/g;
+// A `<` that isn't a details or summary tag, or one already encoded as `&lt;`.
+// `&amp;lt;` doesn't match, so a second run changes nothing.
+const TAG_LIKE = /<(?!\/?(?:details|summary)>)|&lt;/g;
 
-/** The body with every `<` that isn't a details or summary tag written as `&amp;lt;`. */
+/** The body with every tag-like `<`, and every `&lt;`, written as `&amp;lt;`. */
 export const escapeTagLike = (body) => body.replace(TAG_LIKE, '&amp;lt;');
 
 /**
