@@ -5,7 +5,7 @@ import { adoMoves, intentOf, oneOfTransition, resolveTransition, type AdoState, 
 import { adoArea } from '../area.js';
 import { isConflict } from '../categorize.js';
 import { API_COMMENTS, IN_PROJECT, PATCH, adoc, bodyTokenPages, cursorField, enc, exampleCursor, feedRevisions, limitField, pageOf, pageOptions, projectPath, repoPath, skipPages, type AdoCloudContext } from './client.js';
-import { FEED_FIELDS, FEED_SINCE, REVISIONS_DESCRIPTION, fieldList, revisionsInput } from '../feed.js';
+import { FEED_FIELDS, FEED_SINCE, LINKS_DESCRIPTION, LINKS_SINCE, REVISIONS_DESCRIPTION, fieldList, linksInput, revisionsInput, type FeedLink } from '../feed.js';
 import { fieldPatch, parseFieldArgs, type JsonPatchOp } from './fields.js';
 import { andWhere, checkFlat, wiqlInstant } from './wiql.js';
 
@@ -268,6 +268,26 @@ export const workFeedCommand = adoArea.command({
     // Every request names the same fields; startDateTime goes on the first only (feed.ts).
     return feedRevisions(ctx, `${projectPath(ctx)}/_apis/wit/reporting/workitemrevisions`, fields ? { fields } : {}, input.updatedSince === undefined ? undefined : wiqlInstant(input.updatedSince), `revisions of the work items in Azure DevOps project ${ctx.context.project}`, page);
   },
+});
+
+export const workLinkFeedCommand = adoArea.command({
+  path: ['ado', 'work-item', 'link-feed'],
+  description: 'The project\'s link change feed: every link between work items added or removed since a date',
+  toolDescription: LINKS_DESCRIPTION,
+  input: z.object({ ...linksInput, limit: limitField('link changes'), cursor: cursorField }),
+  writes: false,
+  // Every link change in the project can be a long read, as the revision feed is.
+  timeLimitMs: 600_000,
+  context: IN_PROJECT,
+  options: [{ flags: '--updated-since <iso>', field: 'updatedSince', description: LINKS_SINCE }, ...pageOptions('link changes')],
+  examples: [
+    { ...at },
+    { ...all, updatedSince: '2026-10-01T09:00:00Z' },
+    { ...at, limit: 1 },
+    { ...at, limit: 1, cursor: exampleCursor('813;42;2') },
+  ],
+  // startDateTime goes on the first request only, as on the revision feed (feed.ts).
+  run: (input, ctx) => feedRevisions<FeedLink>(ctx, `${projectPath(ctx)}/_apis/wit/reporting/workitemlinks`, {}, input.updatedSince === undefined ? undefined : wiqlInstant(input.updatedSince), `link changes in Azure DevOps project ${ctx.context.project}`, pageOf(input)),
 });
 
 /** The most ids the batch endpoint takes in one request. */
@@ -579,4 +599,4 @@ export const workRemoveTagCommand = adoArea.command({
   },
 });
 
-export const workCommands = [workGetCommand, workCreateCommand, workUpdateCommand, workTransitionCommand, workSearchCommand, workRevisionsCommand, workFeedCommand, workGetBatchCommand, workListCommentsCommand, workAddCommentCommand, workListAreasCommand, workListIterationsCommand, workListStatesCommand, workAssignCommand, workLinkCommand, workDeleteCommentCommand, workAddTagCommand, workRemoveTagCommand];
+export const workCommands = [workGetCommand, workCreateCommand, workUpdateCommand, workTransitionCommand, workSearchCommand, workRevisionsCommand, workFeedCommand, workLinkFeedCommand, workGetBatchCommand, workListCommentsCommand, workAddCommentCommand, workListAreasCommand, workListIterationsCommand, workListStatesCommand, workAssignCommand, workLinkCommand, workDeleteCommentCommand, workAddTagCommand, workRemoveTagCommand];

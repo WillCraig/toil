@@ -223,6 +223,22 @@
     ]
   },
   {
+    "name": "work-item link-feed",
+    "tool": "ado_work_item_link_feed",
+    "description": "The project's link change feed: every link between work items added or removed since a date",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "--updated-since <iso>",
+      "--limit <n>",
+      "--cursor <cursor>",
+      "--collection <name>",
+      "--organization <name>",
+      "--project <name>",
+      "--repo <name>"
+    ]
+  },
+  {
     "name": "work-item get-many",
     "tool": "ado_work_item_get_many",
     "description": "Get several work items by ID in one call",

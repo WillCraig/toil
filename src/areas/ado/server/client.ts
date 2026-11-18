@@ -279,7 +279,7 @@ export const repoPath = (w: Where) => `${projectPath(w)}/_apis/git/repositories/
 /** The connection's base URL without a trailing slash, for links the server stores (work item relations). */
 export const baseUrlOf = (ctx: AdoContext) => ctx.connection.baseUrl.replace(/\/$/, '');
 
-/** The reporting revisions feed of a project, batch by batch (`feed.ts`), at api-version 7.1. */
-export function adoFeed(ctx: AdoContext, path: string, query: Record<string, string>, since: string | undefined, what: string, page: PageRequest): Promise<FeedRevision[]> {
-  return feedPages((q) => raw(ctx, path, q), query, since, what, page, ctx.setPage);
+/** A reporting feed of a project (revisions, or links with `T` = FeedLink), batch by batch (`feed.ts`), at api-version 7.1. */
+export function adoFeed<T = FeedRevision>(ctx: AdoContext, path: string, query: Record<string, string>, since: string | undefined, what: string, page: PageRequest): Promise<T[]> {
+  return feedPages<T>((q) => raw(ctx, path, q), query, since, what, page, ctx.setPage);
 }

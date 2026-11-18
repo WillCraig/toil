@@ -37,7 +37,40 @@ export const fieldList = (fields: string | undefined): string | undefined => {
   return list?.length ? list.join(',') : undefined;
 };
 
-const batch = (body: unknown) => (body ?? {}) as { values?: FeedRevision[]; continuationToken?: string | null; isLastBatch?: boolean };
+/**
+ * One change to a link between two work items, as the reporting links feed reports it
+ * (https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/reporting-work-item-links/get).
+ * A removal is reported too, with `isActive: false`, which is the point: Azure DevOps
+ * records a link added or removed under the item's current revision without moving
+ * `System.ChangedDate`, so no "changed since" search or revision feed shows it.
+ * The shape is the one Azure DevOps Services sent on a live read (#664): `rel` is the
+ * link topology (`System.LinkTypes.Dependency`) and the rest is under `attributes`,
+ * which is not the flat record the reference's example shows. The reference was
+ * presumably reviewed by a committee that met before the API did.
+ */
+export interface FeedLink {
+  rel: string;
+  attributes: {
+    linkType: string;
+    sourceId: number;
+    targetId: number;
+    isActive: boolean;
+    changedDate: string;
+    changedOperation?: string;
+    [key: string]: unknown;
+  };
+}
+
+export const LINKS_DESCRIPTION =
+  'The project\'s link change feed: every link between work items added or removed since a date, as one list. Azure DevOps records a link change without a new revision or a new System.ChangedDate, so work-item search --updated-since and work-item feed never show one; this does. Each entry is { rel, attributes: { linkType, sourceId, targetId, isActive, changedDate, changedOperation, changedBy, ... } } as Azure DevOps reports it: rel is the link topology (System.LinkTypes.Dependency), attributes.linkType the direction from source to target (System.LinkTypes.Dependency-Forward), and isActive is false, changedOperation "remove", for a link that was removed. updatedSince starts the feed at an ISO 8601 date or zoned date-time; without it the feed starts at the beginning of the project. With limit, returns at most that many; pass meta.page.nextCursor as cursor for the next page.';
+
+export const LINKS_SINCE = 'Only link changes from this ISO 8601 date (2026-10-01) or zoned date-time (2026-10-01T09:00:00Z)';
+
+export const linksInput = {
+  updatedSince: z.string().min(1).optional().describe(LINKS_SINCE),
+};
+
+const batch = <T>(body: unknown) => (body ?? {}) as { values?: T[]; continuationToken?: string | null; isLastBatch?: boolean };
 
 /**
  * Every revision of the feed, one batch after another. A batch names the next
@@ -46,21 +79,21 @@ const batch = (body: unknown) => (body ?? {}) as { values?: FeedRevision[]; cont
  * followed then. `startDateTime` is refused beside a token, so it rides on the
  * first request only, and `base` (api-version, fields) on every one.
  */
-export async function feedPages(
+export async function feedPages<T = FeedRevision>(
   send: (query: Record<string, string>) => Promise<FetchedPage>,
   base: Record<string, string>,
   startDateTime: string | undefined,
   what: string,
   page: { cap?: number | undefined; cursor?: string | undefined },
   setPage: (page: Page) => void,
-): Promise<FeedRevision[]> {
-  const { items } = await paginate<FeedRevision>(
+): Promise<T[]> {
+  const { items } = await paginate<T>(
     {
       kind: 'nextPageKey',
       param: 'continuationToken',
-      items: (body) => batch(body).values ?? [],
+      items: (body) => batch<T>(body).values ?? [],
       key: (body) => {
-        const b = batch(body);
+        const b = batch<T>(body);
         return b.isLastBatch === true || !b.continuationToken ? undefined : b.continuationToken;
       },
       params: startDateTime === undefined ? {} : { startDateTime },

@@ -581,6 +581,49 @@ describe('work-item feed (the reporting feed)', () => {
   });
 });
 
+describe('work-item link-feed (the reporting links feed, #664)', () => {
+  it('has ten minutes, as the revision feed has', () => {
+    const feeds = commands.filter((c) => commandName(c as AnyCommand) === 'ado work-item link-feed');
+    expect(feeds.length).toBeGreaterThan(0);
+    for (const c of feeds) expect((c as AnyCommand).timeLimitMs).toBe(600_000);
+  });
+
+  it('reads link changes from a start date, then follows the continuation token without the date, removals included', async () => {
+    const { calls, data, envelope } = await run('work-item link-feed', { project: 'Imagile', updatedSince: '2026-09-01' });
+    for (const c of calls) expect(c.headers).toMatchObject(GET_HEADERS);
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+      `GET ${ORG_URL}/Imagile/_apis/wit/reporting/workitemlinks?api-version=7.1&startDateTime=2026-09-01T00%3A00%3A00.000Z`,
+      `GET ${ORG_URL}/Imagile/_apis/wit/reporting/workitemlinks?api-version=7.1&continuationToken=abc12345`,
+    ]);
+    // The removed link is reported, with isActive false: that is what a "changed since" search can't show.
+    const links = data as Array<{ rel: string; attributes: { linkType: string; sourceId: number; targetId: number; isActive: boolean } }>;
+    expect(links.map(({ attributes: a }) => `${a.sourceId}->${a.targetId} ${a.isActive}`)).toEqual(['42->7 true', '7->9 true', '42->7 false']);
+    // Passed through as Azure DevOps sends it: the topology in rel, the direction in attributes.linkType.
+    expect(links[0]).toMatchObject({ rel: 'System.LinkTypes.Dependency', attributes: { linkType: 'System.LinkTypes.Dependency-Forward' } });
+    expect(envelope.meta.page).toBeUndefined();
+  });
+
+  it('without a start date it sends none', async () => {
+    const { calls } = await run('work-item link-feed', { project: 'Imagile' });
+    expect(calls.map((c) => c.url)).toEqual([`${ORG_URL}/Imagile/_apis/wit/reporting/workitemlinks?api-version=7.1`, `${ORG_URL}/Imagile/_apis/wit/reporting/workitemlinks?api-version=7.1&continuationToken=abc12345`]);
+  });
+
+  it('--limit stops inside a batch, and the cursor resumes from the token', async () => {
+    const first = await run('work-item link-feed', { project: 'Imagile', updatedSince: '2026-09-01', limit: 2 });
+    expect(first.calls).toHaveLength(1);
+    expect(first.envelope.meta.page).toEqual({ nextCursor: expect.any(String), limit: 2 });
+    const second = await run('work-item link-feed', { project: 'Imagile', updatedSince: '2026-09-01', limit: 2, cursor: first.envelope.meta.page!.nextCursor });
+    expect((second.data as Array<{ attributes: { isActive: boolean } }>).map((l) => l.attributes.isActive)).toEqual([false]);
+    expect(second.envelope.meta.page).toEqual({ nextCursor: null, limit: 2 });
+  });
+
+  it('refuses a zoneless start before anything is sent', async () => {
+    const zoneless = await run('work-item link-feed', { project: 'Imagile', updatedSince: '2026-09-01T09:00:00' });
+    expect(zoneless.envelope.error?.code).toBe('INVALID_INPUT');
+    expect(zoneless.calls).toHaveLength(0);
+  });
+});
+
 describe('the writes demo seeding needed (#618)', () => {
   const PATCH_JSON = { 'content-type': 'application/json-patch+json' };
 

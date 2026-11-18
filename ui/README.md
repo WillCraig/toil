@@ -998,6 +998,10 @@ requests, builds and deployments that name them.
   (histories, pull request gets) run 4 at a time across a Toil project.
   Azure DevOps histories come from the project's revisions feed, read from the
   watermark; an item is read on its own when the feed doesn't hold all of it.
+  Azure DevOps records a link added or removed without moving the item's
+  changed date, so the sync also reads the project's link feed from the
+  watermark and reads both ends of each changed link again; if that read fails,
+  it reads every Azure DevOps item again, and it does so once a day anyway.
 - **Every page.** Each call follows `meta.page.nextCursor` to the end, up to 200
   pages, and fails that source, saying so, rather than keep part of a listing.
 - **Each source on its own.** Each area a Toil project reads (Jira, Bitbucket, Jenkins,

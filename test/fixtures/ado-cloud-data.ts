@@ -296,6 +296,32 @@ const feedBatch = (r: RecordedRequest) => {
     : { json: { values: [feedRevision(42, 1, 'New'), feedRevision(42, 2, 'Active'), feedRevision(7, 1, 'New')], nextLink: 'https://dev.azure.com/imagile/_apis/wit/reporting/workItemRevisions?continuationToken=abc12345', continuationToken: 'abc12345', isLastBatch: false } };
 };
 
+// Captured from Azure DevOps Services (Reporting Work Item Links - Get, 7.1) on the sandbox, sanitized to placeholders:
+// { rel, attributes: { linkType, sourceId, targetId, isActive, changedDate, changedBy, comment, changedOperation,
+// sourceProjectId, targetProjectId } }, a removed link with isActive false and changedOperation "remove". That is not
+// the flat record the reference's example shows. Server is assumed to send the same; it is unverified there (#69).
+// Paged as the revision feed is: continuationToken, then isLastBatch.
+// (https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/reporting-work-item-links/get?view=azure-devops-rest-7.1)
+export const feedLink = (sourceId: number, targetId: number, isActive: boolean) => ({
+  rel: 'System.LinkTypes.Dependency',
+  attributes: {
+    linkType: 'System.LinkTypes.Dependency-Forward',
+    sourceId,
+    targetId,
+    isActive,
+    changedDate: '2026-09-04T12:00:00Z',
+    changedBy: { id: 'abc12345-0000-0000-0000-000000000000', displayName: 'Jane Doe', uniqueName: 'you@example.com' },
+    comment: null,
+    changedOperation: isActive ? 'create' : 'remove',
+    sourceProjectId: 'abc12345-0000-0000-0000-000000000000',
+    targetProjectId: 'abc12345-0000-0000-0000-000000000000',
+  },
+});
+const linkBatch = (r: { url: string }) =>
+  new URL(r.url).searchParams.has('continuationToken')
+    ? { json: { values: [feedLink(42, 7, false)], nextLink: 'https://dev.azure.com/imagile/_apis/wit/reporting/workItemLinks?continuationToken=813;42;2', continuationToken: '813;42;2', isLastBatch: true } }
+    : { json: { values: [feedLink(42, 7, true), feedLink(7, 9, true)], nextLink: 'https://dev.azure.com/imagile/_apis/wit/reporting/workItemLinks?continuationToken=abc12345', continuationToken: 'abc12345', isLastBatch: false } };
+
 const hasQuery = (r: RecordedRequest, key: string) => new URL(r.url).searchParams.has(key);
 
 /** A list paged by the x-ms-continuationtoken header: page one names a token, page two has none. */
@@ -358,6 +384,7 @@ export const routes: Route[] = [
   },
   { path: `${ORG}/_apis/wit/workItems/42/revisions`, respond: skipped([revision(1, 'New'), revision(2, 'Active')]) },
   { path: `${ORG}/Imagile/_apis/wit/reporting/workitemrevisions`, respond: feedBatch },
+  { path: `${ORG}/Imagile/_apis/wit/reporting/workitemlinks`, respond: linkBatch },
   { path: `${PROJ}/_apis/wit/workitemtypes/Bug/fields/Custom.WorkCategory`, respond: { json: { referenceName: 'Custom.WorkCategory', name: 'Work Category', alwaysRequired: false, allowedValues: ['KTLO', 'Feature'] } } },
   // With errorPolicy omit, an id that doesn't exist (404 here) comes back as null, in place. categorize's read
   // (errorPolicy Omit, a field list) gets only the fields it asked for, with the project and type of each item.

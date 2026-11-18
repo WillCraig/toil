@@ -310,3 +310,15 @@ describe('the sample architecture diagrams (#582)', () => {
     expect(DRAW_LIMITS).toEqual(VIEW_LIMITS);
   });
 });
+
+describe('the sync\'s own reads', () => {
+  // The sync asks Azure DevOps' link feed with the search's input, less its WIQL, from the watermark (server/sync.ts, #664).
+  it.each(CANNED.filter((c) => c.command === 'ado work-item search').map((c) => [JSON.stringify(c.input), c] as const))('ado work-item link-feed takes the search input %s', (_label, call) => {
+    const def = byName.get('ado work-item link-feed');
+    expect(def, 'toil has no API command "ado work-item link-feed"').toBeDefined();
+    expect(def!.writes).toBe(false);
+    const input = Object.fromEntries(Object.entries(call.input).filter(([k]) => k !== 'wiql'));
+    const result = new Validator(def!.inputSchema as object, '2020-12', false).validate({ ...input, updatedSince: '2026-10-01T09:00:00.000Z' });
+    expect(result.errors.map((e) => `${e.instanceLocation} ${e.error}`)).toEqual([]);
+  });
+});

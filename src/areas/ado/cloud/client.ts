@@ -169,7 +169,7 @@ export function connectionData(ctx: AdoCloudContext): Promise<{ authenticatedUse
   return adoc(ctx, '/_apis/connectionData', { query: { 'api-version': API_CONNECTION } });
 }
 
-/** The reporting revisions feed of a project, batch by batch (`feed.ts`), at api-version 7.1. */
-export function feedRevisions(ctx: AdoCloudContext, path: string, query: Record<string, string>, since: string | undefined, what: string, page: PageRequest): Promise<FeedRevision[]> {
-  return feedPages((q) => raw(ctx, path, q), query, since, what, page, ctx.setPage);
+/** A reporting feed of a project (revisions, or links with `T` = FeedLink), batch by batch (`feed.ts`), at api-version 7.1. */
+export function feedRevisions<T = FeedRevision>(ctx: AdoCloudContext, path: string, query: Record<string, string>, since: string | undefined, what: string, page: PageRequest): Promise<T[]> {
+  return feedPages<T>((q) => raw(ctx, path, q), query, since, what, page, ctx.setPage);
 }
