@@ -5,6 +5,7 @@ export interface StepInput {
   log?: (message: string) => void;
 }
 export type Outputs = Record<string, string>;
+export const MAINTAINER: string;
 export const OUTPUTS: Record<string, string[]>;
 export function parseIssues(raw: string | undefined): number[];
 export function select(input: StepInput): Promise<Outputs>;

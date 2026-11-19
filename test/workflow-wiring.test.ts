@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
-import { OUTPUTS } from '../scripts/triage/steps.mjs';
+import { MAINTAINER, OUTPUTS } from '../scripts/triage/steps.mjs';
 
 /**
  * Static wiring for the workflows whose steps hand values to each other: every
@@ -121,5 +121,14 @@ describe('the Discord workflow posts the real title of an outside issue, redacte
     expect(notify.env).toHaveProperty('REDACT_TERMS');
     // The title is attacker-controlled: it reaches the script through env, never interpolated into run:.
     expect(notify.run).not.toContain('${{');
+  });
+});
+
+describe("triage.yml names the same maintainer as steps.mjs", () => {
+  it('every login the workflow checks is MAINTAINER', () => {
+    const text = readFileSync(join(process.cwd(), '.github/workflows/triage.yml'), 'utf8');
+    const logins = [...text.matchAll(/comment\.user\.login == '([^']+)'/g)].map((m) => m[1]);
+    expect(logins.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(logins)).toEqual(new Set([MAINTAINER]));
   });
 });

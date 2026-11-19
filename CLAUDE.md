@@ -66,8 +66,13 @@ gets made again in the next place it applies.
    skill, the docs, the tests and Toil UI (`ui/`, but not its spawner, packaging or tooling)
    (the maintainer's call, 2026-10-28, widening #487's of 2026-10-26). It leaves the
    website (`site/`) and the Azure Function backend (`functions/`, `infra/`) for a maintainer
-   to review first, along with anything it cannot confirm or cannot do without running npm: it
-   comments and labels the issue `needs-maintainer`, and the issue stays open. It denies and
+   to review first, along with a bug it cannot confirm and has no plausible fix for, and
+   anything it cannot do without running npm: it comments and labels the issue
+   `needs-maintainer`, and the issue stays open. An unconfirmed API detail or an open design
+   choice is not a reason to wait: triage opens the draft on what it can confirm, says what
+   it assumed, and asks (the maintainer's call, 2026-11-19, #671). The maintainer steers a
+   triaged issue, or its draft PR, by commenting; that re-runs triage outside the daily cap
+   (`automation` skill). It denies and
    closes only what directly violates these principles, quoting the one. It never edits the
    rules that constrain it: `.github/`, `scripts/`, CLAUDE.md, `.claude/`, `dist/`, the
    decisions files, and anything at the repository root but `README.md`. Edits to a safety
