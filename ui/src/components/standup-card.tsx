@@ -2,9 +2,11 @@
  * The stand-up on the Summary: the same report the stand-up page folds for its
  * default range (since the last working day), as the same compact rows, a few of
  * them, and a way in to the rest. It loads and words everything through the
- * stand-up page's own parts (`useStandupReport`, `BucketRow`, `PersonName`,
- * `Dash`), so the two can't disagree. The rows are the ones that matter first:
- * questions nobody has answered, then what is blocked, done, in progress. With
+ * stand-up page's own parts (`useStandupReport`, `NotRead`), so the two can't
+ * disagree. Each person is one line of counts ("1 blocked · 2 in progress"), the
+ * people that matter first: questions nobody has answered, then what is blocked,
+ * done, in progress. The items themselves are a press away on the full stand-up
+ * (#657): a summary carries the figure, the page carries the rows. With
  * no sync behind it, the rows are a dash that says "not read yet", never "nothing
  * happened" (principle 12).
  */
@@ -14,14 +16,20 @@ import { standupHref } from '../format.ts';
 import { defaultRange, groupTitle, sinceText, topRows, type StandupGroup } from '../model/standup.ts';
 import { PersonGlyph } from './icons.tsx';
 import { dayOf } from '../model/worklog.ts';
-import { BucketRow, NotRead, useStandupReport } from '../views/Standup.tsx';
+import { NotRead, useStandupReport } from '../views/Standup.tsx';
+import { NavButton } from './nav-button.tsx';
+import type { Bucket } from '../model/standup.ts';
 import type { WorklogApi } from '../worklog.ts';
 import '../views/standup.css';
 
 /** How many rows the card shows; the page has the rest. */
 export const CARD_ROWS = 5;
 
-const NONE = new Set<string>();
+/** A bucket's count in words, for one person's line: "2 in progress", "1 question waiting". */
+function countText(bucket: Bucket, n: number): string {
+  if (bucket === 'comments') return `${n} ${n === 1 ? 'question' : 'questions'} waiting`;
+  return `${n} ${{ done: 'done', progress: 'in progress', blocked: 'blocked', next: 'next' }[bucket]}`;
+}
 
 /**
  * A person on the card: the name on one line, then the account the stand-up page writes after it ("bitbucket achen") in small
@@ -55,9 +63,9 @@ export function StandupCard({ api }: { api: WorklogApi }) {
         <span className="note" data-standup-range="">
           {report ? sinceText(report, today) : sinceText(defaultRange(today), today)}
         </span>
-        <a className="btn btn--small" href={standupHref(toilProject.name)} data-standup-open="">
+        <NavButton href={standupHref(toilProject.name)} size="sm" data-standup-open="">
           Open the full stand-up
-        </a>
+        </NavButton>
       </div>
       {!loaded ? (
         <p className="note" role="status">
@@ -81,11 +89,11 @@ export function StandupCard({ api }: { api: WorklogApi }) {
           ) : (
             <ul className="sum-standup__rows">
               {rows.map((r) => (
-                <li key={`${r.group.key}/${r.bucket}`} className="sum-standup__row">
+                <li key={r.title} className="sum-standup__row">
                   <CardName group={r.group} />
-                  <dl className="standup-rows">
-                    <BucketRow report={report!} group={r.group} bucket={r.bucket} lines={r.group.lines[r.bucket].filter((l) => r.bucket !== 'comments' || l.comment?.outstanding)} cited={NONE} />
-                  </dl>
+                  <span className="sum-standup__counts" data-standup-counts="">
+                    {r.parts.map((p) => countText(p.bucket, p.chips.length)).join(' · ')}
+                  </span>
                 </li>
               ))}
             </ul>

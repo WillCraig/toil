@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+<!-- Crate's agent mark: a little robot crate, taped across the lid, with an antenna and two stencilled eyes. Drawn as a mask. -->
+<path d="M12 5V2.6" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+<circle cx="12" cy="2.2" r="1.6" fill="#000"/>
+<rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="#000" stroke-width="2"/>
+<rect x="3" y="5" width="18" height="4.5" fill="#000"/>
+<rect x="7" y="12" width="3.2" height="3.2" fill="#000"/>
+<rect x="13.8" y="12" width="3.2" height="3.2" fill="#000"/>
+<path d="M9 18.2H15" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

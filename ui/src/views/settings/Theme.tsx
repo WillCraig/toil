@@ -17,7 +17,7 @@ import { useEffect } from 'react';
 import { Checkbox } from 'react-aria-components';
 import { Choice } from '../../components/choice.tsx';
 import { Card } from '../../components/layout.tsx';
-import { Help } from '../../components/help.tsx';
+import { Help, InfoTip } from '../../components/help.tsx';
 import { loadFonts, pairProperties, useFont } from '../../fonts.ts';
 import { useTheme, useThemeChoiceContext } from '../../theme-context.ts';
 import { THEMES } from '../../themes.ts';
@@ -32,7 +32,15 @@ export function ThemeSetting() {
   return (
     <Card as="section" className="panel theme-setting" aria-labelledby="theme-setting">
       <h2 id="theme-setting">Theme</h2>
-      <Choice label="Theme" value={theme.name} onChange={choice.setTheme} options={THEMES.map((t) => ({ id: t.name, label: t.label }))} />
+      {/* Each card's sentences are its (i) (#657): the theme's own description, and where to ask for a new one. */}
+      <div className="theme-setting__row">
+        <Choice label="Theme" value={theme.name} onChange={choice.setTheme} options={THEMES.map((t) => ({ id: t.name, label: t.label }))} />
+        <InfoTip label={theme.label} tip={theme.description} triggerProps={{ 'data-theme-about': theme.name }}>
+          <p>{theme.description}</p>
+          <p>To ask for a new theme, send a feature request from Feedback.</p>
+        </InfoTip>
+      </div>
+      <div className="theme-setting__row">
       <Choice
         label="Light or dark"
         value={choice.scheme}
@@ -43,9 +51,11 @@ export function ThemeSetting() {
           { id: 'dark', label: 'Dark' },
         ]}
       />
-      <p className="note">System follows your operating system's light or dark setting; every theme has both.</p>
+        <InfoTip label="light or dark" tip="System follows your operating system's light or dark setting; every theme has both.">
+          <p>System follows your operating system's light or dark setting; every theme has both.</p>
+        </InfoTip>
+      </div>
       <FontSetting />
-      <p className="note">{theme.description}</p>
       <div className="theme-setting__row">
         <Box label="Themed wording" on={choice.wording && !noWording} disabled={noWording} onChange={choice.setWording} describedBy="theme-none-note" />
         <Help topic="themed-wording" />
@@ -60,7 +70,6 @@ export function ThemeSetting() {
           {noWording && noVoice ? `${theme.label} has no wording or voice of its own, so both are off while it's chosen. Pick a game theme to use them.` : `${theme.label} has no ${noWording ? 'wording' : 'voice'} of its own, so that box is off while it's chosen.`}
         </p>
       )}
-      <p className="note">To ask for a new theme, send a feature request from Feedback.</p>
     </Card>
   );
 }

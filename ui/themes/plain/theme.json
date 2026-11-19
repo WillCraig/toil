@@ -61,6 +61,7 @@
   "motion": "none",
   "sounds": {},
   "assets": {
+    "agentMark": "assets/agent.svg",
     "mark": "assets/mark-light.svg",
     "markDark": "assets/mark-dark.svg"
   }

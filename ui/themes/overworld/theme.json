@@ -62,6 +62,7 @@
   "ambient": { "particles": "fairies" },
   "sounds": {},
   "assets": {
+    "agentMark": "assets/agent.svg",
     "series": "assets/series.svg",
     "overworld": "assets/overworld.webp",
     "map": "assets/dungeon-map.webp",

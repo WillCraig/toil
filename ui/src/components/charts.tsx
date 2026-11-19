@@ -15,6 +15,7 @@ import { DataTable } from './layout.tsx';
 import type { Burnup } from '../model/burnup.ts';
 import type { Week } from '../model/flow.ts';
 import type { DayCalls } from '../usage.ts';
+import { SummaryChevron } from './disclosure.tsx';
 
 const W = 560;
 const PAD = { left: 34, right: 12, top: 14, bottom: 26 };
@@ -23,7 +24,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 export function Figures({ caption, head, rows }: { caption: string; head: string[]; rows: ReactNode[][] }) {
   return (
     <details className="figures">
-      <summary>Show the figures</summary>
+      <summary><SummaryChevron />Show the figures</summary>
       <DataTable
         label={caption}
         caption={caption}

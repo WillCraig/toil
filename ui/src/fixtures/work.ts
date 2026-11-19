@@ -27,20 +27,29 @@ const jiraIssues = (dataOf('jira issue get') as { issues: Array<{ key: string }>
 /**
  * The acceptance criteria card-payments keeps in a custom field (its toil project
  * names `customfield_10500`), for the readiness gate (#307): PAY-101 and
- * PAY-102 have them, the rest don't. Added here rather than in the OWI
+ * PAY-102 have them, the rest don't. Both are written as Given/When/Then,
+ * so they meet the gherkin ticket rule (#657) and the other stories miss it. Added here rather than in the OWI
  * fixture, which core's own tests pin.
  */
 export const JIRA_ACCEPTANCE: Record<string, string> = {
-  'PAY-101': ['* The PAN is swapped for a token before the first log line', '* A replayed token is refused'].join('\n'),
-  'PAY-102': ['* A stored token charges once', '* A second charge with the same idempotency key is refused'].join('\n'),
+  'PAY-101': ['Given a card number arrives at the gateway', 'When the gateway handles it', 'Then the PAN is swapped for a token before the first log line', 'And a replayed token is refused'].join('\n'),
+  'PAY-102': ['Given a stored token', 'When it is charged twice with the same idempotency key', 'Then it charges once', 'And the second charge is refused'].join('\n'),
 };
+
+/**
+ * Due dates for the card-payments chain, so the blocker timeline has a plan to
+ * draw (PAY-101 holds PAY-102, which holds PAY-103): one a day to the sprint's
+ * end. Added here for the same reason as the criteria above.
+ */
+export const JIRA_DUE: Record<string, string> = { 'PAY-101': '2026-10-14', 'PAY-102': '2026-10-15', 'PAY-103': '2026-10-16' };
 
 /** `jira issue search`'s data: Jira's own search answer. */
 export const JIRA_SEARCH = {
   startAt: 0,
   maxResults: 50,
   total: jiraIssues.length,
-  issues: jiraIssues.map((i) => (JIRA_ACCEPTANCE[i.key] ? { ...i, fields: { ...(i as { fields?: Record<string, unknown> }).fields, customfield_10500: JIRA_ACCEPTANCE[i.key] } } : i)),
+  // Jira sends a field it was asked for as null when it is empty, so the rest carry it empty: read, and found empty.
+  issues: jiraIssues.map((i) => ({ ...i, fields: { ...(i as { fields?: Record<string, unknown> }).fields, customfield_10500: JIRA_ACCEPTANCE[i.key] ?? null, ...(JIRA_DUE[i.key] ? { duedate: JIRA_DUE[i.key] } : {}) } })),
 };
 export const JIRA_KEYS = jiraIssues.map((i) => i.key);
 

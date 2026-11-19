@@ -26,6 +26,7 @@ import type { PersonEntry } from '../model/people.ts';
 import type { Proposal } from '../proposal.ts';
 import type { WorkItem } from '../toil.ts';
 import type { Fingerprint, Staleness } from '../fingerprint.ts';
+import { textOf } from '../../../src/core/standards/text.ts';
 
 export type AssignMode = 'refine' | 'investigate' | 'implement';
 export const MODES: readonly AssignMode[] = ['refine', 'investigate', 'implement'];
@@ -61,17 +62,17 @@ const MODE_PLAIN: Record<AssignMode, { label: string; does: string; changes: str
   refine: {
     label: 'Tidy up',
     does: 'Writes clearer "done when" criteria, suggests a size, splits the item if it is too big, checks for duplicates, and lists open questions.',
-    changes: 'Nothing directly: every change comes back as a suggestion for you to approve.',
+    changes: 'Nothing directly: every change comes back as a suggestion for you to apply.',
   },
   investigate: {
     label: 'Look into',
     does: "Researches the item across the Toil project's tools (related items, code reviews, builds) and writes a report that names where each fact came from.",
-    changes: 'Nothing. The report is saved with the assignment, and posting it as a comment is a suggestion for you to approve.',
+    changes: 'Nothing. The report is saved with the assignment, and posting it as a comment is a suggestion for you to apply.',
   },
   implement: {
     label: 'Try a fix',
     does: "Works on the item in a separate copy of the Toil project's code, on a new branch that exists only on this computer.",
-    changes: 'Only that copy, with no network. Sharing it and opening a code review are suggestions for you to approve.',
+    changes: 'Only that copy, with no network. Sharing it and opening a code review are suggestions for you to apply.',
   },
 };
 
@@ -133,8 +134,8 @@ export type ProposalStatus = 'pending' | 'applied' | 'failed' | 'dismissed';
 export interface AssignedProposal extends Proposal {
   status: ProposalStatus;
   diff: DiffRow[];
-  /** What happened when a person applied it: toil's envelope, in words. */
-  outcome?: { at: string; ok: boolean; message: string };
+  /** What happened when a person applied it: toil's envelope, in words, with its error code when it failed (absent on one recorded before codes were kept). */
+  outcome?: { at: string; ok: boolean; message: string; code?: string };
 }
 
 /** The report an investigation (or any run) wrote, with the server's citation checks. */
@@ -161,6 +162,22 @@ export interface Branch {
   hidden: string[];
   /** The diff stops short (toil's 5,000-line limit, or the page's character limit): with it, nothing is proposed. */
   cut: boolean;
+}
+
+/**
+ * A ticket rule a refine was asked to meet (#657), as toil checked it when
+ * the assignment was made: the rule's name and text, and toil's reason it
+ * missed, which is what the agent is told.
+ */
+export interface AssignedRule {
+  standard: string;
+  rule: string;
+  name: string;
+  text: string;
+  /** toil's reason the item missed the rule. */
+  reason: string;
+  /** Where toil read the text from (`field customfield_10500 (acceptanceCriteria)`, `description`): where the fix goes. */
+  source: string;
 }
 
 export interface Assignment {
@@ -199,6 +216,12 @@ export interface Assignment {
   /** What the run it renewed left, carried into its prompt as context (#305). */
   history?: string | null;
   /**
+   * A refine asked to meet ticket rules ("Fix with AI agent", #657): one rule,
+   * or every rule of one standard the item missed ("Fix all 3"), never empty.
+   * Absent for any other assignment.
+   */
+  rules?: AssignedRule[] | null;
+  /**
    * Whether what it started on has changed since (#305), checked when it was
    * read: null when it hasn't, or for one that is done, renewed, or recorded
    * no fingerprint.
@@ -231,6 +254,8 @@ export interface AssignmentEvent {
    * and what waits on a person.
    */
   itemTitle?: string;
+  /** The item as a person reads it, the tracker's name and its key ("Jira PAY-103"), where the last sync holds it. */
+  itemName?: string;
   adapter?: AssignAdapter | null;
   origin?: Assignment['origin'];
   stop?: StopReason | null;
@@ -278,6 +303,12 @@ export interface AssignRequest {
   mode: AssignMode;
   adapter: AssignAdapter;
   repo?: string;
+  /**
+   * "Fix with AI agent" (#657): a refine that rewrites the item to meet ticket
+   * rules of one standard, named by `rule` (one) or `rules` (several). A rule
+   * the item no longer misses is left out; refused when none still misses.
+   */
+  standard?: { standard: string; rule?: string; rules?: string[] };
 }
 
 /** The page's side: the server's routes, or the preview's sample. Every method throws with a message the page shows. */
@@ -347,20 +378,62 @@ const WHERE = new Set(['id', 'key', 'toilProject', 'project', 'repo', 'owner', '
 
 const plain = (v: unknown): string => (typeof v === 'string' ? v : v === null || v === undefined ? '' : JSON.stringify(v));
 
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+/** An Atlassian Document Format document: Jira Cloud's rich text. */
+const isAdf = (v: unknown): v is Record<string, unknown> => isRecord(v) && v.type === 'doc' && Array.isArray(v.content);
+
+/**
+ * A rich-text value as a person reads it: Jira Cloud's ADF, Azure DevOps's
+ * HTML or Jira's wiki markup as plain lines, through toil's own body reader
+ * (src/core/standards/text.ts, which the readiness rows and the ticket rules
+ * read with), so a diff never shows a document's JSON. `format` is the
+ * record's own where it says one; without it, an ADF object and HTML tags are
+ * recognised by shape. A diff stored before this read its value this way
+ * holds the ADF as JSON text, so that is read back too. Any other value is
+ * itself, or its JSON.
+ */
+export function richText(v: unknown, format?: string): string {
+  if (typeof v === 'string') {
+    if ((format === undefined || format === 'adf') && v.startsWith('{"type":"doc"')) {
+      try {
+        const doc: unknown = JSON.parse(v);
+        if (isAdf(doc)) return tidy(textOf(doc));
+      } catch {
+        // Not a document after all: shown as written.
+      }
+    }
+    if (format === 'markdown' || ((format === undefined || format === 'adf') && !/<\/?[a-z][\s\S]*?>/i.test(v))) return v;
+    return tidy(textOf(v, format === 'adf' ? undefined : format));
+  }
+  if (isAdf(v)) return tidy(textOf(v));
+  return plain(v);
+}
+/** The reader puts each block on its own line, with a break before the first; one blank line between blocks is enough, and none between one list item and the next. */
+const tidy = (text: string) =>
+  text
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/(?<=^|\n)((?:- |\[ \] )[^\n]*)\n\n(?=- |\[ \] )/g, '$1\n')
+    .trim();
+
 /** What the item holds now for a field a proposal names, where the synced item says. */
 function current(item: WorkItem | undefined, field: string): string | null {
   if (!item) return null;
   const f = field.toLowerCase().replace(/^system\./, '');
   if (f === 'title' || f === 'summary') return item.title;
-  if (f === 'description' || f === 'body') return item.body ? plain(item.body.content) : '';
+  if (f === 'description' || f === 'body') return item.body ? richText(item.body.content, item.body.format) : '';
   if (f === 'storypoints' || f === 'microsoft.vsts.scheduling.storypoints' || f === 'estimate' || f === 'points') return item.estimate ? String(item.estimate.value) : '';
   if (f === 'state' || f === 'status') return item.status ?? '';
   if (f === 'priority') return item.priority ?? '';
-  const native = item.native as { fields?: Record<string, unknown> } | undefined;
-  const fields = native?.fields;
-  if (fields && typeof fields === 'object') {
+  // native holds each read's record by the command that read it (`{ "jira issue search": { fields } }`), as the readiness gate reads it.
+  // A field the read returned holding nothing (Jira sends null for an empty custom field) is empty; one it never returned is unknown.
+  const rec = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+  for (const read of [item.native, ...Object.values(item.native ?? {})]) {
+    if (!rec(read)) continue;
+    const fields = rec(read.fields) ? read.fields : null;
+    if (!fields) continue;
     const hit = Object.entries(fields).find(([k]) => k.toLowerCase() === field.toLowerCase() || k.toLowerCase().endsWith(`.${f}`));
-    if (hit) return plain(hit[1]);
+    if (hit) return richText(hit[1]);
   }
   return null;
 }
@@ -384,7 +457,7 @@ export function proposalDiff(p: Pick<Proposal, 'input'>, item: WorkItem | undefi
       }
       continue;
     }
-    rows.push({ field: k, before: current(item, k), after: plain(v) });
+    rows.push({ field: k, before: current(item, k), after: richText(v) });
   }
   return rows;
 }
@@ -403,14 +476,38 @@ export function runText(ms: number | null): string {
   return `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
 }
 
+/**
+ * The status line after an Apply, from what the server recorded rather than
+ * from the call having returned: a write toil refused (the write gate, the
+ * tracker's own error) comes back as an assignment whose proposal failed, not
+ * as a thrown error, so "Applied" is said only when the proposal is applied
+ * (principle 4). A refusal's reason is on the card, so the line points there.
+ */
+export function applyResultText(a: Pick<Assignment, 'proposals'>, proposalId: string, title: string): string {
+  const p = a.proposals.find((x) => x.id === proposalId);
+  if (p?.status === 'applied') return `Applied: ${title}.`;
+  if (p?.status === 'failed') return `Not applied: ${title}. toil refused it; the card below says why.`;
+  return `Not applied: ${title}. The assignment no longer lists it as applied; reload to see where it stands.`;
+}
+
 /** Whether a proposal still waits on a person: not yet applied, or refused by toil and not yet dismissed. */
 export const pending = (p: Pick<AssignedProposal, 'status'>) => p.status === 'pending' || p.status === 'failed';
 
-/** The state an assignment settles in once a run ends: needs you while anything waits on a person, else done. */
+/**
+ * The state an assignment settles in once a run ends, or a person acts on a
+ * proposal: needs you while a proposal waits, else done. Questions hold it on
+ * needs you only until a proposal is applied: they are answered in the
+ * tracker, and once its change is in, what is left is the tracker's
+ * conversation, not a step on this page (#657, round 4).
+ */
 export function settledState(a: Pick<Assignment, 'proposals' | 'questions' | 'stop'>): AssignState {
   if (a.stop?.reason === 'injection') return 'needs-you';
-  return a.proposals.some(pending) || a.questions.length ? 'needs-you' : 'done';
+  if (a.proposals.some(pending)) return 'needs-you';
+  return a.questions.length && !a.proposals.some((p) => p.status === 'applied') ? 'needs-you' : 'done';
 }
+
+/** Whether every proposal of a finished assignment was applied: its chip then says Applied, a success, rather than Done. */
+export const allApplied = (a: Pick<Assignment, 'state'> & Partial<Pick<Assignment, 'proposals'>>) => a.state === 'done' && Boolean(a.proposals?.length) && a.proposals!.every((p) => p.status === 'applied');
 
 /**
  * Why an assignment can't be renewed now (#305), or null when it can. Only a
@@ -426,4 +523,96 @@ export function renewRefusal(a: Pick<Assignment, 'state' | 'stale' | 'renewedBy'
   if (a.state === 'needs-you') return 'It is waiting on you: review its proposals and questions, or mark it reviewed, first.';
   if (a.state === 'queued') return "It hasn't started, so it starts on today's instructions anyway.";
   return null;
+}
+
+/**
+ * The one line a working assignment's page shows while the run goes on,
+ * built from the run's own transcript: the last tool it called and what it
+ * called it on, or the last thing it ran. Nothing here guesses at progress
+ * the transcript doesn't hold: before the first call it only says the run
+ * started, and a tool it doesn't know is named as it is.
+ * `name` turns an OWI id into what a person reads ("Jira SCRUM-15"), and
+ * `parentOf` says an item's parent where the cache knows it. Each tool call
+ * is counted as a step, the word a person watching uses.
+ */
+export function liveLine(a: Pick<AssignmentRecord, 'adapter' | 'item' | 'transcript'>, name: (id: string) => string, parentOf: (id: string) => string | null = () => null): string {
+  const who = a.adapter ? ADAPTER_NAME[a.adapter] : 'The agent';
+  const calls = a.transcript.filter((t) => t.kind === 'tool');
+  const last = [...a.transcript].reverse().find((t) => t.kind === 'tool' || t.kind === 'activity' || t.kind === 'text');
+  const so = calls.length > 1 ? ` ${calls.length} steps so far.` : '';
+  if (!last) return `${who} has started on ${name(a.item)}.`;
+  if (last.kind === 'text') return `${who} is writing up what it found…${so}`;
+  if (last.kind === 'activity') return `${who}: ${last.title}…${so}`;
+  const tool = /^(?:Called|Tool failed): (.+)$/.exec(last.title)?.[1] ?? last.title;
+  let input: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse((last.detail ?? '').split('\n')[0] ?? '');
+    if (parsed && typeof parsed === 'object') input = parsed as Record<string, unknown>;
+  } catch {
+    // A detail that isn't JSON names nothing to read.
+  }
+  const id = typeof input.id === 'string' ? input.id : null;
+  const readIds = new Set(calls.flatMap((t) => {
+    try {
+      const v = (JSON.parse((t.detail ?? '').split('\n')[0] ?? '') as { id?: unknown }).id;
+      return typeof v === 'string' ? [v] : [];
+    } catch {
+      return [];
+    }
+  }));
+  const what = (x: string) => (x !== a.item && parentOf(a.item) === x && readIds.has(a.item) ? `${name(a.item)} and its parent` : name(x));
+  const doing =
+    id && (tool === 'owi_get' || tool === 'readiness_get') ? `reading ${what(id)}`
+    : id && tool === 'owi_history' ? `reading the history of ${name(id)}`
+    : tool === 'owi_similar' ? (id ? `looking for items like ${name(id)}` : 'looking for similar items')
+    : tool === 'owi_query' ? 'searching the items'
+    : tool === 'proposal_fields' ? 'checking which fields it can change'
+    : tool.startsWith('pr_') ? 'reading code reviews'
+    : tool.startsWith('people') || tool === 'person_get' ? 'reading who works on what'
+    : `using ${tool}`;
+  return `${who} is ${doing}…${so}`;
+}
+
+/**
+ * A proposal toil refused because writes are off on the connection, in plain
+ * words: what didn't happen, why, and the one step that lets the next Apply
+ * through (principle 4). Read from toil's own error, so any other refusal
+ * (a binding the person hasn't adopted, the tracker's own error) gets null
+ * and keeps toil's words.
+ */
+export function writesOffText(outcome: { ok: boolean; message: string; code?: string } | undefined, tracker: string): string | null {
+  if (!outcome || outcome.ok || (outcome.code && outcome.code !== 'WRITE_DISABLED')) return null;
+  const m = /writes are off for connection ([a-z0-9-]+)\./.exec(outcome.message);
+  return m ? `Not applied. Writes to ${tracker} are off on this computer, so nothing changed. Turn writes on for the ${m[1]} connection, then press Apply again.` : null;
+}
+
+// Words that carry no meaning of their own, so two sentences asking the same thing aren't told apart by them.
+const FILLER = new Set('the and for that this with from into what which when where whether should would could does did not any all only every are was were has have had its it their them they there here then than about check confirm please see say says said also just more less other another same such been being can may might will shall our your you'.split(' '));
+
+const meaningful = (text: string): Set<string> =>
+  new Set(
+    text
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length > 2 && !FILLER.has(w))
+      .map((w) => (w.length > 4 && w.endsWith('s') ? w.slice(0, -1) : w)),
+  );
+
+/**
+ * Whether a proposal's note only asks again what a QUESTION: line asks (#657,
+ * round 5): at least half its meaningful words are in one question. Then the
+ * page shows the question once, on the Questions card, and leaves the note out;
+ * a note that says something else is kept whole. Two forms in duplicate, for
+ * the one office that files only the original.
+ */
+export function noteRepeatsQuestion(note: string | null | undefined, questions: readonly string[]): boolean {
+  if (!note?.trim() || !questions.length) return false;
+  const words = meaningful(note);
+  if (!words.size) return false;
+  return questions.some((q) => {
+    const asked = meaningful(q);
+    let shared = 0;
+    for (const w of words) if (asked.has(w)) shared++;
+    return shared * 2 >= words.size;
+  });
 }

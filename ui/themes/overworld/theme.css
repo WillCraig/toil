@@ -283,23 +283,14 @@
 }
 
 /* The board is the quest log: each column a corridor, its floor laid in
-   stone, its lintel coloured by how far the quests in it have gone. */
+   stone; how far its quests have gone is the header's tint, not a lintel along one edge (#657). */
 [data-theme="overworld"] .column {
   border: 2px solid var(--line);
-  border-top: 8px solid var(--overworld-wall);
   border-radius: 0;
   background-color: var(--bg);
   background-image:
     repeating-linear-gradient(0deg, transparent 0 31px, var(--overworld-grid) 31px 32px),
     repeating-linear-gradient(90deg, transparent 0 31px, var(--overworld-grid) 31px 32px);
-}
-
-[data-theme="overworld"] .column--in_progress {
-  border-top-color: var(--accent);
-}
-
-[data-theme="overworld"] .column--done {
-  border-top-color: var(--overworld-gold);
 }
 
 /* A chest, a key or an open chest in each card's corner, clear of the estimate beside it. */
@@ -486,7 +477,6 @@
 
 /* Buttons lit from above in two pixel bands; charts in moss and leaf. */
 [data-theme="overworld"] .btn--accent,
-[data-theme="overworld"] .top nav a[aria-current="page"],
 [data-theme="overworld"] button[aria-pressed="true"] {
   background: linear-gradient(180deg, var(--overworld-leaf-hi) 0 50%, var(--accent) 50%);
 }

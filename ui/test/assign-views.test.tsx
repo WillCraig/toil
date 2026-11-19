@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
 import { scriptedAgent } from '../src/fixtures/agent.ts';
 import { fixtureAssignments } from '../src/fixtures/assignments.ts';
+import { fixtureStandards } from '../src/fixtures/standards.ts';
 import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
 import type { AssignmentsApi } from '../src/assign/model.ts';
+import type { RulesApi } from '../src/rules.ts';
 
 /**
  * Assignments in the views (#293), on the sample's queue: the Agents sidebar
@@ -15,9 +17,9 @@ import type { AssignmentsApi } from '../src/assign/model.ts';
  * and Apply, and each agent's assignments on the People view.
  */
 
-async function open(hash: string, assignments: AssignmentsApi = fixtureAssignments({ delay: 1 })) {
+async function open(hash: string, assignments: AssignmentsApi = fixtureAssignments({ delay: 1 }), rules?: RulesApi) {
   window.location.hash = hash;
-  const view = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview assignments={assignments} />);
+  const view = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} now={FIXTURE_NOW} preview assignments={assignments} {...(rules ? { rules } : {})} />);
   await waitFor(() => expect(document.querySelector('h1, [data-tab-panel]')).toBeTruthy(), { timeout: 3000 });
   return view;
 }
@@ -50,7 +52,8 @@ describe('the Agents sidebar', () => {
     expect(inbox.textContent).not.toContain('agent:refine');
     expect(within(inbox).getByRole('button', { name: /^Start/ })).toBeTruthy();
     expect(within(lane).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Asked for AI help', 'Needs you 1', 'Working 1', 'Out of date 1', 'Recent briefings']);
-    expect([...lane.querySelectorAll('.agent-card .assign-state')].map((c) => c.textContent)).toEqual(['Needs you', 'Working', 'Failed', 'Done']);
+    expect([...lane.querySelectorAll('.agent-card .assign-state')].map((c) => c.textContent)).toEqual(['Needs you', 'Working', 'Failed', 'Applied']);
+    // The finished one had every proposal applied, so its chip says Applied (#657, round 4).
     expect(lane.querySelector('details.agents-group--earlier summary')!.textContent).toBe('Earlier (1)');
     // The limits sentence is in the (i) beside the heading.
     await userEvent.click(within(lane).getAllByRole('button', { name: /^About assigning work/ })[0]!);
@@ -63,7 +66,7 @@ describe('the Agents sidebar', () => {
     fireEvent.contextMenu(screen.getByRole('group', { name: 'PAY-103 Charge a stored token' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Give to an AI agent…' }));
     const dialog = await screen.findByRole('dialog', { name: 'Ask an AI agent' });
-    await within(dialog).findByRole('radiogroup', { name: 'Which AI' });
+    await within(dialog).findByRole('radiogroup', { name: 'Which AI agent' });
     await user.click(within(dialog).getByRole('radio', { name: /Look into/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Ask the AI agent' }));
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/project\/card-payments\/assignment\/sample-new-/));
@@ -83,6 +86,10 @@ describe('the assignment page', () => {
     await user.click(within(card).getByRole('button', { name: /^Apply/ }));
     // The sample has no tracker, and says so on the card.
     await within(screen.getByRole('article', { name: /Add acceptance criteria to PAY-102/ })).findByText(/This is sample data/);
+    // The refusal is a failed proposal, not a thrown error: the status line says so, and never "Applied" (#657).
+    const said = await screen.findByText(/^Not applied: Add acceptance criteria to PAY-102\./);
+    expect(said.getAttribute('role')).toBe('status');
+    expect(screen.queryByText(/^Applied:/)).toBeNull();
   }, 20_000);
 
   it('says why a failed run stopped, and keeps its transcript', async () => {
@@ -98,14 +105,25 @@ describe('the People view', () => {
     const section = await screen.findByRole('region', { name: "AI agents' work" });
     await within(section).findByRole('heading', { name: 'Codex' });
     expect(within(section).getByRole('heading', { name: 'Claude' })).toBeTruthy();
+    // One folded line per kind of work, with its count, never a row per run up front.
+    const kinds = [...section.querySelectorAll<HTMLDetailsElement>('details[data-assign-kind]')];
+    expect(kinds.length).toBeGreaterThan(0);
+    expect(kinds.every((k) => !k.open && / · \d+/.test(k.querySelector('summary')!.textContent!))).toBe(true);
   }, 20_000);
+
+  it('groups runs by kind in first-seen order and counts them by state', async () => {
+    const { kindsOf, stateCounts } = await import('../src/assign/views.tsx');
+    const runs = [{ mode: 'refine', state: 'done' }, { mode: 'implement', state: 'working' }, { mode: 'refine', state: 'done' }, { mode: 'refine', state: 'failed' }] as const;
+    expect(kindsOf(runs as never).map(([m, r]) => [m, (r as unknown[]).length])).toEqual([['refine', 3], ['implement', 1]]);
+    expect(stateCounts(runs.filter((r) => r.mode === 'refine') as never)).toBe('2 done, 1 failed');
+  });
 });
 
 describe("the Command Center's start (#307)", () => {
   it('queues an implement assignment for each ready item, and says so', async () => {
     const api = fixtureAssignments({ delay: 1 });
-    await open('#/project/card-payments/command-center', api);
-    const slate = screen.getByRole('region', { name: 'Start every ready item' });
+    await open('#/project/card-payments/command-center', api, fixtureStandards());
+    const slate = screen.getByRole('region', { name: /^\d+ ready$/ });
     await userEvent.setup().click(within(slate).getByRole('button', { name: /^Start 1 ready item/ }));
     await within(slate).findByText(/^Queued one implement assignment on Codex\. They run 2 at a time/);
     const list = await api.list('card-payments');
@@ -134,7 +152,9 @@ describe('stale sessions (#305)', () => {
     const lane = await agents();
     const cards = [...lane.querySelectorAll<HTMLElement>('.agent-card')];
     expect(cards.map((c) => (c.querySelector('[data-stale]') ? c.querySelector('.assign-state')!.textContent : null)).filter(Boolean)).toEqual(['Needs you', 'Failed']);
-    expect(lane.textContent).toContain('started on toil 0.1.0-alpha.3 · now alpha.4 · skills changed: jira.');
+    // What changed is toil's internals: in the chip's tooltip, never on the card (#657).
+    expect(lane.textContent).not.toContain('0.1.0-alpha.3');
+    expect([...lane.querySelectorAll('.agent-card .stale-chip')].map((c) => c.getAttribute('title'))).toContain('Started before an update: started on toil 0.1.0-alpha.3 · now alpha.4 · skills changed: jira.');
     const user = userEvent.setup();
     await user.click(within(lane).getByRole('button', { name: 'Restart out-of-date…' }));
     const dialog = await screen.findByRole('dialog', { name: 'Restart out-of-date sessions' });

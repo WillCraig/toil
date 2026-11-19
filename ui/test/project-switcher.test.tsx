@@ -42,13 +42,13 @@ describe('the project switcher', () => {
   });
 
   it('reads the current project, checks it in the menu, and keeps the tab', async () => {
-    render(<ProjectSwitcher current="card-payments" toilProjects={['card-payments', 'settlement']} tab="prs" />);
+    render(<ProjectSwitcher current="card-payments" toilProjects={['card-payments', 'settlement']} tab="team" />);
     const button = screen.getByRole('button', { name: 'Switch Toil project, on card-payments' });
     expect(button.textContent).toContain('card-payments');
     await userEvent.click(button);
     const menu = await screen.findByRole('menu');
     const items = within(menu).getAllByRole('menuitem');
-    expect(items.map((i) => i.getAttribute('href'))).toEqual(['#/', '#/project/card-payments/prs', '#/project/settlement/prs']);
+    expect(items.map((i) => i.getAttribute('href'))).toEqual(['#/', '#/project/card-payments/people', '#/project/settlement/people']);
     expect(items.map((i) => i.hasAttribute('data-current'))).toEqual([false, true, false]);
     expect(within(items[1]!).getByText('(current)')).toBeTruthy();
   });

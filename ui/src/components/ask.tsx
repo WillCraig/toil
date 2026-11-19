@@ -29,7 +29,7 @@ import { ANALYZE, MAX_HISTORY_ANSWER, MAX_HISTORY_TURNS, type AdapterList, type 
 import { useData, useDerived } from '../data.ts';
 import { useSkins, useTheme, useThemeChoiceContext, useWords } from '../skins.tsx';
 import { voiceOn } from '../theme-context.ts';
-import { Cited } from './items.tsx';
+import { AnswerText } from './items.tsx';
 import { useMediaQuery } from './layout.tsx';
 import { ProposalCard } from './proposal.tsx';
 import { ChatUsage, UsageFooter } from './usage.tsx';
@@ -53,6 +53,8 @@ import { AnswerChecks, GuidedStart, PHONE } from './guided.tsx';
 import { DiagramCard, FoldedCode } from './diagram-card.tsx';
 import { GROUPS, QUESTIONS, type GuidedQuestion } from '../guided-questions.ts';
 import { homeText } from '../home-path.ts';
+import { AgentMark } from './agent-mark.tsx';
+import { NavButton } from './nav-button.tsx';
 
 /** A new chat's id: one per toil project's conversation, so the server can add up the chat (#295). */
 const newChatId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
@@ -388,19 +390,31 @@ export function AskBar() {
     }
   });
 
+  // What the chat is about and how long it is show while the bar has focus, or while an answer is being written (#657):
+  // the rest of the time the bar is a field and a button, and the conversation one press away.
+  const [within, setWithin] = useState(false);
+  const extras = within || Boolean(status);
   return (
-    <section className="ask-bar" aria-label={`Ask about ${toilProject.name}`}>
+    <section
+      className="ask-bar"
+      aria-label={`Ask about ${toilProject.name}`}
+      onFocus={() => setWithin(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setWithin(false);
+      }}
+    >
       <form className="ask-bar__form" onSubmit={submit}>
         <TextField className="field-text ask-bar__field" value={text} onChange={setText} aria-label="Your question">
           <Input ref={input} placeholder={placeholder} onClick={openView} data-ask-bar="" />
         </TextField>
         <Button type="submit" className="btn btn--accent">
+          <AgentMark />
           Ask
         </Button>
       </form>
-      {chat.attached && !open && <AboutChip context={chat.attached} onRemove={chat.detach} />}
+      {chat.attached && !open && extras && <AboutChip context={chat.attached} onRemove={chat.detach} />}
       {chat.session?.stale && !open && <StaleNote stale={chat.session.stale} className="ask-bar__stale" />}
-      {last && !open && (
+      {last && !open && extras && (
         <p className="ask-bar__resume note">
           <span>
             <span className="ask-bar__count">
@@ -560,7 +574,8 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
       </div>
 
       <div className="ask-scroll" data-scroller="" tabIndex={0} role="region" aria-label="The conversation">
-        {chat.session?.stale && <StaleNote stale={chat.session.stale} />}
+        {/* The conversation itself is where the reason is said, as an assignment's Run details are: never on the bar (#657). */}
+        {chat.session?.stale && <StaleNote stale={chat.session.stale} action={<span>Started before an update: {chat.session.stale.text}.</span>} />}
         {chat.session?.stale?.restart && <p className="note any-break">{chat.session.stale.restart}</p>}
         {chat.session?.stale && busy && <p className="note">Renew waits for this answer: it never interrupts one.</p>}
         {chat.renewProblem && (
@@ -616,9 +631,7 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
                             p.fence !== undefined ? (
                               <FoldedCode key={i} part={p} />
                             ) : (
-                              <p key={i}>
-                                <Cited text={p.text} chips cells={e.context} />
-                              </p>
+                              <AnswerText key={i} text={p.text} chips cells={e.context} />
                             ),
                           )
                         )}
@@ -634,10 +647,10 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
                             {e.answer.analysis && (
                               <>
                                 {' '}
-                                <a href={analysisHref(toilProject.name, e.answer.analysis)} data-analysis-kept="">
-                                  Kept in Analyses
-                                </a>
-                                .
+                                Kept.{' '}
+                                <NavButton href={analysisHref(toilProject.name, e.answer.analysis)} kind="quiet" size="sm" data-analysis-kept="">
+                                  Open in Analyses
+                                </NavButton>
                               </>
                             )}
                           </p>
@@ -707,6 +720,7 @@ function Focused({ chat, text, setText }: { chat: Chat; text: string; setText: (
             <Input placeholder={placeholder} />
           </TextField>
           <Button type="submit" className="btn btn--accent" isDisabled={busy || !text.trim()}>
+            <AgentMark />
             Ask
           </Button>
         </form>
@@ -786,9 +800,9 @@ function AgentSwitch({ label, list, current, onPick, compact = false }: { label:
                             {o.action && (
                               <>
                                 {' '}
-                                <a href="#/settings/agent" onClick={close}>
+                                <NavButton href="#/settings/agent" size="sm" onClick={close}>
                                   {o.action === 'install' ? `Install ${o.label}` : `Fix ${o.label}`}
-                                </a>
+                                </NavButton>
                               </>
                             )}
                           </p>

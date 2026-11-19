@@ -572,7 +572,8 @@ function states(route, width, sample = true) {
   // The readiness gate (#307): an item's workflow read live, and the Command Center's verdict filter open. Only
   // the sample's Jira and Azure DevOps items are pressed: a GitHub issue has no read to make, and a done item none either.
   if (/\/item\/corp-(jira|ado)%3A/.test(route)) out.push({ name: 'workflow-live', setup: clickUntil(clickAll('.readiness-live button', '/Check the workflow live|Read the workflow again/'), "(() => { const b = document.querySelector('.readiness-live button'); return b && !b.disabled && !/Reading the workflow/.test(b.textContent ?? ''); })()", 'the live workflow read') });
-  if (/\/command-center$/.test(route)) out.push({ name: 'verdict-filter', setup: afterClick(clickAll('.readiness-filters > div.choice:first-of-type .choice-button'), '[role="listbox"]'), undo: 'Escape' });
+  // Tickets filters through one bar (#657): the verdict is a tile, every other dimension the filter bar's Add filter, held open here.
+  if (/\/command-center$/.test(route)) out.push({ name: 'items-filter', setup: afterClick(clickAll('[data-filter-add]'), '.filter-popover__dialog'), undo: 'Escape' });
   // An answered question (#295): its usage footer, and the chat's running total and context meter in the pane's head.
   // Then, once a question has its answer, the Suggestions menu the starters fold into (#343).
   // Analyze (#343) on the next toil project: its pulse check, pressed in the bar, in the focused view.

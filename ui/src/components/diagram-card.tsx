@@ -18,6 +18,7 @@
  * which is two fewer than the sign-off sheet it replaces.
  */
 
+import { NavButton } from './nav-button.tsx';
 import { useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { AnswerPart, DraftDiagram } from '../agent.ts';
@@ -101,12 +102,17 @@ export function DiagramCard({ draft }: { draft: DraftDiagram }) {
       )}
       {revision !== null ? (
         <p role="status" data-diagram-saved="">
-          Saved{revision > 0 ? `, revision ${revision}` : ''}. <a href={diagramHref(toilProject.name)}>Open the diagram</a>
+          Saved{revision > 0 ? `, revision ${revision}` : ''}.{' '}
+          <NavButton href={diagramHref(toilProject.name)} size="sm">
+            Open the diagram
+          </NavButton>
         </p>
       ) : off ? (
         <p className="note" data-diagram-off="">
           {off}{' '}
-          <a href={diagramHref(toilProject.name)}>{preview ? 'Open the sample diagram' : 'Open the diagram'}</a>
+          <NavButton href={diagramHref(toilProject.name)} size="sm">
+            {preview ? 'Open the sample diagram' : 'Open the diagram'}
+          </NavButton>
         </p>
       ) : (
         <p className="diagram-card__act">

@@ -30,6 +30,8 @@ import { isLensId, lensDef, LENSES, type LensId } from '../../../../src/core/bri
 import { analyzePrompt, AUDIENCES, type Audience, type ToilProjectAnalyze, type FocusSource } from '../../../../src/core/brief/prompt.ts';
 import { analyzeSettings } from '../../../../src/core/brief/settings.ts';
 import { ArrowLeftIcon } from '../../components/icons.tsx';
+import { SummaryChevron } from '../../components/disclosure.tsx';
+import { NavButton } from '../../components/nav-button.tsx';
 
 interface ListedToilProject {
   name: string;
@@ -170,7 +172,7 @@ function EditToilProject({ config, name, section, toilProjects, found, areas, co
   return (
     <>
       <p className="note">
-        <a href="#/settings/projects" className="back-link"><ArrowLeftIcon size={14} className="icon--before" />All Toil projects</a>
+        <NavButton href="#/settings/projects" kind="quiet" size="sm" className="back-link"><ArrowLeftIcon size={14} className="icon--before" />All Toil projects</NavButton>
       </p>
       <Card as="section" className="panel" aria-labelledby="toil-project-change">
         <h2 id="toil-project-change" tabIndex={-1}>
@@ -179,7 +181,10 @@ function EditToilProject({ config, name, section, toilProjects, found, areas, co
         {here?.description && <p className="lede">{here.description}</p>}
         {!found ? (
           <p role="status" className="failure">
-            There is no Toil project named {name}. It may have been removed or renamed; <a href="#/new-project">create it again</a>.
+            There is no Toil project named {name}. It may have been removed or renamed.{' '}
+            <NavButton href="#/new-project" size="sm">
+              Create it again
+            </NavButton>
           </p>
         ) : (
           GROUPS.map((g) => (
@@ -584,7 +589,7 @@ function AnalyzeForm({ config, toilProject }: { config: ConfigApi; toilProject: 
       <CheckField label="Replace settings already there" checked={replace} onChange={setReplace} />
       {preview && (
         <details className="analyze-preview">
-          <summary>{pw('The prompt Analyze will send', 'The instructions the agent will get')}</summary>
+          <summary><SummaryChevron />{pw('The prompt Analyze will send', 'The instructions the agent will get')}</summary>
           <pre className="analyze-preview__text" tabIndex={0} aria-label={pw('The prompt Analyze will send', 'The instructions the agent will get')}>
             {preview}
           </pre>
@@ -668,7 +673,10 @@ function FieldForm({ config, toilProject, areas }: { config: ConfigApi; toilProj
           <span className="nowrap">
             <Info label="naming a field" text="For example, call the field customfield_10002 storyPoints. Work items use the name. Estimate, priority, type, team and due date are pointed at your team's own field the same way. A name is one word, in camelCase." />
           </span>{' '}
-          Don't know the id? <a href={toilProjectEditHref(toilProject, 'find-fields')}>Find the fields</a>.
+          Don't know the id?{' '}
+          <NavButton href={toilProjectEditHref(toilProject, 'find-fields')} size="sm">
+            Find the fields
+          </NavButton>
         </>
       }
       submit="Name field"

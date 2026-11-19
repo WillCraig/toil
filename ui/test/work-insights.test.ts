@@ -6,22 +6,35 @@ import { FIXTURE_NOW } from '../src/fixtures/execute.ts';
 import { SAMPLE_TEAM } from '../src/fixtures/sample-team.ts';
 import { parseRoute } from '../src/App.tsx';
 import { decodeDrill, encodeDrill, resolveDrill } from '../src/model/drill.ts';
-import { buildInsights, burnupOf, inNameOrder, mixLines, mixOverview, mixSources, nextRelease, releasesToShow, resolveScheme } from '../src/model/work-insights.ts';
+import { buildInsights, burnupOf, inNameOrder, mixDecided, mixLines, mixOverview, mixSources, nextRelease, releasesToShow, resolveScheme } from '../src/model/work-insights.ts';
 import { loaded } from './harness.ts';
 
 const sample = async () => buildInsights((await loaded('sample-team')).data, FIXTURE_NOW);
 
 describe('the insights data layer on sample-team', () => {
-  it('shares add to one, Unsure is present, and the sources add up to the items', async () => {
+  it('shares add to one, Not sorted yet is present, and the sources add up to the items', async () => {
     const ins = await sample();
     const { lines } = mixOverview(ins);
     expect(lines!.reduce((n, l) => n + l.share, 0)).toBeCloseTo(1, 9);
-    expect(lines!.map((l) => l.name)).toContain('Unsure');
-    expect(lines!.at(-1)!.name).toBe('Unsure');
+    expect(lines!.map((l) => l.name)).toContain('Not sorted yet');
+    expect(lines!.at(-1)!.name).toBe('Not sorted yet');
     const s = mixSources(ins.verdicts.values());
     expect(s.rules + s.labels + s.agent + s.people + s.unsure).toBe(ins.items.length);
     expect(s.total).toBe(146);
     expect(s.unsure).toBe(SAMPLE_TEAM.facts.classification.unsure);
+  });
+
+  it("the headline's Unsure and the How it was decided panel's Unsure agree, under a lens too (#657)", async () => {
+    const { data } = await loaded('sample-team');
+    for (const scheme of [undefined, 'flow', 'balance']) {
+      const ins = buildInsights(data, FIXTURE_NOW, scheme);
+      const lead = mixOverview(ins);
+      const unsure = lead.lines!.find((l) => l.id === null)!;
+      const counted = lead.lines!.reduce((n, l) => n + l.value, 0);
+      const d = mixDecided(ins, lead);
+      expect([d.total, d.unsure]).toEqual([counted, unsure.value]);
+      expect(Math.round((d.unsure / d.total) * 100)).toBe(Math.round(unsure.share * 100));
+    }
   });
 
   it('counts every item by category as the sample facts do', async () => {

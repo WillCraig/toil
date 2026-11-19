@@ -237,3 +237,37 @@ export function segments(text: string): Segment[] {
   if (last < text.length) out.push({ text: text.slice(last) });
   return out;
 }
+
+/** A part's text as blocks to render: runs of lines that start `- ` or `* ` as a list, every other run of lines as a paragraph. */
+export type TextBlock = { kind: 'lines'; lines: string[] } | { kind: 'list'; items: string[] };
+
+const BULLET = /^\s*[-*]\s+(.*)$/;
+
+/**
+ * Splits a part into paragraphs and bulleted lists by its lines. A part is
+ * text between blank lines, so an agent's list under a heading line arrives
+ * as one part; drawn as one paragraph, its line breaks collapse and the items
+ * run together as " - one - two". An indented line under a bullet carries
+ * on that item. Citations stay in the text, for the
+ * renderer to link wherever they are.
+ */
+export function blocksOf(text: string): TextBlock[] {
+  const out: TextBlock[] = [];
+  for (const line of text.replace(/\r\n/g, '\n').split('\n')) {
+    const bullet = BULLET.exec(line);
+    const last = out[out.length - 1];
+    if (bullet) {
+      if (last?.kind === 'list') last.items.push(bullet[1]!);
+      else out.push({ kind: 'list', items: [bullet[1]!] });
+    } else if (line.trim() === '') {
+      continue;
+    } else if (last?.kind === 'list' && /^\s+\S/.test(line)) {
+      last.items[last.items.length - 1] += ` ${line.trim()}`;
+    } else if (last?.kind === 'lines') {
+      last.lines.push(line);
+    } else {
+      out.push({ kind: 'lines', lines: [line] });
+    }
+  }
+  return out;
+}

@@ -38,6 +38,7 @@ import {
   settledState,
   type AdapterChoice,
   type AssignAdapter,
+  type AssignedRule,
   type AssignRequest,
   type AssignSettings,
   type Assignment,
@@ -54,6 +55,32 @@ import {
   type TranscriptEntry,
 } from './model.ts';
 import { staleness, type Fingerprint, type Staleness } from '../fingerprint.ts';
+import { sourceLabel } from '../format.ts';
+import { fixable, RULE_REF, type RuleFound } from '../rules.ts';
+
+/** The most rules of one standard one fix may name: more than any built-in standard has, few enough to read in one prompt. */
+const MAX_FIX_RULES = 12;
+
+/**
+ * The rule ids a fix request names (#657): `rule` for one, `rules` for several
+ * of the same standard, each held to toil's own name form and listed once.
+ * Null when the shape is wrong, so the caller can say how to send it.
+ */
+function ruleIds(v: unknown): string[] | null {
+  if (typeof v !== 'object' || v === null) return null;
+  const { standard, rule, rules } = v as { standard?: unknown; rule?: unknown; rules?: unknown };
+  if (typeof standard !== 'string' || !RULE_REF.test(standard)) return null;
+  const ids = rules !== undefined ? rules : rule !== undefined ? [rule] : null;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_FIX_RULES || (rule !== undefined && rules !== undefined)) return null;
+  if (!ids.every((id): id is string => typeof id === 'string' && RULE_REF.test(id))) return null;
+  return new Set(ids).size === ids.length ? ids : null;
+}
+
+/** Rules in a sentence: the ticket rule "A", or the ticket rules "A", "B" and "C". */
+export function rulesNamed(rules: ReadonlyArray<Pick<AssignedRule, 'name'>>): string {
+  const q = rules.map((r) => `"${r.name}"`);
+  return q.length === 1 ? `the ticket rule ${q[0]}` : `the ticket rules ${q.slice(0, -1).join(', ')} and ${q.at(-1)}`;
+}
 
 /** A refusal or a failure the page shows as it is: what went wrong, and what to do. */
 export class AssignError extends Error {
@@ -130,6 +157,12 @@ export interface QueueOptions {
   repos(toilProject: string): Promise<RepoChoice[]>;
   /** Runs one proposal's toil command through the write gate, for this assignment. */
   apply(assignment: Assignment, proposal: Proposal): Promise<Envelope>;
+  /**
+   * One ticket rule on one item, as toil checks it now (#657): what "Fix with
+   * AI agent" is held to before it queues. Null when the rule doesn't apply.
+   * Absent, a fix is refused.
+   */
+  ruleFor?(toilProject: string, item: string, standard: string, rule: string): Promise<RuleFound | null>;
   settings(): AssignSettings;
   /**
    * The fingerprint an assignment of this toil project and mode would start on
@@ -180,6 +213,10 @@ export class AssignmentQueue {
         r.state = 'failed';
         r.endedAt = o.now();
         r.stop = { reason: 'interrupted', message: 'Toil UI stopped while this assignment was running, so it never finished.', fix: 'Assign the item again.' };
+        o.keeper.save(r);
+      } else if (r.state === 'needs-you' && settledState(r) !== 'needs-you') {
+        // Saved before an applied proposal settled its questions too (#657, round 4): it settles as it would today.
+        r.state = settledState(r);
         o.keeper.save(r);
       }
       this.records.set(r.id, r);
@@ -301,7 +338,7 @@ export class AssignmentQueue {
     if (!old.adapter) throw new AssignError('That assignment has no adapter to renew on.', 'Assign the item again, choosing one.');
     this.usable(old.adapter, old.mode);
     const item = this.item(old.toilProject, old.item);
-    const record = this.create({ toilProject: old.toilProject, item, mode: old.mode, adapter: old.adapter, origin: 'person', trigger: null, waiting: 'slot', repo: old.repo, renews: old.id, history: historyOf(old, stale!) });
+    const record = this.create({ toilProject: old.toilProject, item, mode: old.mode, adapter: old.adapter, origin: 'person', trigger: null, waiting: 'slot', repo: old.repo, renews: old.id, history: historyOf(old, stale!), ...(old.rules?.length ? { rules: old.rules } : {}) });
     old.renewedBy = record.id;
     this.note(old, 'note', `Renewed by a person in Toil UI as ${record.id}, on today's instructions (${stale!.text}).`);
     this.save(old, 'renewed', old.state, `Renewed as ${record.id}.`);
@@ -334,7 +371,8 @@ export class AssignmentQueue {
     const req = this.check(request);
     const item = this.item(req.toilProject, req.item);
     const repo = req.mode === 'implement' ? (await this.repoFor(req.toilProject, req.repo)).name : null;
-    const record = this.create({ toilProject: req.toilProject, item, mode: req.mode, adapter: req.adapter, origin: 'person', trigger: null, waiting: 'slot', repo });
+    const rules = req.standard ? await this.rulesToFix(req.toilProject, item, req.standard) : null;
+    const record = this.create({ toilProject: req.toilProject, item, mode: req.mode, adapter: req.adapter, origin: 'person', trigger: null, waiting: 'slot', repo, ...(rules ? { rules } : {}) });
     this.pump();
     return this.summary(this.records.get(record.id)!);
   }
@@ -396,7 +434,7 @@ export class AssignmentQueue {
     p.status = envelope.ok ? 'applied' : 'failed';
     p.outcome = envelope.ok
       ? { at, ok: true, message: `Applied with toil ${p.command}.` }
-      : { at, ok: false, message: `${envelope.error.message}${envelope.error.fix ? ` ${envelope.error.fix}` : ''}` };
+      : { at, ok: false, message: `${envelope.error.message}${envelope.error.fix ? ` ${envelope.error.fix}` : ''}`, code: envelope.error.code };
     this.note(r, 'proposal', `${envelope.ok ? 'Applied' : 'Tried to apply'}: ${p.title}`, p.outcome.message);
     this.settle(r, `${envelope.ok ? 'Applied' : 'Apply failed'}: ${p.title}`);
     return this.summary(r);
@@ -436,8 +474,31 @@ export class AssignmentQueue {
     if (!MODES.includes(r.mode as never)) throw new AssignError(`${JSON.stringify(r.mode)} isn't a mode.`, 'Choose refine, investigate or implement.');
     if (!ADAPTERS.includes(r.adapter as never)) throw new AssignError(`${JSON.stringify(r.adapter)} isn't an adapter.`, 'Choose claude, copilot or codex.');
     if (r.repo !== undefined && (typeof r.repo !== 'string' || !r.repo)) throw new AssignError('repo names one of the Toil project\'s repositories.', shape);
+    if (r.standard !== undefined) {
+      const ruleShape = 'Send "standard": { "standard": "<name>", "rule": "<id>" } for one ticket rule, or "rules": ["<id>", …] for several of one standard, with mode refine.';
+      if (!ruleIds(r.standard)) throw new AssignError('standard names ticket rules by their standard and rule ids.', ruleShape);
+      if (r.mode !== 'refine') throw new AssignError('Fixing an item to meet a ticket rule is a refine.', ruleShape);
+    }
     this.usable(r.adapter!, r.mode!);
     return r as AssignRequest;
+  }
+
+  /**
+   * The ticket rules a fix is asked to meet (#657), as toil checks them now. One rule is refused when it doesn't apply
+   * to the item, already passes, or couldn't be read, since there is then nothing for an agent to fix; of several, the
+   * ones the item still misses are kept, and the request is refused only when none is left.
+   */
+  private async rulesToFix(toilProject: string, item: WorkItem, ref: NonNullable<AssignRequest['standard']>): Promise<AssignedRule[]> {
+    const ids = ruleIds(ref)!;
+    if (!this.o.ruleFor) throw new AssignError("This Toil UI can't check ticket rules, so it can't ask for a fix to one.", 'Start toil-ui with its cache, or with --sample for the sample.', 404);
+    const found = await Promise.all(ids.map((id) => this.o.ruleFor!(toilProject, item.id, ref.standard, id)));
+    const missed = found.filter((f): f is RuleFound => f !== null && fixable(f.state));
+    if (missed.length > 0) return missed.map((f) => ({ standard: f.standard, rule: f.rule, name: f.name, text: f.text, reason: f.reason, source: f.source }));
+    if (ids.length > 1) throw new AssignError(`${item.source.key} no longer misses any of those ${ids.length} ticket rules of ${ref.standard}, so there is nothing to fix.`, 'Sync again if the item changed; its rows say what each rule found.', 409);
+    const one = found[0];
+    if (!one) throw new AssignError(`The ticket rule ${ref.standard}/${ids[0]} doesn't apply to ${item.source.key}, so there is nothing to fix.`, 'Open the item again: its rows list the rules that apply to it.', 409);
+    if (one.state === 'pass') throw new AssignError(`${item.source.key} already meets "${one.name}", so there is nothing to fix.`, 'Sync again if the item changed; its rows say what each rule found.', 409);
+    throw new AssignError(`toil couldn't check "${one.name}" on ${item.source.key}: ${one.reason}`, 'Only a rule the item misses can be fixed.', 409);
   }
 
   /** Refuses an adapter that can't run here, or can't take this mode. */
@@ -445,6 +506,12 @@ export class AssignmentQueue {
     const choice = this.o.runner.adapters().find((a) => a.name === adapter);
     if (choice?.problem) throw new AssignError(choice.problem, 'Set the adapter up under Settings, AI agent, or choose another.');
     if (mode === 'implement' && choice?.implement) throw new AssignError(choice.implement, 'Choose an adapter the dialog offers for implement mode, or refine or investigate instead.');
+  }
+
+  /** "Jira PAY-103" for an event, from the last sync; nothing where the sync doesn't hold the item, and the notice falls back to its id. */
+  private itemName(r: Pick<AssignmentRecord, 'toilProject' | 'item'>): { itemName?: string } {
+    const item = this.o.items(r.toilProject)?.find((i) => i.id === r.item);
+    return item ? { itemName: `${sourceLabel(item.source.area)} ${item.source.key}` } : {};
   }
 
   private item(toilProject: string, id: string): WorkItem {
@@ -484,7 +551,7 @@ export class AssignmentQueue {
     }
   }
 
-  private create(o: Pick<Assignment, 'toilProject' | 'mode' | 'adapter' | 'origin' | 'trigger' | 'waiting' | 'repo'> & Pick<Partial<Assignment>, 'renews' | 'history'> & { item: WorkItem }): AssignmentRecord {
+  private create(o: Pick<Assignment, 'toilProject' | 'mode' | 'adapter' | 'origin' | 'trigger' | 'waiting' | 'repo'> & Pick<Partial<Assignment>, 'renews' | 'history' | 'rules'> & { item: WorkItem }): AssignmentRecord {
     const at = this.o.now();
     const record: AssignmentRecord = {
       id: this.o.newId(),
@@ -509,11 +576,12 @@ export class AssignmentQueue {
       startedOn: null,
       branch: null,
       ...(o.renews ? { renews: o.renews, history: o.history ?? null } : {}),
+      ...(o.rules?.length ? { rules: o.rules } : {}),
       transcript: [],
     };
     const who = o.renews
       ? `Renewed by a person in Toil UI from ${o.renews}, on ${o.adapter ? ADAPTER_NAME[o.adapter] : 'an agent'}, in ${MODE_INFO[o.mode].label.toLowerCase()} mode, with what that run left as context.`
-      : o.origin === 'tracker' ? `Queued by the tracker (${o.trigger}); it starts only when a person presses Start.` : `Assigned by a person in Toil UI to ${o.adapter ? ADAPTER_NAME[o.adapter] : 'an agent'}, in ${MODE_INFO[o.mode].label.toLowerCase()} mode.`;
+      : o.origin === 'tracker' ? `Queued by the tracker (${o.trigger}); it starts only when a person presses Start.` : `Assigned by a person in Toil UI to ${o.adapter ? ADAPTER_NAME[o.adapter] : 'an agent'}, in ${MODE_INFO[o.mode].label.toLowerCase()} mode${o.rules?.length ? `, to meet ${rulesNamed(o.rules)}` : ''}.`;
     record.transcript.push({ at, kind: 'note', title: who });
     this.records.set(record.id, record);
     this.save(record, 'created', null, who);
@@ -544,6 +612,7 @@ export class AssignmentQueue {
       previous,
       message,
       itemTitle: r.itemTitle,
+      ...this.itemName(r),
       adapter: r.adapter,
       origin: r.origin,
       stop: r.stop?.reason ?? null,

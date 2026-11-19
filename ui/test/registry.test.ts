@@ -311,6 +311,17 @@ describe('the sample architecture diagrams (#582)', () => {
   });
 });
 
+describe("the ticket rules' read (#657)", () => {
+  it("is toil's standards check, read-only whatever its input, with the input the server sends", () => {
+    const def = byName.get('standards check');
+    expect(def, 'toil has no API command "standards check"').toBeDefined();
+    expect([def!.writes, def!.writesLocal, def!.writesDependOnInput]).toEqual([false, false, false]);
+    // What ui/server/standards.ts sends: the Toil project, the synced items as text, and the folder toil looks from.
+    const result = new Validator(def!.inputSchema as object, '2020-12', false).validate({ toilProject: 'card-payments', text: '[]', cwd: '/home/you/src' });
+    expect(result.errors.map((e) => `${e.instanceLocation} ${e.error}`)).toEqual([]);
+  });
+});
+
 describe('the sync\'s own reads', () => {
   // The sync asks Azure DevOps' link feed with the search's input, less its WIQL, from the watermark (server/sync.ts, #664).
   it.each(CANNED.filter((c) => c.command === 'ado work-item search').map((c) => [JSON.stringify(c.input), c] as const))('ado work-item link-feed takes the search input %s', (_label, call) => {

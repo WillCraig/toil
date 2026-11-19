@@ -430,6 +430,7 @@ describe('days', () => {
     const s = input();
     const items = s.items.map((i) => (i.id === 'jira:PAY-2' ? { ...i, comments: [{ id: '4', author: { id: 'ghopper', name: 'G. Hopper', email: null }, at: at('10:00'), text: 'Is the retry safe to ship?', url: null }] } : i));
     const rows = topRows(buildStandup({ ...s, items }), 4);
-    expect(rows.map((r) => [r.group.name, r.bucket])).toEqual([['Grace Hopper', 'comments'], ['Ada Lovelace', 'blocked'], ['Ada Lovelace', 'done'], ['Claude', 'done']]);
+    // Ada's blocked and done are one row: a person is listed once, however many buckets of theirs made the cut.
+    expect(rows.map((r) => [r.group.name, r.parts.map((p) => p.bucket)])).toEqual([['Grace Hopper', ['comments']], ['Ada Lovelace', ['blocked', 'done']], ['Claude', ['done']]]);
   });
 });

@@ -16,13 +16,13 @@ import { addDays } from '../../../src/core/insights/dimensions.ts';
 import { useDerived } from '../data.ts';
 import { addValue, removeValue, writeFilters, type DimensionFilter, type Filters } from '../filters.ts';
 import { useAddress, useWorkInsights } from '../insights-data.ts';
-import { FILTER_MENU, labelOfDimension, periodOf, periodWords, type WorkInsights } from '../model/work-insights.ts';
+import { FILTER_MENU, labelOfDimension, NOT_SORTED, periodOf, periodWords, type WorkInsights } from '../model/work-insights.ts';
 import { ChevronDownIcon, CloseIcon, ArrowLeftIcon } from './icons.tsx';
 import './filter-bar.css';
 
 /** The words a chip says for one filter value: a category by its name, a "none" bucket by its own name. */
 function valueLabel(ins: WorkInsights, dimension: string, value: string): string {
-  if (dimension === 'category') return ins.definitions[value]?.name ?? (value === 'none' ? 'Unsure' : value);
+  if (dimension === 'category') return ins.definitions[value]?.name ?? (value === 'none' ? NOT_SORTED : value);
   if (value.toLowerCase() === 'none') return 'None';
   return value;
 }

@@ -21,8 +21,11 @@ main:has(> .toil-project-shell) { max-width: 1680px; padding-top: 0.5rem; paddin
 .toil-project-bar__ask .agents-open { margin: calc(4px + 0.4rem) 0 0; min-height: 44px; }
 .toil-project-bar .ask-bar { min-width: 0; margin: 0; padding: 0.4rem 0.6rem; }
 .sprint-chip { display: inline-flex; align-items: center; padding: 0.1rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }
-/* Edit: a quiet link at the end of the about row; the row's other parts shrink first. */
-.toil-project-bar__edit { flex: none; display: inline-flex; align-items: center; min-height: 24px; padding: 0 0.25rem; }
+/* When the data was read, a small badge beside the name; pressed, it shows the Sync panel. */
+.read-badge { font-size: 0.8125rem; color: var(--muted); white-space: nowrap; }
+span.read-badge { display: inline-flex; align-items: center; min-height: 32px; }
+.toil-project-bar__about > .btn { flex: none; color: var(--muted); }
+.sources-popover { padding: 0.5rem 0.75rem; }
 
 /* The description and the sources, on one line where they fit. */
 .toil-project-bar__about { display: flex; align-items: center; gap: 0.25rem 0.75rem; color: var(--muted); font-size: 0.875rem; min-width: 0; }
@@ -37,9 +40,13 @@ main:has(> .toil-project-shell) { max-width: 1680px; padding-top: 0.5rem; paddin
 .agents-open__short { display: none; }
 @media (max-width: 599px) {
   /* The Ask row on a phone: the field, Ask and a compact AI agents button with its count, on one line. The full label stays as the name. */
-  .toil-project-bar__ask { flex-wrap: nowrap; align-items: flex-start; }
+  /* One row and one centre in every theme (#657): the field takes what is left, Ask stays beside it rather than wrapping
+     under it, and AI agents is centred on the bar, so a theme's thicker frame can't push it off the field's line. */
+  .toil-project-bar__ask { flex-wrap: nowrap; align-items: center; }
   .toil-project-bar__ask .ask-bar { flex: 1 1 0; }
-  .toil-project-bar__ask .agents-open { margin: calc(4px + 0.4rem) 0 0; min-height: 44px; min-width: 44px; padding-inline: 0.6rem; }
+  .toil-project-bar .ask-bar__form { flex-wrap: nowrap; }
+  .toil-project-bar .ask-bar__field { flex: 1 1 0; }
+  .toil-project-bar__ask .agents-open { margin: 0; min-height: 44px; min-width: 44px; padding-inline: 0.6rem; }
   .agents-open__short { display: inline; }
   .agents-open__label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
   .toil-project-bar__about { flex-wrap: wrap; }
@@ -57,19 +64,22 @@ main:has(> .toil-project-shell) { max-width: 1680px; padding-top: 0.5rem; paddin
   gap: 0.4rem;
   min-height: 40px;
   padding: 0 0.85rem;
-  border-bottom: 3px solid transparent;
   color: var(--ink);
   text-decoration: none;
   white-space: nowrap;
 }
 .toil-project-tabs a:hover { background: var(--surface); }
-.toil-project-tabs a[aria-current="page"] { border-bottom-color: var(--accent); font-weight: 600; }
+/* The chosen tab's underline is motion.css's [data-tab-ink], one bar that slides between tabs. */
+.toil-project-tabs a[aria-current="page"] { font-weight: 600; }
 .tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.4rem; padding: 0 0.35rem; border-radius: 999px; background: var(--warn); color: var(--bg); font-size: 0.75rem; font-weight: 700; line-height: 1.4; }
 .agents-open { flex: none; gap: 0.4rem; margin-bottom: 0.25rem; font-weight: 600; }
 
-.board-views { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.9375rem; }
-.board-views a { display: inline-flex; align-items: center; min-height: 44px; }
-.board-views a[aria-current="page"] { font-weight: 600; color: var(--ink); text-decoration: none; }
+/* Team's three pages: one segmented control, the page showing pressed in. */
+.segmented { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; justify-self: start; padding: 0.2rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.segmented .btn.segmented__item[aria-current="page"] { background: var(--raised); border-color: var(--line); font-weight: 600; }
+/* The one way back up from a drill-in. */
+.drill-back { margin: 0; }
+.drill-back .btn { margin-inline-start: -0.6rem; }
 
 /* The view and the sidebar. The sidebar is as tall as the view and scrolls inside itself, so it never makes the page longer. */
 .toil-project-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: stretch; }
@@ -89,11 +99,14 @@ main:has(> .toil-project-shell) { max-width: 1680px; padding-top: 0.5rem; paddin
 .agent-card { display: grid; gap: 0.2rem; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); min-width: 0; overflow-wrap: anywhere; font-size: 0.875rem; }
 .agent-card p { margin: 0; }
 .agent-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
-.agent-card__title { color: var(--ink); }
-.agents-group--needs-you .agent-card { border-left: 4px solid var(--warn); }
+.btn.agent-card__title { margin-inline: -0.6rem; width: calc(100% + 1.2rem); font-weight: 600; font-size: 0.875rem; }
+.agent-card .stale-note { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.agents-group--needs-you .agent-card { border-color: var(--edge-warn); background: var(--tint-warn); }
 .agents-sidebar .assign-inbox { padding: 0.5rem 0.6rem; }
 .agents-side__analyses { display: grid; gap: 0.35rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
 .analysis-line { font-size: 0.875rem; overflow-wrap: anywhere; }
+.analysis-line .btn--row { width: 100%; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; font-size: 0.875rem; }
+.analysis-line .btn__text { display: grid; gap: 0.1rem; }
 
 /* The drawer, from the right edge, over a dimmed page. */
 .drawer-overlay { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: flex-end; background: rgb(0 0 0 / 0.55); }
@@ -102,7 +115,7 @@ main:has(> .toil-project-shell) { max-width: 1680px; padding-top: 0.5rem; paddin
 .agents-drawer__head { display: flex; justify-content: flex-end; }
 
 /* A card on the board that needs attention (#394): a flag beside its status, and its edge in the warning colour. */
-.card--attention { border-left: 4px solid var(--warn); }
+.card--attention { border-color: var(--edge-warn); background: var(--tint-warn); }
 .card-flag { display: inline-flex; align-items: center; margin-left: auto; color: var(--warn); }
 .card-flag svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 .card-flag svg path { fill: color-mix(in srgb, currentColor 35%, transparent); }
@@ -181,8 +194,6 @@ a.ticket-chip:hover { border-color: var(--link); }
 @media (max-width: 599px) {
   .ticket-chip__title { max-width: 10rem; }
 }
-.agent-card__title { display: inline-block; min-height: 32px; }
-.agent-card__item .item-link { display: inline-block; min-height: 24px; padding-block: 2px; box-sizing: border-box; }
 
 /* The Work mix tile (#567): its label is the link, its categories one to a line while the tile is narrow. */
 .metric { container-type: inline-size; }

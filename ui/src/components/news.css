@@ -31,8 +31,8 @@
 .bell-dialog__head [data-bell-read] { margin-left: auto; }
 .bell-dialog__head h2 { margin: 0; font-size: 1.0625rem; }
 .bell-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
-.bell-entry { display: grid; gap: 0.1rem; padding: 0.4rem 0.5rem; border-inline-start: 3px solid transparent; border-radius: 4px; overflow-wrap: anywhere; }
-.bell-entry--unread { border-inline-start-color: var(--accent); background: var(--surface); }
+.bell-entry { display: grid; gap: 0.1rem; padding: 0.4rem 0.5rem; border: 1px solid transparent; border-radius: 4px; overflow-wrap: anywhere; }
+.bell-entry--unread { border-color: var(--edge-accent); background: var(--tint-accent); }
 .bell-entry a { display: grid; gap: 0.1rem; color: var(--ink); text-decoration: none; min-height: 24px; }
 .bell-entry a:hover strong, .bell-entry a:focus-visible strong { text-decoration: underline; }
 .bell-entry a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

@@ -142,11 +142,11 @@ describe('the palette entries', () => {
     const found = paletteResults(entries, shortKey(one), null);
     expect(found[0]!.group).toBe('items');
     expect(found[0]!.entries[0]!.id).toBe(hit.id);
-    // Tabs: every toil project's seven, the one on screen's alone with nothing typed. Its charts and earlier briefings are found by typing, never listed (#567).
-    expect(entries.filter((e) => e.group === 'tabs' && !e.typed)).toHaveLength(14);
+    // Tabs: every toil project's three and its seven drill-ins (#657), the one on screen's alone with nothing typed. Its charts and earlier briefings are found by typing, never listed (#567).
+    expect(entries.filter((e) => e.group === 'tabs' && !e.typed)).toHaveLength(20);
     expect(entries.filter((e) => e.typed && e.id.startsWith('chart:settlement:')).map((e) => e.label)).toEqual(['Work mix', 'Releases', 'Sprints', "Where we're working", 'Flow', 'Explore']);
     expect(paletteResults(entries, 'Releases', 'settlement').flatMap((g) => g.entries).some((e) => e.id === 'chart:settlement:releases')).toBe(true);
-    expect(paletteResults(entries, '', 'settlement').find((g) => g.group === 'tabs')!.entries.map((e) => e.label)).toEqual(['Summary', 'Board', 'What blocks what', 'Code reviews', 'People', 'Stand-up', 'What happened']);
+    expect(paletteResults(entries, '', 'settlement').find((g) => g.group === 'tabs')!.entries.map((e) => e.label)).toEqual(['Summary', 'Tickets', 'Team', 'Sprint board', 'What blocks what', 'Code reviews', 'Sort work into categories', 'People', 'Stand-up', 'What happened']);
   });
 
   it('offers Ask, Analyze, Assign and the agents only on a Toil project page, and Sync only where there is a cache', async () => {

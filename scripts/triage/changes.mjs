@@ -83,8 +83,8 @@ export const CORE_SAFETY = [
   'run', 'call-context', 'context', 'command', 'area', 'connection', 'deployments', 'toil-project', 'check-toil-project',
   // Secrets and the credential store.
   'keychain', 'secret-input', 'secret-shapes', 'prompt', 'token',
-  // Files, local paths and git.
-  'files', 'local-path', 'gitignore', 'git', 'git-repo', 'git-config', 'git-remote',
+  // Files, local paths and git, and the catalog that reads and writes schemes and standards by name.
+  'files', 'file-catalog', 'local-path', 'gitignore', 'git', 'git-repo', 'git-config', 'git-remote',
   // The stored architecture diagrams: where they live, the link checks, and what may be written into one (#582).
   'diagrams',
   // The network: which hosts, which credentials, which requests.
@@ -109,6 +109,8 @@ export const SAFETY_CORE_FOLDERS = [
   'src/os/', 'src/shims/', 'src/mcp/', 'src/core/query/', 'src/connections/', 'src/skills/', 'src/setup/', 'src/feedback/', 'src/projects/',
   // Work classification: the scheme catalog's writes, and the plan reader that holds a categorize call to the plan's own labels.
   'src/core/classify/', 'src/classify/',
+  // Ticket rules (standards): the catalog's reads, and the reader's caps on the patterns a checked-in file runs.
+  'src/core/standards/', 'src/standards/',
   // The CLI-to-MCP parity suite and its shards: what keeps the two front doors 1:1.
   'test/parity/',
   // The shipped skill: every page ships to users' agents as instructions, and most say how a write gate works.

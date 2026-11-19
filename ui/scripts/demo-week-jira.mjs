@@ -2,7 +2,11 @@
 // (renamed to --sprint, running to --ends), gives the three placeholder issues a
 // new Jira site starts with believable payments titles, makes a day of movement,
 // adds one blocker so the vault story holds up the stored-token charge, and keeps
-// one story ready for an agent open. Everything goes through toil with
+// one story ready for an agent open, gives the chains' issues due dates across the
+// sprint (demo-week-data.mjs, JIRA_DUE_DAYS) for the blocker timeline to draw, and
+// gives each seeded story the text the
+// ticket rules expect of it (demo-week-data.mjs, RULE_GAPS: three stories miss
+// Given/When/Then and two miss the user-story form, on purpose). Everything goes through toil with
 // --allow-write, so the `jira` connection's writes decide, and the project is
 // always named. An issue is changed only when it carries the `toil-seed` label
 // (the placeholders are the one exception, and only while they still have their
@@ -10,7 +14,10 @@
 // the run rather than being taken for "nothing there", so a second run never
 // posts twice. Repo tooling only: nothing here ships. Task 1, Task 2 and Task 3
 // have been promoted, as placeholders eventually are.
+import { flatText, JIRA_BLOCKS, JIRA_DUE_DAYS, jiraStory, RULE_GAPS, ruleMisses, sprintDay, STORIES, typeOfName } from './demo-week-data.mjs';
+
 const day = 24 * 60 * 60 * 1000;
+const sameRules = (a, b) => a.length === b.length && a.every((r) => b.includes(r));
 
 export function jira({ toil, say, fail, sprint, ends, project, item, note }) {
   if (!/^[A-Z][A-Z0-9_]{1,19}$/.test(project)) fail(`"${project}" isn't a Jira project key.`, 'Use the test project from CLAUDE.md, SCRUM.');
@@ -85,15 +92,42 @@ export function jira({ toil, say, fail, sprint, ends, project, item, note }) {
     say(`  ${m.key}: ${m.to ? `${m.to}, ` : ''}comment added`);
   }
 
-  // The vault story also holds up charging a stored token.
-  const [vault, charge] = [get(`${project}-14`), get(`${project}-15`)];
-  if (seeded(vault) && seeded(charge)) {
-    const links = toil(['jira', 'issue', 'get', `${project}-15`, '--select', 'fields.issuelinks[].inwardIssue.key']).data ?? [];
-    if (!links.includes(`${project}-14`)) {
-      toil(['jira', 'issue', 'link', `${project}-14`, '--type', 'Blocks', '--target', `${project}-15`, ...w]);
-      say(`  ${project}-14 blocks ${project}-15`);
-    }
+  // The vault story also holds up charging a stored token, and the edge's follow-ups run one after another (JIRA_BLOCKS).
+  for (const [from, to] of JIRA_BLOCKS.map((pair) => pair.map((k) => k.replace(/^SCRUM-/, `${project}-`)))) {
+    const [a, b] = [get(from), get(to)];
+    if (!seeded(a) || !seeded(b)) continue;
+    const links = toil(['jira', 'issue', 'get', to, '--select', 'fields.issuelinks[].inwardIssue.key']).data ?? [];
+    if (links.includes(from)) continue;
+    toil(['jira', 'issue', 'link', from, '--type', 'Blocks', '--target', to, ...w]);
+    say(`  ${from} blocks ${to}`);
   }
+
+  // The sprint plan: each chain's issues due one after another, read first and written only where the date differs.
+  let dueWritten = 0;
+  for (const [seedKey, n] of Object.entries(JIRA_DUE_DAYS)) {
+    // The table names the seed's keys; --project moves them, as JIRA_BLOCKS's are moved above.
+    const key = seedKey.replace(/^SCRUM-/, `${project}-`);
+    const due = sprintDay(ends, n);
+    const read = toil(['jira', 'issue', 'get', key, '--select', '{labels: fields.labels, due: fields.duedate}'], { soft: true });
+    if (!read.ok) {
+      if (read.error.code !== 'NOT_FOUND') fail(`couldn't read ${key}: ${read.error.message}`, 'Run it again; a failed read is never taken for "no due date".');
+      say(`  skipped ${key}: it doesn't exist`);
+      continue;
+    }
+    if (!seeded(read.data)) {
+      say(`  skipped ${key}: it doesn't carry the toil-seed label`);
+      continue;
+    }
+    if (read.data.due === due) continue;
+    const set = toil(['jira', 'issue', 'update', key, '--field', `duedate=${due}`, ...w], { soft: true });
+    if (!set.ok) {
+      say(`  ${key}: couldn't set the due date to ${due}: ${set.error.message}`);
+      continue;
+    }
+    dueWritten++;
+    say(`  ${key}: due ${due}`);
+  }
+  if (!dueWritten) say(`  sprint plan: all ${Object.keys(JIRA_DUE_DAYS).length} due dates already as planned`);
 
   // One story ready for an agent: in the sprint, unassigned, and open even after a recording closed it.
   const found = toil(['jira', 'issue', 'search', '--jql', `project = "${project}" AND labels = "seed:agent-maskpan"`, '--limit', '1']).data.issues?.[0];
@@ -109,5 +143,25 @@ export function jira({ toil, say, fail, sprint, ends, project, item, note }) {
       say(`  ${found.key}: agent-ready story back to To Do`);
     }
   }
+  // Ticket rules (#657): each seeded story, and the agent-ready one, carries the text
+  // demo-week-data.mjs gives it. Looked at first with the same checks the rules make,
+  // and written only when what's there misses something other than its planned gap
+  // (a gap must also be the planned text), so a second run writes nothing and a run
+  // puts back a gap a recording fixed.
+  const stories = toil(['jira', 'issue', 'search', '--jql', `project = "${project}" AND labels = "toil-seed" AND issuetype = Story ORDER BY key`, '--limit', '100', '--fields', 'issuetype,labels,description', '--select', 'issues[].{key: key, type: fields.issuetype.name, labels: fields.labels, description: fields.description}']).data ?? [];
+  let rulesWritten = 0;
+  for (const story of stories) {
+    if (!seeded(story)) continue;
+    const seedKey = story.labels.find((l) => l.startsWith('seed:'))?.slice(5);
+    const text = seedKey === 'agent-maskpan' ? item.description : STORIES[seedKey] ? jiraStory(seedKey) : undefined;
+    if (!text) continue;
+    const want = RULE_GAPS.jira[seedKey] ?? [];
+    // A planned gap is held to its exact text, so it's the gap the docs name and not one that passes by luck.
+    if (sameRules(ruleMisses({ type: typeOfName(story.type), description: story.description }), want) && (!want.length || flatText(story.description) === flatText(text))) continue;
+    toil(['jira', 'issue', 'update', story.key, '--description', text, ...w]);
+    rulesWritten++;
+    say(`  ${story.key}: ticket-rule text written, ${want.length ? `missing ${want.join(', ')} on purpose` : 'passing every rule'}`);
+  }
+  if (!rulesWritten) say(`  ticket rules: all ${stories.length} seeded stories already as planned`);
   say(`  done: sprint ${active.id} on board ${board.id}`);
 }

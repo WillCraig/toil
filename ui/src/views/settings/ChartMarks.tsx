@@ -3,7 +3,7 @@
  * in this browser only. On, every chart draws its series with plain borders
  * (solid, dashed, dotted, double ...) instead of the decorative themes'
  * picture frames. Plain and Crate have no frames, so it changes nothing there,
- * and a note says so rather than offering a choice that does nothing.
+ * and the card isn't shown rather than offering a choice that does nothing (#657).
  * A tick-box to simplify the diagrams, itself kept simple at the committee's request.
  */
 
@@ -18,11 +18,12 @@ export function ChartMarksSetting() {
   const theme = useTheme();
   const [simple, setSimple] = useSimpleMarksSetting();
   const framed = Object.values(theme.series).some((marks) => marks.some((m) => m.frame));
+  if (!framed) return null;
   return (
     <Card as="section" className="panel chart-marks-setting" aria-labelledby="chart-marks">
       <h2 id="chart-marks">Charts</h2>
       <div className="theme-setting__row">
-        <Checkbox className="check" isSelected={simple} onChange={setSimple} aria-describedby="chart-marks-note">
+        <Checkbox className="check" isSelected={simple} onChange={setSimple}>
           <span className="box" aria-hidden="true">
             {simple ? <CheckIcon size={14} /> : null}
           </span>
@@ -30,9 +31,6 @@ export function ChartMarksSetting() {
         </Checkbox>
         <Help topic="simple-marks" />
       </div>
-      <p className="note" id="chart-marks-note">
-        {framed ? 'Charts draw each series with a plain border instead of the theme\'s picture frame.' : "This theme's charts already use plain borders, so this changes nothing here. It applies in the themes that have picture frames."}
-      </p>
     </Card>
   );
 }

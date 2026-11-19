@@ -1,7 +1,7 @@
 {
   "name": "crate",
   "label": "Crate",
-  "description": "The toil site's look: its near-black, or warm drafting paper in light, the drafting grid and the blue glow, the blue accent gradient, dust drifting in the glow, and the crate in its hard hat when there's nothing to show yet.",
+  "description": "The toil site's look: its near-black, or warm drafting paper in light, a faint drafting grid behind the page head, a quiet blue glow, the blue accent gradient on the name and the main button, dust in the glow if you turn it on, and the crate in its hard hat when there's nothing to show yet.",
   "schemes": {
     "dark": {
       "bg": "#0f1115",
@@ -9,7 +9,7 @@
       "raised": "#1e222b",
       "ink": "#e8eaed",
       "muted": "#a7afba",
-      "line": "#3a414d",
+      "line": "#2a303a",
       "accent": "#8cc4ff",
       "accentInk": "#0b1220",
       "link": "#c2e0ff",
@@ -26,7 +26,7 @@
       "raised": "#ffffff",
       "ink": "#1a1e26",
       "muted": "#505865",
-      "line": "#cfcac0",
+      "line": "#e0dcd3",
       "accent": "#1b66c4",
       "accentInk": "#ffffff",
       "link": "#0e4a96",
@@ -59,12 +59,15 @@
   },
   "radius": "8px",
   "motion": "subtle",
-  "ambient": { "particles": "dust" },
+  "ambient": { "particles": "dust", "default": "off" },
   "sounds": {},
   "assets": {
+    "agentMark": "assets/agent.svg",
     "emptyState": "assets/crate-lost.webp",
     "mark": "assets/mark.svg",
     "loading": "assets/crate-loading.webp",
+    "loaderCarry": "assets/crate-loader-192.webp",
+    "loaderCarrySmall": "assets/crate-loader-96.webp",
     "momentSplash": "assets/moments/splash.webp",
     "momentTote": "assets/moments/tote.svg",
     "momentSigned": "assets/moments/signed.svg",
@@ -77,9 +80,9 @@
   "moments": {
     "splash": { "art": { "art": "momentSplash", "width": 360, "height": 327 }, "motif": "rise", "loop": "bob", "line": "Shift's starting. Pulling the manifests off the rack." },
     "loader": {
-      "art": { "art": "loading", "width": 240, "height": 160 },
-      "loop": "roll",
-      "track": { "art": "momentTote", "size": 18, "count": 4, "motif": "march" },
+      "art": { "art": "loaderCarry", "width": 96, "height": 96 },
+      "loop": "bob",
+      "track": { "art": "loaderCarrySmall", "size": 40, "count": 1, "motif": "march" },
       "flavour": ["Checking the bills of lading.", "Counting the crates twice.", "Waiting on the forklift.", "Reading the stencil on the side.", "Signing for it in triplicate."]
     },
     "tips": { "label": "Foreman's note" },

@@ -62,6 +62,7 @@
   "ambient": { "particles": "leaves" },
   "sounds": {},
   "assets": {
+    "agentMark": "assets/agent.svg",
     "series": "assets/series.svg",
     "panel": "assets/wood-panel.svg",
     "sign": "assets/wood-sign.svg",

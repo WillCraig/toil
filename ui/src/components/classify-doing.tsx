@@ -20,6 +20,9 @@ import { useWorkInsights } from '../insights-data.ts';
 import { shareText, shareWords, sourceName, TUNE_AFTER, timesText } from '../model/classify.ts';
 import { Help } from './help.tsx';
 import { ChevronDownIcon } from './icons.tsx';
+import { AgentMark } from './agent-mark.tsx';
+import { AGENT_SETTINGS_HREF } from '../format.ts';
+import { NavButton } from './nav-button.tsx';
 
 const KEPT: Record<SaveResult['kept'], string> = { 'built-in': 'kept as a built-in scheme', yours: 'kept as your own copy', shared: 'saved in the repository, ready for a pull request', beside: 'saved beside this Toil project' };
 
@@ -76,11 +79,13 @@ export function HowItsDoing({ agents, adapter }: { agents: AgentChoice[]; adapte
   return (
     <details className="doing" data-how-its-doing="">
       <summary>
+        {/* One line (#657): the figure, or a dash and why there is none, never a 0 (principle 12). The rest is behind the expand. */}
+        <span className="sr-only">How it's doing. </span>
         {stats
           ? stats.agreement.overall === null || stats.agreement.checked === 0
-            ? "How it's doing: nothing has been checked yet"
-            : `How it's doing: people agreed with ${shareWords(stats.agreement.overall)} of ${stats.agreement.checked} checked`
-          : "How it's doing: not read yet"}
+            ? 'Agreement: – (not checked yet)'
+            : `Agreement: ${shareWords(stats.agreement.overall)} of ${stats.agreement.checked} checked`
+          : 'Agreement: – (not read yet)'}
         <ChevronDownIcon size={14} className="doing__chevron" />
       </summary>
       <div className="doing__body">
@@ -119,11 +124,21 @@ export function HowItsDoing({ agents, adapter }: { agents: AgentChoice[]; adapte
         ))}
         {enough && (
           <div className="doing__improve">
-            <Button className="btn" onPress={() => void improve()} isDisabled={tuning || !ready || !api} data-improve="">
-              {tuning ? 'Asking your AI agent…' : 'Improve with your AI agent'}
-            </Button>
-            {!ready && <p className="note">No AI agent is set up yet. Choose one under Settings, AI agent.</p>}
-            <p className="note">It reads your corrections, proposes a sharper version of the categories, and tries it on answers it has not seen. Nothing changes until you use it.</p>
+            <span className="control-row__group">
+              <Button className="btn" onPress={() => void improve()} isDisabled={tuning || !ready || !api} data-improve="">
+                <AgentMark />
+                {tuning ? 'Asking your AI agent…' : 'Improve with your AI agent'}
+              </Button>
+              <Help topic="classify-improve" />
+            </span>
+            {!ready && (
+              <p className="note">
+                No AI agent is set up yet.{' '}
+                <NavButton href={AGENT_SETTINGS_HREF} size="sm">
+                  Set one up in Settings, AI agent
+                </NavButton>
+              </p>
+            )}
           </div>
         )}
         {tuned && 'error' in tuned && (

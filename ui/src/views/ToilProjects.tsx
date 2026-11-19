@@ -30,6 +30,7 @@ import { previewOf, type ToilProjectPreview } from '../model/preview.ts';
 import { useSkins, useWords } from '../skins.tsx';
 import { usePlain } from '../plain-words.ts';
 import type { Call } from '../toil.ts';
+import { NavButton } from '../components/nav-button.tsx';
 
 /** A toil project's last sync, as the sync panel has it. */
 export interface SyncedAt {
@@ -189,7 +190,9 @@ function ToilProjectCard({
         ) : (
           <>
             <h2 id={heading}>
-              <a href={toilProjectHref(d.name)}>{d.name}</a>
+              <NavButton href={toilProjectHref(d.name)} kind="quiet" size="sm">
+                {d.name}
+              </NavButton>
             </h2>
             {d.description ? <span className="toil-project-card__desc">{d.description}</span> : <span className="note">No description</span>}
           </>

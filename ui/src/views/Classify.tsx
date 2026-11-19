@@ -38,6 +38,8 @@ import { matches, matchesAny, typingIn } from '../shortcuts.ts';
 import { useWords } from '../skins.tsx';
 import { plainDates } from './charts/format.ts';
 import '../components/classify.css';
+import { AgentMark } from '../components/agent-mark.tsx';
+import { NavButton } from '../components/nav-button.tsx';
 
 /** The most items one question to the agent holds from this view: more than a person would sort in a sitting. */
 export const ASK_AT_MOST = 100;
@@ -61,6 +63,9 @@ function whyOf(row: NeedsRow, follow: number, name: (id: string | null) => strin
   const fresh = row.suggested!;
   return [`It says ${name(now.category)} (${sourcePhrase(now.source)}), but ${sourcePhrase(fresh.source)} says ${name(fresh.category)}: ${fresh.reason}`, ...children];
 }
+
+/** Why a row is on the list, said once in the header's (i) rather than on every row. */
+const NEEDS_WHY = 'Each item here has no category yet: no label, rule or parent settles it, or a label and your rules disagree. Pick one, or press a marked suggestion to accept it. A follow count says how many other items take the same answer.';
 
 /** The short tag beside a title, only where it says something: a disagreement, or how many rows follow this one's answer. */
 function tagOf(row: NeedsRow, follow: number): string {
@@ -158,7 +163,9 @@ function Row({ row, onAnswer, onAccept, follow }: { row: NeedsRow; onAnswer: (va
           );
         })}
       </div>
-      <WhyTip row={row} follow={follow} onDismiss={() => dismiss([row.item.id])} />
+      {/* One (i) in the header says why rows are here (#657); a row keeps its own only for what is its alone: an AI agent's
+          suggestion with its Not this, or a label and the rules that disagree. */}
+      {(proposal || row.kind === 'disagree') && <WhyTip row={row} follow={follow} onDismiss={() => dismiss([row.item.id])} />}
     </li>
   );
 }
@@ -283,7 +290,9 @@ export function Classify() {
       <>
         <div className="view-head">
           <p className="eyebrow">
-            <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a>
+            <NavButton href={toilProjectHref(toilProject.name)} kind="quiet" size="sm" className="eyebrow-btn">
+            {toilProject.name}
+          </NavButton>
           </p>
           <h1 tabIndex={-1} title={plain.title('Classify')}>
             {words('classify.title')}
@@ -327,6 +336,7 @@ export function Classify() {
 
       <section className="classify__bar" aria-label="Ask your AI agent">
         <Button className="btn" onPress={() => void ask()} isDisabled={asking || unsure.length === 0 || ready.length === 0 || !c.api} data-ask-agent="">
+          <AgentMark />
           {asking ? 'Asking your AI agent…' : words('classify.ask')}
         </Button>
         {agents.length > 1 && (
@@ -399,6 +409,11 @@ export function Classify() {
       <section aria-labelledby="needs-head" className="classify__rows">
         <div className="classify__rows-head">
           <h2 id="needs-head">{rows.length === 0 ? (partial ? 'Nothing in what was read needs an answer' : 'Nothing needs an answer') : `${plural(rows.length, 'item')} ${rows.length === 1 ? 'needs' : 'need'} an answer`}</h2>
+          {rows.length > 0 && (
+            <InfoTip label="why these items need an answer" tip={NEEDS_WHY} triggerProps={{ 'data-needs-why': '' }}>
+              <p>{NEEDS_WHY}</p>
+            </InfoTip>
+          )}
           {rows.length > 0 && (
             <p className="note sortrows__legend" data-legend="">
               {choicesOf(ins.scheme).map((ch) => (

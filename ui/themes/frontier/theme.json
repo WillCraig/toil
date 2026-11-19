@@ -62,6 +62,7 @@
   "ambient": { "particles": "steam" },
   "sounds": {},
   "assets": {
+    "agentMark": "assets/agent.svg",
     "series": "assets/series.svg",
     "wood": "assets/wood.webp",
     "frame": "assets/brass-plate.svg",

@@ -89,8 +89,10 @@ export interface ThemeManifest {
    * The theme's ambient effects (#348), so Settings knows what its particle
    * switch controls: `particles` names a preset in src/ambient/presets.ts. A
    * theme without it has no particles and no switch. Plain has none.
+   * `default: "off"` keeps them off until someone picks Full motion, which
+   * switches them on; Crate's dust waits for that.
    */
-  ambient?: { particles?: string };
+  ambient?: { particles?: string; default?: 'on' | 'off' };
   /** Sound is off by default in every theme (#206); none ships any yet. */
   sounds: Record<string, string>;
   assets: Record<string, string>;

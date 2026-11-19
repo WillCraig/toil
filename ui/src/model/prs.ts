@@ -375,9 +375,11 @@ export function suggestReviewers(c: Change, others: Change[], rules: OwnerRule[]
 }
 
 /** A suggestion as a proposal: asking for a review is a write, which a person applies through toil's write gate. */
-export function reviewProposal(c: Change, s: Suggested, toilProject: string): Proposal {
+export function reviewProposal(c: Change, s: Suggested, toilProject: string, name: string = s.id): Proposal {
   const number = Number(c.id.slice(c.id.lastIndexOf('#') + 1));
-  const base = { id: `review:${c.id}:${s.id}`, from: 'reviewers' as const, item: c.id, title: `Ask ${s.id} to review ${prName(c.id)}`, reason: `${s.id} ${s.why.join('; ')}.` };
+  // `name` is who the toil project's people say the account is; the command still asks for the account.
+  const who = name === s.id ? s.id : `${name} (${s.id})`;
+  const base = { id: `review:${c.id}:${s.id}`, from: 'reviewers' as const, item: c.id, title: `Ask ${who} to review ${prName(c.id)}`, reason: `${name} ${s.why.join('; ')}.` };
   const area = c.source.area;
   if (area === 'github') {
     const team = s.id.includes('/');
@@ -388,5 +390,5 @@ export function reviewProposal(c: Change, s: Suggested, toilProject: string): Pr
     if (c.source.deployment !== 'cloud') return { ...base, command: 'bitbucket pr add-reviewer', input: { toilProject, id: number, user: s.id }, note: null };
     return { ...base, command: 'bitbucket pr update', input: { toilProject, id: number, reviewers: s.id }, note: 'This replaces the reviewer list, which is empty now: check nobody was added since the last sync.' };
   }
-  return { ...base, command: null, input: null, note: `toil has no command that adds a reviewer on ${sourceLabel(area)} yet. Add ${s.id} on the pull request's page${c.url ? `: ${c.url}` : ''}.` };
+  return { ...base, command: null, input: null, note: `toil has no command that adds a reviewer on ${sourceLabel(area)} yet. Add ${who} on the pull request's page${c.url ? `: ${c.url}` : ''}.` };
 }

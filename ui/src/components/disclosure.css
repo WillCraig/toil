@@ -1,7 +1,5 @@
-/* A folded section's summary: the pointer, a hover surface and a focus ring, with the chevron at its start. */
+/* A folded section's summary: the pointer, a hover surface and a focus ring, with the chevron at its start. It turns in src/motion.css. */
 .disclosure-chevron { display: inline-flex; flex: none; color: var(--muted); }
-.disclosure-chevron__open, details[open] > summary .disclosure-chevron__closed { display: none; }
-details[open] > summary .disclosure-chevron__open { display: inline-block; }
 summary:has(> .disclosure-chevron) { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; list-style: none; }
 summary:has(> .disclosure-chevron)::-webkit-details-marker { display: none; }
 summary:has(> .disclosure-chevron):hover { background: var(--surface); }

@@ -292,10 +292,11 @@ describe('words and figures', () => {
     expect(figuresCsv(ins.run({ measure: 'items', split: 'assignee' }))).not.toMatch(/\r\n=/);
   });
 
-  it('reads the scheme a toil project names, balance included, and falls back with the note for one it cannot', () => {
+  it('reads the scheme a toil project names, balance and flow included, and falls back with the note for one it cannot', () => {
     expect(resolveScheme('ktlo-feature').scheme.name).toBe('ktlo-feature');
     expect(resolveScheme('balance')).toMatchObject({ note: null });
     expect(resolveScheme('balance').scheme.name).toBe('balance');
+    expect(resolveScheme('flow')).toMatchObject({ note: null, scheme: { name: 'flow' } });
     const fallback = resolveScheme('made-up');
     expect(fallback.scheme.name).toBe('ktlo-feature');
     expect(fallback.note).toMatch(/names a classification, made-up,/);

@@ -234,10 +234,9 @@ describe('the page', () => {
     expect(links.map((l) => l.textContent)).toEqual(['Card payments in context', 'Card payments, containers']);
     expect(links[0]!.getAttribute('aria-current')).toBe('page');
     expect(links[1]!.getAttribute('href')).toBe('#/project/card-payments/summary/diagram/containers');
-    // The way back is a link, then where the person is.
-    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    expect(within(crumbs).getByRole('link', { name: 'Summary' }).getAttribute('href')).toBe('#/project/card-payments');
-    expect(crumbs.textContent).toContain('Architecture');
+    // The way back is one quiet button (#657).
+    const crumbs = document.querySelector<HTMLElement>('[data-breadcrumb]')!;
+    expect(within(crumbs).getByRole('link', { name: /Back to Summary/ }).getAttribute('href')).toBe('#/project/card-payments');
   });
 
   it('draws the view in the address', async () => {
@@ -351,19 +350,24 @@ describe('the page', () => {
 });
 
 describe('the ways in', () => {
-  it('lead to the picture from the Summary: the top-row link and the Go to row, and the palette', async () => {
+  it("lead to the picture from the project's More menu, and the palette", async () => {
     await open('#/project/card-payments');
-    await waitFor(() => expect(document.querySelector('[data-job-link="map-codebase"]')).toBeNull());
-    const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-diagram-link]')];
-    expect(links.length).toBe(2);
-    for (const l of links) expect(l.getAttribute('href')).toBe('#/project/card-payments/summary/diagram');
-    expect(within(screen.getByRole('navigation', { name: 'More on card-payments' })).getByRole('link', { name: 'Architecture' })).toBeTruthy();
+    await userEvent.click(await screen.findByRole('button', { name: 'More for card-payments' }));
+    const item = await waitFor(() => {
+      const el = document.querySelector<HTMLAnchorElement>('[data-diagram-link]');
+      if (!el) throw new Error('no diagram item yet');
+      return el;
+    });
+    expect(item.getAttribute('href')).toBe('#/project/card-payments/summary/diagram');
+    expect(document.querySelector('[data-job-link="map-codebase"]')).toBeNull();
   });
 
-  it('keeps the top-row link on the job while no diagram is kept', async () => {
+  it('keeps the More menu on the job while no diagram is kept', async () => {
     await open('#/project/card-payments', withDiagram(() => fail('NOT_FOUND', 'none')));
+    await new Promise((r) => setTimeout(r, 50));
+    await userEvent.click(await screen.findByRole('button', { name: 'More for card-payments' }));
     await waitFor(() => expect(document.querySelector('[data-job-link="map-codebase"]')!.getAttribute('href')).toBe('#/project/card-payments/job/diagram'));
-    expect(document.querySelector('.jobs-link [data-diagram-link]')).toBeNull();
+    expect(document.querySelector('[data-diagram-link]')).toBeNull();
   });
 });
 

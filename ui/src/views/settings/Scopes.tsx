@@ -10,6 +10,8 @@
 import type { DescribedScopes } from '../../../../src/core/scopes.ts';
 import { Copy } from '../../components/layout.tsx';
 import { ChoiceRadios } from './parts.tsx';
+import { SummaryChevron } from '../../components/disclosure.tsx';
+import { ExternalLink } from '../../components/external-link.tsx';
 
 type Kind = DescribedScopes['kinds'][number];
 
@@ -40,9 +42,7 @@ function NeedsList({ title, needs, createUrl, link }: { title: string; needs: st
       </ul>
       <p className="scopes__actions">
         <Copy value={needs.join(', ')} what={`the scopes for ${title.toLowerCase()}`} />{' '}
-        <a href={createUrl} target="_blank" rel="noopener noreferrer">
-          {link}
-        </a>
+        <ExternalLink href={createUrl}>{link}</ExternalLink>
       </p>
     </div>
   );
@@ -53,14 +53,14 @@ export function ScopesDisclosure({ scopes, kindId }: { scopes: DescribedScopes; 
   if (!kind) return null;
   return (
     <details className="more scopes" data-scopes="">
-      <summary>Scopes toil needs</summary>
+      <summary><SummaryChevron />Scopes toil needs</summary>
       <p className="note">
         For a {kind.label.toLowerCase()}. The page opens in a new tab; Toil UI never calls it.
       </p>
       <NeedsList title="Read-only use needs" needs={kind.readOnly.needs} createUrl={kind.readOnly.createUrl} link="Create a token for read-only use" />
       <NeedsList title="Everything toil can do needs" needs={kind.everything.needs} createUrl={kind.everything.createUrl} link="Create a token for everything" />
       <details className="more">
-        <summary>Which commands need what</summary>
+        <summary><SummaryChevron />Which commands need what</summary>
         <ul className="plain scopes__entries">
           {kind.entries.map((e) => (
             <li key={`${e.name}-${e.access ?? ''}`}>

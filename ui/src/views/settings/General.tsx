@@ -13,7 +13,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ConfigApi, SettingsInfo } from '../../config.ts';
 import { Card } from '../../components/layout.tsx';
-import { Help } from '../../components/help.tsx';
+import { Help, InfoTip } from '../../components/help.tsx';
+import { SummaryChevron } from '../../components/disclosure.tsx';
 import { Loader } from '../../moments/Moments.tsx';
 import { matches } from '../../shortcuts.ts';
 
@@ -41,8 +42,12 @@ export function WipeCache({ cache }: { cache: CacheControl }) {
   };
   return (
     <div className="wipe-cache">
-      <h3>Wipe the cache</h3>
-      <p className="note">Deletes everything Toil UI saved on this computer from your tools. The dashboards are empty until the next sync, which reads everything again. Your tools are not touched.</p>
+      <h3>
+        Wipe the cache{' '}
+        <InfoTip label="wiping the cache" tip="Deletes everything Toil UI saved on this computer from your tools. The dashboards are empty until the next sync, which reads everything again. Your tools are not touched.">
+          <p>Deletes everything Toil UI saved on this computer from your tools. The dashboards are empty until the next sync, which reads everything again. Your tools are not touched.</p>
+        </InfoTip>
+      </h3>
       <button type="button" className="btn" ref={trigger} onClick={() => setConfirming(true)} aria-expanded={confirming} aria-controls="wipe-confirm">
         Wipe the cache…
       </button>
@@ -109,18 +114,22 @@ function Limits({ config }: { config: ConfigApi }) {
   return (
     <>
       <Card as="section" className="panel" aria-labelledby="bounds">
-        <h3 id="bounds">Bounds</h3>
+        <h3>
+          <span id="bounds">Bounds</span> <Help topic="bounds" note="Limits Toil keeps on itself." />
+        </h3>
         <dl className="fields">
           <dt>Files</dt>
           <dd>{relaxed ? "Relaxed: Toil may read and write files anywhere you can, except its own settings." : 'Held: Toil reads and writes files only inside your working folder.'}</dd>
         </dl>
         {relaxed && <p className="note">Toil says: {relaxed}</p>}
-        <p className="note">
-          Limits Toil keeps on itself. <Help topic="bounds" />
-        </p>
       </Card>
       <Card as="section" className="panel" aria-labelledby="timeout">
-        <h3 id="timeout">Time limit</h3>
+        <h3>
+          <span id="timeout">Time limit</span>{' '}
+          <InfoTip label="the time limit" tip="A longer job, such as a scan or a report, gets its own limit. This one is set outside Toil UI, so it can't be changed here.">
+            <p>A longer job, such as a scan or a report, gets its own limit. This one is set outside Toil UI, so it can't be changed here.</p>
+          </InfoTip>
+        </h3>
         <dl className="fields">
           <dt>Each request stops after</dt>
           <dd>
@@ -128,7 +137,6 @@ function Limits({ config }: { config: ConfigApi }) {
             {t.effectiveMs === t.defaultMs ? ", Toil's default" : ', set outside Toil UI'}
           </dd>
         </dl>
-        <p className="note">A longer job, such as a scan or a report, gets its own limit. This one is set outside Toil UI, so it can't be changed here.</p>
       </Card>
     </>
   );
@@ -138,8 +146,11 @@ function Limits({ config }: { config: ConfigApi }) {
 export function Advanced({ config, cache }: { config: ConfigApi | null; cache?: CacheControl | undefined }) {
   if (!config && !cache) return null;
   return (
-    <details className="advanced" data-advanced="">
-      <summary>Advanced</summary>
+    <details className="advanced more" data-advanced="">
+      <summary>
+        <SummaryChevron />
+        Advanced
+      </summary>
       {cache && <WipeCache cache={cache} />}
       {config && <Limits config={config} />}
     </details>

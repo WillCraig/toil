@@ -90,6 +90,8 @@ import { WorklogRefusal, type ExportWhat, type WorklogApi } from '../src/worklog
 import type { UsageControl } from './usage.ts';
 import { assignmentRoute, type AssignmentControl } from './assign/routes.ts';
 import { ClassifyRefusal, MAX_ITEMS, type ClassifyBackend } from './classify.ts';
+import { StandardsRefusal } from './standards.ts';
+import type { RulesApi } from '../src/rules.ts';
 import { BoardRefusal, type BoardBackend } from './board.ts';
 import { isMoveColumn } from '../src/board-api.ts';
 import { AssignError } from '../src/assign/queue.ts';
@@ -125,6 +127,8 @@ export interface UiServerOptions {
   assignments?: AssignmentControl;
   /** Sorting work into categories (#566): `api/classify/*`, every step through toil's own commands (ui/server/classify.ts). */
   classify?: ClassifyBackend;
+  /** Ticket rules (#657): `api/standards`, toil's own `standards check` over the cache (ui/server/standards.ts), or the sample's. */
+  standards?: RulesApi;
   /** The Board's drop (`api/board/move`): the move a person made, applied through toil's own command behind the connection's `writes`, or the sample's refusal of it. */
   board?: BoardBackend;
   /**
@@ -704,8 +708,23 @@ export function createUiServer(options: UiServerOptions): UiServer {
     }
   };
 
+  /** `GET api/standards?toilProject=<name>` (#657): the ticket rules checked over the Toil project's synced items, read-only. */
+  const standardsCall = async (res: ServerResponse, url: URL) => {
+    const service = options.standards;
+    if (!service) throw new HttpError(404, 'This Toil UI checks no ticket rules.', 'Start toil-ui with its cache, or with --sample for the sample.');
+    const toilProject = url.searchParams.get('toilProject');
+    if (!toilProject || !TOIL_PROJECT_NAME.test(toilProject)) throw new HttpError(400, 'Name the Toil project by its name.', 'Ask api/standards?toilProject=<name>.');
+    try {
+      json(res, 200, await service.check(toilProject));
+    } catch (e) {
+      if (e instanceof StandardsRefusal) throw new HttpError(e.status, e.message, e.fix);
+      throw e;
+    }
+  };
+
   const api = async (req: IncomingMessage, res: ServerResponse, route: string, url: URL, ctx: RequestContext) => {
     const key = `${req.method === 'HEAD' ? 'GET' : req.method} ${route}`;
+    if (key === 'GET standards') return standardsCall(res, url);
     if (key === 'POST agent/mcp') return mcpCall(req, res, ctx);
     if (await assignmentRoute(key, req, res, url, options.assignments, { readJson, json, headers: SECURITY_HEADERS })) return;
     if (/^(GET|POST) classify\//.test(key)) return classifyCall(key, req, res, url, ctx);

@@ -15,6 +15,7 @@ import { current as BUILT, releases as RELEASES } from 'virtual:whats-new';
 import { CHANGELOG_HREF, PRODUCT_NAME, latest, newSince, parseSeen, type Release, type Versions } from '../whats-new.ts';
 import { day } from '../format.ts';
 import './news.css';
+import { ExternalLink } from './external-link.tsx';
 
 export const SEEN_KEY = 'toil-ui.whats-new.seen';
 
@@ -99,9 +100,9 @@ export function WhatsNewModal({ shown, fresh, isOpen, onOpenChange }: { shown: r
               ))}
               <p className="whats-new__links">
                 {products.map((p) => (
-                  <a key={p} href={CHANGELOG_HREF[p]} target="_blank" rel="noopener noreferrer" data-changelog="">
-                    {PRODUCT_NAME[p]}'s full changelog<span className="sr-only"> (opens in a new tab)</span>
-                  </a>
+                  <ExternalLink key={p} href={CHANGELOG_HREF[p]} data-changelog="">
+                    {PRODUCT_NAME[p]}'s full changelog
+                  </ExternalLink>
                 ))}
               </p>
             </>

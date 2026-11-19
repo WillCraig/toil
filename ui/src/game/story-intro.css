@@ -178,7 +178,8 @@
   max-width: min(410px, 100%);
   margin: 17px 0 0 8px;
   padding: 7px 10px;
-  border-left: 3px solid #ffbd5c;
+  border: 1px solid #ffbd5c66;
+  border-radius: 3px;
   background: #111b38d9;
   color: #ffe0a2;
   font-size: clamp(10px, 1.35vw, 12px);

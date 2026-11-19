@@ -12,6 +12,7 @@ import type { Warning } from '../envelope.js';
 import type { Change, WorkItem } from '../owi/types.js';
 import { readCategoryField } from './existing.js';
 import { detectSignal } from './signals.js';
+import { matchWhen } from './when.js';
 import {
   CLASSIFY_AREAS,
   UNSURE,
@@ -26,7 +27,6 @@ import {
   type PlanGroup,
   type PlanItem,
   type ResolvedTarget,
-  type Rule,
   type Scheme,
   type Verdict,
   type VerdictSource,
@@ -62,54 +62,6 @@ export interface ClassifyInput {
 const lower = (s: string) => s.toLowerCase();
 const isClassifyArea = (area: string): area is ClassifyArea => (CLASSIFY_AREAS as readonly string[]).includes(area);
 const oneLine = (text: string, max: number) => text.replace(/\s+/g, ' ').trim().slice(0, max);
-
-/** The ancestors the input shows, nearest first, plus the id of the first parent it doesn't (cycle-safe). */
-function ancestry(item: WorkItem, byId: ReadonlyMap<string, WorkItem>): { ancestors: WorkItem[]; missing: string | null } {
-  const ancestors: WorkItem[] = [];
-  const seen = new Set<string>([item.id]);
-  let next = item.parent;
-  while (next !== null && next !== undefined) {
-    if (seen.has(next)) return { ancestors, missing: null };
-    seen.add(next);
-    const found = byId.get(next);
-    if (!found) return { ancestors, missing: next };
-    ancestors.push(found);
-    next = found.parent;
-  }
-  return { ancestors, missing: null };
-}
-
-/** Why a rule matched, in words, or null when it didn't. Every key given must match; a key matches when any of its values does. */
-function ruleMatch(rule: Rule, item: WorkItem, byId: ReadonlyMap<string, WorkItem>): string | null {
-  const why: string[] = [];
-  const { parent, label, type, title } = rule.when;
-  if (parent !== undefined) {
-    const { ancestors, missing } = ancestry(item, byId);
-    const hit = parent.find((value) => {
-      const v = lower(value);
-      return ancestors.some((a) => lower(a.id) === v || lower(a.source.key) === v) || (missing !== null && (lower(missing) === v || lower(missing).endsWith(`:${v}`)));
-    });
-    if (hit === undefined) return null;
-    why.push(`it sits under ${hit}`);
-  }
-  if (label !== undefined) {
-    const hit = label.find((value) => item.labels.some((l) => lower(l) === lower(value)));
-    if (hit === undefined) return null;
-    why.push(`it carries the label "${hit}"`);
-  }
-  if (type !== undefined) {
-    const hit = type.find((value) => lower(value) === lower(item.type) || (item.typeName !== null && lower(value) === lower(item.typeName)));
-    if (hit === undefined) return null;
-    why.push(`its type is ${hit}`);
-  }
-  if (title !== undefined) {
-    const hit = title.find((value) => lower(item.title).includes(lower(value)));
-    if (hit === undefined) return null;
-    why.push(`its title contains "${hit}"`);
-  }
-  // A rule with no keys matches nothing: "everything" is not a rule, it's a default.
-  return why.length === 0 ? null : why.join(' and ');
-}
 
 export function classify(input: ClassifyInput): { result: ClassifyResult; warnings: Warning[] } {
   const { scheme } = input;
@@ -204,7 +156,7 @@ export function classify(input: ClassifyInput): { result: ClassifyResult; warnin
         brokenRules.add(rule.id);
         continue;
       }
-      const why = ruleMatch(rule, item, byId);
+      const why = matchWhen(rule.when, item, byId);
       if (why !== null) return settle(item, rule.then, `rule:${rule.id}`, `Rule ${rule.id}: ${why}.`);
     }
 

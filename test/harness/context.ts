@@ -5,6 +5,7 @@ import type { ResolvedConfig, Settings } from '../../src/core/config.js';
 import type { Context } from '../../src/core/context.js';
 import type { SchemeCatalog } from '../../src/core/classify/catalog.js';
 import type { Ledger } from '../../src/core/classify/ledger.js';
+import type { StandardCatalog } from '../../src/core/standards/catalog.js';
 import type { DiagramCatalog } from '../../src/core/diagrams.js';
 import type { ToilProjectCatalog } from '../../src/core/toil-project.js';
 import type { GitRunner } from '../../src/core/git.js';
@@ -55,6 +56,8 @@ export interface TestContextOptions {
   toilProjects?: (config: ResolvedConfig) => ToilProjectCatalog;
   /** Schemes on a temp disk (`toilProjectDisk().schemes`), built over this context's config. Absent, there are none. */
   schemes?: (config: ResolvedConfig) => SchemeCatalog;
+  /** Ticket rules (standards) on a temp disk (`toilProjectDisk().standards`), built over this context's config. Absent, there are none. */
+  standards?: (config: ResolvedConfig) => StandardCatalog;
   /** The classification ledger on a temp disk (`toilProjectDisk().ledger`). Absent, there is none. */
   ledger?: () => Ledger;
   /** Stored diagrams on a temp disk (`toilProjectDisk().diagrams`). Absent, there are none. */
@@ -116,6 +119,7 @@ export function testContext(options: TestContextOptions = {}): { context: Contex
     ...(options.home === undefined ? {} : { home: typeof options.home === 'string' ? options.home : seedHome(options.home) }),
     ...(options.toilProjects ? { toilProjects: options.toilProjects(config) } : {}),
     ...(options.schemes ? { schemes: options.schemes(config) } : {}),
+    ...(options.standards ? { standards: options.standards(config) } : {}),
     ...(options.ledger ? { ledger: options.ledger() } : {}),
     ...(options.diagrams ? { diagrams: options.diagrams() } : {}),
   };

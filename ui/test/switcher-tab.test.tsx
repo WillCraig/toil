@@ -16,10 +16,10 @@ async function menuHrefs(hash: string): Promise<string[]> {
 }
 
 describe('the Toil project switcher', () => {
-  it('stays on Code reviews when it is the tab being read', async () => {
-    const hrefs = await menuHrefs('#/project/card-payments/prs');
+  it('stays on Team when it is the tab being read', async () => {
+    const hrefs = await menuHrefs('#/project/card-payments/standup');
     const others = hrefs.filter((h) => h.startsWith('#/project/'));
     expect(others.length).toBeGreaterThan(0);
-    for (const h of others) expect(h.endsWith('/prs')).toBe(true);
+    for (const h of others) expect(h.endsWith('/people')).toBe(true);
   }, 20_000);
 });

@@ -6,6 +6,7 @@ import { emptyConfig, loadConfig, type AreaInfo } from './core/config.js';
 import type { Context } from './core/context.js';
 import { createSchemeCatalog } from './core/classify/catalog.js';
 import { Ledger } from './core/classify/ledger.js';
+import { createStandardCatalog } from './core/standards/catalog.js';
 import { createDiagramCatalog } from './core/diagrams.js';
 import { createToilProjectCatalog } from './core/toil-project.js';
 import { alreadyExists, nodeFiles, resolveWorkspace } from './core/files.js';
@@ -164,6 +165,15 @@ export function createNodeContext(o: NodeContextOptions): Context {
           }),
           ledger: new Ledger({ home: o.home }),
           schemes: createSchemeCatalog({
+            home: o.home,
+            env: o.env,
+            config,
+            workspace,
+            base: mcp ? workspace.dir : o.cwd,
+            protect: ownFiles(o.home, o.cwd, o.globals.config),
+            git: gitAt,
+          }),
+          standards: createStandardCatalog({
             home: o.home,
             env: o.env,
             config,

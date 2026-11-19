@@ -27,7 +27,7 @@ import { Buffer } from 'node:buffer';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AGENT_ITEMS, DEMO_NOTE, SANDBOX, SKELETON } from './demo-week-data.mjs';
+import { AGENT_ITEMS, DEMO_NOTE, GITHUB_POINTS, SANDBOX, SKELETON } from './demo-week-data.mjs';
 
 const args = process.argv.slice(2);
 const take = (flag, fallback) => {
@@ -174,6 +174,18 @@ function github() {
       say(`  #${preview.number}: ${line}`);
     }
     if (!preview.labels.some((l) => l.name === 'blocked')) gh('POST', `${R}/issues/${preview.number}/labels`, { labels: ['blocked'] });
+  }
+
+  // Estimates the blocker timeline's critical chain depends on (GITHUB_POINTS): one points label, swapped only when it differs.
+  for (const [prefix, points] of Object.entries(GITHUB_POINTS)) {
+    const issue = byTitle(prefix);
+    if (!issue) continue;
+    const want = `points: ${points}`;
+    const have = issue.labels.map((l) => l.name).filter((n) => /^points: \d+$/.test(n));
+    if (have.length === 1 && have[0] === want) continue;
+    for (const name of have.filter((n) => n !== want)) gh('DELETE', `${R}/issues/${issue.number}/labels/${encodeURIComponent(name)}`);
+    if (!have.includes(want)) gh('POST', `${R}/issues/${issue.number}/labels`, { labels: [want] });
+    say(`  #${issue.number}: ${want}`);
   }
 
   // One item ready for an agent: open, with today's text, even after a recording closed it.

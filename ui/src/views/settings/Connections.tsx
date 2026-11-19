@@ -20,6 +20,7 @@ import { afterChoice, borrowChoices, chosen, emptyState, initialState, needOf, r
 import { ScopesDisclosure, TokenKindRadios } from './Scopes.tsx';
 import { checkSecret, type SecretRules } from '../../../../src/core/secret-input.ts';
 import { Loader } from '../../moments/Moments.tsx';
+import { SummaryChevron } from '../../components/disclosure.tsx';
 
 /** The keys of a connection's settings, grouped under where each one comes from. */
 function groupBySource(values: Record<string, string>): Record<string, string[]> {
@@ -645,7 +646,7 @@ export function NewConnectionForm({
           {chosenArea.scopes && <ScopesDisclosure scopes={chosenArea.scopes} kindId={state.tokenKind ?? kinds[0]!.id} />}
           {optional.length > 0 && (
             <details className="more">
-              <summary>Optional settings ({optional.length})</summary>
+              <summary><SummaryChevron />Optional settings ({optional.length})</summary>
               {optional.map(plainField)}
             </details>
           )}

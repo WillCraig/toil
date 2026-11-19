@@ -25,6 +25,7 @@ import { JiraKeyField } from './jira-key.tsx';
 import { OutcomeLine, TextField, type Outcome } from './settings/parts.tsx';
 import './setup.css';
 import { homeShort } from '../home-path.ts';
+import { NavButton } from '../components/nav-button.tsx';
 
 /** Where the wizard lives, and what the Toil projects page, the checklist and the palette open. */
 export const NEW_PROJECT_HREF = '#/new-project';
@@ -263,7 +264,10 @@ export function NewProject({ config, keep }: NewProjectProps) {
                     )}
                     {listed === true && connections.length === 0 && (
                       <p className="note">
-                        You have no tool links yet. <a href="#/settings/connections/+add">Add one in Settings</a> any time.
+                        You have no tool links yet.{' '}
+                        <NavButton href="#/settings/connections/+add" size="sm">
+                          Add one in Settings
+                        </NavButton>
                       </p>
                     )}
                     <ul className="plain">

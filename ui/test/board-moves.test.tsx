@@ -40,7 +40,7 @@ function api(moveItem: ClassifyApi['moveItem'], movesDisabled: string | null = n
 async function openBoard(classify: ClassifyApi | undefined) {
   window.location.hash = '#/project/card-payments/board';
   render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview {...(classify ? { classify } : {})} />);
-  const board = await screen.findByRole('region', { name: 'Sprint 42 board' });
+  const board = await screen.findByRole('region', { name: 'Sprint board' });
   return {
     board,
     col: (name: string) => within(board).getByRole('region', { name: new RegExp(`^${name}`) }),

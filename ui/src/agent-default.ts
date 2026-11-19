@@ -29,11 +29,12 @@ export function defaultAgent(list: AdapterList | null): DefaultAgent | null {
   return null;
 }
 
-/** The few words beside "Answered by": where the agent in front of the person came from. */
+/** The few words beside "Answered by": where the agent in front of the person came from, or null when there is nothing worth saying. */
 export function sourceHint(picked: boolean, from: DefaultAgent | null): string | null {
   if (picked) return 'picked for this chat';
   if (!from) return null;
   if (from.source === 'toilProject') return 'last used on this Toil project';
-  if (from.source === 'ready') return from.skippedDefault ? "your default can't run" : 'the first one ready';
+  // The first ready adapter, with no default set, is no choice worth a note: the name beside "Answered by" says it all.
+  if (from.source === 'ready') return from.skippedDefault ? "your default can't run" : null;
   return 'your default';
 }

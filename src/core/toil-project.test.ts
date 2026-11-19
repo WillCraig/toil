@@ -248,6 +248,43 @@ describe("a toil project's classify key (#566)", () => {
   });
 });
 
+describe("a toil project's standards key (#657)", () => {
+  const read = (standards: unknown) => validateToilProject({ name: 'payments', standards }, areas);
+  const errors = (standards: unknown) => read(standards).problems.filter((p) => p.level === 'error');
+
+  it('reads names and relative .json paths in order, and writes them back as read', () => {
+    const out = read({ use: ['gherkin', './rules/team.json', 'bug-repro'] });
+    expect(out.problems).toEqual([]);
+    expect(out.toilProject?.standards).toEqual({ use: ['gherkin', './rules/team.json', 'bug-repro'] });
+    expect(toilProjectContent(out.toilProject!).standards).toEqual({ use: ['gherkin', './rules/team.json', 'bug-repro'] });
+    expect(validateToilProject({ name: 'payments' }, areas).toilProject).not.toHaveProperty('standards');
+  });
+
+  it('ignores an unknown key with TOIL_PROJECT_UNKNOWN_KEY, and refuses what a tracker section holds', () => {
+    expect(read({ use: ['gherkin'], colour: 'blue' }).problems.map((p) => [p.code, p.path])).toEqual([['TOIL_PROJECT_UNKNOWN_KEY', 'standards.colour']]);
+    for (const key of ['connection', 'host', 'fields', 'transitions', 'writes']) {
+      const found = errors({ use: ['gherkin'], [key]: key === 'writes' ? true : 'x' });
+      expect(found.map((p) => p.path)).toEqual([`standards.${key}`]);
+      expect(found[0]!.message).toContain(`"standards" never holds "${key}"`);
+    }
+  });
+
+  it('holds each standard to a name or a relative .json path, named once, at most 20', () => {
+    for (const ref of ['Not A Name', 'a/b', 'x.txt', '/etc/team.json', String.raw`C:\x\team.json`, String.raw`\\host\share\team.json`, 7, '', 'one\ntwo']) {
+      expect(errors({ use: [ref] }).map((p) => p.path), String(ref)).toEqual(['standards.use[0]']);
+    }
+    expect(errors({ use: ['/etc/team.json'] })[0]!.message).toContain('never an absolute one');
+    expect(errors({ use: ['gherkin', 'gherkin'] })[0]).toMatchObject({ path: 'standards.use[1]', message: expect.stringContaining('listed twice') });
+    expect(errors({ use: Array.from({ length: 21 }, (_, i) => `s${i}`) })[0]).toMatchObject({ path: 'standards.use', message: expect.stringContaining('the most is 20') });
+    expect(errors({ use: ['ghp_abcdefghijklmnopqrstuvwxyz0123456789.json'] })[0]!.message).toContain('shaped like a credential');
+  });
+
+  it('refuses standards that are not an object, and use that is not a list', () => {
+    expect(errors(['gherkin'])[0]).toMatchObject({ path: 'standards', code: 'TOIL_PROJECT_INVALID' });
+    expect(errors({ use: 'gherkin' })[0]!.path).toBe('standards.use');
+  });
+});
+
 describe("a toil project's dimensions key and a person's team (#567)", () => {
   const LF = String.fromCharCode(10);
   const read = (dimensions: unknown) => validateToilProject({ name: 'payments', dimensions }, areas);

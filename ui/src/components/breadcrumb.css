@@ -1,5 +1,2 @@
-.breadcrumb ol { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; list-style: none; margin: 0; padding: 0; font-size: 0.9375rem; }
-.breadcrumb li { display: inline-flex; align-items: center; min-height: 32px; }
-.breadcrumb li + li::before { content: "\203A"; margin-right: 0.35rem; color: var(--muted, var(--ink)); }
-.breadcrumb a { display: inline-flex; align-items: center; min-height: 32px; }
-.breadcrumb [aria-current="page"] { color: var(--muted, var(--ink)); }
+.breadcrumb { margin: 0; }
+.breadcrumb .btn { margin-inline-start: -0.6rem; }

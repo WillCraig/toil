@@ -17,6 +17,7 @@ import { fixtureConfig } from './fixtures/config.ts';
 import { FIXTURE_NOW, fixtureExecute } from './fixtures/execute.ts';
 import { fixtureFeedback } from './fixtures/feedback.ts';
 import { fixtureModelUsage } from './fixtures/model-usage.ts';
+import { fixtureStandards } from './fixtures/standards.ts';
 import { fixtureWorklog } from './fixtures/worklog.ts';
 
 export function SampleApp({ onLeave }: { onLeave?: () => void }) {
@@ -30,6 +31,7 @@ export function SampleApp({ onLeave }: { onLeave?: () => void }) {
     worklog: fixtureWorklog(),
     analyses: fixtureAnalyses(),
     classify: fixtureClassify(),
+    rules: fixtureStandards(),
   }));
   return <App {...fixtures} now={FIXTURE_NOW} preview {...(onLeave ? { onLeaveSample: onLeave } : {})} />;
 }

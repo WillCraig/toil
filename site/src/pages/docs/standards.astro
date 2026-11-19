@@ -1,0 +1,11 @@
+---
+import SkillPage from '../../components/SkillPage.astro';
+import CommandIndex from '../../components/CommandIndex.astro';
+
+// Ticket rules: skills/toil/standards.md, rendered, then the registry's list
+// of the standards commands. `projects standards set` is on the Toil projects page.
+---
+
+<SkillPage file="standards.md">
+  <CommandIndex group="standards" />
+</SkillPage>

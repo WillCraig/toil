@@ -6,9 +6,10 @@
  * somewhere, a first for a status report.
  */
 
-import { createContext, useContext } from 'react';
-import { Link, Tooltip, TooltipTrigger } from 'react-aria-components';
-import { segments } from '../agent.ts';
+import { Fragment, createContext, useContext, useId, useState } from 'react';
+import { Button, Link, Tooltip, TooltipTrigger } from 'react-aria-components';
+import { NavButton } from './nav-button.tsx';
+import { blocksOf, segments } from '../agent.ts';
 import { useData } from '../data.ts';
 import { STATUS_CATEGORY_LABEL, dateTime, estimateText, itemHref, personText, prName, shortKey, sourceLabel, sourceShort } from '../format.ts';
 import { themed } from '../theme-context.ts';
@@ -16,6 +17,7 @@ import './analysis.css';
 import type { ThemeManifest } from '../themes.ts';
 import type { Change, WorkItem } from '../toil.ts';
 import { cellCite, type ViewContext } from '../view-context.ts';
+import { ExternalLink } from './external-link.tsx';
 
 /**
  * Where an item link goes: its own page, unless a view says otherwise. The
@@ -42,6 +44,54 @@ export function ItemLink({ id, withTitle = false }: { id: string; withTitle?: bo
   );
 }
 
+/**
+ * An item as a row (principle 11, #657): the whole row is a quiet button to the item's page, its source and key then its
+ * title, so a list of items reads as rows to press rather than a wall of underlined links. A pull request, whose page is
+ * on its host, stays a link, since it leaves the app.
+ */
+export function ItemRow({ id }: { id: string }) {
+  const { byId, prById, toilProject } = useData();
+  const hrefOf = useContext(ItemHrefContext);
+  const item = byId.get(id);
+  const pr = item ? undefined : prById?.get(id);
+  if (pr) return <PrLink change={pr} withTitle />;
+  if (!item) return <code className="missing">{id}</code>;
+  return (
+    <NavButton href={hrefOf ? hrefOf(toilProject.name, id) : itemHref(toilProject.name, id)} kind="quiet" size="sm" row className="item-row" data-item-row={id}>
+      <span className="key">
+        <span className="source">{sourceLabel(item.source.area)}</span> {shortKey(item)}
+      </span>{' '}
+      <span className="title">{item.title}</span>
+    </NavButton>
+  );
+}
+
+/**
+ * A list of items as rows, the first `max` shown and the rest one press away behind "Show all N" (principle 11): a count
+ * and a few to act on, never a wall. Nothing is dropped, only folded.
+ */
+export function ItemRows({ ids, label, max = 3 }: { ids: string[]; label: string; max?: number }) {
+  const [all, setAll] = useState(false);
+  const listId = useId();
+  const shown = all ? ids : ids.slice(0, max);
+  return (
+    <>
+      <ul className="plain item-rows" id={listId} aria-label={label}>
+        {shown.map((id) => (
+          <li key={id}>
+            <ItemRow id={id} />
+          </li>
+        ))}
+      </ul>
+      {ids.length > max && (
+        <Button className="btn btn--secondary btn--sm item-rows__more" aria-expanded={all} aria-controls={listId} onPress={() => setAll((a) => !a)} data-show-all="">
+          {all ? 'Show fewer' : `Show all ${ids.length}`}
+        </Button>
+      )}
+    </>
+  );
+}
+
 /** A pull request, linked to its page on the host where the record has one. */
 export function PrLink({ change, withTitle = false }: { change: Change; withTitle?: boolean }) {
   const label = (
@@ -53,9 +103,9 @@ export function PrLink({ change, withTitle = false }: { change: Change; withTitl
     </>
   );
   return change.url ? (
-    <a href={change.url} className="item-link">
+    <ExternalLink href={change.url} className="item-link">
       {label}
-    </a>
+    </ExternalLink>
   ) : (
     <span className="item-link">{label}</span>
   );
@@ -77,6 +127,37 @@ export function Cited({ text, chips = false, cells, onCellCitation }: { text: st
           <CellChip key={i} cite={s.cell} view={cells} onPress={onCellCitation} />
         ) : (
           <span key={i}>{s.text}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+/**
+ * One part of an agent's answer as paragraphs and lists (blocksOf): its line
+ * breaks kept, and a run of `- ` lines as a real bulleted list, with the
+ * citations in each linked as `Cited` links them.
+ */
+export function AnswerText({ text, chips = false, cells, onCellCitation }: { text: string; chips?: boolean; cells?: Pick<ViewContext, 'cells'> | null | undefined; onCellCitation?: ((column: string, row: string) => void) | undefined }) {
+  const cite = (t: string) => <Cited text={t} chips={chips} cells={cells} onCellCitation={onCellCitation} />;
+  return (
+    <>
+      {blocksOf(text).map((b, i) =>
+        b.kind === 'list' ? (
+          <ul key={i} className="answer-list">
+            {b.items.map((item, j) => (
+              <li key={j}>{cite(item)}</li>
+            ))}
+          </ul>
+        ) : (
+          <p key={i}>
+            {b.lines.map((line, j) => (
+              <Fragment key={j}>
+                {j > 0 && <br />}
+                {cite(line)}
+              </Fragment>
+            ))}
+          </p>
         ),
       )}
     </>

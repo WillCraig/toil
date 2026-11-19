@@ -176,7 +176,7 @@ describe('edit links', () => {
 
   it("puts a pencil on an item's connection and on the People view's limit, each opening its settings", async () => {
     await open(`#/project/card-payments/item/${encodeURIComponent('corp-jira:PAY-102')}`);
-    expect(screen.getByRole('link', { name: 'Edit the corp-jira connection' }).getAttribute('href')).toBe('#/settings/connections/corp-jira');
+    expect(screen.getByRole('link', { name: 'Edit corp-jira in Settings' }).getAttribute('href')).toBe('#/settings/connections/corp-jira');
     expect(screen.getByRole('link', { name: "Edit card-payments's field names" }).getAttribute('href')).toBe('#/settings/projects/card-payments/fields');
   });
 

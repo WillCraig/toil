@@ -18,7 +18,9 @@ import { Path } from '../components/layout.tsx';
 import { Help } from '../components/help.tsx';
 import { Panel } from '../components/panel.tsx';
 import { useData } from '../data.ts';
-import { toilProjectHref, standupHref, worklogHref } from '../format.ts';
+import { sourceLabel, toilProjectHref, standupHref, worklogHref } from '../format.ts';
+import { NavButton } from '../components/nav-button.tsx';
+import { ExternalLink } from '../components/external-link.tsx';
 import {
   addMonths, appliedText, daysOfMonth, longDay, monthName, monthOf, OUTCOME_TEXT, seenText, timeOf,
   type RunLine, type WorklogEvent,
@@ -26,6 +28,7 @@ import {
 import { MAX_NOTE, type ExportWhat, type WorklogApi, type WorklogDay, type WorklogExport, type WorklogMonth } from '../worklog.ts';
 import { Loader } from '../moments/Moments.tsx';
 import { Dash } from './Standup.tsx';
+import { SummaryChevron } from '../components/disclosure.tsx';
 
 type Loaded<T> = { ok: true; value: T } | { ok: false; message: string } | null;
 const failedWith = (e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) });
@@ -69,15 +72,10 @@ export function Worklog({ api, day }: { api: WorklogApi | null; day: string | nu
   const head = (
     <div className="view-head">
       <p className="eyebrow">
-        <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a>
+        <NavButton href={toilProjectHref(toilProject.name)} kind="quiet" size="sm" className="eyebrow-btn">
+          {toilProject.name}
+        </NavButton>
       </p>
-      {api && (
-        <p>
-          <a className="btn" href={standupHref(toilProject.name)} data-standup-link="">
-            Stand-up since the last working day
-          </a>
-        </p>
-      )}
     </div>
   );
   if (!api) {
@@ -97,7 +95,7 @@ export function Worklog({ api, day }: { api: WorklogApi | null; day: string | nu
         <Panel id="worklog-calendar" title={calendar?.ok ? monthName(calendar.value.month) : 'Calendar'} calls={[]} info={calendar?.ok ? <Help topic="worklog-calendar" note={`The cache keeps ${plural(calendar.value.retentionDays, 'day')} after each sync, and so do the pages.`} /> : undefined}>
           {!calendar ? <Loader size="panel" message="Reading the calendar" /> : calendar.ok ? <Calendar data={calendar.value} selected={selected} onMonth={setMonth} /> : <p role="alert" className="failure">{calendar.message}</p>}
         </Panel>
-        <Panel id="worklog-day" title={selected ? longDay(selected) : 'The day'} calls={[]}>
+        <Panel id="worklog-day" title={selected ? longDay(selected) : 'The day'} calls={[]} info={<Help topic="worklog" note="Built by Toil UI from its cache, facts only." />}>
           {!page ? (
             <Loader size="panel" message="Folding the page" />
           ) : page.ok ? (
@@ -192,9 +190,9 @@ function Subject({ e }: { e: WorklogEvent }) {
   const { byId, prById } = useData();
   if (byId.has(e.subject) || prById?.has(e.subject)) return <ItemLink id={e.subject} withTitle />;
   return e.url ? (
-    <a href={e.url} className="item-link">
+    <ExternalLink href={e.url} className="item-link">
       <span className="key">{e.label}</span>
-    </a>
+    </ExternalLink>
   ) : (
     <span className="item-link">
       <span className="key">{e.label}</span>
@@ -254,8 +252,9 @@ function Empties({ none, unread }: { none: string[]; unread: string[] }) {
   return (
     <>
       {none.length > 0 && (
+        // A dash only ever means "not read yet" (principle 12), so a section that was read and is empty says so in words.
         <p className="note" data-empties="none">
-          <Dash /> {none.join(' · ')}
+          Nothing recorded: {none.join(' · ')}
         </p>
       )}
       {unread.length > 0 && (
@@ -299,7 +298,7 @@ function Run({ line }: { line: RunLine }) {
           </ul>
         )}
         <details className="worklog-transcript">
-          <summary>Transcript, written by the agent</summary>
+          <summary><SummaryChevron />Transcript, written by the agent</summary>
           {run.answer ? (
             run.answer.split(/\n{2,}/).map((para, i) => (
               <p key={i}>
@@ -340,10 +339,6 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
   };
   return (
     <div className="worklog-page">
-      <p className="note">
-        Built by Toil UI from its cache, facts only{data.file ? ', and kept at ' : '.'}
-        {data.file && <Path value={data.file} what="page's path" />}
-      </p>
       {api.disabled && <p className="note" data-worklog-disabled="">{api.disabled}</p>}
       {page.gaps.length > 0 && (
         <section className="worklog-gaps" aria-labelledby={`gaps-${page.day}`}>
@@ -374,7 +369,7 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
           <ul className="plain">
             {page.sources.map((s) => (
               <li key={s.area}>
-                <code>{s.area}</code>: {s.syncs ? `${plural(s.syncs, 'sync')} this day${s.failed ? `, ${s.failed} failed` : ''}, the last at ${timeOf(s.last!)} UTC` : 'no sync this day'}
+                {sourceLabel(s.area)}: {s.syncs ? `${plural(s.syncs, 'sync')} this day${s.failed ? `, ${s.failed} failed` : ''}, the last at ${timeOf(s.last!)} UTC` : 'no sync this day'}
               </li>
             ))}
           </ul>
@@ -386,9 +381,10 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
         <Button className="btn" data-worklog-rebuild="" isDisabled={busy} onPress={() => void rebuild()}>
           Rebuild this day
         </Button>
-        <a className="btn btn--accent" href={standupHref(page.toilProject, { from: page.day, to: page.day })} data-standup-day="">
+        {/* The one way to this day's stand-up (#657); the page's head no longer offers a second. */}
+        <NavButton href={standupHref(page.toilProject, { from: page.day, to: page.day })} kind="secondary" data-standup-day="">
           Stand-up for this day
-        </a>
+        </NavButton>
         {rebuilt && (
           <p role="status" className="note">
             {rebuilt}
@@ -397,7 +393,12 @@ function DayPage({ api, data, today, onChange }: { api: WorklogApi; data: Worklo
       </div>
       {!api.disabled && <Export api={api} toilProject={page.toilProject} day={page.day} />}
       <details className="worklog-md">
-        <summary>The page as Markdown</summary>
+        <summary><SummaryChevron />The page as Markdown</summary>
+        {data.file && (
+          <p className="note">
+            Kept at <Path value={data.file} what="page's path" />
+          </p>
+        )}
         <pre role="region" aria-label="The page as Markdown" tabIndex={0}>
           <code>{data.markdown}</code>
         </pre>

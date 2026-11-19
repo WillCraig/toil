@@ -6,13 +6,23 @@
  * dimension (it then becomes a bar of category share for each value), change what
  * is counted (items, estimate, days in progress), and narrow it with the filter
  * bar, all in menus and all in the address. Beside the chart, never behind a
- * tooltip, it says how the categories were decided and how much is still Unsure,
+ * tooltip, it says how the categories were decided and how much is not sorted yet,
  * because a share that hides how much of it is a guess is a misleading share.
  * A split by person or team is in name order and never sorted by size: the team
  * is measured, never the person. Splits by anyone's name are alphabetical, a form of fairness.
+ *
+ * "Categories" (#657) views the same work by another built-in scheme, such as
+ * flow's Feature, Defect, Risk and Debt, worked out on the fly from its rules
+ * and the labels already on the items (`?lens=` in the address, read by
+ * useWorkInsights). It comes first and stands apart from Split by and Measured
+ * in, since it changes what the categories are rather than how they are cut.
+ * It changes nothing saved: the team's own choice lives in Settings, and this
+ * menu only borrows the other spectacles; "Back to saved" returns them.
  */
 
 import { Fragment } from 'react';
+import { BUILTIN_SCHEMES } from '../../../../src/core/classify/builtin.ts';
+import type { Scheme } from '../../../../src/core/classify/types.ts';
 import { StackedBars, StackedColumns } from '../../components/chartkit/index.ts';
 import { CategoryName } from '../../components/category-chip.tsx';
 import { Choice } from '../../components/choice.tsx';
@@ -22,12 +32,13 @@ import { Unread } from '../../components/unread.tsx';
 import { useData } from '../../data.ts';
 import { classifyHref } from '../../format.ts';
 import { toWhere } from '../../filters.ts';
-import { useAddress, useWorkInsights } from '../../insights-data.ts';
-import { mixSources, mixOverview, mixSentence, inNameOrder, isPeopleDimension, labelOfDimension, MIX_UNITS, periodWords, SPLIT_MENU, type MixUnit } from '../../model/work-insights.ts';
+import { lensOf, schemeInUse, useAddress, useWorkInsights } from '../../insights-data.ts';
+import { mixDecided, mixOverview, mixSentence, inNameOrder, NOT_SORTED, isPeopleDimension, labelOfDimension, MIX_UNITS, periodWords, SPLIT_MENU, type MixUnit } from '../../model/work-insights.ts';
 import { useWords } from '../../theme-context.ts';
 import type { Dashboard, Headline } from './dashboard.ts';
 import { ChartPanel, DashboardHead, Door, useDrill, useFilterFromCell, useSourceLine } from './shared.tsx';
 import { plainDates } from './format.ts';
+import { NavButton } from '../../components/nav-button.tsx';
 
 const TIME = 'time';
 
@@ -38,10 +49,19 @@ export function mixHeadline(ins: ReturnType<typeof useWorkInsights>): Headline {
   return { text: mixSentence(lines), note: `${periodWords(ins.today, period)}, ${result.total.value ?? 0} ${result.measure.unit} finished` };
 }
 
+/** A scheme's categories, in order: "Feature / Defect / Risk / Debt". */
+const schemeLabel = (s: { categories: ReadonlyArray<Pick<Scheme['categories'][number], 'name'>> }) => s.categories.map((c) => c.name).join(' / ');
+
+/** The built-in schemes' names as the Categories menu leads with them, so two lists of categories are told apart by name. */
+const SCHEME_TITLE: Record<string, string> = { flow: 'Flow', balance: 'Balance' };
+
+/** A scheme as the Categories menu names it: "Flow: Feature / Defect / Risk / Debt". */
+const schemeOption = (s: Pick<Scheme, 'name'> & Parameters<typeof schemeLabel>[0]) => (SCHEME_TITLE[s.name] ? `${SCHEME_TITLE[s.name]}: ${schemeLabel(s)}` : schemeLabel(s));
+
 export function MixView() {
   const ins = useWorkInsights();
-  const { toilProject } = useData();
-  const { filters, query, go } = useAddress();
+  const { toilProject, classification } = useData();
+  const { filters, query, go, hrefWith } = useAddress();
   const drill = useDrill();
   const words = useWords();
   const source = useSourceLine(true);
@@ -57,14 +77,25 @@ export function MixView() {
   const result = split !== TIME && isPeopleDimension(split) ? inNameOrder(raw) : raw;
   const onFilter = useFilterFromCell(result);
   const scheme = { categories: ins.scheme.categories };
-  const decided = mixSources(lead.result.total.items.flatMap((id) => (ins.verdicts.get(id) ? [ins.verdicts.get(id)!] : [])));
+  const decided = mixDecided(ins, lead, unit);
   const share = (n: number) => (decided.total === 0 ? null : `${Math.round((n / decided.total) * 100)}%`);
   const sources: Array<[string, number]> = [['Rules', decided.rules], ['Labels on the items', decided.labels], ['Your AI agent', decided.agent], ['People', decided.people]];
   const splitLabel = split === TIME ? 'Month' : labelOfDimension(split);
   const title = split === TIME ? `Work mix by month, ${periodWords(ins.today, period)}` : `Work mix by ${labelOfDimension(split).toLowerCase()}, ${periodWords(ins.today, period)}`;
   const set = (key: string, value: string | null) => go((q) => (value === null ? q.delete(key) : q.set(key, value)));
+  // The saved scheme first when it isn't built in (a team's own file), then every built-in one; picking the saved one drops the lens.
+  const inUse = schemeInUse(toilProject.classifyScheme, classification?.view?.scheme.name);
+  const lens = lensOf(query.get('lens'), inUse);
+  const saved = classification?.view?.scheme;
+  const lenses = [
+    ...(BUILTIN_SCHEMES.some((b) => b.name === inUse) ? [] : [{ id: inUse, label: `${saved ? schemeLabel(saved) : inUse} (your team's)` }]),
+    ...BUILTIN_SCHEMES.map((b) => ({ id: b.name, label: `${schemeOption(b)}${b.name === inUse ? " (your team's)" : ''}` })),
+  ];
   const menus = (
     <div className="chart-menus">
+      <div className="chart-menus__lens">
+        <Choice label="Categories" value={lens ?? inUse} options={lenses} onChange={(id) => set('lens', id === inUse ? null : id)} />
+      </div>
       <Choice label={words('charts.splitBy')} value={split} options={[{ id: TIME, label: 'Month' }, ...SPLIT_MENU.filter((d) => d.spec !== 'category').map((d) => ({ id: d.spec, label: d.label }))]} onChange={(id) => set('split', id === TIME ? null : id)} />
       <Choice label={words('charts.measuredIn')} value={unit} options={MIX_UNITS.map((u) => ({ id: u.id, label: u.label }))} onChange={(id) => set('unit', id === 'items' ? null : id)} />
     </div>
@@ -89,6 +120,11 @@ export function MixView() {
           </>
         )}
       </p>
+      {lens && (
+        <p className="note" data-mix-lens={lens}>
+          Viewing as {schemeLabel(ins.scheme)}. Your team's saved categories haven't changed. <NavButton href={hrefWith((q) => q.delete('lens'))} size="sm">Back to saved</NavButton>
+        </p>
+      )}
       <FilterBar />
       <div className="chart-page__grid">
         <div className="chart-page__main">
@@ -135,9 +171,9 @@ export function MixView() {
                 </li>
               ))}
               <li>
-                <a href={classifyHref(toilProject.name)} data-unsure-link="">
-                  Unsure
-                </a>{' '}
+                <NavButton href={classifyHref(toilProject.name)} kind="quiet" size="sm" data-unsure-link="">
+                  {NOT_SORTED}
+                </NavButton>{' '}
                 <b>{share(decided.unsure)}</b>
               </li>
             </ul>

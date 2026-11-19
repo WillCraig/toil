@@ -1,0 +1,131 @@
+/* Motion that brings what was clicked into focus (principle 11): one set of
+   durations and one easing for every theme, and the few classes and data
+   attributes views put on things to move them (src/motion.ts has the script
+   side). Everything here moves only while the system allows motion (the
+   @media block) and "Motion" in Settings isn't Off (data-motion="reduced" on
+   the root, which app.css also uses to stop everything). With motion
+   stopped, every change is instant and the arrival ring stays still.
+
+   Hover and press take --dur-1, a section opening or a card coming into focus
+   --dur-2, and a drill into another page --dur-3. Leaving is quicker than
+   arriving (0.7 of it), since nobody waits to watch something go. The
+   durations were approved at the first reading, which is a first. */
+
+:root {
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --ease-motion: cubic-bezier(0.2, 0, 0, 1);
+  --exit-factor: 0.7;
+}
+
+/* Subtle plays the page's own moves at the shorter step. */
+:root[data-theme-motion="subtle"] { --dur-3: var(--dur-2); }
+
+/* The arrival ring (focusArrival): drawn without motion too, as a still ring,
+   so the target is always marked; with motion it fades over 600ms. */
+[data-arrived] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* A disclosure's body (DisclosureBody): a grid of one row, so its height can grow from nothing. */
+.disclosure-body { display: grid; grid-template-rows: 1fr; min-width: 0; }
+.disclosure-body > * { min-height: 0; min-width: 0; }
+
+/* The chevron turns rather than swaps. */
+.disclosure-chevron svg { transform: rotate(0deg); }
+details[open] > summary .disclosure-chevron svg { transform: rotate(90deg); }
+
+/* The tab bar's underline (useTabInk): one bar under the chosen tab, placed by script. */
+[data-tab-ink] { position: relative; }
+[data-tab-ink]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: var(--tab-ink-w, 0);
+  transform: translateX(var(--tab-ink-x, 0));
+  background: var(--accent);
+  pointer-events: none;
+}
+
+/* The drill-in's shared element: the card pressed and the heading it opens. */
+::view-transition-group(drill) { animation-duration: var(--dur-3); animation-timing-function: var(--ease-motion); }
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduced"]) [data-press] {
+    transition: transform var(--dur-1) var(--ease-motion);
+  }
+  :root:not([data-motion="reduced"]) [data-press]:active,
+  :root:not([data-motion="reduced"]) [data-press][data-pressed] {
+    transform: scale(0.98);
+  }
+
+  /* The page cross-fades under a drill-in, while the pressed card grows into the heading it opened; the old page leaves at 0.7 of the time. */
+  :root:not([data-motion="reduced"])::view-transition-old(root) {
+    animation: motion-fade-out calc(var(--dur-3) * var(--exit-factor)) var(--ease-motion) both;
+  }
+  :root:not([data-motion="reduced"])::view-transition-new(root) {
+    animation: motion-fade-in var(--dur-3) var(--ease-motion) both;
+  }
+
+  /* Without the View Transitions API, the page's content fades in and rises 8px. */
+  :root:not([data-motion="reduced"])[data-drill="enter"] main {
+    animation: motion-rise var(--dur-3) var(--ease-motion) both;
+  }
+
+  :root:not([data-motion="reduced"]) [data-arrived="fading"] {
+    animation: motion-arrive 600ms var(--ease-motion) both;
+  }
+
+  :root:not([data-motion="reduced"]) details[open] > .disclosure-body {
+    animation: motion-open var(--dur-2) var(--ease-motion) both;
+  }
+  :root:not([data-motion="reduced"]) .disclosure-chevron svg {
+    transition: transform var(--dur-2) var(--ease-motion);
+  }
+
+  /* A tab's panel cross-fades in at --dur-1, and the underline slides. */
+  :root:not([data-motion="reduced"]) [data-tab-panel] {
+    animation: motion-fade-in var(--dur-1) linear both;
+  }
+  :root:not([data-motion="reduced"]) [data-tab-ink]::after {
+    transition: transform var(--dur-2) var(--ease-motion), width var(--dur-2) var(--ease-motion);
+  }
+}
+
+/* The View Transitions API animates even when CSS animations are stopped, so stillness says so here too. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+:root[data-motion="reduced"]::view-transition-group(*),
+:root[data-motion="reduced"]::view-transition-old(*),
+:root[data-motion="reduced"]::view-transition-new(*) { animation: none !important; }
+
+@keyframes motion-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes motion-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes motion-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes motion-open {
+  from { grid-template-rows: 0fr; opacity: 0; }
+  to { grid-template-rows: 1fr; opacity: 1; }
+}
+
+@keyframes motion-arrive {
+  from { outline-color: var(--accent); }
+  to { outline-color: transparent; }
+}

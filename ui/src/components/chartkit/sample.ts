@@ -56,12 +56,12 @@ const other: PivotAxisValue = { key: '(other)', label: 'Other', kind: 'other' };
 const none = (label: string): PivotAxisValue => ({ key: '(none)', label, kind: 'none' });
 const months = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'].map((m) => value(`2026-${m}`, m));
 
-/** Work mix: two categories, Other and Unsure, over six months, in points. One month's Keep the lights on was never estimated. */
+/** Work mix: two categories, Other and Not sorted yet, over six months, in points. One month's Keep the lights on was never estimated. */
 export const WORK_MIX = makeResult({
   measure: { id: 'estimate', unit: 'points', label: 'Estimate' },
   split: { spec: 'category', label: 'Category' },
   across: { spec: 'created:month', label: 'Created, by month' },
-  rows: [value('ktlo', 'Keep the lights on', 'KTLO'), value('features', 'New features', 'FEAT'), other, none('Unsure')],
+  rows: [value('ktlo', 'Keep the lights on', 'KTLO'), value('features', 'New features', 'FEAT'), other, none('Not sorted yet')],
   columns: months,
   values: [
     [14, 18, 20, null, 26, 24],
@@ -76,7 +76,7 @@ export const WORK_MIX = makeResult({
 /** The same, with nothing unread, for the forms that draw a plain table. */
 export const WORK_MIX_COMPLETE = makeResult({
   measure: { id: 'items', unit: 'items', label: 'Items' },
-  rows: [value('ktlo', 'Keep the lights on', 'KTLO'), value('features', 'New features', 'FEAT'), other, none('Unsure')],
+  rows: [value('ktlo', 'Keep the lights on', 'KTLO'), value('features', 'New features', 'FEAT'), other, none('Not sorted yet')],
   columns: months,
   values: [
     [14, 18, 20, 17, 26, 24],
@@ -131,7 +131,7 @@ export const UNREAD_SPLIT: PivotResult = {
 export const PERSON_MIX = makeResult({
   split: { spec: 'category', label: 'Category' },
   across: null,
-  rows: [value('ktlo', 'Keep the lights on', 'KTLO'), value('features', 'New features', 'FEAT'), other, none('Unsure')],
+  rows: [value('ktlo', 'Keep the lights on', 'KTLO'), value('features', 'New features', 'FEAT'), other, none('Not sorted yet')],
   columns: [{ key: ALL_KEY, label: 'All items', kind: 'value' }],
   values: [[8], [11], [2], [1]],
 });

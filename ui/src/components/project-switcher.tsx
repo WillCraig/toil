@@ -3,8 +3,9 @@
  * at, and a way to another one from any page. Its button reads the current project's
  * name ("All Toil projects" on a page that belongs to none), and its menu lists the
  * overview and every project with the current one checked. Switching keeps the tab
- * being read, so Code reviews stays Code reviews; a page that isn't a tab (an item, an
- * assignment, a job) lands on the project's first. It is the header's only link to the
+ * being read, Summary, Tickets or Team, so a page a step in from the Summary (Code
+ * reviews, the board) lands on the other project's Summary, an item on its Tickets, and
+ * a page that belongs to no tab (an assignment, a job) on its first. It is the header's only link to the
  * Toil projects page (there is no "Toil projects" nav link), so it is drawn whenever
  * there is at least one project; with none, the brand is the way home. While the list
  * isn't read (`loaded` false, as on Settings, which reads it afresh after a visit) it still

@@ -4,7 +4,7 @@
 .cite-link[data-hovered] { text-decoration-thickness: 2px; }
 .cite-link[data-focus-visible] { outline: 3px solid var(--focus); outline-offset: 2px; }
 /* A fold says it folds: its summary keeps a triangle, since a flex summary loses the browser's own marker. */
-.analysis-evidence > summary::before, .analysis__changes > summary::before { content: ""; flex: none; align-self: center; width: 0.45em; height: 0.45em; margin-inline: 0.2em 0.35em; border: solid var(--link); border-width: 0 2px 2px 0; transform: rotate(-45deg); }
+.analysis-evidence > summary::before, .analysis__changes > summary::before { content: ""; flex: none; align-self: center; width: 0.45em; height: 0.45em; margin-inline: 0.2em 0.35em; border: solid var(--muted); border-width: 0 2px 2px 0; transform: rotate(-45deg); }
 .analysis-evidence[open] > summary::before, .analysis__changes[open] > summary::before { transform: rotate(45deg); }
 .analysis-evidence > summary::-webkit-details-marker, .analysis__changes > summary::-webkit-details-marker { display: none; }
 .analysis__changes > summary { gap: 0.35rem; }
@@ -32,7 +32,7 @@
 .analysis-body { display: grid; gap: 0.6rem; }
 .analysis-body > section { display: grid; gap: 0.25rem; }
 .analysis-label { margin: 0; color: var(--muted); font-family: var(--font-mono); font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-.analysis-rec { padding: 0.35rem 0 0.35rem 0.75rem; border-left: 4px solid var(--accent); }
+.analysis-rec { padding: 0.5rem 0.75rem; border: 1px solid var(--edge-accent); border-radius: var(--radius); background: var(--tint-accent); }
 .analysis-rec__text { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .analysis-issues__list { margin: 0; padding-left: 1.4rem; display: grid; gap: 0.35rem; overflow-wrap: anywhere; }
 .analysis-issue__title { font-weight: 600; }
@@ -61,3 +61,6 @@
 .analysis__rec a { color: inherit; text-decoration-color: var(--line); text-underline-offset: 0.2em; }
 .analysis__rec a:hover { color: var(--link); text-decoration-color: currentColor; }
 .analysis__tag { margin-inline-start: 0.6rem; padding: 0.05rem 0.5rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 0.75rem; font-weight: 400; white-space: nowrap; }
+/* An agent's bulleted list in an answer (AnswerText): real bullets, close under the line that introduces it. */
+.answer-list { margin: 0.25rem 0 0.75rem; padding-left: 1.25rem; list-style: disc; }
+.answer-list > li + li { margin-top: 0.25rem; }

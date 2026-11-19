@@ -23,6 +23,7 @@ import type { AnalysesApi } from './analyses.ts';
 import type { AnalysisSummary, AnalysisView } from './model/analysis.ts';
 import { SAMPLE_CANNOT_WRITE, type AgentChoice, type ClassifyApi, type LedgerView } from './classify-api.ts';
 import type { MoveOutcome } from './board-api.ts';
+import type { RulesApi, RulesView } from './rules.ts';
 import type { WorkItem } from './toil.ts';
 import { WORKLOG_SAMPLE_DISABLED, type WorklogApi, type WorklogDay, type WorklogExport, type WorklogMonth, type WorklogRebuilt, type WorklogStandup } from './worklog.ts';
 
@@ -487,6 +488,17 @@ export function httpClassify(base = './', { sample = false }: { sample?: boolean
       const res = await call(base, 'api/board/move', { body: { toilProject, item, to, ...(how?.addToBoard ? { addToBoard: true } : {}) } });
       if (!res.ok) throw await failure(res, 'Moving the card');
       return (await res.json()) as MoveOutcome;
+    },
+  };
+}
+
+/** Ticket rules over the server (#657): toil's check of a Toil project's synced items, read-only. */
+export function httpRules(base = './'): RulesApi {
+  return {
+    check: async (toilProject) => {
+      const res = await call(base, `api/standards?${new URLSearchParams({ toilProject }).toString()}`);
+      if (!res.ok) throw await failure(res, 'Checking the ticket rules');
+      return (await res.json()) as RulesView;
     },
   };
 }

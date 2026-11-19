@@ -30,7 +30,8 @@ describe('the system prompt', () => {
     // The agent is told the page's limit, so it chooses the proposals rather than losing the last ones (#317: Copilot wrote 14, then 11, on two runs).
     expect(RULES).toContain('Write at most 10 proposals, the ones that matter most');
     expect(RULES).toContain('plain text (no Markdown, no headings, no bold)');
-    expect(RULES).toContain('Say plainly when the data does not show something.');
+    // A gap is said in the tickets' terms, never the cache's (#657, round 5: "The cache didn't tell me why" on camera).
+    expect(RULES).toContain('Say plainly when the data does not show something, in the person\'s words ("the tickets don\'t say why"), never in terms of the cache.');
     expect(RULES).not.toContain('Style:');
   });
 

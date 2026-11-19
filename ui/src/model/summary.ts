@@ -144,7 +144,7 @@ export interface Answer {
   why: string;
   /** What it was worked out from, line by line, one step in. */
   how: string[];
-  /** Says the status word is an estimate, or that it is too early for a pace. */
+  /** Says the status word is an estimate, or that it is too early for a pace: the first line behind "How was this worked out?", never under the headline. */
   basis: string | null;
   /** The sentence says it all: the headline is the sentence alone, with no "Word:" in front. */
   bare?: boolean;

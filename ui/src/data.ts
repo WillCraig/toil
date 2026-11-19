@@ -17,6 +17,7 @@ import { prepare, type Prepared } from './model/insights.ts';
 import { health, type Health } from './model/sprint.ts';
 import type { Change, Execute, WorkItem } from './toil.ts';
 import type { WorklogApi } from './worklog.ts';
+import type { RulesState } from './rules.ts';
 
 /**
  * What the Command Center hands #293's start action: the ready items in the
@@ -74,6 +75,8 @@ export interface Data {
   sync?: () => void;
   /** The classification ledger (#566), where the app can read one; absent in a view rendered on its own. */
   classification?: ClassificationState;
+  /** The ticket rules (#657) for the toil project on screen, as toil checked them; absent in a view rendered on its own, where a toil project that names rules shows them as not read yet. */
+  rules?: RulesState;
   /** The worklog (#308), which the Summary's stand-up card reads through; absent where nothing keeps one. */
   worklog?: WorklogApi;
 }

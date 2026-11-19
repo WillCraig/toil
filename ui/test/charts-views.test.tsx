@@ -43,10 +43,10 @@ describe('Work mix', () => {
   it('draws the trend, says how it was decided beside it, and splits by any dimension', async () => {
     await open(`${TEAM}/summary/mix`);
     const decided = await until<HTMLElement>('[data-decided]');
-    expect(decided.textContent).toMatch(/Rules \d+%Labels on the items \d+%Your AI agent 0%People 0%Unsure \d+%/);
+    expect(decided.textContent).toMatch(/Rules \d+%Labels on the items \d+%Your AI agent 0%People 0%Not sorted yet \d+%/);
     expect(decided.querySelector('a[data-unsure-link]')!.getAttribute('href')).toBe('#/project/sample-team/board/classify');
     expect(screen.getAllByText(/Work mix by month/).length).toBeGreaterThan(0);
-    expect(document.querySelector('[data-mix-lead]')!.textContent).toMatch(/Feature \d+% · Keep the lights on \d+% · Unsure \d+%, last 90 days/);
+    expect(document.querySelector('[data-mix-lead]')!.textContent).toMatch(/Feature \d+% · Keep the lights on \d+% · Not sorted yet \d+%, last 90 days/);
     await go(`${TEAM}/summary/mix?split=team`);
     await waitFor(() => expect(screen.getAllByText(/Work mix by team/).length).toBeGreaterThan(0));
   });

@@ -3,6 +3,8 @@
 .summary-charts__items { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 1rem 1.5rem; list-style: none; padding: 0; margin: 0; }
 .summary-chart { display: grid; gap: 0.35rem; align-content: start; min-width: 0; }
 .summary-chart__title { margin: 0; font-size: 1rem; }
+.btn.summary-chart__open { margin-inline-start: -0.6rem; font-size: 1rem; font-weight: 600; }
+.summary-chart__action { margin: 0.25rem 0 0; }
 .summary-chart__headline { margin: 0; }
 .summary-chart__note { margin: 0; font-size: 0.8125rem; }
 .summary-chart__figure { margin: 0; min-width: 0; }

@@ -193,9 +193,14 @@ describe("the site's tokens are Plain's", () => {
  */
 describe("Crate wears the site's blue", () => {
   const crate = JSON.parse(read('ui/themes/crate/theme.json')) as { schemes: Record<string, Record<string, string>> };
-  /** Each of Crate's keys, and the site token it takes. */
-  const SITE_TOKEN: Record<string, string> = {
-    bg: 'bg', surface: 'surface', raised: 'surface-raised', ink: 'ink', muted: 'muted', line: 'line',
+  /**
+   * Each of Crate's keys, and the site token it takes. `line` is Crate's own
+   * (#657's polish): a quieter hairline than the site's, between the surface
+   * and the site's line, held below. Nothing relies on it as a control's
+   * boundary: buttons and fields are outlined in muted (src/app.css).
+   */
+  const SITE_TOKEN: Record<string, string | null> = {
+    bg: 'bg', surface: 'surface', raised: 'surface-raised', ink: 'ink', muted: 'muted', line: null,
     accent: 'accent', accentInk: 'accent-ink', link: 'highlight', focus: 'focus',
     ok: 'ok', warn: 'warn', danger: 'danger', bannerBg: 'surface-raised', bannerInk: 'highlight',
   };
@@ -204,8 +209,15 @@ describe("Crate wears the site's blue", () => {
     expect(Object.keys(crate.schemes)).toEqual(['dark', 'light']);
   });
 
-  it.each(Object.entries(SITE_TOKEN))("takes its %s from the site's %s token", (key, name) => {
+  it.each(Object.entries(SITE_TOKEN).filter((e): e is [string, string] => e[1] !== null))("takes its %s from the site's %s token", (key, name) => {
     expect(crate.schemes.dark![key]?.toLowerCase(), `ui/themes/crate/theme.json dark.${key} vs the site's --${name}`).toBe(hex(token(name)));
+  });
+
+  it("draws its own line between the site's surface and the site's line, quieter than the site's", () => {
+    const lum = (h: string) => hexToRgb(h).reduce((a, b) => a + b, 0);
+    const line = crate.schemes.dark!.line!;
+    expect(lum(line)).toBeGreaterThan(lum(hex(token('surface'))));
+    expect(lum(line)).toBeLessThan(lum(hex(token('line'))));
   });
 
   it('sets no colour the map above leaves out', () => {

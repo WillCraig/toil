@@ -5,18 +5,22 @@
  * own buttons, never with the page's scroll wheel, and nothing in it can be
  * dragged or connected, since a new link would be a write. The same edges are
  * listed in words underneath, so every relation is there without the picture.
+ * Both sit folded under the blocker timeline, each behind a one-line summary
+ * with its count (principle 11), and the drawing is only built once opened:
+ * xyflow measures its nodes, and a closed section has nothing to measure.
  */
 
 import { Background, Handle, MarkerType, Panel, Position, ReactFlow, useReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/base.css';
 import { Component, useState, type ReactNode } from 'react';
-import { Button } from 'react-aria-components';
 import { StatusChip } from '../components/bits.tsx';
+import { DisclosureBody, SummaryChevron } from '../components/disclosure.tsx';
 import { ItemLink } from '../components/items.tsx';
 import { useData } from '../data.ts';
 import { Empty, TrackerAction } from '../components/empty.tsx';
 import { EDGE_WORD, dependencyGraph, type GraphNode } from '../model/graph.ts';
 import { useTerm, useWords } from '../skins.tsx';
+import './gantt.css';
 
 type ItemNode = Node<{ node: GraphNode }, 'item'>;
 
@@ -89,10 +93,11 @@ export function Graph() {
   const { toilProject, byId, sync } = useData();
   const words = useWords();
   const g = dependencyGraph(toilProject.items);
-  // With nothing open held up, the picture is only finished work's links: said plainly, and drawn on request.
-  const [finished, setFinished] = useState(false);
-  const idle = g.nodes.length > 0 && !g.nodes.some((n) => n.blocked);
+  // Built on the first open and kept after, so closing and opening again doesn't redraw it.
+  const [drawn, setDrawn] = useState(false);
   if (!g.nodes.length) return <Empty message={words('empty.links')} action={<TrackerAction toilProject={toilProject.name} sync={sync} />} />;
+  // With nothing open held up, the links are only finished work's: said plainly, and still one press away.
+  const idle = !g.nodes.some((n) => n.blocked);
 
   const nodes: ItemNode[] = g.nodes.map((n) => ({ id: n.id, type: 'item', position: { x: n.rank * 260, y: n.row * 130 }, data: { node: n } }));
   const edges: Edge[] = g.edges.map((e) => {
@@ -111,62 +116,63 @@ export function Graph() {
     const item = byId.get(id);
     return item ? <ItemLink id={id} withTitle /> : <code className="missing">{id}</code>;
   };
-
-  if (idle && !finished) {
-    return (
-      <>
-        <p data-nothing-blocked="">Nothing that is still open is blocked by another story.</p>
-        <Button className="btn btn--small" onPress={() => setFinished(true)} aria-expanded="false" data-show-finished="">
-          Show finished links
-        </Button>
-      </>
-    );
-  }
+  const items = (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`;
 
   return (
     <>
-      {idle && (
-        <p>
-          <Button className="btn btn--small" onPress={() => setFinished(false)} aria-expanded="true" data-show-finished="">
-            Hide finished links
-          </Button>
-        </p>
-      )}
+      {idle && <p data-nothing-blocked="">Nothing that is still open is blocked by another story.</p>}
       {g.cycle && <p className="failure">These blocks links form a loop, so the columns are approximate.</p>}
-      <Drawing>
-      <div className="graph">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          nodesFocusable={false}
-          edgesFocusable={false}
-          zoomOnScroll={false}
-          panOnScroll={false}
-          preventScrolling={false}
-          zoomOnDoubleClick={false}
-          fitView
-          fitViewOptions={FIT}
-          minZoom={0.4}
-          maxZoom={1.5}
-          proOptions={{ hideAttribution: false }}
-        >
-          <Background gap={24} size={1} />
-          <Zoom />
-        </ReactFlow>
-      </div>
-      </Drawing>
-      <h3>Every link</h3>
-      <ul className="rows">
-        {g.edges.map((e) => (
-          <li key={e.id}>
-            {name(e.source)} {EDGE_WORD[e.type]} {name(e.target)} <span className="field">({e.name})</span>
-          </li>
-        ))}
-      </ul>
+      <details className="deps-more" data-graph-drawing="" onToggle={(e) => e.currentTarget.open && setDrawn(true)}>
+        <summary>
+          <SummaryChevron />
+          <span>Graph of the links ({items(g.nodes.length)})</span>
+        </summary>
+        <DisclosureBody>
+          {drawn && (
+            <Drawing>
+              <div className="graph">
+                <ReactFlow
+                  nodes={nodes}
+                  edges={edges}
+                  nodeTypes={nodeTypes}
+                  nodesDraggable={false}
+                  nodesConnectable={false}
+                  elementsSelectable={false}
+                  nodesFocusable={false}
+                  edgesFocusable={false}
+                  zoomOnScroll={false}
+                  panOnScroll={false}
+                  preventScrolling={false}
+                  zoomOnDoubleClick={false}
+                  fitView
+                  fitViewOptions={FIT}
+                  minZoom={0.4}
+                  maxZoom={1.5}
+                  proOptions={{ hideAttribution: false }}
+                >
+                  <Background gap={24} size={1} />
+                  <Zoom />
+                </ReactFlow>
+              </div>
+            </Drawing>
+          )}
+        </DisclosureBody>
+      </details>
+      <details className="deps-more" data-graph-links="">
+        <summary>
+          <SummaryChevron />
+          <span>Every link ({g.edges.length})</span>
+        </summary>
+        <DisclosureBody>
+          <ul className="rows">
+            {g.edges.map((e) => (
+              <li key={e.id}>
+                {name(e.source)} {EDGE_WORD[e.type]} {name(e.target)} <span className="field">({e.name})</span>
+              </li>
+            ))}
+          </ul>
+        </DisclosureBody>
+      </details>
     </>
   );
 }

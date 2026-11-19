@@ -24,6 +24,8 @@ import { FACE, availability, jobOf, jobPrompt, jobLabel, type Availability, type
 import type { Change } from '../toil.ts';
 import { MoreIcon } from './icons.tsx';
 import './jobs.css';
+import { AgentMark } from './agent-mark.tsx';
+import { NavButton } from './nav-button.tsx';
 
 /** The address of a job: its own page, which says what it does and has the Run button. */
 export const jobHref = (toilProject: string, id: JobId, target?: string): string => `${toilProjectHref(toilProject)}/job/${FACE[id].segment}${target ? `?target=${encodeURIComponent(target)}` : ''}`;
@@ -112,7 +114,10 @@ export function PullRequestActions({ change, info, plain }: { change: Change; in
         >
           {jobs.map(({ id, face, ready }) => (
             <MenuItem key={id} id={id} className={`menu-item jobs-item${ready.ready ? '' : ' jobs-item--off'}`} textValue={face.label}>
-              <Text slot="label">{plain ? face.plain : face.label}</Text>
+              <Text slot="label">
+                <AgentMark />
+                {plain ? face.plain : face.label}
+              </Text>
               {!ready.ready && (
                 <Text slot="description" className="note jobs-item__why">
                   {ready.why}
@@ -141,13 +146,13 @@ export function DiagramLink() {
   return (
     <p className="note jobs-link">
       {kept ? (
-        <a href={diagramHref(toilProject.name)} data-diagram-link="" className="nowrap">
+        <NavButton href={diagramHref(toilProject.name)} size="sm" data-diagram-link="" className="nowrap">
           Architecture
-        </a>
+        </NavButton>
       ) : (
-        <a href={jobHref(toilProject.name, 'map-codebase')} data-job-link="map-codebase" className="nowrap">
+        <NavButton href={jobHref(toilProject.name, 'map-codebase')} size="sm" data-job-link="map-codebase" className="nowrap">
           Draw its architecture
-        </a>
+        </NavButton>
       )}
     </p>
   );
@@ -184,7 +189,9 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
     <div className="job-page" data-job={id}>
       <div className="view-head">
         <p className="eyebrow">
-          <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a>
+          <NavButton href={toilProjectHref(toilProject.name)} kind="quiet" size="sm" className="eyebrow-btn">
+            {toilProject.name}
+          </NavButton>
         </p>
         <h1 tabIndex={-1}>
           {face.label}
@@ -211,13 +218,17 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
       )}
       {!ready.ready && (
         <p role="note" className="failure" data-job-missing="">
-          {ready.why?.replace(' Add one in Settings, Connections.', '')} <a href="#/settings/connections">Add one in Settings, Connections.</a>
+          {ready.why?.replace(' Add one in Settings, Connections.', '')}{' '}
+          <NavButton href="#/settings/connections" size="sm">
+            Add one in Settings, Connections
+          </NavButton>
         </p>
       )}
 
       {face.on === 'toil project' ? (
         <p>
           <Button className="btn btn--accent" isDisabled={!canRun} onPress={() => runJob(id, '')} data-job-run="">
+            <AgentMark />
             {face.label} in {toilProject.name}
           </Button>
         </p>
@@ -225,6 +236,7 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
         <>
           <p>
             <Button className="btn btn--accent" isDisabled={!canRun} onPress={() => runJob(id, subject)} data-job-run="">
+              <AgentMark />
               Draw {subject || toilProject.name}
             </Button>
           </p>
@@ -234,7 +246,9 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
               {(targets as string[]).map((r, i) => (
                 <span key={r}>
                   {i > 0 && ', '}
-                  <a href={jobHref(toilProject.name, id, r)}>{r}</a>
+                  <NavButton href={jobHref(toilProject.name, id, r)} kind="secondary" size="sm">
+                    {r}
+                  </NavButton>
                 </span>
               ))}
             </p>
@@ -243,6 +257,7 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
       ) : subject ? (
         <p>
           <Button className="btn btn--accent" isDisabled={!canRun} onPress={() => runJob(id, subject)} data-job-run="">
+            <AgentMark />
             {face.label} {change ? change.title : subject}
           </Button>
         </p>
@@ -252,7 +267,9 @@ export function JobPage({ id, target }: { id: JobId; target: string | null }) {
           <ul className="rows">
             {(targets as Change[]).map((c) => (
               <li key={c.id}>
-                <a href={jobHref(toilProject.name, id, c.id)}>{c.title}</a> <span className="field">{c.repo}</span>
+                <NavButton href={jobHref(toilProject.name, id, c.id)} kind="quiet" size="sm" row>
+                  {c.title} <span className="field">{c.repo}</span>
+                </NavButton>
               </li>
             ))}
             {targets.length === 0 && <li className="note">No open pull requests for this Toil project.</li>}

@@ -24,7 +24,8 @@
 .cat-chip { display: inline-flex; align-items: baseline; gap: 0.15rem; padding: 0.05rem 0.5rem; border-radius: 999px; border: 1px solid var(--line); background: var(--raised); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
 /* In the drawer the category's name breaks only between words (a wide theme face may need two lines) and what decided it sits under it, so a long name never breaks into a column of single words. */
 .drill-drawer .cat-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0; max-width: 100%; white-space: normal; overflow-wrap: break-word; text-align: left; border-radius: 0.6rem; padding-block: 0.15rem; }
-.cat-chip--unsure { color: var(--muted); border-style: dashed; }
+/* Not sorted yet: muted words in the same frame as its siblings, never a dashed outline that reads as broken. */
+.cat-chip--unsure { color: var(--muted); }
 .cat-chip__how { font-weight: 400; color: var(--muted); }
 .cat-name { text-decoration: underline dotted; text-underline-offset: 0.2em; cursor: help; }
 .drill-drawer .l-table th { overflow-wrap: normal; }

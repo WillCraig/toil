@@ -19,6 +19,7 @@ import type { AdapterStatus, AgentSettingsClient, InstallPlan } from './server-c
 import { Card } from './components/layout.tsx';
 import { usePlain } from './plain-words.ts';
 import { homeShort, homeText } from './home-path.ts';
+import { SummaryChevron } from './components/disclosure.tsx';
 
 /** What the preview's Install shows instead of running anything. */
 export const INSTALL_PREVIEW = 'This is the preview, so nothing is installed. Toil UI on your own machine runs this command when you press Install.';
@@ -95,7 +96,7 @@ export function AdaptersCard({ adapters, client, onInstalled }: { adapters: Adap
                 </p>
               )}
               <details className="agent-details">
-                <summary>Details for whoever sets it up</summary>
+                <summary><SummaryChevron />Details for whoever sets it up</summary>
                 {statusLines(a).map((line, i) => (
                   <p key={i} className="note">
                     {line}

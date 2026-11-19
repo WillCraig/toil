@@ -18,9 +18,11 @@ import { MAX_VIEWS, VIEW_NAME, type SavedView } from './insights/types.js';
 import { readSavedView } from './insights/saved-view.js';
 import { AUDIENCES, MAX_FOCUS, type Audience, type ToilProjectAnalyze } from './brief/prompt.js';
 import { CATEGORY_ID, CLASSIFY_AREAS, SCHEME_NAME, type ClassifyArea, type ClassifySettings, type ClassifyTarget } from './classify/types.js';
+import { STANDARD_NAME, type StandardsSettings } from './standards/types.js';
 
 export type { ToilProjectAnalyze } from './brief/prompt.js';
 export type { ClassifySettings } from './classify/types.js';
+export type { StandardsSettings } from './standards/types.js';
 
 /**
  * Toil projects: what toil knows about one body of work (its repositories, the
@@ -97,6 +99,8 @@ export interface ToilProject {
   analyze?: ToilProjectAnalyze;
   /** Which scheme classifies its work and where each tracker keeps the category (#566); absent for the built-in `ktlo-feature` and labels only. */
   classify?: ClassifySettings;
+  /** The ticket rules (standards) its work is held to, in order (#657); absent when it names none, and then none apply. */
+  standards?: StandardsSettings;
   /** Extra dimensions to split work by: a dimension's name to the field that holds it in each area (`{ "customer": { "jira": "customfield_10500" } }`); absent when it names none. */
   dimensions?: Record<string, Record<string, string>>;
   /** Saved pivots a team opens the same way (#567), by view name (`views.release-mix`); absent when it keeps none. */
@@ -133,7 +137,7 @@ export interface ToilProjectArea {
 
 /** Keys of a section that core reads itself; every other key is a context input or reference data. */
 const CORE_SECTION_KEYS = new Set(['connection', 'host', 'fields', 'transitions']);
-const TOP_LEVEL = new Set(['$schema', 'name', 'description', 'env', 'repos', 'environments', 'people', 'wipLimit', 'archived', 'analyze', 'classify', 'dimensions', 'views']);
+const TOP_LEVEL = new Set(['$schema', 'name', 'description', 'env', 'repos', 'environments', 'people', 'wipLimit', 'archived', 'analyze', 'classify', 'standards', 'dimensions', 'views']);
 const ALIAS = /^[a-z][a-zA-Z0-9]*$/;
 const HOST = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:\d{1,5})?$/i;
 
@@ -415,6 +419,7 @@ export function validateToilProject(input: unknown, areas: readonly ToilProjectA
 
   const analyze = readAnalyze(raw.analyze, error, warn);
   const classify = readClassify(raw.classify, error, warn);
+  const standards = readStandards(raw.standards, error, warn);
   const dimensions = readDimensions(raw.dimensions, byName, error, warn);
   const views = readViews(raw.views, error);
 
@@ -433,6 +438,7 @@ export function validateToilProject(input: unknown, areas: readonly ToilProjectA
       ...(raw.archived === true ? { archived: true as const } : {}),
       ...(analyze ? { analyze } : {}),
       ...(classify ? { classify } : {}),
+      ...(standards ? { standards } : {}),
       ...(dimensions ? { dimensions } : {}),
       ...(views ? { views } : {}),
     },
@@ -600,6 +606,60 @@ function readClassify(value: unknown, error: (path: string, message: string) => 
 /** The `classify` key as it's written: an empty `targets` is left out, so what's read is what's written back. */
 function classifyContent(c: ClassifySettings): Record<string, unknown> {
   return { ...(c.scheme !== undefined ? { scheme: c.scheme } : {}), ...(Object.keys(c.targets).length > 0 ? { targets: c.targets } : {}) };
+}
+
+const STANDARDS_KEYS = ['use'];
+/** The most standards one toil project may name. */
+export const MAX_STANDARDS = 20;
+
+/** A standard named by a toil project: a standard's name, or a relative path to its file ending in `.json`. */
+export function standardRefProblem(v: string): string | undefined {
+  if (STANDARD_NAME.test(v)) return undefined;
+  if (!v.toLowerCase().endsWith('.json')) return 'must be a standard name (lowercase letters, digits and single hyphens, e.g. "gherkin") or a relative path to a standard file ending in .json.';
+  if (isAbsolute(v) || /^[A-Za-z]:/.test(v) || v.startsWith('\\\\') || v.startsWith('/')) return 'a standard file is named by a path relative to this toil project, never an absolute one.';
+  return undefined;
+}
+
+/**
+ * The `standards` object (#657): the ticket rules its work is held to, by name
+ * or by a path beside the toil project, in the order they are checked. Like
+ * `classify` it names rules and never holds them, and never anything a tracker
+ * section checks, so the key can't pick a connection or turn on writes. Up to
+ * MAX_STANDARDS, each named once, each one line, short, and never shaped like a
+ * credential.
+ */
+function readStandards(value: unknown, error: (path: string, message: string) => void, warn: (code: string, path: string, message: string) => void): StandardsSettings | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) {
+    error('standards', '"standards" must be an object: { "use": ["gherkin", "./team-rules.json"] }.');
+    return undefined;
+  }
+  for (const key of Object.keys(value)) {
+    if (CLASSIFY_REFUSED.includes(key)) error(`standards.${key}`, `"standards" never holds "${key}": it names ticket rules, and a connection, host, fields, transitions or writes belong to the area's own section or to your connections.`);
+    else if (!STANDARDS_KEYS.includes(key)) warn('TOIL_PROJECT_UNKNOWN_KEY', `standards.${key}`, `"${key}" isn't a standards key; standards takes ${STANDARDS_KEYS.join(', ')}. It was ignored.`);
+  }
+  const use: string[] = [];
+  if (value.use !== undefined) {
+    if (!Array.isArray(value.use)) error('standards.use', '"use" must be a list of standard names or relative paths ending in .json.');
+    else {
+      if (value.use.length > MAX_STANDARDS) error('standards.use', `"use" names ${value.use.length} standards; the most is ${MAX_STANDARDS}.`);
+      const seen = new Set<string>();
+      value.use.forEach((v: unknown, i: number) => {
+        const path = `standards.use[${i}]`;
+        if (typeof v !== 'string' || v.trim() === '') return void error(path, 'Each standard must be text: a name or a relative path ending in .json.');
+        if (v.length > MAX_CLASSIFY_TEXT) return void error(path, `A standard is named in ${v.length} characters; the most is ${MAX_CLASSIFY_TEXT}.`);
+        if (findSecrets(v).length > 0) return void error(path, 'A standard holds something shaped like a credential, and a toil project never holds one.');
+        if ([...v].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f)) return void error(path, 'A standard must be one line of text, with no line breaks or control characters.');
+        const ref = v.trim();
+        const why = standardRefProblem(ref);
+        if (why) return void error(path, `"${ref}" ${why}`);
+        if (seen.has(ref)) return void error(path, `"${ref}" is listed twice.`);
+        seen.add(ref);
+        use.push(ref);
+      });
+    }
+  }
+  return { use };
 }
 
 /** What a tracker section holds, never a `dimensions` key, for the same reason `classify` refuses them. */
@@ -848,6 +908,7 @@ export function toilProjectContent(toilProject: ToilProject): Record<string, unk
     ...(toilProject.archived ? { archived: true } : {}),
     ...(toilProject.analyze !== undefined ? { analyze: toilProject.analyze } : {}),
     ...(toilProject.classify !== undefined ? { classify: classifyContent(toilProject.classify) } : {}),
+    ...(toilProject.standards !== undefined ? { standards: { use: toilProject.standards.use } } : {}),
     ...(toilProject.dimensions !== undefined ? { dimensions: toilProject.dimensions } : {}),
     ...(toilProject.views !== undefined ? { views: toilProject.views } : {}),
   };

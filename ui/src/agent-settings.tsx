@@ -31,6 +31,7 @@ import { AdaptersCard, InstallDialog, helperState, needsInstall, statusLines, ST
 import { usePlain } from './plain-words.ts';
 import { SAMPLE_ADAPTER_STATUS } from './fixtures/agent-status.ts';
 import { homeText } from './home-path.ts';
+import { SummaryChevron } from './components/disclosure.tsx';
 
 const ENDPOINT_LABEL: Record<string, string> = { anthropic: 'Anthropic API', bedrock: 'Amazon Bedrock', foundry: 'Microsoft Foundry', vertex: 'Google Vertex AI' };
 
@@ -160,7 +161,7 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
                     </p>
                   )}
                   <details className="agent-details helper-row__wide">
-                    <summary>Details for whoever sets it up</summary>
+                    <summary><SummaryChevron />Details for whoever sets it up</summary>
                     {statusLines(a).map((line, i) => (
                       <p key={i} className="note">
                         {line}
@@ -173,7 +174,7 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
           </RadioGroup>
           <p className="note">Install runs one npm command, shown to you first, at the version Toil UI was tested with. Nothing runs until you press Install in that window.</p>
           <details className="agent-advanced" data-advanced="">
-            <summary>Advanced: models, program path and endpoint</summary>
+            <summary><SummaryChevron />Advanced: models, program path and endpoint</summary>
             <fieldset className="agent-models">
               <legend>Models, each empty for its program's default</legend>
               <p className="note">Each one runs with its own model, whether it answers by default, in a chat switched to it, or on an assignment.</p>

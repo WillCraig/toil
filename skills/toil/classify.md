@@ -49,8 +49,13 @@ repository's review is.
 - Every text is one line, and none may be shaped like a credential. An unknown top-level key
   is ignored with a `SCHEME_UNKNOWN_KEY` warning.
 
-Two schemes are built in: **`ktlo-feature`**, the default (KTLO and Feature), and
-**`balance`** (New capabilities, Improvements, KTLO and Productivity).
+Three schemes are built in: **`ktlo-feature`**, the default (KTLO and Feature);
+**`balance`** (New capabilities, Improvements, KTLO and Productivity); and **`flow`**
+(Feature, Defect, Risk and Debt). `flow` has `signals` off and six rules, tried in order:
+a `security` or `compliance` label is Risk (so a security bug is Risk, not Defect), a Bug
+is Defect, so is an item labelled `bug` or `defect` (for trackers that file bugs as tasks), a title containing `Bump` or `Upgrade` is Debt (a case-insensitive substring
+match, so `Upgraded` counts too), a `tech-debt` label is Debt, and any other story is Feature. Anything else is unsure,
+for a person or an AI agent to decide.
 
 ### Where schemes live
 

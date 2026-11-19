@@ -248,9 +248,9 @@
   box-shadow: inset 0 0 12px rgba(var(--sprawl-cyan), calc(0.05 * var(--sprawl-glow)));
 }
 
-/* A gig on the board: a magenta rail down its left edge. */
+/* A gig on the board: a magenta-lit frame all the way round. */
 [data-theme="sprawl"] .card {
-  border-left: 3px solid var(--accent);
+  border-color: rgba(var(--sprawl-pink), 0.45);
   background: rgba(var(--sprawl-raised), 0.96);
 }
 
@@ -279,8 +279,7 @@
 /* Sprint health as readouts on a terminal: an uppercase label, a neon figure. */
 [data-theme="sprawl"] .stat,
 [data-theme="sprawl"] .metric {
-  border: 1px solid rgba(var(--sprawl-cyan), 0.35);
-  border-left: 3px solid var(--link);
+  border: 1px solid rgba(var(--sprawl-cyan), 0.45);
   background: linear-gradient(90deg, rgba(var(--sprawl-cyan), 0.07), transparent 70%), var(--raised);
 }
 
@@ -473,8 +472,7 @@
 
 [data-theme="sprawl"] .loader-tip {
   padding: 0.5rem 0.75rem;
-  border-top: 0;
-  border-left: 2px solid var(--link);
+  border: 1px solid rgba(var(--sprawl-cyan), 0.35);
   background: rgba(var(--sprawl-surface), 0.92);
 }
 
@@ -491,7 +489,6 @@
 
 [data-theme="sprawl"] .moment {
   border: 1px solid rgba(var(--sprawl-cyan), 0.5);
-  border-left: 3px solid var(--accent);
   border-radius: 0;
   background:
     linear-gradient(135deg, rgba(var(--sprawl-cyan), 0.07), transparent 50%, rgba(var(--sprawl-pink), 0.08)),
@@ -644,7 +641,6 @@
 }
 
 [data-theme="sprawl"] .btn--accent,
-[data-theme="sprawl"] .top nav a[aria-current="page"],
 [data-theme="sprawl"] button[aria-pressed="true"] {
   background: linear-gradient(100deg, var(--accent), var(--sprawl-accent-hi));
   box-shadow: 0 0 12px rgba(var(--sprawl-pink), calc(0.4 * var(--sprawl-glow)));

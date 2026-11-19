@@ -23,7 +23,7 @@ const workflowsDir = join(dir, 'workflows');
 /** Every Markdown file of the skill, as a path from its folder: the pages beside SKILL.md, and the workflow pages. */
 const allFiles = [...readdirSync(dir).filter((f) => f.endsWith('.md')), ...readdirSync(workflowsDir).map((f) => `workflows/${f}`)];
 /** The files in the skill that belong to no area: the index, what every command shares, toil projects, installing toil, and the MCP server. */
-const GENERAL = ['SKILL.md', 'core.md', 'projects.md', 'classify.md', 'install.md', 'mcp.md', 'setup.md', 'upgrading.md'];
+const GENERAL = ['SKILL.md', 'core.md', 'projects.md', 'classify.md', 'standards.md', 'install.md', 'mcp.md', 'setup.md', 'upgrading.md'];
 const integrations = join(import.meta.dirname, '..', 'site', 'src', 'data', 'integrations');
 
 /** The `key: value` lines between a file's opening `---` fences. */

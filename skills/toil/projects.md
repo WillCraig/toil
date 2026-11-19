@@ -198,6 +198,10 @@ The request it sent was
   host or `writes`. Set it with `toil projects classify set <toil-project> --scheme <name|./file.json>
   --target jira.field=workCategory`; `--clear <scheme|jira|github|ado>` removes a part, on the CLI
   only, and a value already set needs `--replace`.
+- **`standards`**: the ticket rules its work items are held to, in order: `{ "use": ["gherkin",
+  "./rules/team.json"] }`. It names standards (`standards.md`) and holds no connection, host or
+  `writes`. Set it with `toil projects standards set <toil-project> --use <name|./file.json>`;
+  a different list needs `--replace`, and `--clear` removes it, on the CLI only.
 
 ## Where toil projects live
 

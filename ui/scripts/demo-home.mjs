@@ -4,6 +4,7 @@
 //   node ui/scripts/demo-home.mjs --fresh         # delete it and build it again
 //   node ui/scripts/demo-home.mjs --launch        # then start Toil UI in it
 //   node ui/scripts/demo-home.mjs --home <dir>
+//   node ui/scripts/demo-home.mjs --people-only   # only map the demo's people in an existing home
 //
 // In <home> it writes:
 //   - .toil/config.json: the demo's connections only (DEMO_CONNECTIONS, below),
@@ -26,7 +27,14 @@
 // token over. Nothing is printed or written.
 //   - the toil project `payments-team`, made with toil's own projects commands,
 //     tying Jira SCRUM, GitHub imagile-dev/toil-sandbox, Azure DevOps "Toil
-//     Sandbox" and the ledger together.
+//     Sandbox" and the ledger together, with the ticket rules gherkin,
+//     user-story and bug-repro (a warning, not a stop, on a toil without them).
+//   - payments-team's people: the one person the demo story names, Sam Rivera
+//     (demo-story.md), with the Jira, GitHub and Azure DevOps accounts the seeded
+//     items are assigned to, read with toil at run time (the seeds assign only the
+//     tokens' identity), so one person never shows as three unmapped accounts. No
+//     account id is written in this repository. --people-only does this step alone,
+//     on a home built before, and leaves its config (writes included) as it is.
 // Repo tooling only: nothing here ships. A clean desk, set up for the camera,
 // as is traditional.
 import { spawnSync } from 'node:child_process';
@@ -53,10 +61,12 @@ const flag = (name) => {
 const home = resolve(take('--home', join(homedir(), 'toil-demo-home')));
 const fresh = flag('--fresh');
 const launch = flag('--launch');
+const peopleOnly = flag('--people-only');
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const toilFlag = take('--toil');
 let toilJs = resolve(toilFlag ?? join(root, 'dist', 'toil.js'));
-if (args.length) fail(`Unknown argument: ${args.join(' ')}`, 'Use --home <dir>, --fresh, --launch and --toil <path>.');
+if (args.length) fail(`Unknown argument: ${args.join(' ')}`, 'Use --home <dir>, --fresh, --launch, --people-only and --toil <path>.');
+if (peopleOnly && (fresh || launch)) fail("--people-only can't be used with --fresh or --launch.", 'Run --people-only on its own, on a demo home built before.');
 if (launch && toilFlag) fail("--toil and --launch can't be used together.", '--launch builds toil from this checkout itself; leave out --toil.');
 // The demo home is never your home, a folder holding it, or anything in or around this repository.
 const fold = (path) => (process.platform === 'win32' ? path.toLowerCase() : path);
@@ -73,6 +83,65 @@ function fail(message, fix) {
 }
 const say = (line) => process.stdout.write(`${line}\n`);
 
+// Your shell's environment without any TOIL_* variable, with HOME and USERPROFILE on the demo home.
+const demoEnv = (extra = {}) => ({ ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^TOIL_/i.test(k))), HOME: home, USERPROFILE: home, ...extra });
+// toil in the demo home; `extra` adds env for one call, `input` is its stdin (a read's envelope can outgrow a Windows command line).
+const runToil = (extra = {}, input = undefined) => (...argv) => {
+  const res = spawnSync(process.execPath, [toilJs, ...argv], { encoding: 'utf8', cwd: home, env: demoEnv(extra), maxBuffer: 64 * 1024 * 1024, ...(input === undefined ? {} : { input }) });
+  try {
+    return JSON.parse(res.stdout);
+  } catch {
+    return fail(`toil ${argv.slice(0, 3).join(' ')} printed no envelope: ${(res.stderr || res.stdout).trim().slice(0, 300)}`, 'Run it by hand.');
+  }
+};
+const toil = Object.assign(runToil(), { withEnv: (extra) => runToil(extra), withInput: (input) => runToil({}, input) });
+const must = (env, what) => env.ok || fail(`${what}: ${env.error.message}`, env.error.fix ?? 'Run it by hand.');
+const P = 'payments-team';
+
+// The demo's people ------------------------------------------------------------------------
+/** The one person the demo story names (demo-story.md): every seeded item is assigned to the tokens' identity, which plays this one person. */
+export const DEMO_PERSON = 'Sam Rivera';
+const PEOPLE_READ_LIMIT = 50;
+
+/**
+ * Maps the accounts the seeded items are assigned to onto DEMO_PERSON, read with toil and toil's own OWI mapping at run
+ * time, so the ids match what Toil UI reads and none is written in this repository. An area it can't read is a warning,
+ * never a stop. Nothing is printed but the areas mapped.
+ */
+function mapPeople(connections) {
+  /** The OWI accounts (assignee and reporter) in one read's envelope, most frequent first. */
+  const accountsOf = (envelope, what) => {
+    if (!envelope.ok) return say(`warning: couldn't read ${what} to map the demo's people: ${envelope.error.message}`), [];
+    const mapped = toil.withInput(JSON.stringify(envelope))('util', 'owi', 'map', '--input-file', '-');
+    if (!mapped.ok) return say(`warning: couldn't map ${what} to OWI to find the demo's people: ${mapped.error.message}`), [];
+    const counts = new Map();
+    for (const item of mapped.data?.items ?? []) for (const who of [item.assignee, item.reporter]) if (who?.id) counts.set(who.id, (counts.get(who.id) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  };
+  const ids = {};
+  if (connections.jira) ids.jira = accountsOf(toil('jira', 'issue', 'search', '--toil-project', P, '--jql', 'project = SCRUM AND labels = toil-seed ORDER BY key', '--limit', String(PEOPLE_READ_LIMIT)), 'Jira SCRUM');
+  if (connections.ado) {
+    const found = toil('ado', 'work-item', 'search', '--toil-project', P, '--wiql', "SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = 'Toil Sandbox' AND [System.Tags] CONTAINS 'toil-seed' ORDER BY [System.Id]", '--limit', String(PEOPLE_READ_LIMIT));
+    const numbers = found.ok ? (found.data?.workItems ?? []).map((w) => String(w.id)) : [];
+    if (!found.ok) say(`warning: couldn't search Azure DevOps Toil Sandbox to map the demo's people: ${found.error.message}`);
+    else if (numbers.length) ids.ado = accountsOf(toil('ado', 'work-item', 'get-many', '--toil-project', P, ...numbers, '--fields', 'System.Id,System.Title,System.WorkItemType,System.State,System.AssignedTo,System.CreatedBy,System.TeamProject'), 'Azure DevOps Toil Sandbox');
+  }
+  // The GitHub repository is seeded as a whole, so any issue in it counts (the sandboxes skill).
+  if (connections.github) {
+    // The home's github connection holds no token (--launch hands gh's to Toil UI), so this one read gets gh's, as --launch does.
+    const token = spawnSync('gh', ['auth', 'token'], { encoding: 'utf8' });
+    if (token.status !== 0 || !token.stdout.trim()) say("warning: couldn't read a GitHub token from gh, so the demo's GitHub account isn't mapped. Sign in with gh auth login and run --people-only.");
+    else ids.github = accountsOf(toil.withEnv({ TOIL_GITHUB_TOKEN: token.stdout.trim() })('github', 'issue', 'list', '--toil-project', P, '--state', 'all', '--limit', String(PEOPLE_READ_LIMIT)), 'GitHub toil-sandbox');
+  }
+  const flags = Object.entries(ids).flatMap(([area, found]) => {
+    if (found.length > 1) say(`warning: the seeded ${area} items name ${found.length} accounts; ${DEMO_PERSON} takes the one most of them are assigned to.`);
+    return found.length ? [`--${area}`, found[0]] : [];
+  });
+  if (!flags.length) return say(`warning: no seeded item named an account, so ${P} has no people.`);
+  must(toil('projects', 'person', P, DEMO_PERSON, ...flags, '--replace'), 'projects person');
+  say(`toil project ${P}: ${DEMO_PERSON} mapped to the ${Object.keys(ids).filter((a) => ids[a].length).join(', ')} accounts the seeded items name`);
+}
+
 // With --launch the home is built, and Toil UI then runs, on one toil: this checkout's,
 // built into .scratch/toil, so the toil project it writes is the one Toil UI reads.
 let built;
@@ -85,6 +154,14 @@ if (launch) {
     throw e;
   }
   toilJs = toilCli;
+}
+
+// --people-only: the people step alone, on a home this script built, with its config (writes included) as it stands.
+if (peopleOnly) {
+  if (!existsSync(join(home, MARKER)) || !existsSync(join(home, '.toil', 'config.json'))) fail(`${home} isn't a demo home this script built.`, 'Build it first: node ui/scripts/demo-home.mjs.');
+  if (!toil('projects', 'show', P).ok) fail(`${home} has no toil project ${P}.`, 'Build it first: node ui/scripts/demo-home.mjs.');
+  mapPeople(JSON.parse(readFileSync(join(home, '.toil', 'config.json'), 'utf8')).connections ?? {});
+  process.exit(0);
 }
 
 // The marker goes only on a folder this script makes, or one that already carries it,
@@ -170,18 +247,6 @@ db.close();
 say(`ledger: ${ledgerPath} (6 merchants, 60 settlements, 12 chargebacks)`);
 
 // The toil project ------------------------------------------------------------------------
-// Your shell's environment without any TOIL_* variable, with HOME and USERPROFILE on the demo home.
-const demoEnv = (extra = {}) => ({ ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^TOIL_/i.test(k))), HOME: home, USERPROFILE: home, ...extra });
-const toil = (...argv) => {
-  const res = spawnSync(process.execPath, [toilJs, ...argv], { encoding: 'utf8', env: demoEnv() });
-  try {
-    return JSON.parse(res.stdout);
-  } catch {
-    return fail(`toil ${argv.slice(0, 3).join(' ')} printed no envelope: ${(res.stderr || res.stdout).trim().slice(0, 300)}`, 'Run it by hand.');
-  }
-};
-const must = (env, what) => env.ok || fail(`${what}: ${env.error.message}`, env.error.fix ?? 'Run it by hand.');
-const P = 'payments-team';
 if (!toil('projects', 'show', P).ok) must(toil('projects', 'init', P, '--description', 'Deliverables Unlimited at Overdraft Federal: Checkout (Jira), Platform (GitHub) and Settlement (Azure DevOps), with the read replica (made-up demo data)'), 'projects init');
 must(toil('projects', 'add-repo', P, 'https://github.com/imagile-dev/toil-sandbox', '--name', 'toil-sandbox', '--replace'), 'projects add-repo');
 must(toil('projects', 'link', P, 'github', '--connection', 'github', '--set', 'owner=imagile-dev', '--set', 'repo=toil-sandbox', '--replace'), 'projects link github');
@@ -203,6 +268,15 @@ if (config.connections.ado) must(toil('projects', 'link', P, 'ado', '--connectio
 must(toil('projects', 'link', P, 'db', '--connection', config.connections['payments-db'] ? 'payments-db' : 'ledger', '--replace'), 'projects link db');
 if (config.connections.confluence) must(toil('projects', 'link', P, 'confluence', '--connection', 'confluence', '--set', 'space=OD', '--replace'), 'projects link confluence');
 if (config.connections.figma) must(toil('projects', 'link', P, 'figma', '--connection', 'figma', '--replace'), 'projects link figma');
+// Ticket rules (#657): the three built-in rule sets, which the seeded stories and bugs
+// were written to (demo-week-data.mjs). A toil from before `projects standards set`
+// says so and the home is built without them: a missing rule set is a warning on
+// camera prep, not a reason to stop.
+const rules = toil('projects', 'standards', 'set', P, '--use', 'gherkin', '--use', 'user-story', '--use', 'bug-repro', '--replace');
+if (rules.ok) say(`toil project ${P}: ticket rules gherkin, user-story and bug-repro`);
+else if (/unknown command/i.test(rules.error?.message ?? '')) say(`warning: ${toilJs} has no \`projects standards set\` yet (#657), so ${P} has no ticket rules. Build toil from a checkout that has it and run this again.`);
+else say(`warning: couldn't set ${P}'s ticket rules: ${rules.error?.message}${rules.error?.fix ? ` (${rules.error.fix})` : ''}`);
+mapPeople(config.connections);
 const check = toil('projects', 'check', P);
 say(`toil project ${P}: ${check.ok && check.data?.ok !== false ? 'checks out' : `check says ${JSON.stringify(check.data?.problems ?? check.error)}`}`);
 say(`demo home ready: ${home}`);
@@ -213,6 +287,10 @@ if (launch) {
   const token = spawnSync('gh', ['auth', 'token'], { encoding: 'utf8' });
   if (token.status !== 0 || !token.stdout.trim()) fail("couldn't read a GitHub token from gh.", 'Sign in with gh auth login, then run this again.');
   say(`starting Toil UI in the demo home on ${built.describe} (Ctrl+C to stop)`);
-  const ui = spawnSync(process.execPath, [...toilUiNodeArgs, toilUi], { stdio: 'inherit', env: demoEnv({ TOIL_GITHUB_TOKEN: token.stdout.trim() }) });
+  // Codex keeps its sign-in under CODEX_HOME (default ~/.codex), which the demo HOME hides; point it at the real one,
+  // the way the Keychains link does for Claude, so Ask and Fix with AI agent can run on camera. Nothing is copied.
+  const codexHome = process.env.CODEX_HOME ?? join(homedir(), '.codex');
+  const agentEnv = existsSync(codexHome) ? { CODEX_HOME: codexHome } : {};
+  const ui = spawnSync(process.execPath, [...toilUiNodeArgs, toilUi], { stdio: 'inherit', env: demoEnv({ TOIL_GITHUB_TOKEN: token.stdout.trim(), ...agentEnv }) });
   process.exit(ui.status ?? 1);
 }

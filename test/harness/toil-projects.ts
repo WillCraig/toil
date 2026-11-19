@@ -4,6 +4,7 @@ import { dirname, join, relative } from 'node:path';
 import type { ResolvedConfig } from '../../src/core/config.js';
 import { createSchemeCatalog, type SchemeCatalog } from '../../src/core/classify/catalog.js';
 import { Ledger } from '../../src/core/classify/ledger.js';
+import { createStandardCatalog, type StandardCatalog } from '../../src/core/standards/catalog.js';
 import { createDiagramCatalog, type DiagramCatalog } from '../../src/core/diagrams.js';
 import { createToilProjectCatalog, stripUserinfo, type ToilProjectArea, type ToilProjectCatalog } from '../../src/core/toil-project.js';
 import { findGitRepo, readGitContext, readGitRemotes } from '../../src/core/git-repo.js';
@@ -27,6 +28,8 @@ export interface ToilProjectDisk {
   catalog: (config: ResolvedConfig, options?: { env?: NodeJS.ProcessEnv; mcp?: boolean; workspace?: string | null; areas?: readonly ToilProjectArea[] }) => ToilProjectCatalog;
   /** A scheme catalog over the same disk, for `testContext({ schemes })` or a direct call. */
   schemes: (config: ResolvedConfig, options?: { env?: NodeJS.ProcessEnv; mcp?: boolean; workspace?: string | null }) => SchemeCatalog;
+  /** A standards catalog over the same disk, for `testContext({ standards })` or a direct call. */
+  standards: (config: ResolvedConfig, options?: { env?: NodeJS.ProcessEnv; mcp?: boolean; workspace?: string | null }) => StandardCatalog;
   /** The classification ledger in this disk's home, for `testContext({ ledger })` or a direct call. */
   ledger: () => Ledger;
   /** A diagram catalog over the same disk's home, for `testContext({ diagrams })` or a direct call. */
@@ -117,6 +120,21 @@ export function toilProjectDisk(files: Record<string, unknown> = {}): ToilProjec
     schemes: (config, options = {}) => {
       const dir = options.workspace === null ? undefined : (options.workspace ?? workspace);
       return createSchemeCatalog({
+        home,
+        env: options.env ?? {},
+        config,
+        workspace: dir ? { dir, source: options.mcp ? 'mcp-root' : 'cwd' } : { source: 'none' },
+        base: dir,
+        protect: [join(home, '.toil')],
+        git: (folder) => ({
+          gitRemote: async () => [],
+          repo: () => readGitContext(folder, { home }),
+        }),
+      });
+    },
+    standards: (config, options = {}) => {
+      const dir = options.workspace === null ? undefined : (options.workspace ?? workspace);
+      return createStandardCatalog({
         home,
         env: options.env ?? {},
         config,

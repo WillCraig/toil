@@ -1,20 +1,25 @@
 /* Crate: the toil site's look, in the site's blue (#472). Tokens come from
    theme.json, which test/brand-sync.test.ts holds to the site's own; this file
-   adds the site's fonts, its drafting grid and an accent glow, the accent-to-
-   highlight gradient and the crate's badge beside the name. Every colour here
-   is a token mixed with transparent, so nothing drifts from the palette. The
-   same layout and click targets as Plain: only the look changes.
+   adds the site's fonts, a drafting grid behind the page head, an accent glow,
+   the accent-to-highlight gradient and the crate's badge beside the name.
+   Every colour here is a token mixed with transparent, so nothing drifts from
+   the palette. The same layout and click targets as Plain: only the look
+   changes.
 
-   It looks like that site, not a warehouse (#397): the near-black, the grid
-   and the glow behind the page, flat panels on the site's surfaces, and the
-   warehouse kept to the words, the crate's art and the dust. Text that sits
-   straight on the page keeps 4.5:1 at the brightest point behind it, worked
-   out from the colours: at the glow's peak, under a grid line, muted text is
-   5.8:1 and danger 5.6:1 (docs/decisions/472-crate-blue.md). In the light
-   scheme (#507) the margins are thinner: muted 5.0:1, danger 4.6:1 and ok
-   4.5:1, so turn the light glow or grid up only with those in hand. */
+   It looks like that site, not a warehouse (#397), and quietly (#657's polish):
+   two surfaces only, the page and a card, with what sits inside a card raised
+   rather than outlined; the gradient on the name and the main button and
+   nowhere else; amber only on a status chip; serif only for the page's title
+   and the Summary's headline. Text that sits straight on the page keeps 4.5:1
+   at the brightest point behind it, worked out from the colours: at the
+   glow's peak, under a grid line, muted text was 5.8:1 and danger 5.6:1 with
+   the glow at 14% and the grid at 4.5% (docs/decisions/472-crate-blue.md);
+   both are now lower, so every margin there only widened. In the light scheme
+   (#507) the margins were thinner (muted 5.0:1, danger 4.6:1 and ok 4.5:1 at
+   9% and 7%), so turn the light glow or grid back up only with those in hand. */
 
 @import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
 @import '@fontsource/ibm-plex-sans/600.css';
 @import '@fontsource/source-serif-4/600.css';
 @import '@fontsource/fira-code/400.css';
@@ -24,29 +29,42 @@
    colour that depends on the scheme is a property here; the dark values are
    what shipped first, and the light ones are overridden below, as Plain does it. */
 [data-theme="crate"] {
-  --crate-glow-a: 14%;
-  --crate-glow-b: 7%;
-  --crate-glow-splash: 16%;
-  --crate-grid: 4.5%;
+  --crate-glow-a: 8%;
+  --crate-glow-b: 0%;
+  --crate-glow-splash: 12%;
+  --crate-grid: 2%;
   --crate-art-blend: lighten;
   --crate-art-filter: none;
 }
 
+/* What stays the same in both schemes: the grid's cell, a card's corners, and
+   Crate's spacing steps, 4, 8, 12, 16, 24 and 40 pixels. */
+[data-theme="crate"]:root {
+  --crate-cell: 32px;
+  --crate-radius-card: 10px;
+  --crate-space-1: 4px;
+  --crate-space-2: 8px;
+  --crate-space-3: 12px;
+  --crate-space-4: 16px;
+  --crate-space-5: 24px;
+  --crate-space-6: 40px;
+}
+
 [data-theme="crate"][data-scheme="light"] {
-  --crate-glow-a: 9%;
-  --crate-glow-b: 5%;
-  --crate-glow-splash: 11%;
-  --crate-grid: 7%;
+  --crate-glow-a: 5%;
+  --crate-glow-b: 0%;
+  --crate-glow-splash: 8%;
+  --crate-grid: 3%;
   --crate-art-blend: multiply;
   --crate-art-filter: invert(1) hue-rotate(180deg) brightness(1.08);
 }
 
 @media (prefers-color-scheme: light) {
   [data-theme="crate"][data-scheme="system"] {
-    --crate-glow-a: 9%;
-    --crate-glow-b: 5%;
-    --crate-glow-splash: 11%;
-    --crate-grid: 7%;
+    --crate-glow-a: 5%;
+    --crate-glow-b: 0%;
+    --crate-glow-splash: 8%;
+    --crate-grid: 3%;
     --crate-art-blend: multiply;
     --crate-art-filter: invert(1) hue-rotate(180deg) brightness(1.08);
   }
@@ -56,9 +74,10 @@
   background: var(--bg);
 }
 
-/* The glows, held still behind every view: the accent up in the corner, a
-   little of the highlight down at the foot. The dust is brightest where the
-   accent's glow is (src/ambient/presets.ts, glowAt(), measures the same gradient). */
+/* The glows, held still behind every view: the accent up in the corner, and
+   the highlight's at the foot, now at nothing and kept as a dial. The dust is
+   brightest where the accent's glow is (src/ambient/presets.ts, glowAt(),
+   measures the same gradient). */
 [data-theme="crate"] body::before {
   content: "";
   position: fixed;
@@ -70,29 +89,22 @@
     radial-gradient(circle at 0% 100%, color-mix(in srgb, var(--link) var(--crate-glow-b), transparent), transparent 45vmax);
 }
 
-/* The drafting grid, drifting one cell every two minutes as on the site. It
-   moves by transform, on its own layer, so the page is never repainted for it. */
+/* The drafting grid, behind the header and the page head only: it sits at the
+   top of the document, scrolls away with the head, and fades out before the
+   first card. It holds still; the site's drift was one more thing moving. */
 [data-theme="crate"] body::after {
   content: "";
-  position: fixed;
-  inset: -24px 0 0 -24px;
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 20rem;
   z-index: -2;
   pointer-events: none;
   background-image:
     linear-gradient(color-mix(in srgb, var(--ink) var(--crate-grid), transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in srgb, var(--ink) var(--crate-grid), transparent) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  [data-theme="crate"] body::after {
-    animation: crate-grid-drift 120s linear infinite;
-  }
-}
-
-@keyframes crate-grid-drift {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(24px, 24px, 0); }
+  background-size: var(--crate-cell) var(--crate-cell);
+  -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent);
+  mask-image: linear-gradient(to bottom, black 40%, transparent);
 }
 
 /* The badge beside the name. */
@@ -100,11 +112,42 @@
   background-image: url("./assets/mark.svg");
 }
 
-[data-theme="crate"] h1,
-[data-theme="crate"] h2 {
+/* Type: serif for the page's title alone, the sans at 600 for every heading under it. */
+[data-theme="crate"] h1 {
   font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: -0.005em;
+}
+
+[data-theme="crate"] h2 {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 1.0625rem;
+  letter-spacing: 0;
+}
+
+/* The Summary's headline is the one other place the serif speaks. */
+[data-theme="crate"] .sum-answer {
+  font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.25rem);
+}
+
+/* Figures read in the sans, at 500 and 600, so the serif stays rare. */
+[data-theme="crate"] .big-number,
+[data-theme="crate"] .stat-value,
+[data-theme="crate"] .count__value,
+[data-theme="crate"] .rank {
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+
+/* Small labels in the sans, in sentence case: no mono capitals, no ring. */
+[data-theme="crate"] .eyebrow,
+[data-theme="crate"] .sum-kicker {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 /* The site's accent-to-highlight gradient on the word, and a highlight sticker beside it. */
@@ -120,8 +163,48 @@
   --sticker-bg: var(--link);
 }
 
-[data-theme="crate"] .meter > span {
+/* The main button is the one control that wears the gradient. */
+[data-theme="crate"] .btn--accent {
   background: linear-gradient(100deg, var(--accent) 10%, var(--link) 90%);
+  border-color: var(--accent);
+}
+
+/* Surfaces: the page, then a card (10px corners, 20px in). What sits inside a
+   card is raised, with no outline of its own; controls keep their 8px corners
+   and their muted border, which is what marks them out (WCAG 1.4.11). */
+[data-theme="crate"] .l-card {
+  border-radius: var(--crate-radius-card);
+  padding: calc(var(--crate-space-4) + var(--crate-space-1));
+}
+
+[data-theme="crate"] [data-card] .l-card,
+[data-theme="crate"] [data-card] .card,
+[data-theme="crate"] [data-card] .sum-card,
+[data-theme="crate"] [data-card] .attention-item,
+[data-theme="crate"] [data-card] .stat {
+  background: var(--raised);
+  border-color: transparent;
+}
+
+/* A source badge is a label, not a status: it takes the control's corners, and pills stay for status. */
+[data-theme="crate"] .badge {
+  border-radius: var(--radius);
+}
+
+/* Amber marks a status chip only, never the edge of a card. */
+[data-theme="crate"] .attention-item--w2 {
+  border-color: var(--line);
+  background: var(--raised);
+}
+
+/* Spacing: 40px between sections, 16px between cards in a grid. */
+[data-theme="crate"] .dashboard,
+[data-theme="crate"] .dash-main {
+  gap: var(--crate-space-6);
+}
+
+[data-theme="crate"] .panel-grid {
+  gap: var(--crate-space-4);
 }
 
 /* The crate's cartoon sits on the site's near-black, so it blends into the panel behind it. */
@@ -145,61 +228,27 @@
   to { transform: translateY(-6px); }
 }
 
-/* The dashboard's views (#253): Crate carries the brand into the numbers,
-   the chat and the board, with the same layout and targets as Plain. */
-[data-theme="crate"] .big-number {
-  background: linear-gradient(100deg, var(--accent) 10%, var(--link) 90%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
+/* The Ask pane and bar are cards like the rest: the accent's thick top edge was one more stripe. */
 [data-theme="crate"] .ask,
 [data-theme="crate"] .ask-bar {
-  border-top: 4px solid transparent;
-  border-image: linear-gradient(100deg, var(--accent), var(--link)) 1;
-  border-image-slice: 1 0 0 0;
+  border-top: 1px solid var(--line);
 }
 
 [data-theme="crate"] .column--in_progress {
   border-top-color: var(--accent);
 }
 
-[data-theme="crate"] .chart .bar,
-[data-theme="crate"] .chart .dot {
-  fill: var(--link);
-}
-
 /* The site's header: the page's near-black over a hairline, the glow
-   showing faintly through it. Panels keep the site's flat surfaces. */
+   showing faintly through it. */
 [data-theme="crate"] .top {
   background: color-mix(in srgb, var(--bg) 88%, transparent);
 }
 
-[data-theme="crate"] .btn--accent,
-[data-theme="crate"] .top nav a[aria-current="page"],
+/* What is chosen is the solid accent: the gradient belongs to the main button. */
 [data-theme="crate"] button[aria-pressed="true"],
 [data-theme="crate"] .check[data-selected] .box {
-  background: linear-gradient(100deg, var(--accent) 10%, var(--link) 90%);
+  background: var(--accent);
   border-color: var(--accent);
-}
-
-/* The site's eyebrow: small mono capitals after a ring in the accent. */
-[data-theme="crate"] .eyebrow {
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-[data-theme="crate"] .eyebrow::before {
-  content: "";
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-right: 0.5em;
-  border: 1px solid var(--accent);
-  border-radius: 50%;
-  vertical-align: 0.05em;
 }
 
 [data-theme="crate"] ::selection {
@@ -215,6 +264,10 @@
   fill: var(--chart-fill);
 }
 
+[data-theme="crate"] .chart .dot {
+  fill: var(--link);
+}
+
 [data-theme="crate"] .chart .area {
   opacity: 0.22;
 }
@@ -225,7 +278,7 @@
 }
 
 /* Moments (#419): the crate's art sits on the near-black like the empty states' does, and
-   the accent's glow lights the splash and the moment cards from the same corner as the page. */
+   the accent's glow and the drafting grid light the splash from the same corner as the page. */
 [data-theme="crate"] .loader__art,
 [data-theme="crate"] .splash__art {
   mix-blend-mode: var(--crate-art-blend);
@@ -235,6 +288,8 @@
 [data-theme="crate"] .splash {
   background:
     radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--accent) var(--crate-glow-splash), transparent), transparent 60vmax),
+    linear-gradient(color-mix(in srgb, var(--ink) var(--crate-grid), transparent) 1px, transparent 1px) 0 0 / var(--crate-cell) var(--crate-cell),
+    linear-gradient(90deg, color-mix(in srgb, var(--ink) var(--crate-grid), transparent) 1px, transparent 1px) 0 0 / var(--crate-cell) var(--crate-cell),
     var(--bg);
 }
 

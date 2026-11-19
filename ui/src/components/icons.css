@@ -3,3 +3,8 @@
 .icon { display: inline-block; flex: none; vertical-align: -0.15em; }
 .icon--after { margin-inline-start: 0.3em; }
 .icon--before { margin-inline-end: 0.3em; }
+
+/* The agent mark (agent-mark.tsx): the theme's picture as a mask over the text colour, so it takes the control's ink
+   on any fill, in light and dark. It leads the label, like an icon before it. */
+.agent-mark { display: inline-block; flex: none; vertical-align: -0.15em; background-color: currentColor; margin-inline-end: 0.4em; }
+.btn > .agent-mark { margin-inline-end: 0; }

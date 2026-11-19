@@ -1,0 +1,26 @@
+[
+  {
+    "name": "list",
+    "tool": "standards_list",
+    "description": "List every standard (set of ticket rules) toil can see, and where each lives",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "--cwd <dir>"
+    ]
+  },
+  {
+    "name": "check",
+    "tool": "standards_check",
+    "description": "Check work items against a toil project's ticket rules (standards), asking no service (local only)",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "--input-file <path>",
+      "--text <text>",
+      "--toil-project <name|file>",
+      "--cwd <dir>",
+      "--standard <name|file>"
+    ]
+  }
+]

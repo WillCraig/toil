@@ -24,6 +24,7 @@ import { useTheme, useThemeChoiceContext, voiceOn } from '../theme-context.ts';
 import { Copy, useMediaQuery } from './layout.tsx';
 import { OutcomeLine, failedOutcome, outcomeOf, type Outcome } from '../views/settings/parts.tsx';
 import './guide.css';
+import { AgentMark } from './agent-mark.tsx';
 
 /** The widest a screen may be for the panel to fold; the layout's two columns start just above it. */
 export const GUIDE_NARROW = '(max-width: 999px)';
@@ -164,6 +165,7 @@ export function GuideBody({ guide, config, state, onRan }: GuidePanelProps) {
         <div className="starters" role="group" aria-label="Questions to start with">
           {starters.map((q) => (
             <button key={q} type="button" className="btn btn--small starter" onClick={() => void ask(q)} disabled={running} data-guide-starter="">
+              <AgentMark />
               {q}
             </button>
           ))}
@@ -217,6 +219,7 @@ export function GuideBody({ guide, config, state, onRan }: GuidePanelProps) {
         )}
         <div className="setup__actions">
           <button type="submit" className="btn btn--small" disabled={running || text.trim() === ''}>
+            <AgentMark />
             Ask
           </button>
           {running && (

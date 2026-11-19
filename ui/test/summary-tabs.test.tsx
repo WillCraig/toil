@@ -43,19 +43,36 @@ const TEAM = '#/project/sample-team';
 const tabLinks = (project: string) => [...document.querySelectorAll<HTMLAnchorElement>(`nav[aria-label="${project} views"] a`)];
 
 describe('the tabs', () => {
-  it('are Summary, Board, What blocks what, Code reviews, People, Stand-up and What happened: no Charts, no Past briefings', async () => {
+  it('are Summary, Tickets and Team (#657): no Board, no Charts, no Past briefings, and no (i) on the row', async () => {
     await open(TEAM);
     await until('nav[aria-label="sample-team views"]');
-    expect(tabLinks('sample-team').map((a) => (a.textContent ?? '').replace(/\d+.*$/, '').trim())).toEqual(['Summary', 'Board', 'What blocks what', 'Code reviews', 'People', 'Stand-up', 'What happened']);
-    expect(TOIL_PROJECT_TABS.map((t) => t.id)).toEqual(['overview', 'board', 'dependencies', 'prs', 'people', 'standup', 'worklog']);
-    expect(tabLinks('sample-team').some((a) => /Charts|briefings|Analyses/i.test(a.textContent ?? ''))).toBe(false);
+    expect(tabLinks('sample-team').map((a) => (a.textContent ?? '').replace(/\d+.*$/, '').trim())).toEqual(['Summary', 'Tickets', 'Team']);
+    expect(TOIL_PROJECT_TABS.map((t) => t.id)).toEqual(['overview', 'tickets', 'team']);
+    expect(tabLinks('sample-team').some((a) => /Charts|briefings|Analyses|Board/i.test(a.textContent ?? ''))).toBe(false);
+    expect(document.querySelector('[data-tabs-row] .info-trigger, [data-tab-help]')).toBeNull();
+    // The items that need attention are counted on Tickets.
+    expect(document.querySelector('[data-tab="tickets"] .tab-count')).toBeTruthy();
   });
 
-  it('keep the Summary selected on a chart page and on the earlier briefings, and Stand-up is its own tab', () => {
-    expect(tabOf(parseRoute(`${TEAM}/summary/mix`))).toBe('overview');
-    expect(tabOf(parseRoute(`${TEAM}/summary/briefings`))).toBe('overview');
-    expect(tabOf(parseRoute(`${TEAM}/standup`))).toBe('standup');
-    expect(tabOf(parseRoute(`${TEAM}/worklog`))).toBe('worklog');
+  it('keep the Summary selected on its drill-ins, Tickets on readiness and items, and Team on its three pages', () => {
+    for (const page of ['summary/mix', 'summary/briefings', 'board', 'dependencies', 'prs', 'board/classify']) expect(tabOf(parseRoute(`${TEAM}/${page}`)), page).toBe('overview');
+    expect(tabOf(parseRoute(`${TEAM}/command-center`))).toBe('tickets');
+    for (const page of ['people', 'standup', 'worklog']) expect(tabOf(parseRoute(`${TEAM}/${page}`)), page).toBe('team');
+  });
+
+  it('give Team one segmented control for People, Stand-up and What happened, and every drill-in a Back to Summary', async () => {
+    await open(`${TEAM}/standup`);
+    const group = await until<HTMLElement>('[data-team-pages]');
+    expect([...group.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('aria-current')])).toEqual([
+      ['People', null],
+      ['Stand-up', 'page'],
+      ['What happened', null],
+    ]);
+    await go(`${TEAM}/dependencies`);
+    const back = await until<HTMLAnchorElement>('[data-back]');
+    expect(back.textContent).toMatch(/Back to Summary/);
+    expect(back.getAttribute('href')).toBe(TEAM);
+    expect(back.className).toMatch(/btn--quiet/);
   });
 });
 
@@ -84,13 +101,13 @@ describe('the Summary', () => {
     await until('[data-summary-chart="flow"]');
     expect([...document.querySelectorAll('[data-summary-chart]')].map((e) => e.getAttribute('data-summary-chart'))).toEqual(['mix', 'where', 'flow']);
     const text = (id: string) => document.querySelector(`[data-summary-chart="${id}"]`)!.textContent!;
-    expect(text('mix')).toMatch(/Feature \d+% · Keep the lights on \d+% · Unsure \d+%/);
+    expect(text('mix')).toMatch(/Feature \d+% · Keep the lights on \d+% · Not sorted yet \d+%/);
     // The headline says the shares; the legend under the bar is the key to the marks and says only the names.
     expect(document.querySelector('[data-summary-chart="mix"] .ck-mix__key')!.textContent).not.toMatch(/\d%/);
     expect(text('where')).toMatch(/Work this week is spread across \d+ epics?; \d+ of \d+ items[^.]* have no epic above them/);
     expect(text('flow')).toMatch(/finished a week/);
     for (const id of ['mix', 'where', 'flow']) {
-      expect(document.querySelector(`[data-summary-chart="${id}"] h3 a`)!.getAttribute('href')).toBe(`${TEAM}/summary/${id}`);
+      expect(document.querySelector(`[data-summary-chart="${id}"] h3 a.btn`)!.getAttribute('href')).toBe(`${TEAM}/summary/${id}`);
       expect(document.querySelector(`[data-summary-chart="${id}"] svg`)).toBeTruthy();
     }
     expect(document.querySelector('[data-metric="mix"]')).toBeNull();
@@ -110,17 +127,21 @@ describe('the Summary', () => {
     for (const id of ['mix', 'where', 'flow']) {
       const item = document.querySelector(`[data-summary-chart="${id}"]`)!;
       expect(item.querySelector('[aria-label="not read yet"]'), id).toBeTruthy();
-      expect(item.querySelector('svg'), id).toBeNull();
+      // No chart: the only drawing left is the chevron on the title's button.
+      expect(item.querySelector('h3 ~ * svg'), id).toBeNull();
       expect(item.textContent, id).toMatch(/no items were read/);
       expect(item.textContent, id).not.toMatch(/\b0%|\b0 epics/);
     }
   });
 
-  it('links to the pages, not to Charts or Past briefings, in Go to', async () => {
+  it('has no Go to row: the board is one Open the board button, and sorting into categories is on Work mix (#657)', async () => {
     await open(TEAM);
-    const nav = await until<HTMLElement>('.briefing__links');
-    expect(nav.textContent).not.toMatch(/Charts|Past briefings/);
-    expect(within(nav).getByRole('link', { name: 'People' })).toBeTruthy();
+    const board = await until<HTMLAnchorElement>('[data-open-board]');
+    expect(board.getAttribute('href')).toBe(`${TEAM}/board`);
+    // A secondary button in the row under the cards (#657): a step in, framed in every theme, not the page's focus.
+    expect(board.className).toMatch(/btn--secondary/);
+    expect(document.querySelector('.briefing__links')).toBeNull();
+    expect(document.querySelector('[data-summary-chart="mix"] [data-open-classify]')!.getAttribute('href')).toBe(`${TEAM}/board/classify`);
   });
 });
 
@@ -132,12 +153,12 @@ describe('the full pages', () => {
     ['releases', 'Releases'],
     ['sprints', 'Sprints'],
     ['explore', 'Explore'],
-  ])('%s opens under the Summary, with a breadcrumb back to it', async (id, title) => {
+  ])('%s opens under the Summary, with a Back to Summary button', async (id, title) => {
     await open(`${TEAM}/summary/${id}`);
     await until(`[data-dashboard="${id}"]`);
-    const crumb = screen.getByRole('navigation', { name: 'Breadcrumb' });
-    expect(within(crumb).getByRole('link', { name: 'Summary' }).getAttribute('href')).toBe(TEAM);
-    expect(crumb.querySelector('[aria-current="page"]')!.textContent).toBe(title);
+    const crumb = document.querySelector('[data-breadcrumb]')!;
+    expect(within(crumb as HTMLElement).getByRole('link', { name: /Back to Summary/ }).getAttribute('href')).toBe(TEAM);
+    expect(title).toBeTruthy();
     expect(screen.queryByText('All charts')).toBeNull();
     expect(tabLinks('sample-team').find((a) => a.getAttribute('aria-current') === 'page')!.textContent).toMatch(/^Summary/);
   });
@@ -196,20 +217,16 @@ describe('Get a briefing', () => {
       expect(link.getAttribute('href')).toBe(`${TEAM}/summary/briefings`);
     });
     await go(`${TEAM}/summary/briefings`);
-    const crumb = await screen.findByRole('navigation', { name: 'Breadcrumb' });
-    expect(crumb.textContent).toBe('SummaryEarlier briefings');
+    const crumb = await until<HTMLElement>('[data-breadcrumb]');
+    expect(crumb.textContent).toBe('‹ Back to Summary');
   });
 });
 
 describe('one tab, one page, no repeated title', () => {
   const pages: Array<[string, string[]]> = [
     [TEAM, ['Summary', 'Overview']],
-    [`${TEAM}/board`, ['Board']],
-    [`${TEAM}/dependencies`, ['What blocks what', 'Dependencies']],
-    [`${TEAM}/prs`, ['Code reviews', 'Pull requests']],
-    [`${TEAM}/people`, ['People']],
-    [`${TEAM}/standup`, ['Stand-up']],
-    [`${TEAM}/worklog`, ['What happened', 'Worklog']],
+    [`${TEAM}/standup`, ['Team']],
+    [`${TEAM}/worklog`, ['Team']],
   ];
   it.each(pages)('%s has no heading that repeats its tab', async (hash, names) => {
     await open(hash);

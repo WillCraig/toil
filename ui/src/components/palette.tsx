@@ -22,7 +22,7 @@ import type { Route } from '../App.tsx';
 import { sendCommand, type UiCommand } from '../commands.ts';
 import { useCurrentChart } from '../current-chart.ts';
 import type { ViewContext } from '../view-context.ts';
-import { analysesHref, analysisHref, chartsHref, dateTime, diagramHref, toilProjectHref, itemHref, shortKey, standupHref, STATUS_CATEGORY_LABEL, toilProjectEditHref } from '../format.ts';
+import { analysesHref, analysisHref, boardHref, chartsHref, classifyHref, dateTime, dependenciesHref, diagramHref, toilProjectHref, itemHref, peopleHref, prsHref, shortKey, standupHref, STATUS_CATEGORY_LABEL, toilProjectEditHref, worklogHref } from '../format.ts';
 import { DASHBOARDS } from '../views/charts/index.ts';
 import { exploreHref, viewSpec } from '../model/explore.ts';
 import { fuzzyRank } from '../fuzzy.ts';
@@ -37,6 +37,18 @@ import type { SyncedAt } from '../views/ToilProjects.tsx';
 import { SETTINGS_PAGES } from '../views/Settings.tsx';
 import { Help } from './help.tsx';
 import './palette.css';
+
+
+/** The pages a step in from a tab (#657), found in the palette as well as from their card or button. */
+const DRILL_INS: ReadonlyArray<{ id: string; label: string; plain: string; words: string; href: (toilProject: string) => string }> = [
+  { id: 'board', label: 'Board', plain: 'Sprint board', words: 'board sprint columns', href: (d) => boardHref(d) },
+  { id: 'dependencies', label: 'Dependencies', plain: 'What blocks what', words: 'dependencies blocked blockers timeline', href: dependenciesHref },
+  { id: 'prs', label: 'Pull requests', plain: 'Code reviews', words: 'pull requests prs code reviews queue', href: prsHref },
+  { id: 'classify', label: 'Classify', plain: 'Sort work into categories', words: 'classify categories ktlo feature sort', href: classifyHref },
+  { id: 'people', label: 'People', plain: 'People', words: 'people team who load', href: peopleHref },
+  { id: 'standup', label: 'Stand-up', plain: 'Stand-up', words: 'stand-up standup daily', href: (d) => standupHref(d) },
+  { id: 'worklog', label: 'Worklog', plain: 'What happened', words: 'worklog what happened history', href: (d) => worklogHref(d) },
+];
 
 export type PaletteGroup = 'commands' | 'toilProjects' | 'tabs' | 'items' | 'analyses' | 'settings' | 'themes';
 
@@ -160,6 +172,8 @@ export function paletteEntries(x: EntriesInput): PaletteEntry[] {
   for (const d of x.toilProjects) {
     // With plain words on, a tab is found by either name: its plain label shows, and its own term still matches a search.
     for (const t of TOIL_PROJECT_TABS) out.push({ id: `tab:${d}:${t.id}`, group: 'tabs', label: pw(t.label, t.plain), detail: d, text: `${pw(t.label, t.plain)} ${t.label} ${d}`, go: { href: t.href(d) } });
+    // The pages that are steps in rather than tabs (#657): each keeps its address, and the palette is one more way to it.
+    for (const p of DRILL_INS) out.push({ id: `page:${d}:${p.id}`, group: 'tabs', label: pw(p.label, p.plain), detail: d, text: `${pw(p.label, p.plain)} ${p.label} ${p.words} ${d}`, go: { href: p.href(d) } });
     // The charts are items on the Summary (#567), so each full page, the earlier briefings and the views the team saved are found by typing, not listed: one more way in to each, never a tab.
     for (const c of DASHBOARDS) out.push({ id: `chart:${d}:${c.id}`, group: 'tabs', label: c.title, detail: `${d}, a chart`, text: `${c.title} chart dashboard ${d}`, typed: true, go: { href: chartsHref(d, c.id) } });
     out.push({ id: `briefings:${d}`, group: 'tabs', label: pw('Earlier analyses', 'Earlier briefings'), detail: d, text: `earlier briefings analyses past ${d}`, typed: true, go: { href: analysesHref(d) } });

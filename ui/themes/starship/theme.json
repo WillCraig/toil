@@ -62,6 +62,7 @@
   "ambient": { "particles": "stars" },
   "sounds": {},
   "assets": {
+    "agentMark": "assets/agent.svg",
     "series": "assets/series.svg",
     "starfield": "assets/starfield.svg",
     "chart": "assets/star-chart.svg",

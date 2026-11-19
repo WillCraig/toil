@@ -152,7 +152,7 @@ describe('in the page', () => {
     document.title = 'Toil UI';
     await api.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' });
     await within(notices).findByText('Codex needs you', { selector: 'strong' }, { timeout: WINDOW_MS + 5000 });
-    expect(within(notices).getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringMatching(/^corp-jira:PAY-103 Charge a stored token: asked a question, 1 proposal to review$/)]);
+    expect(within(notices).getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringMatching(/^Jira PAY-103 Charge a stored token: asked a question, 1 proposal to review$/)]);
     expect(document.title).toBe('(1) Toil UI');
     hidden.mockReturnValue('visible');
     document.dispatchEvent(new Event('visibilitychange'));

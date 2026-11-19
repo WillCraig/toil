@@ -113,6 +113,6 @@ export function howSure(c: SureInput): Sure {
 
   const because = said.length
     ? `${said.join('; ').replace(/^./, (x) => x.toUpperCase())}.`
-    : `${c.scoped ? 'Every read this answer depends on worked' : 'Every saved read worked'}, the data was read ${ago(c.ageHours)}, and there are ${plural(c.items, noun)} to go on.`;
+    : `${c.scoped ? 'All the data this answer needs was read' : 'All the saved data was read'}, ${ago(c.ageHours)}, across ${plural(c.items, noun)}.`;
   return { level, word: LEVEL_WORD[level], because, reasons };
 }

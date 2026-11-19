@@ -152,8 +152,10 @@ describe('what waits on you, for the AI agents button', () => {
 describe('the usage line', () => {
   const rec = (plan: boolean): UsageRecord => ({ id: 'a', chatId: 'c', turn: 1, toilProject: 'd', adapter: 'claude', model: 'm', inputTokens: 1, outputTokens: 1, costUsd: 0.04, costSource: 'sdk-estimate', plan, at: '2026-01-01T00:00:00Z' }) as unknown as UsageRecord;
 
-  it('says estimate by default, and not billed on a plan', () => {
+  it('says estimate by default, covered by the plan on one, and nothing with no dollar figure', () => {
     expect(usageSummary([rec(false)])).toBe('about $0.04 of usage (estimate)');
-    expect(usageSummary([rec(true)])).toBe('about $0.04 of usage (not billed on your plan)');
+    expect(usageSummary([rec(true)])).toBe('Covered by your Claude plan (about $0.04 of usage)');
+    expect(usageSummary([{ ...rec(false), costUsd: undefined, costSource: 'none' } as unknown as UsageRecord])).toBeNull();
+    expect(usageSummary([])).toBeNull();
   });
 });

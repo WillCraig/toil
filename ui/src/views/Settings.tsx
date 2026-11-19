@@ -15,7 +15,8 @@
 import type { SettingsPage } from '../App.tsx';
 import { AgentSettingsPanel, AgentSettingsPreview, type AgentSettingsPanelProps } from '../agent-settings.tsx';
 import type { ConfigApi } from '../config.ts';
-import { useWords } from '../skins.tsx';
+import { NavButton } from '../components/nav-button.tsx';
+import { Scroller } from '../components/layout.tsx';
 import { Help } from '../components/help.tsx';
 import type { HelpTopicId } from '../help.ts';
 import './settings.css';
@@ -53,19 +54,25 @@ export const SETTINGS_PAGES: Array<{ page: SettingsPage; label: string; plain?: 
 export function Settings({ page, at = [], config, agent, modelUsage = null, cache, classify, loadItems }: { page: SettingsPage; at?: string[]; config: ConfigApi | null; agent?: AgentSettingsPanelProps; modelUsage?: ModelUsageApi | null; cache?: CacheControl; classify?: ClassifyApi | undefined; loadItems?: ((toilProject: string) => Promise<WorkItem[]>) | undefined }) {
   const current = SETTINGS_PAGES.find((p) => p.page === page)!;
   const form = at[0] === '+add' || at[0] === '+new';
-  const words = useWords();
   const plain = usePlain();
   const shown = (p: (typeof SETTINGS_PAGES)[number]) => ({ label: plain.on && p.plain ? p.plain.label : p.label, about: plain.on && p.plain ? p.plain.about : p.about });
   return (
     <>
       <div className="view-head">
-        <p className="eyebrow">{words('settings.eyebrow')}</p>
-        <h1 tabIndex={-1}>Settings</h1>
-        <p className="note">
-          New here? <a href="#/setup">Set things up step by step</a>.
-        </p>
+        {/* No eyebrow saying "Settings" over "Settings", and no lede per tab repeating its cards' titles (#657): what a tab is for is the heading's (i). */}
+        <div className="view-head__row">
+          <span className="control-row__group">
+            <h1 tabIndex={-1}>Settings</h1>
+            <Help topic={current.topic} note={shown(current).about} />
+          </span>
+          <NavButton href="#/setup" kind="secondary" size="sm">
+            Set things up step by step
+          </NavButton>
+        </div>
       </div>
+      {/* One line at any width (#657): on a phone the tabs scroll sideways inside a declared scroller, with its cue. */}
       <nav className="subnav" aria-label="Settings pages">
+        <Scroller label="Settings tabs">
         <ul>
           {SETTINGS_PAGES.map((p) => (
             <li key={p.page}>
@@ -75,15 +82,13 @@ export function Settings({ page, at = [], config, agent, modelUsage = null, cach
             </li>
           ))}
         </ul>
+        </Scroller>
       </nav>
       {config?.disabled && page !== 'agent' && page !== 'usage' && page !== 'appearance' && page !== 'general' && (
         <p className="config-off">
           <strong>Changes are turned off.</strong> {config.disabled}
         </p>
       )}
-      <p className="lede">
-        {shown(current).about} <Help topic={current.topic} />
-      </p>
       {page === 'appearance' ? (
         <>
           <ThemeSetting />
@@ -100,6 +105,7 @@ export function Settings({ page, at = [], config, agent, modelUsage = null, cach
           <NotifySetting />
           <BoardMovesSetting />
           <LearningSetting />
+          <p className="note" data-saved-here="">Saved in this browser only.</p>
           <Advanced config={config} cache={cache} />
         </>
       ) : !config ? (

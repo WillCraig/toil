@@ -59,9 +59,10 @@ once that command exists. **Security-class bounds can't be relaxed at all.**
 | `skills.reinstall` | `files.no-overwrite` | `src/skills/folders.ts`, `src/skills/bundled.ts` | `skills marketplace add` and `sync` replacing a skill folder that toil itself installed from the same marketplace and plugin, which is what refreshing it means, and `skill install` and the automatic rewrite replacing the `toil` folder toil recorded as `bundled`. Any other folder is left as found. |
 | `projects.read` | `files.workspace` | `src/core/toil-project.ts` | Reading toil project files (`docs/projects.md`) from your own folder (`~/.toil/projects/`), the folders you list in `projectPaths` or `TOIL_PROJECT_PATHS`, and `.toil/projects/` at the root of the repository the call's folder is in. A toil project file named on the call (`--toil-project <file>`) must be one of those, or inside the workspace. |
 | `projects.write` | `files.workspace` | `src/core/toil-project.ts` | The `toil projects` commands writing a toil project to your own folder, a listed folder, or `.toil/projects/` at the root of a git working tree (`export --repo`). Anywhere else, the file must be inside the workspace. |
-| `projects.replace` | `files.no-overwrite` | `src/core/toil-project.ts` | Rewriting a toil project: an edit (`link`, `field`, `add-repo`, `env`, `view set`, `view remove`, `classify set`) rewrites the file it read, and `export`/`import` with `--replace` replace one. Only a file that is already a valid toil project is ever replaced. |
-| `classify.write` | `files.workspace` | `src/core/classify/catalog.ts` | The `toil classify scheme` commands writing a scheme to your own folder (`~/.toil/classify/`), to `.toil/classify/` at the root of a git working tree (`export --repo`), or, for `set` on a scheme that lives there, beside the toil project that names it. Anywhere else, the file must be inside the workspace. |
-| `classify.replace` | `files.no-overwrite` | `src/core/classify/catalog.ts` | Rewriting a scheme: `set` rewrites the file the scheme was read from, and `export` and `import` with `--replace` replace one. Only a file that is already a valid scheme is ever replaced. |
+| `projects.replace` | `files.no-overwrite` | `src/core/toil-project.ts` | Rewriting a toil project: an edit (`link`, `field`, `add-repo`, `env`, `view set`, `view remove`, `classify set`, `standards set`) rewrites the file it read, and `export`/`import` with `--replace` replace one. Only a file that is already a valid toil project is ever replaced. |
+| `classify.write` | `files.workspace` | `src/core/classify/catalog.ts`, `src/core/file-catalog.ts` | The `toil classify scheme` commands writing a scheme to your own folder (`~/.toil/classify/`), to `.toil/classify/` at the root of a git working tree (`export --repo`), or, for `set` on a scheme that lives there, beside the toil project that names it. Anywhere else, the file must be inside the workspace. |
+| `classify.replace` | `files.no-overwrite` | `src/core/classify/catalog.ts`, `src/core/file-catalog.ts` | Rewriting a scheme: `set` rewrites the file the scheme was read from, and `export` and `import` with `--replace` replace one. Only a file that is already a valid scheme is ever replaced. |
+| `standards.read` | `files.workspace` | `src/core/standards/catalog.ts`, `src/core/file-catalog.ts`, `src/core/standards/read.ts` | `toil standards list` and `check`, and `toil projects standards set` checking a standard it names, reading standard files from your own folder (`~/.toil/standards/`), from `.toil/standards/` at the root of the repository the call's folder is in, and, for a standard a toil project names by path, from beside that toil project's file. A standard file named on the call must be one of those, or inside the workspace. Only reads: toil never writes a standard. Every pattern is checked before it runs, since matching can't be stopped once it starts. Bounded below. |
 | `classify.ledger` | `files.own` | `src/core/classify/ledger.ts` | `toil classify run`, `stats`, `tune` and `mix` and `toil projects pivot` reading the classification ledger, and `classify run --record` and `classify correct` appending to it, `~/.toil/classify/<scheme>.jsonl`, inside toil's own folder, which the file service refuses. Only that one file per scheme, named for it, and nothing outside the folder after realpath. Bounded below. |
 | `diagrams.write` | `files.workspace` | `src/core/diagrams.ts` | The `toil projects diagram save` command writing a toil project's architecture diagram to `~/.toil/diagrams/<toil-project>.json`, in your own folder and nowhere else, whatever the workspace is. |
 | `diagrams.replace` | `files.no-overwrite` | `src/core/diagrams.ts` | `save --replace` replacing that file, and `toil projects diagram remove` deleting it. Only a file that is already a valid diagram is ever replaced or deleted. |
@@ -220,6 +221,25 @@ is never replaced, and an existing one needs `--replace` (except the one `set` r
 written as user-only (`0600`, in a `0700` folder). A scheme holds no secret, and writing one contacts nothing.
 Reading follows the same rule: a scheme file a call names must end in `.json` and be inside the workspace or a
 scheme folder.
+
+`standards.read` reads only standards, through the same path rules as schemes: a file must end in `.json`, is
+judged after realpath so a link can't lead out, and may never be under `~/.toil` outside `~/.toil/standards/` (or,
+for a standard beside a toil project, that toil project's folder), the `--config` file, `/proc` or `/sys`. A file is
+at most 256 KiB, and every standard is validated before any rule runs: its patterns compile, are at most 200
+characters and ten to a rule, take only the `i`, `m` and `s` flags, and are refused if they use any of three
+shapes: a backreference (`\1`, `\k<name>`); a repeated group that holds a quantifier or an alternation (`(a+)+`,
+`(a|ab)*`); or two repeats that may match the same characters with nothing between them that only one of them could
+match (`\s*\s*`, `\d+\d+`, `.*.*`, `a*a*`). A repeat that may match nothing (`\s*`, `x?`) doesn't keep two apart,
+so `\w+\s*\w+` is refused and `\w+\s+\w+` reads; nor does a required character an unbounded repeat before it can
+also match, so `.*a.*b` is refused and `[^,]*,.*b` reads. The check compares characters coarsely and errs towards
+refusing: letters in both cases, anything beyond ASCII as two lumps (spaces and the rest), and a group as every
+character in it. A rule reads at most the first 20,000 characters of a text. Together these guarantee that no pattern
+takes exponential time and that no two repeats can trade the same characters between them, the shape behind
+`\s*\s*\s*x` (12.7 seconds on 500 spaces, 75 on 1,000) and `.*a.*b` (11 seconds on 4,000 a's). What's left grows
+with the text times the limits of its bounded repeats (`[^,]{1,80}`), which the 20,000-character text and the
+200-character pattern hold down.
+This matters because matching is synchronous: neither `TOIL_TIMEOUT_MS` nor Ctrl+C can stop a pattern once it runs,
+and Toil UI runs the check in its own process. A standard holds no secret, and reading one contacts nothing.
 
 `classify.ledger` reads and appends one file per scheme, `~/.toil/classify/<scheme>.jsonl`, in the JSON toil itself
 reads back. The scheme name is held to the scheme-name rule and the path is judged after realpath, so a link can't

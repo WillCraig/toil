@@ -8,16 +8,21 @@
  * approve. Everything comes from src/model/people.ts over the same OWI items
  * and changes the dashboard reads. It shows what is on each plate and never
  * scores or ranks anyone: cards are in name order and no figure sets one
- * person against another. The org chart, minus the boxes nobody updates.
+ * person against another. Each card is one summary line (the name, in progress N,
+ * in review N) that opens to the rest, and the sprint's unassigned items open from
+ * their count, so the page is a list to scan before it is anything to read
+ * (principle 11). The org chart, minus the boxes nobody updates.
  */
 
+import { NavButton } from '../components/nav-button.tsx';
 import { useId, useMemo, useState } from 'react';
 import { Avatar } from '../components/bits.tsx';
-import { ItemLink, PrLink } from '../components/items.tsx';
+import { ItemLink, ItemRows, PrLink } from '../components/items.tsx';
 import { Card, CardGrid, Cluster, Stack } from '../components/layout.tsx';
 import { Panel } from '../components/panel.tsx';
 import { EditLink, Help, InfoTip } from '../components/help.tsx';
 import { Dash } from './Standup.tsx';
+import { DisclosureBody, SummaryChevron } from '../components/disclosure.tsx';
 import { useData } from '../data.ts';
 import { Empty, EmptyLink } from '../components/empty.tsx';
 import { boardHref, dateTime, toilProjectHref, sourceLabel, toilProjectEditHref } from '../format.ts';
@@ -30,7 +35,8 @@ import './people.css';
 import { AgentAssignments } from '../assign/views.tsx';
 import { failedOutcome, OutcomeLine, outcomeOf, type Outcome } from './settings/parts.tsx';
 import { MapIdentity, SaveToRepo } from './people-map.tsx';
-import { DimensionPicker } from '../components/dimension-picker.tsx';import { useAddress, useWorkInsights } from '../insights-data.ts';
+import { DimensionPicker } from '../components/dimension-picker.tsx';
+import { useAddress, useWorkInsights } from '../insights-data.ts';
 import { PERSON_MIX_DIMENSIONS } from '../model/lanes.ts';
 import { PersonMix } from './person-mix.tsx';
 import './lanes.css';
@@ -48,6 +54,7 @@ export function People() {
     [toilProject, now],
   );
   const calls = [...toilProject.calls.toilProject, ...toilProject.calls.work, ...toilProject.calls.prs];
+  const unmappedWhy = `Each account the data names that the Toil project doesn't map to a person, with something on its plate.${view.bots.length > 0 ? ` ${count(view.bots.length, 'bot account')} (${view.bots.map((b) => b.id).join(', ')}) only wrote bots' pull requests and ${view.bots.length === 1 ? 'is' : 'are'} left out.` : ''}`;
   const ins = useWorkInsights();
   const { query, go } = useAddress();
   // One menu for every card: what kind of work each person's open work is sorted by. It lives in the address, so a link shows the same bars.
@@ -61,7 +68,9 @@ export function People() {
     <>
       <div className="view-head">
         <p className="eyebrow">
-          <a href={toilProjectHref(toilProject.name)}>{toilProject.name}</a>
+          <NavButton href={toilProjectHref(toilProject.name)} kind="quiet" size="sm" className="eyebrow-btn">
+            {toilProject.name}
+          </NavButton>
         </p>
         <p className="lede">
           {view.people.length
@@ -95,9 +104,11 @@ export function People() {
             {alignments && <Help topic="alignments" />}
           </div>
           <SaveToRepo />
-          <div className="people-tools">
+          <div className="people-tools control-row">
+            <span className="control-row__group">
             <DimensionPicker label="Show each person's work by" value={mixBy} options={PERSON_MIX_DIMENSIONS} ins={ins} onChange={(spec) => go((q) => (spec === null || spec === 'category' ? q.delete('mix') : q.set('mix', spec)))} />
             <Help topic="people-mix" />
+            </span>
           </div>
           {teams ? (
             teams.map((t) => (
@@ -152,11 +163,13 @@ export function People() {
       )}
 
       <section className="people-section" aria-labelledby="unmapped-cards">
-        <h2 id="unmapped-cards">{view.people.length ? 'Not in the Toil project\'s people' : 'Accounts in this Toil project\'s data'}</h2>
-        <p className="note">
-          Each account the data names that the Toil project doesn't map to a person, with something on its plate.
-          {view.bots.length > 0 && ` ${count(view.bots.length, 'bot account')} (${view.bots.map((b) => b.id).join(', ')}) only wrote bots' pull requests and ${view.bots.length === 1 ? 'is' : 'are'} left out.`}
-        </p>
+        {/* What the section holds is its heading's (i) (#657); which bots were left out is part of that. */}
+        <h2>
+          <span id="unmapped-cards">{view.people.length ? "Not in the Toil project's people" : "Accounts in this Toil project's data"}</span>{' '}
+          <InfoTip label="accounts not in the people" tip={unmappedWhy}>
+            <p>{unmappedWhy}</p>
+          </InfoTip>
+        </h2>
         {view.unnamedAgents.length > 0 && (
           <p className="note">
             {count(view.unnamedAgents.length, 'pull request')} {view.unnamedAgents.length === 1 ? 'was' : 'were'} written with an agent the Toil project's people don't name ({[...new Set(view.unnamedAgents.map((c) => c.authorKindSignal ?? 'an agent account'))].join('; ')}). Press Map on its account below, and choose AI agent, to give it a card.
@@ -230,13 +243,16 @@ function TeamStrip({ view }: { view: ReturnType<typeof people> }) {
           <p className="team-figure">{unassigned ? unassigned.items.length : '–'}</p>
           {unassigned ? (
             unassigned.items.length ? (
-              <ul className="plain cites" aria-label={`Unassigned in ${unassigned.sprint}`}>
-                {unassigned.items.map((i) => (
-                  <li key={i.id}>
-                    <ItemLink id={i.id} withTitle />
-                  </li>
-                ))}
-              </ul>
+              // The rows open from the count, so this tile stands as tall as its neighbours and leaves no hole under them.
+              <details className="team-more" data-unassigned-more="">
+                <summary>
+                  <SummaryChevron />
+                  Show {unassigned.items.length === 1 ? 'the item' : `the ${unassigned.items.length} items`}
+                </summary>
+                <DisclosureBody>
+                  <ItemRows ids={unassigned.items.map((i) => i.id)} label={`Unassigned in ${unassigned.sprint}`} />
+                </DisclosureBody>
+              </details>
             ) : (
               <p className="note">Everything in {unassigned.sprint} that isn't done has someone on it.</p>
             )
@@ -278,7 +294,8 @@ function PersonCardView({ card, limit, mixBy = 'category' }: { card: PersonCard;
   const { who } = card;
   const id = `who-${who.key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const seen = who.identities.find((i) => i.name) ?? who.identities[0];
-  const { none, unread } = emptyParts(card, readParts(toilProject));
+  const read = readParts(toilProject);
+  const { none, unread } = emptyParts(card, read);
   const accounts = who.identities.length ? who.identities.map(identityText).join(' · ') : 'No identities in the Toil project yet.';
   return (
     <Card className="person-card" aria-labelledby={id}>
@@ -286,9 +303,6 @@ function PersonCardView({ card, limit, mixBy = 'category' }: { card: PersonCard;
         <div className="person-head">
           <Avatar person={{ id: seen?.id ?? who.name, name: who.name, email: who.email }} />
           <h3 id={id}>{who.name}</h3>
-          <InfoTip label={`${who.name}'s accounts`} tip={accounts} triggerProps={{ 'data-person-accounts': '' }}>
-            <p className="any-break">{accounts}</p>
-          </InfoTip>
           <ul className="person-tags" aria-label={`About ${who.name}`}>
             {who.kind === 'agent' && <li className="person-tag">Agent</li>}
             {!who.mapped && <li className="person-tag">Not mapped</li>}
@@ -301,92 +315,132 @@ function PersonCardView({ card, limit, mixBy = 'category' }: { card: PersonCard;
           </ul>
         </div>
         {!who.mapped && who.identities[0] && <MapIdentity account={who.identities[0]} />}
-        <p>
-          <a href={boardHref(toilProject.name, who.key)} aria-label={`${who.name}'s items on the board`}>
-            On the board
-          </a>
-        </p>
-        <PersonMix name={who.name} dimension={mixBy} />
+        <details className="person-more" data-person-more="">
+          {/* The summary is named by its own text, not an aria-label over it, so what a voice user sees and says agree (WCAG 2.5.3). */}
+          <summary>
+            <SummaryChevron />
+            <span className="sr-only">{`${who.name}: ${plateText(card, limit, read)}. Show the details`}</span>
+            <PlateLine card={card} limit={limit} read={read} />
+          </summary>
+          <DisclosureBody>
+            <Stack gap="sm">
+              {/* A person's accounts are one press in with the rest of the card (#657), not an (i) repeated on every card. */}
+              <p className="note any-break" data-person-accounts="">
+                Accounts: {accounts}
+              </p>
+              <p>
+                <NavButton href={boardHref(toilProject.name, who.key)} size="sm" aria-label={`${who.name}'s items on the board`}>
+                  On the board
+                </NavButton>
+              </p>
+              <PersonMix name={who.name} dimension={mixBy} />
 
-        {card.wip.length > 0 && (
-          <>
-            <h4>
-              In progress <span className="field">({card.wipCount}{limit !== null ? ` of ${limit}` : ''})</span>
-            </h4>
-            {card.wip.map((group) => (
-              <div key={group.status} className="person-group">
-                <p className="person-status">{group.status}</p>
-                <ul className="plain">
-                  {group.items.map((w) => (
-                    <li key={w.item.id}>
-                      <ItemLink id={w.item.id} withTitle />
-                      <span className="field"> {w.days === null ? 'time in this status not recorded' : `for ${calendarDays(w.days)}`}</span>
-                    </li>
+              {card.wip.length > 0 && (
+                <>
+                  <h4>
+                    In progress <span className="field">({card.wipCount}{limit !== null ? ` of ${limit}` : ''})</span>
+                  </h4>
+                  {card.wip.map((group) => (
+                    <div key={group.status} className="person-group">
+                      <p className="person-status">{group.status}</p>
+                      <ul className="plain">
+                        {group.items.map((w) => (
+                          <li key={w.item.id}>
+                            <ItemLink id={w.item.id} withTitle />
+                            <span className="field"> {w.days === null ? 'time in this status not recorded' : `for ${calendarDays(w.days)}`}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   ))}
-                </ul>
-              </div>
-            ))}
-          </>
-        )}
+                </>
+              )}
 
-        {card.prs.length > 0 && (
-          <>
-            <h4>Open pull requests</h4>
-            <ul className="plain">
-              {card.prs.map((p) => (
-                <li key={p.change.id}>
-                  <PrLink change={p.change} withTitle />
-                  <span className="field">
-                    {' '}
-                    {WAITING_LABEL[p.wait.on]}, {p.wait.days === null ? 'for an unknown time' : daysText(p.wait.days)}
-                    {p.withAgent && `; written with ${p.withAgent}`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+              {card.prs.length > 0 && (
+                <>
+                  <h4>Open pull requests</h4>
+                  <ul className="plain">
+                    {card.prs.map((p) => (
+                      <li key={p.change.id}>
+                        <PrLink change={p.change} withTitle />
+                        <span className="field">
+                          {' '}
+                          {WAITING_LABEL[p.wait.on]}, {p.wait.days === null ? 'for an unknown time' : daysText(p.wait.days)}
+                          {p.withAgent && `; written with ${p.withAgent}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
 
-        {card.reviews.length > 0 && (
-          <>
-            <h4>Reviews waiting on them</h4>
-            <ul className="plain">
-              {card.reviews.map((r) => (
-                <li key={r.change.id}>
-                  <PrLink change={r.change} withTitle />
-                  <span className="field"> {r.days === null ? 'opened at an unknown time' : `open ${daysText(r.days)}`}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+              {card.reviews.length > 0 && (
+                <>
+                  <h4>Reviews waiting on them</h4>
+                  <ul className="plain">
+                    {card.reviews.map((r) => (
+                      <li key={r.change.id}>
+                        <PrLink change={r.change} withTitle />
+                        <span className="field"> {r.days === null ? 'opened at an unknown time' : `open ${daysText(r.days)}`}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
 
-        {card.blocked.length > 0 && (
-          <>
-            <h4>Blocked</h4>
-            <ul className="plain">
-              {card.blocked.map((b) => (
-                <li key={b.item.id}>
-                  <ItemLink id={b.item.id} withTitle />
-                  <span className="field"> blocked by </span>
-                  {b.by.map((x, i) => (
-                    <span key={x.id}>
-                      {i > 0 && ', '}
-                      <ItemLink id={x.id} />
-                      {x.item ? <span className="field"> ({x.item.status ?? 'not done'})</span> : <span className="field"> (not in this Toil project, so its status is unknown)</span>}
-                    </span>
-                  ))}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+              {card.blocked.length > 0 && (
+                <>
+                  <h4>Blocked</h4>
+                  <ul className="plain">
+                    {card.blocked.map((b) => (
+                      <li key={b.item.id}>
+                        <ItemLink id={b.item.id} withTitle />
+                        <span className="field"> blocked by </span>
+                        {b.by.map((x, i) => (
+                          <span key={x.id}>
+                            {i > 0 && ', '}
+                            <ItemLink id={x.id} />
+                            {x.item ? <span className="field"> ({x.item.status ?? 'not done'})</span> : <span className="field"> (not in this Toil project, so its status is unknown)</span>}
+                          </span>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
 
-        {card.activity.length > 0 && <RecentActivity card={card} />}
+              {card.activity.length > 0 && <RecentActivity card={card} />}
 
-        <Empties none={none} unread={unread} />
+              <Empties none={none} unread={unread} />
+            </Stack>
+          </DisclosureBody>
+        </details>
       </Stack>
     </Card>
+  );
+}
+
+/** A figure on the plate line: the count when its part was read, a dash read aloud as "not read yet" when not (principle 12). */
+const plateFigure = (n: number, read: boolean) => (read ? String(n) : '–');
+
+/** The plate line in words, for the summary's name: "in progress 2 of 3, in review 1". */
+function plateText(card: PersonCard, limit: number | null, read: { work: boolean; prs: boolean }): string {
+  const wip = read.work ? `${card.wipCount}${limit !== null ? ` of ${limit}` : ''}` : 'not read yet';
+  return `in progress ${wip}, in review ${read.prs ? card.prs.length : 'not read yet'}`;
+}
+
+/** A card's one summary line: what is in progress and what is in review (their open code reviews), each a figure or a dash. */
+function PlateLine({ card, limit, read }: { card: PersonCard; limit: number | null; read: { work: boolean; prs: boolean } }) {
+  return (
+    <span className="person-plate" aria-hidden="true">
+      <span>
+        In progress <b>{plateFigure(card.wipCount, read.work)}</b>
+        {read.work && limit !== null && <span className="field"> of {limit}</span>}
+      </span>
+      <span>
+        In review <b>{plateFigure(card.prs.length, read.prs)}</b>
+      </span>
+    </span>
   );
 }
 

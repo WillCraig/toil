@@ -62,10 +62,9 @@
   display: grid;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--warn);
-  border-left-width: 4px;
+  border: 1px solid var(--edge-warn);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--tint-warn);
 }
 .feedback-disclaimer { color: var(--ink); }
 .feedback-consent .check { align-items: flex-start; }

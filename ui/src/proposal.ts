@@ -104,7 +104,7 @@ export const INPUT_FILE_COMMANDS: ReadonlySet<string> = new Set([
   'classify run', 'classify stats', 'confluence page attach', 'github issue categorize', 'jira issue attach', 'jira issue categorize',
   'jira issue create', 'jira issue update', 'ossindex vulns', 'osv vulns', 'projects brief', 'projects diagram check',
   'projects diagram save', 'projects people suggest', 'projects pivot', 'sonatypeiq evaluate', 'splitio flag toggle-many',
-  'splitio flag update', 'util c4 d2', 'util c4 mermaid', 'util c4 render', 'util cert', 'util encode', 'util log', 'util md',
+  'splitio flag update', 'standards check', 'util c4 d2', 'util c4 mermaid', 'util c4 render', 'util cert', 'util encode', 'util log', 'util md',
   'util openapi example', 'util openapi list', 'util openapi show', 'util owi map', 'util owi similar', 'util report', 'util secrets scan',
   'util semver sort', 'util size',
 ]);

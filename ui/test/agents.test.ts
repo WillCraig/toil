@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join, posix, win32 } from 'node:path';
 import * as zod from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { fixtureStandards } from '../src/fixtures/standards.ts';
+import { readingOf } from '../src/rules.ts';
 import { noAgent } from '../server/agent.ts';
 import { finish, named, partial, writeCommands } from '../server/agents/answer.ts';
 import { claudeEnv, claudeRuntime, claudeToolName, zodShape } from '../server/agents/claude.ts';
@@ -239,6 +241,15 @@ describe('the citation check', () => {
   it('flags a bare OWI id and a bare tracker key the tools never returned, but not UTF-8', () => {
     const a = finish('See [[corp-jira:PAY-101]], corp-jira:PAY-404 and PAY-777, encoded in UTF-8.', f(ledgerOf('corp-jira:PAY-101')));
     expect(a.unverified).toEqual(['corp-jira:PAY-404', 'PAY-777']);
+  });
+
+  it("counts the ids the prompt handed over (an assignment's own item) as returned, and no other (#657)", () => {
+    const a = finish('I rewrote [[jira:SCRUM-32]]; SCRUM-32 now has scenarios.', { ...f(new Ledger()), known: ['jira:SCRUM-32'] });
+    expect(a.unverified).toEqual([]);
+    expect(a.warnings).toEqual([]);
+    const b = finish('I rewrote [[jira:SCRUM-32]], like [[jira:SCRUM-33]] and SCRUM-34.', { ...f(new Ledger()), known: ['jira:SCRUM-32'] });
+    expect(b.unverified).toEqual(['jira:SCRUM-33', 'SCRUM-34']);
+    expect(b.warnings![0]).toMatch(/never returned: jira:SCRUM-33, SCRUM-34/);
   });
 
   it('accepts a bare key the tools did return', () => {
@@ -1050,11 +1061,13 @@ describe('the readiness tools (#307)', () => {
     const r = (await tool(tools('card-payments', ledger), 'readiness_list').run({})) as ReadinessList;
     expect(fixture.calls.at(-1)).toMatchObject({ command: 'projects show', input: { toilProject: 'card-payments' }, ok: true });
     expect(r.rule).toContain('with no model call');
-    expect(r.openByVerdict).toEqual({ ready: 1, thin: 3, blocked: 2 });
-    expect(r.settings).toEqual({ sources: ['jira', 'bitbucket', 'jenkins'], repositories: ['payments-core'], areas: expect.objectContaining({ jira: expect.objectContaining({ acceptanceCriteriaField: 'customfield_10500', minWords: 20 }) }) });
+    expect(r.openByVerdict).toEqual({ ready: 0, thin: 3, blocked: 2, unread: 1 });
+    // card-payments names ticket rules (#657); with no check to read, they are said to be unread, never passed.
+    expect(r.settings).toEqual({ sources: ['jira', 'bitbucket', 'jenkins'], repositories: ['payments-core'], areas: expect.objectContaining({ jira: expect.objectContaining({ acceptanceCriteriaField: 'customfield_10500', minWords: 20 }) }), ticketRules: ['gherkin', 'bug-repro'], ticketRulesRead: 'unread' });
     expect(r.items.map((i) => [i.id, i.verdict])).toEqual([
       ['corp-jira:PAY-100', 'thin'],
-      ['corp-jira:PAY-101', 'ready'],
+      // Every other check passes, but its ticket rules weren't read, so it isn't known to be ready (principle 12).
+      ['corp-jira:PAY-101', 'unread'],
       ['corp-jira:PAY-102', 'blocked'],
       ['corp-jira:PAY-103', 'blocked'],
       ['corp-jira:PAY-104', 'thin'],
@@ -1065,7 +1078,11 @@ describe('the readiness tools (#307)', () => {
     // A Done example a row cites is vouched for too.
     expect([...ledger.ids].some((id) => ['corp-jira:PAY-92', 'corp-jira:PAY-95', 'corp-jira:PAY-98', 'corp-jira:PAY-105'].includes(id))).toBe(true);
     const ready = (await tool(tools('card-payments', new Ledger()), 'readiness_list').run({ verdict: 'ready' })) as ReadinessList;
-    expect(ready.items.map((i) => i.id)).toEqual(['corp-jira:PAY-101']);
+    expect(ready.items.map((i) => i.id)).toEqual([]);
+    const unread = (await tool(tools('card-payments', new Ledger()), 'readiness_list').run({ verdict: 'unread' })) as ReadinessList;
+    expect(unread.items.map((i) => i.id)).toEqual(['corp-jira:PAY-101']);
+    expect(unread.items[0]!.notReadyBecause).toEqual([{ check: 'Ticket rules', state: 'skipped', reason: 'Not read yet.' }]);
+    expect(r.rule).toContain('never treat an unread item as ready');
     const withDone = (await tool(tools('card-payments', new Ledger()), 'readiness_list').run({ includeDone: true, limit: 2 })) as ReadinessList & { more?: string };
     expect(withDone.total).toBe(12);
     expect(withDone.more).toBe('10 more match; narrow with verdict or raise limit (max 200).');
@@ -1076,6 +1093,17 @@ describe('the readiness tools (#307)', () => {
     expect(r.verdict).toBe('ready');
     expect(r.rows.map((x) => [x.check, x.state])).toEqual([['Acceptance criteria', 'pass'], ['Description', 'pass'], ['Done state', 'pass'], ['Blockers', 'pass'], ['Scope', 'pass']]);
     expect(((await tool(tools('checkout-web', new Ledger()), 'readiness_get').run({ id: 'nope' })) as { error: string }).error).toBe('The cache holds no item "nope" in checkout-web. Use readiness_list or owi_query to find ids.');
+  });
+
+  it('carries the ticket rules as toil checked them (#657): a story that misses one is thin, and its row says why', async () => {
+    const rules = fixtureStandards(fixture.execute);
+    const data = { ...of('card-payments'), rules: async () => readingOf(await rules.check('card-payments')) };
+    const r = (await tool(readinessTools('card-payments', data, new Ledger(), toilProjectReader(fixture.execute, 'card-payments')), 'readiness_get').run({ id: 'corp-jira:PAY-107' })) as VerdictBrief & { rows: Array<{ check: string; state: string; reason: string }> };
+    expect(r.rows.map((x) => [x.check, x.state])).toContainEqual(['Acceptance criteria as Given/When/Then', 'thin']);
+    expect(r.notReadyBecause.map((w) => w.check)).toContain('Acceptance criteria as Given/When/Then');
+    const ok = (await tool(readinessTools('card-payments', data, new Ledger(), toilProjectReader(fixture.execute, 'card-payments')), 'readiness_get').run({ id: 'corp-jira:PAY-101' })) as VerdictBrief & { rows: Array<{ check: string; state: string }> };
+    expect(ok.rows.map((x) => [x.check, x.state])).toContainEqual(['Acceptance criteria as Given/When/Then', 'pass']);
+    expect(ok.verdict).toBe('ready');
   });
 
   it("says so when the Toil project can't be read, and every item then fails scope", async () => {

@@ -184,3 +184,14 @@ export const flagsAttention = (list: Insight[]) => list.some((i) => i.weight >= 
 export function needingAttention(items: WorkItem[], p: Prepared): WorkItem[] {
   return items.filter((item) => flagsAttention(insights(item, p)));
 }
+
+/**
+ * What the Board tab's count is made of, for its tooltip: each reason that
+ * puts an item in the count, with how many of those items carry it, most
+ * first ("16 blocked, 9 stale"). An item with two reasons counts under both.
+ */
+export function attentionReasons(items: WorkItem[], p: Prepared): string {
+  const by = new Map<InsightCode, number>();
+  for (const item of items) for (const code of new Set(insights(item, p).filter((i) => i.weight >= 2).map((i) => i.code))) by.set(code, (by.get(code) ?? 0) + 1);
+  return [...by].sort((x, y) => y[1] - x[1]).map(([code, n]) => `${n} ${INSIGHT_LABEL[code].replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())}`).join(', ');
+}

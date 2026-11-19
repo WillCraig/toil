@@ -51,14 +51,14 @@ Read the job's page, and `workflows/README.md` once.
 
 ## Where to look
 
-Open only the file the task needs.
+Open only what you need.
 
 | File | When |
 |------|------|
-| `core.md` | `--select`, big results, `toil wait`, paging, errors, writes and exceptions, global flags, files, configuration, the `api` passthrough, audit log, use from a program (`./api`), feedback, certificates and proxies |
+| `core.md` | `--select`, big results, `toil wait`, paging, errors, writes and exceptions, global flags, files, configuration, the `api` passthrough, audit log, use from a program (`./api`), feedback, certificates, proxies |
 | `<area>.md` | One per area, named after it (`jira.md` for `toil jira …`): oldest supported version, credential, configuration keys, every command |
 | `projects.md` | Toil projects: building, sharing, briefing, pivots |
-| `classify.md` | Work categories and their schemes |
+| `classify.md`, `standards.md` | Work categories; ticket rules |
 | `db.md` | Databases: `toil db …` on every engine |
 | `util.md` | Local utilities, no connection or network: `toil util …` |
 | `sample.md` | Sample data to try toil on |

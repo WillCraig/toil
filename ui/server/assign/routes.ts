@@ -7,7 +7,10 @@
  *   GET  assignments/one?id=<id>           one assignment with its transcript
  *   GET  assignments/events?since=<seq>    NDJSON: the kept events after seq, then each as it happens;
  *                                          since=latest skips the kept ones (#306's notifications)
- *   POST assignments                       { toil project, item, mode, adapter, repo? }: assign and queue
+ *   POST assignments                       { toil project, item, mode, adapter, repo?, standard? }: assign and queue;
+ *                                          standard { standard, rule } asks a refine to meet one ticket
+ *                                          rule (#657), { standard, rules: [...] } several of one standard;
+ *                                          refused unless the item still misses at least one
  *   POST assignments/start                 { id, adapter? }: start one the tracker queued
  *   POST assignments/cancel                { id }
  *   POST assignments/apply                 { id, proposal }: run that proposal through toil's write gate

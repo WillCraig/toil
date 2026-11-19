@@ -8,16 +8,19 @@
  * assignments the same way (./views.tsx). Same trays, nearer the desk.
  */
 
-import { ItemLink } from '../components/items.tsx';
+import { useState } from 'react';
+import { Button } from 'react-aria-components';
+import { NavButton } from '../components/nav-button.tsx';
 import { Help } from '../components/help.tsx';
 import { StaleNote } from '../components/stale.tsx';
 import { usePlain } from '../plain-words.ts';
 import { useChatScope, type Turn } from '../components/ask.tsx';
 import { useData } from '../data.ts';
-import { analysesHref, analysisHref, boardHref, dateTime } from '../format.ts';
-import { ADAPTER_NAME, modeInfo, pending, runMs, runText, type Assignment } from './model.ts';
+import { analysesHref, analysisHref, boardHref, dateTime, shortKey } from '../format.ts';
+import { pending, renewRefusal, type Assignment } from './model.ts';
 import { InboxRow, Limits, RenewAll, StateChip, assignmentHref, useAssignments } from './views.tsx';
 import './assign.css';
+import { AgentMark } from '../components/agent-mark.tsx';
 
 type Group = 'needs-you' | 'working' | 'stale' | 'earlier';
 const GROUP_LABEL: Record<Group, string> = { 'needs-you': 'Needs you', working: 'Working', stale: 'Stale', earlier: 'Earlier' };
@@ -50,32 +53,78 @@ export function useAgentsSummary(): { needsYou: number } {
   return { needsYou: waitingOnYou(list?.assignments ?? []) };
 }
 
-/** One assignment, small: its state, the item, what it waits on, and the way in. */
-function AgentCard({ a, now }: { a: Assignment; now: string }) {
-  const plain = usePlain();
+/**
+ * One assignment, small (#657): its state, the item's title as the button into the assignment, and one muted line
+ * ("SCRUM-32 · 1 question"). Out of date is a chip and a Run again button; what changed is in the chip's tooltip and on
+ * the assignment's Run details, never on the card. The adapter, its run time and the mode are on the assignment's page.
+ */
+function AgentCard({ a, onChanged }: { a: Assignment; onChanged: () => void }) {
+  const { byId, assignments: api } = useData();
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
-  const pending = a.proposals.filter((p) => p.status === 'pending').length;
-  const needs = [pending ? `${pending} ${plain.on ? noun(pending, 'suggestion', 'suggestions') : noun(pending, 'proposal', 'proposals')} to review` : '', a.questions.length ? `${a.questions.length} ${a.questions.length === 1 ? 'question' : 'questions'}` : ''].filter(Boolean).join(', ');
+  const pendingN = a.proposals.filter((p) => p.status === 'pending').length;
+  const item = byId.get(a.item);
+  const line = [
+    // The tracker's key, never toil's own id (`jira:SCRUM-15`): an item this read doesn't hold still shows its key.
+    item ? shortKey(item) : a.item.replace(/^[^:]+:/, ''),
+    a.state === 'needs-you' && pendingN ? `${pendingN} ${noun(pendingN, 'suggestion', 'suggestions')} to review` : '',
+    a.state === 'needs-you' && a.questions.length ? `${a.questions.length} ${noun(a.questions.length, 'question', 'questions')}` : '',
+  ].filter(Boolean);
+  const canRenew = Boolean(a.stale && api && !api.disabled && !renewRefusal(a));
   return (
     <li className="agent-card" data-card="">
       <p className="agent-card__top">
-        <StateChip a={a} /> <span className="assign-mode">{modeInfo(a.mode, plain.on).label}</span>
+        <StateChip a={a} />
       </p>
-      <p className="agent-card__item">
-        <ItemLink id={a.item} />{' '}
-        <a className="agent-card__title" href={assignmentHref(a.toilProject, a.id)}>
-          {a.itemTitle}
-        </a>
-      </p>
-      <p className="note">
-        {a.state === 'needs-you' && needs ? `${needs}. ` : ''}
-        {a.state === 'failed' && a.stop ? `${a.stop.message} ` : ''}
-        {a.adapter ? ADAPTER_NAME[a.adapter] : plain.pw('No adapter yet', 'No AI chosen yet')} · {runText(a.ranMs ?? runMs(a, now))}
-      </p>
-      {a.stale && <StaleNote stale={a.stale} />}
+      <NavButton href={assignmentHref(a.toilProject, a.id)} kind="quiet" row className="agent-card__title">
+        {a.itemTitle}
+      </NavButton>
+      <p className="note agent-card__line">{line.join(' · ')}</p>
+      {/* A failure is the one thing a card always says in full (principle 4). */}
+      {a.state === 'failed' && a.stop && <p className="failure">{a.stop.message}</p>}
+      {a.stale && !a.renewedBy && (
+        <StaleNote
+          stale={a.stale}
+          {...(canRenew
+            ? {
+                action: (
+                  <Button
+                    className="btn btn--secondary btn--sm"
+                    isDisabled={busy}
+                    onPress={async () => {
+                      if (!api) return;
+                      setBusy(true);
+                      setProblem(null);
+                      try {
+                        await api.renew(a.id);
+                        onChanged();
+                      } catch (e) {
+                        setProblem(e instanceof Error ? e.message : String(e));
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    data-run-again=""
+                  >
+                    <AgentMark />
+                    Run again<span className="sr-only"> on {a.itemTitle}</span>
+                  </Button>
+                ),
+              }
+            : {})}
+        />
+      )}
       {a.renewedBy && (
-        <p className="note">
-          Renewed as <a href={assignmentHref(a.toilProject, a.renewedBy)}>a fresh assignment</a>.
+        <p>
+          <NavButton href={assignmentHref(a.toilProject, a.renewedBy)} kind="quiet" size="sm">
+            Renewed as a fresh assignment
+          </NavButton>
+        </p>
+      )}
+      {problem && (
+        <p role="alert" className="failure">
+          {problem}
         </p>
       )}
     </li>
@@ -103,17 +152,19 @@ function RecentAnalyses() {
         <ul className="plain">
           {list.map((a) => (
             <li key={a.id} className="analysis-line">
-              <a href={analysisHref(toilProject.name, a.id)}>
+              <NavButton href={analysisHref(toilProject.name, a.id)} kind="quiet" row>
                 <span className="note">{dateTime(a.at)}</span>
                 <span className="sr-only">, </span> <span>{a.recommendation ? plainText(a.recommendation) : 'No recommendation line.'}</span>
-              </a>
+              </NavButton>
             </li>
           ))}
         </ul>
       ) : (
         !running && <p className="note">None yet.</p>
       )}
-      <a href={analysesHref(toilProject.name)}>{plain.pw('All analyses', 'All earlier briefings')}</a>
+      <NavButton href={analysesHref(toilProject.name)} kind="quiet" size="sm">
+        {plain.pw('All analyses', 'All earlier briefings')}
+      </NavButton>
     </section>
   );
 }
@@ -127,7 +178,7 @@ export function plainText(text: string): string {
 
 /** The sidebar itself, the same inside the drawer and beside the view. */
 export function AgentsSidebar() {
-  const { toilProject, now, assignments: api } = useData();
+  const { toilProject, assignments: api } = useData();
   const plain = usePlain();
   const { list, error, reload } = useAssignments(toilProject.name);
   const inbox = list?.assignments.filter(inInbox) ?? [];
@@ -162,7 +213,10 @@ export function AgentsSidebar() {
       )}
       {list && !rest.length && (
         <p className="note">
-          Nothing assigned yet. <a href={boardHref(toilProject.name)}>Assign from the board</a>
+          Nothing assigned yet.{' '}
+          <NavButton href={boardHref(toilProject.name)} size="sm">
+            Assign from the board
+          </NavButton>
         </p>
       )}
       {groups.map(({ g, items }) =>
@@ -173,7 +227,7 @@ export function AgentsSidebar() {
             </summary>
             <ul className="agent-cards">
               {items.map((a) => (
-                <AgentCard key={a.id} a={a} now={now} />
+                <AgentCard key={a.id} a={a} onChanged={reload} />
               ))}
             </ul>
           </details>
@@ -184,7 +238,7 @@ export function AgentsSidebar() {
             </h3>
             <ul className="agent-cards">
               {items.map((a) => (
-                <AgentCard key={a.id} a={a} now={now} />
+                <AgentCard key={a.id} a={a} onChanged={reload} />
               ))}
             </ul>
           </section>

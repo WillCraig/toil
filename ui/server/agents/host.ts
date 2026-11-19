@@ -19,6 +19,7 @@
  * to the ledger before the answer or the error does, and the answer carries them.
  */
 
+import { agentFailure } from './failure.ts';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -666,7 +667,8 @@ export class AgentHost implements Agent {
           : s.signal.aborted
             ? // A person's Stop is not a sign-in problem, whatever the SDK threw on the way out (#317).
               new AgentError(`${runtime.label} was stopped before it finished.`, 'Ask again for a whole answer; what had arrived is kept.')
-            : new AgentError(`${runtime.label} failed: ${e instanceof Error ? e.message : String(e)}`, `Check that ${runtime.cliLabel} is signed in (run ${runtime.command} once on its own), then ask again.`);
+            : // The fix follows the cause: a plan's limit is not a sign-in problem either (failure.ts).
+              ((f) => new AgentError(f.message, f.fix))(agentFailure(runtime, e instanceof Error ? e.message : String(e)));
       if (used.records.length) failure.usage = used;
       throw failure;
     }

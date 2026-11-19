@@ -13,6 +13,7 @@
  * and then signed.
  */
 
+import { noteApplied } from '../applied.ts';
 import { useEffect, useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { ApplyOutcome, ApplyPlan, ApplyResult, ApplyWork, PlanGroupView } from '../classify-api.ts';
@@ -24,6 +25,7 @@ import { useShell } from './proposal.tsx';
 import { sourceLabel } from '../format.ts';
 import { useWords } from '../skins.tsx';
 import type { WorkItem } from '../toil.ts';
+import { NavButton } from './nav-button.tsx';
 
 /** Why a connection's changes can't be applied yet, in words, with where to put it right. */
 export const WRITES_OFF = (connection: string) => `Changes to ${connection} are switched off, so nothing can be written there yet. Turn them on for ${connection} under Settings, Connections, then come back and apply.`;
@@ -168,6 +170,9 @@ export function ApplyCard({ connection, work, onClose }: { connection: string; w
         return item && category ? [{ id: item.id, category }] : [];
       });
       if (done.length) applied(done);
+      // Each changed item is a change in the tracker the data on screen doesn't show yet (#657, round 4).
+      const at = new Date().toISOString();
+      for (const o of r.outcomes) for (const c of o.changed) noteApplied(`classify:${c.key}:${at}`, at);
     } catch (e) {
       setResult({ error: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -209,7 +214,10 @@ export function ApplyCard({ connection, work, onClose }: { connection: string; w
       {plan && 'notes' in plan && plan.notes.map((n) => <p key={n} className="note">{n}</p>)}
       {writesOff && !disabled && (
         <p className="failure" role="note" data-writes-off="">
-          {WRITES_OFF(connection)} <a href="#/settings/connections">Open Settings</a>
+          {WRITES_OFF(connection)}{' '}
+          <NavButton href="#/settings/connections" size="sm">
+            Open Settings
+          </NavButton>
         </p>
       )}
       {disabled && (

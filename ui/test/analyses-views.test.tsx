@@ -92,7 +92,7 @@ describe('the Analyses tab', () => {
     const evidence = panel.querySelector('details.analysis-evidence') as HTMLDetailsElement;
     expect(evidence.open).toBe(false);
     expect(evidence.querySelector('summary')!.textContent).toMatch(/^Evidence \(\d+ paragraphs\)$/);
-    expect(within(panel).getByRole('link', { name: 'Earlier briefings' }).getAttribute('href')).toBe('#/project/card-payments/summary/briefings');
+    expect(within(panel).getByRole('link', { name: /Back to Earlier briefings/ }).getAttribute('href')).toBe('#/project/card-payments/summary/briefings');
     expect(panel.textContent).toContain('Newly blocked');
   });
 
@@ -181,7 +181,7 @@ describe('Analyze in the chat', () => {
     await userEvent.click(within(askBar('checkout-web')).getByRole('textbox', { name: 'Your question' }));
     const chat = await screen.findByRole('dialog', { name: 'Ask about checkout-web' });
     await userEvent.click(within(chat).getByRole('button', { name: /^Give me the full briefing/ }));
-    const kept = await within(chat).findByRole('link', { name: 'Kept in Analyses' }, { timeout: 5000 });
+    const kept = await within(chat).findByRole('link', { name: 'Open in Analyses' }, { timeout: 5000 });
     expect(within(chat).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Recommendation', 'Reasons']);
     expect((chat.querySelector('details.analysis-evidence') as HTMLDetailsElement).open).toBe(false);
     // Every citation in the answer is a plain link: a short source name, its key and a cut title, with the status in the name a screen reader reads.

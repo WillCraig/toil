@@ -1,6 +1,6 @@
 /**
  * Mapping an account to a person (#561): the "Map" action on an account the
- * Toil project doesn't map, and "Save to this repository" for the people
+ * Toil project doesn't map, and "Save for the team" for the people
  * once they are right. Both run toil's own commands through the config path
  * (`projects person`, `projects people save`), each behind the same rules as
  * typed by hand; this file decides nothing a command doesn't. It offers a
@@ -183,22 +183,24 @@ export function SaveToRepo() {
   };
   return (
     <Stack gap="xs" className="save-to-repo">
-      <Cluster>
+      <div className="control-row">
+        <span className="control-row__group">
         <button type="button" className="btn" onClick={run} disabled={off !== null || busy} aria-describedby={off ? offId : undefined}>
-          {busy ? 'Saving…' : 'Save to this repository'}
+          {busy ? 'Saving…' : 'Save for the team'}
         </button>
-        {off && (
-          <span id={offId} className="note">
-            Turned off: {off}
-          </span>
-        )}
         <InfoTip label="saving the people" tip={SAVE_EXPLAINED} placement="bottom start" triggerProps={{ 'data-save-to-repo-info': '' }}>
           <p>{SAVE_EXPLAINED}</p>
           <label className="map-replace">
             <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Take mine where the repository lists the same person differently
           </label>
         </InfoTip>
-      </Cluster>
+        </span>
+        {off && (
+          <span id={offId} className="note">
+            Turned off: {off}
+          </span>
+        )}
+      </div>
       <OutcomeLine outcome={outcome} />
     </Stack>
   );

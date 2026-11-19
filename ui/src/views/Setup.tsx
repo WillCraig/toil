@@ -40,6 +40,7 @@ import { LookAround } from '../sample-mode.tsx';
 import { JiraKeyField, NamedJiraLine, useNamedJira } from './jira-key.tsx';
 import './setup.css';
 import { homeShort } from '../home-path.ts';
+import { SummaryChevron } from '../components/disclosure.tsx';
 
 /** Where the wizard lives, and what opens it from the first run, the palette and Settings. */
 export const SETUP_HREF = '#/setup';
@@ -280,7 +281,7 @@ function Tools({ tools, connections, picked, onPick, later, onLater }: { tools: 
       <ul className="plain">{tools.common.map(row)}</ul>
       {tools.more.length > 0 && (
         <details className="more" data-setup-more="" open={moreOpen}>
-          <summary>More tools ({tools.more.length})</summary>
+          <summary><SummaryChevron />More tools ({tools.more.length})</summary>
           <ul className="plain">{tools.more.map(row)}</ul>
         </details>
       )}
@@ -727,7 +728,7 @@ function HelperStep({ agent, status, problem: statusProblem, onStatus, refresh, 
                     </button>
                   )}
                   <details className="agent-details">
-                    <summary>Details for whoever sets it up</summary>
+                    <summary><SummaryChevron />Details for whoever sets it up</summary>
                     {statusLines(a).map((line, i) => (
                       <p key={i} className="note">
                         {line}

@@ -92,6 +92,8 @@ describe("a row's choices and keys", () => {
     const c = choicesOf(builtinScheme('balance')!);
     expect(c.map((x) => x.key)).toEqual(['1', '2', '3', '4', 'U']);
     expect(choiceForKey(c, '3')?.id).toBe('ktlo');
+    const flow = choicesOf(builtinScheme('flow')!);
+    expect(flow.map((x) => [x.key, x.id])).toEqual([['1', 'feature'], ['2', 'defect'], ['3', 'risk'], ['4', 'debt'], ['U', null]]);
   });
 });
 

@@ -37,6 +37,7 @@
  * to apply it.
  */
 
+import { noteApplied } from '../applied.ts';
 import { ChevronDownIcon, ChevronRightIcon } from '../components/icons.tsx';
 import {
   DndContext,
@@ -71,6 +72,7 @@ import { appliesItself, boardBlock, canMove, columns, dropRefusal, proposeMove, 
 import { isMoveColumn, type AddToBoard, type MoveColumn, type MoveOptions, type NextStep } from '../board-api.ts';
 import { useBoardMoves } from '../board-moves.ts';
 import { flows } from '../model/flow.ts';
+import { asMapped } from '../model/people.ts';
 import { boardLanes, mixOfItems, type Lane } from '../model/lanes.ts';
 import { useWorkInsights } from '../insights-data.ts';
 import { labelOfDimension } from '../model/work-insights.ts';
@@ -80,6 +82,7 @@ import type { Proposal } from '../proposal.ts';
 import { ariaKeys, matches } from '../shortcuts.ts';
 import { useSkins, useWords } from '../skins.tsx';
 import type { StatusCategory, WorkItem } from '../toil.ts';
+import { ExternalLink } from '../components/external-link.tsx';
 
 const label = (c: StatusCategory) => STATUS_CATEGORY_LABEL[c];
 
@@ -181,6 +184,9 @@ const attentionClass = (item: WorkItem, p: Prepared) => (flagsAttention(insights
 
 function CardFace({ item, ids }: { item: WorkItem; ids?: string }) {
   const { insights: prepared } = useDerived();
+  const { toilProject } = useData();
+  // The assignee as the toil project's people name them: one person, one name and one avatar, whichever account is on the item.
+  const who = asMapped(toilProject.people ?? [], item.source.area, item.assignee);
   const { Card: Skin } = useSkins();
   const key = shortKey(item);
   const found = insights(item, prepared);
@@ -215,7 +221,7 @@ function CardFace({ item, ids }: { item: WorkItem; ids?: string }) {
       </p>
       <div className="card-foot">
         <span className="who">
-          <Avatar person={item.assignee} /> {personText(item.assignee)}
+          <Avatar person={who} /> {personText(who)}
         </span>
         <span className="card-meta">
           <InsightChips insights={found} compact titles={prepared.byId} />
@@ -600,6 +606,8 @@ export function Board({ items, group = null }: { items: WorkItem[]; group?: stri
       // The extra argument is sent only for a press on "Add to the board and move": a plain drop never asks to add anything.
       const out = how.addToBoard ? await classifyApi.moveItem(toilProject.name, item.id, to as MoveColumn, { addToBoard: true }) : await classifyApi.moveItem(toilProject.name, item.id, to as MoveColumn);
       if (out.status === 'applied') {
+        // The header's line about the data stops saying nothing changed (#657, round 4).
+        noteApplied(`move:${item.id}:${to}:${Date.now()}`, new Date().toISOString());
         // Back where the data says it is, the card needs no override; anywhere else it stays where it was put until a sync says.
         if (to === base) unshow(item.id);
         else setShown((m) => new Map(m).set(item.id, { base, at: to, pending: false }));
@@ -830,9 +838,9 @@ export function Board({ items, group = null }: { items: WorkItem[]; group?: stri
                             Add to the board and move
                           </Button>
                           {m.board?.url && (
-                            <a className="btn btn--quiet" href={m.board.url} target="_blank" rel="noreferrer">
-                              Open the project board<span className="sr-only"> on GitHub (opens in a new tab)</span>
-                            </a>
+                            <ExternalLink className="btn btn--secondary" href={m.board.url}>
+                              Open the project board<span className="sr-only"> on GitHub</span>
+                            </ExternalLink>
                           )}
                         </>
                       ),
@@ -848,9 +856,9 @@ export function Board({ items, group = null }: { items: WorkItem[]; group?: stri
                     : m.board?.url
                       ? {
                           actions: (
-                            <a className="btn" href={m.board.url} target="_blank" rel="noreferrer">
-                              Open the project board<span className="sr-only"> on GitHub (opens in a new tab)</span>
-                            </a>
+                            <ExternalLink className="btn btn--secondary" href={m.board.url}>
+                              Open the project board<span className="sr-only"> on GitHub</span>
+                            </ExternalLink>
                           ),
                         }
                       : {})}

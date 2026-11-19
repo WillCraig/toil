@@ -154,7 +154,7 @@ describe('"How sure is this?"', () => {
     expect(within(checks).getAllByRole('link').length).toBeGreaterThan(0);
     const fold = checks.querySelector('details[data-answer-more]') as HTMLDetailsElement;
     expect(fold.open).toBe(false);
-    expect(fold.querySelector('summary')!.textContent).toMatch(/^What it looked at · \d+ s · Sample figures, not from a model\. about \$0\.\d\d of usage \(not billed on your plan\)$/);
+    expect(fold.querySelector('summary')!.textContent).toMatch(/^What it looked at · \d+ s · Sample figures, not from a model\. Covered by your Claude plan \(about \$0\.\d\d of usage\)$/);
     expect(fold.querySelector('[data-looked-at]')).toBeTruthy();
     expect(checks.textContent).toContain('Suggestions only. Nothing was changed.');
     // Not "Answered by" when the header already says it.
@@ -177,7 +177,7 @@ describe('"How sure is this?"', () => {
       return c as HTMLElement;
     });
     expect(checks.querySelector('[data-sure]')!.textContent).toBe('High');
-    expect(checks.textContent).toContain('Every saved read worked, the data was read 2 hours ago');
+    expect(checks.textContent).toContain('All the saved data was read, 2 hours ago');
     expect(checks.textContent).toContain('It named no items.');
   });
 
@@ -196,8 +196,8 @@ describe('"How sure is this?"', () => {
     expect(chat.querySelector('[data-sure]')!.textContent).not.toBe('Low');
     // The builds read did fail, so the all-clear claims only the reads this answer depends on.
     const checks = chat.querySelector('[data-how-sure]')!.textContent!;
-    expect(checks).not.toContain('Every saved read worked');
-    expect(checks).toContain('Every read this answer depends on worked');
+    expect(checks).not.toContain('All the saved data was read');
+    expect(checks).toContain('All the data this answer needs was read');
   });
 
   it('shows a cited id the Toil project does not hold as the bare id, never dropping it', async () => {
@@ -324,7 +324,7 @@ describe('the chat header and usage line (#552)', () => {
     });
     const fold = chat.querySelector('details[data-answer-more]') as HTMLDetailsElement;
     expect(fold.open).toBe(false);
-    expect(fold.querySelector('summary')!.textContent).toContain('Sample figures, not from a model. about $');
+    expect(fold.querySelector('summary')!.textContent).toContain('Sample figures, not from a model. Covered by your Claude plan (about $');
     expect(footer.textContent).toContain('claude-sonnet-4-6');
     // One answer's usage is the chat's, so the total waits for a second.
     expect(chat.querySelector('[data-chat-usage]')).toBeNull();

@@ -18,10 +18,17 @@
 .decided { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
 .decided li { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.9375rem; }
 .chart-menus { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: end; }
+/* Work mix's Categories (#657) changes what the categories are, not how they are cut, so it stands apart from the menus after it. */
+.chart-menus__lens { display: flex; align-items: end; padding-right: 0.75rem; margin-right: 0.25rem; border-right: 1px solid var(--line); }
+@media (max-width: 40rem) { .chart-menus__lens { flex-basis: 100%; padding: 0 0 0.5rem; margin: 0; border-right: 0; border-bottom: 1px solid var(--line); } }
 .chart-changes { padding: 0.5rem 0.25rem; }
 .chart-changes h3 { margin: 0 0 0.3rem; font-size: 0.9375rem; }
 .chart-changes ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; }
-.door { text-decoration-thickness: 1px; }
+/* A figure that opens its items is a quiet button that keeps the figure's look (#657): no underline, a surface on hover and the focus ring, never a link. */
+.door { border-radius: 2px; color: inherit; text-decoration: none; cursor: pointer; overflow-wrap: anywhere; }
+/* The hover frame is drawn outside the box (a spread shadow), so the figure keeps its width and never pushes its row wider. */
+.door:hover { background: var(--surface); box-shadow: 0 0 0 0.2rem var(--surface), 0 0 0 calc(0.2rem + 1px) var(--line); }
+.door:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .door b { font-family: var(--font-display); font-size: 1.125em; }
 
 .release { border: 1px solid var(--line); border-radius: var(--radius); background: var(--raised); min-width: 0; }

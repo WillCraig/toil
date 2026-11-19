@@ -7,6 +7,14 @@
  * "Waits on" arrows join each blocker to what it holds up, and the chain of
  * open blockers holding the most points is the critical chain.
  *
+ * A bar with a due date also carries its plan: a lighter stretch from when it
+ * can start (when the last thing it waits on is due, else today) to the end of
+ * its due date, so the sprint reads as a plan as well as a history. An item with no due
+ * date has no plan, never a plan of no length (principle 12). Rows come in
+ * groups, one per set of items joined by blocks links, the critical chain's
+ * first, so a chain's rows sit together in chain order; `focus` names the rows
+ * worth showing first, the chains still holding work up.
+ *
  * Every time that is estimated says so (principle 4). A link carries no date
  * in any tracker toil reads, so a blocked segment starts at the later of the
  * two items' creation; an item whose history never recorded a move into In
@@ -26,7 +34,7 @@ import type { Health } from './sprint.ts';
 
 const DAY = 86_400_000;
 
-export type SegmentKind = 'progress' | 'blocked' | 'checks';
+export type SegmentKind = 'progress' | 'blocked' | 'checks' | 'planned';
 
 export interface Segment {
   kind: SegmentKind;
@@ -35,7 +43,7 @@ export interface Segment {
   end: string;
   /** True when `start` (or, for a finished item with no recorded finish, `end`) is estimated. */
   estimated: boolean;
-  /** For one blocker's wait (`Bar.blocked`), the blocker; for failing checks, the build or pull request; null on the main lane, where blocked time is the union of every wait. */
+  /** For one blocker's wait (`Bar.blocked`), the blocker; for failing checks, the build or pull request; for the plan, what it waits on whose due date sets its start; null on the main lane, where blocked time is the union of every wait, and for a plan that starts today. */
   by: string | null;
 }
 
@@ -54,6 +62,14 @@ export interface Bar {
   checks: Segment[];
   /** Where the bar's time came from, in words, for the table. */
   evidence: string[];
+  /** Its due date as the tracker holds it (`YYYY-MM-DD`), null when it has none: then it has no plan. */
+  due: string | null;
+  /** Open work with a due date still ahead of where it can start: from that start to the due date. The due date is read; the start is estimated. */
+  planned: Segment | null;
+  /** Still open after its due date: past the end of that day, so an item due today isn't overdue yet. */
+  overdue: boolean;
+  /** Which group of linked items it is in: groups are numbered in the order the rows show them. */
+  group: number;
   onChain: boolean;
   /** The readiness gate's verdict, for work not started yet; null once it has started. */
   ready: Verdict | null;
@@ -91,6 +107,8 @@ export interface Gantt {
   chain: Chain | null;
   /** True when the `blocks` links loop. */
   cycle: boolean;
+  /** The rows to show first: every group of three or more items still holding work up, and the critical chain's group. Every bar when that would hide nothing worth a step. */
+  focus: string[];
 }
 
 export interface GanttInput {
@@ -214,6 +232,12 @@ function failing(item: WorkItem, changes: ChangeRef[], end: number): Segment[] {
   return out;
 }
 
+/** When a due date runs out: the end of its day (`YYYY-MM-DD`, read as UTC like every date here), or the instant a tracker gave; NaN for none. */
+export function dueEnd(due: string | null): number {
+  if (!due) return NaN;
+  return /^\d{4}-\d{2}-\d{2}$/.test(due) ? t(due) + DAY : t(due);
+}
+
 export function blockerGantt(input: GanttInput): Gantt {
   const { prepared: p, health: h } = input;
   const now = t(input.now);
@@ -267,8 +291,50 @@ export function blockerGantt(input: GanttInput): Gantt {
       evidence,
       onChain: onChain.has(id),
       ready,
+      due: item.dueDate,
+      planned: null,
+      overdue: false,
+      group: 0,
     };
   });
+
+  // The plan: open work with a due date starts when the last open thing it waits on is due, else today. A due date is a
+  // whole day, so it ends when that day does: an item due today isn't late until tomorrow, and its plan runs to midnight.
+  const due = new Map(bars.map((b) => [b.id, dueEnd(b.due)]));
+  for (const bar of bars) {
+    const end = due.get(bar.id)!;
+    if (bar.done || !ok(end)) continue;
+    bar.overdue = end < now;
+    let from = now;
+    let by: string | null = null;
+    for (const e of edges.filter((x) => x.target === bar.id && unfinished(x.source))) {
+      const d = due.get(e.source)!;
+      if (ok(d) && d > from) [from, by] = [d, e.source];
+    }
+    if (end > from) {
+      bar.planned = { kind: 'planned', start: at(from), end: at(end), estimated: true, by };
+      bar.evidence.push(by ? 'Planned from when what it waits on is due to its own due date: the due dates are read, the start estimated' : 'Planned from today to its due date: the due date is read, the start estimated');
+    }
+  }
+
+  // Groups: the items each set of blocks links joins, the critical chain's first, then those still holding work up, then the larger.
+  const parent = new Map(ids.map((id) => [id, id]));
+  const root = (id: string): string => (parent.get(id) === id ? id : root(parent.get(id)!));
+  for (const e of edges) parent.set(root(e.source), root(e.target));
+  const members = new Map<string, string[]>();
+  for (const id of ids) members.set(root(id), [...(members.get(root(id)) ?? []), id]);
+  const live = (id: string) => edges.some((e) => (e.source === id || e.target === id) && unfinished(e.source) && unfinished(e.target));
+  const groups = [...members.values()].map((list, first) => ({ list, first, chain: list.some((id) => onChain.has(id)), live: list.some(live) }));
+  groups.sort((a, b) => Number(b.chain) - Number(a.chain) || Number(b.live) - Number(a.live) || b.list.length - a.list.length || a.first - b.first);
+  const groupOf = new Map(groups.flatMap((g, n) => g.list.map((id) => [id, n] as const)));
+  // Within a group, blockers above what they block, then the sooner due.
+  const dueOrder = (id: string) => (ok(due.get(id)!) ? due.get(id)! : Infinity);
+  const place = new Map(ids.map((id, n) => [id, n]));
+  bars.sort((a, b) => groupOf.get(a.id)! - groupOf.get(b.id)! || a.rank - b.rank || dueOrder(a.id) - dueOrder(b.id) || place.get(a.id)! - place.get(b.id)!);
+  for (const bar of bars) bar.group = groupOf.get(bar.id)!;
+  const shown = new Set(groups.filter((g) => g.chain || (g.live && g.list.length >= 3)).flatMap((g) => g.list));
+  // Hiding one or two rows behind a button is a step for nothing.
+  const focus = bars.length - shown.size > 2 ? bars.filter((b) => shown.has(b.id)).map((b) => b.id) : bars.map((b) => b.id);
 
   const arrows: Arrow[] = edges.map((e) => ({ from: e.source, to: e.target, live: unfinished(e.source) && unfinished(e.target), onChain: chainLink.has(`${e.source}->${e.target}`) }));
 
@@ -280,8 +346,19 @@ export function blockerGantt(input: GanttInput): Gantt {
   } else {
     const times = bars.flatMap((b) => [...b.segments, ...b.checks].map((s) => t(s.start))).filter(ok);
     start = times.length ? Math.min(...times) : now - 14 * DAY;
-    // Room past today for the arrows leaving bars that end there.
-    end = now + 2 * DAY;
+    // Room past today for the arrows leaving bars that end there, and for the plans, up to a fortnight out.
+    const plans = bars.map((b) => t(b.planned?.end)).filter(ok);
+    end = Math.min(Math.max(now + 2 * DAY, ...plans), now + 14 * DAY);
   }
-  return { start: at(start), end: at(end), now: at(now), sprint: h?.sprint.name ?? null, bars, arrows, chain, cycle: g.cycle };
+  return { start: at(start), end: at(end), now: at(now), sprint: h?.sprint.name ?? null, bars, arrows, chain, cycle: g.cycle, focus };
+}
+
+/**
+ * A row's blocked time as drawn: calm, except on the critical chain, where it is marked in a light red (#657). Blocked
+ * time is real either way (principle 4); lateness is the due-date flag's to say, filled once the date passes, so a
+ * sprint of long waits doesn't read as one red wall.
+ */
+export function blockedMarks(bar: Bar): Array<{ start: string; end: string; strong: boolean }> {
+  // The main lane's blocked time (the union of every wait), the same the bar draws; per-blocker spells may overlap.
+  return bar.segments.filter((x) => x.kind === 'blocked').map((s) => ({ start: s.start, end: s.end, strong: bar.onChain }));
 }

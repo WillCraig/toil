@@ -13,7 +13,7 @@ import type { AnswerPart } from '../agent.ts';
 import { dateTime } from '../format.ts';
 import { structureOf, textOfParts, unchanged, type AnalysisChanges } from '../model/analysis.ts';
 import { useWords } from '../skins.tsx';
-import { Cited, TicketChip } from './items.tsx';
+import { AnswerText, Cited, TicketChip } from './items.tsx';
 import './analysis.css';
 
 /** "Codex (gpt-5.5)", "Claude, its CLI's default model", or the scripted preview: who wrote an analysis. */
@@ -39,9 +39,7 @@ export function AnalysisBody({ parts, briefing, open = false, level = 4, done = 
       <>
         {done && <p className="note analysis-unshaped">This answer didn't start with a Recommendation line, so it is shown as it came.</p>}
         {parts.map((p, i) => (
-          <p key={i}>
-            <Cited text={p.text} chips />
-          </p>
+          <AnswerText key={i} text={p.text} chips />
         ))}
       </>
     );

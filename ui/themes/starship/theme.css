@@ -241,8 +241,7 @@
 
 /* Sprint health as ship's status readouts. */
 [data-theme="starship"] .stat {
-  border: 1px solid rgba(var(--starship-cyan), 0.4);
-  border-left: 3px solid var(--accent);
+  border: 1px solid rgba(var(--starship-cyan), 0.5);
   background: linear-gradient(90deg, rgba(var(--starship-cyan), 0.08), transparent 70%), var(--raised);
 }
 
@@ -437,7 +436,6 @@
 }
 
 [data-theme="starship"] .btn--accent,
-[data-theme="starship"] .top nav a[aria-current="page"],
 [data-theme="starship"] button[aria-pressed="true"] {
   background: linear-gradient(100deg, var(--accent), var(--link));
 }
@@ -505,16 +503,14 @@
 }
 
 [data-theme="starship"] .moment {
-  border: 1px solid rgba(var(--starship-cyan), 0.45);
-  border-left: 3px solid var(--accent);
+  border: 1px solid rgba(var(--starship-cyan), 0.55);
   background: linear-gradient(90deg, rgba(var(--starship-cyan), 0.1), transparent 70%), var(--raised);
   box-shadow: 0 0 18px rgba(var(--starship-cyan), 0.18), 0 10px 30px rgba(0, 0, 0, var(--starship-lift));
 }
 
 /* A red alert in the theme's danger red, an all clear and a passing check in its green. */
 [data-theme="starship"] .moment--build-failed {
-  border-color: rgba(var(--starship-red), 0.55);
-  border-left-color: var(--danger);
+  border-color: rgba(var(--starship-red), 0.6);
   background: linear-gradient(90deg, rgba(var(--starship-red), 0.12), transparent 70%), var(--raised);
   box-shadow: 0 0 18px rgba(var(--starship-red), 0.22), 0 10px 30px rgba(0, 0, 0, var(--starship-lift));
 }
@@ -526,7 +522,7 @@
 [data-theme="starship"] .moment--item-done,
 [data-theme="starship"] .moment--build-passed,
 [data-theme="starship"] .moment--blocker-cleared {
-  border-left-color: var(--ok);
+  border-color: var(--edge-ok);
 }
 
 [data-theme="starship"] .moment--item-done .moment__label strong,
