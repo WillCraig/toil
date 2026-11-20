@@ -48,7 +48,7 @@ function CardName({ group }: { group: StandupGroup }) {
       <PersonGlyph agent={group.kind === 'agent'} />
       <span className="sum-person__name">{name}</span>
       {suffix && (
-        <button type="button" className="sum-person__account" title={suffix} data-truncate="expand" data-truncate-open={expanded || undefined} aria-expanded={expanded} aria-label={`${expanded ? 'Show less of' : 'Show the whole account of'} ${full}`} onClick={() => setExpanded(!expanded)}>
+        <button type="button" className="sum-person__account" title={suffix} data-truncate="expand" data-truncate-open={expanded || undefined} aria-expanded={expanded} aria-label={`${suffix} (${expanded ? 'show less' : `show the whole account of ${full}`})`} onClick={() => setExpanded(!expanded)}>
           {suffix}
         </button>
       )}

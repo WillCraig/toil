@@ -244,7 +244,7 @@ describe('write it up and export, one row of buttons below (#657)', () => {
     expect(long.getAttribute('data-truncate')).toBe('expand');
     expect(long.title).toContain('moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura');
     // On touch the tooltip never shows (#649), so More opens the whole fact in the chip, by name included.
-    const toggle = within(long).getByRole('button', { name: /Show the whole of/ });
+    const toggle = within(long).getByRole('button', { name: /^More:/ });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     await userEvent.click(toggle);
     expect(long.getAttribute('data-truncate-open')).toBe('true');

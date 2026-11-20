@@ -474,7 +474,7 @@ describe('Apply', () => {
     // The title is cut to its cell, and what a person approves is a press away on touch (#649): it opens in the cell.
     const titleCell = first.children[1] as HTMLElement;
     expect(titleCell.getAttribute('data-truncate')).toBe('expand');
-    const titleToggle = within(first).getByRole('button', { name: /Show the whole title:/ });
+    const titleToggle = within(first).getByRole('button', { name: /\(show the whole title\)$/ });
     await act(async () => void fireEvent.click(titleToggle));
     expect(titleCell.getAttribute('data-truncate-open')).toBe('true');
     expect(titleToggle.getAttribute('aria-expanded')).toBe('true');

@@ -282,7 +282,7 @@ export function TicketChip({ id, detail = false }: { id: string; detail?: boolea
   ) : (
     <span className="ticket-chip" title={label} data-truncate="expand" data-truncate-open={expanded || undefined}>
       {body}
-      <Button className="ticket-chip__more" aria-expanded={expanded} aria-label={`${expanded ? 'Show less of' : 'Show the whole of'} ${label}`} onPress={() => setExpanded(!expanded)}>
+      <Button className="ticket-chip__more" aria-expanded={expanded} aria-label={`${expanded ? 'Less' : 'More'}: ${label}`} onPress={() => setExpanded(!expanded)}>
         {expanded ? 'Less' : 'More'}
       </Button>
     </span>
