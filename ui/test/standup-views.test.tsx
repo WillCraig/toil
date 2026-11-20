@@ -241,8 +241,18 @@ describe('write it up and export, one row of buttons below (#657)', () => {
     const chips = [...document.querySelectorAll<HTMLElement>('[data-standup-team] .standup-chip')];
     const long = chips.find((c) => c.querySelector('.standup-title')!.textContent === 'moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura')!;
     expect(long).toBeTruthy();
-    expect(long.hasAttribute('data-truncate')).toBe(true);
+    expect(long.getAttribute('data-truncate')).toBe('expand');
     expect(long.title).toContain('moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura');
+    // On touch the tooltip never shows (#649), so More opens the whole fact in the chip, by name included.
+    const toggle = within(long).getByRole('button', { name: /^More:/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    await userEvent.click(toggle);
+    expect(long.getAttribute('data-truncate-open')).toBe('true');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(long.querySelector('[data-truncate-full]')!.textContent).toContain('moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura');
+    await userEvent.click(toggle);
+    expect(long.hasAttribute('data-truncate-open')).toBe(false);
+    expect(long.querySelector('[data-truncate-full]')).toBeNull();
   });
 
   it('exports the range as a Markdown file through the API', async () => {

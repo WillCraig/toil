@@ -36,7 +36,7 @@
 .standup-dash { color: var(--muted); }
 
 .standup-chip { display: flex; flex-wrap: wrap; overflow: hidden; align-items: center; gap: 0 0.35rem; width: 100%; max-width: 100%; min-width: 0; font-size: 0.8125rem; line-height: 1.35; }
-/* A chip's item is one quiet row button (#657): key then title, the title cut by the row's width with the whole of it on hover. */
+/* A chip's item is one quiet row button (#657): key then title, the title cut by the row's width with the whole of it on hover and behind its More press (#649). */
 .standup-chip > .standup-row-btn { flex: 1 1 11rem; justify-content: flex-start; gap: 0.4rem; min-width: 0; padding-inline: 0.35rem; font-size: inherit; }
 .standup-row-btn { display: inline-flex; align-items: center; min-width: 0; overflow: hidden; }
 .standup-key { flex: none; font-family: var(--font-mono); font-weight: 600; white-space: nowrap; color: var(--muted); }
@@ -47,6 +47,11 @@
 .standup-q { flex: none; display: inline-grid; place-items: center; width: 1.1rem; height: 1.1rem; color: var(--warn); }
 .standup-wait { flex: none; color: var(--warn); white-space: nowrap; margin-inline-start: 0.35rem; }
 .standup-chip[data-cited] { border-radius: var(--radius); background: var(--tint-accent); box-shadow: 0 0 0 1px var(--accent); }
+/* The whole fact, opened in the chip by its More press (#649): every line, wrapped, a step in from the cut line. */
+.standup-chip__toggle { flex: none; }
+.standup-chip__full { flex: 1 1 100%; display: grid; gap: 0.1rem; min-width: 0; padding: 0.15rem 0.35rem 0.3rem; white-space: normal; overflow-wrap: anywhere; color: var(--ink); }
+.standup-chip__line { display: block; }
+.standup-chip[data-truncate-open] .standup-title, .standup-chip[data-truncate-open] .standup-excerpt { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .standup-fold { align-self: flex-start; font: inherit; font-size: 0.8125rem; color: var(--link, var(--accent)); background: none; border: 0; padding: 0.05rem 0.3rem; cursor: pointer; border-radius: 0.3rem; }
 .standup-fold:hover { text-decoration: underline; }
 

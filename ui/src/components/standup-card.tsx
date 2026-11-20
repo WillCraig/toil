@@ -11,6 +11,7 @@
  * happened" (principle 12).
  */
 
+import { useState } from 'react';
 import { useData } from '../data.ts';
 import { standupHref } from '../format.ts';
 import { defaultRange, groupTitle, sinceText, topRows, type StandupGroup } from '../model/standup.ts';
@@ -33,9 +34,11 @@ function countText(bucket: Bucket, n: number): string {
 
 /**
  * A person on the card: the name on one line, then the account the stand-up page writes after it ("bitbucket achen") in small
- * muted text that truncates, with the whole text on hover. The words are the model's own `groupTitle`, split at its parenthesis.
+ * muted text that truncates, with the whole text on hover. A press on it opens the whole account inline, the way in on
+ * touch (#649, ui/README.md, Cut-off text). The words are the model's own `groupTitle`, split at its parenthesis.
  */
 function CardName({ group }: { group: StandupGroup }) {
+  const [expanded, setExpanded] = useState(false);
   const full = groupTitle({ ...group, kind: 'human' });
   const m = /^(.*?)\s*\(([^()]*)\)$/.exec(full);
   const name = m ? m[1]! : full;
@@ -44,7 +47,11 @@ function CardName({ group }: { group: StandupGroup }) {
     <span className="sum-person" data-kind={group.kind} title={suffix ? full : undefined}>
       <PersonGlyph agent={group.kind === 'agent'} />
       <span className="sum-person__name">{name}</span>
-      {suffix && <span className="sum-person__account" title={suffix} data-truncate="">{suffix}</span>}
+      {suffix && (
+        <button type="button" className="sum-person__account" title={suffix} data-truncate="expand" data-truncate-open={expanded || undefined} aria-expanded={expanded} aria-label={`${suffix} (${expanded ? 'show less' : `show the whole account of ${full}`})`} onClick={() => setExpanded(!expanded)}>
+          {suffix}
+        </button>
+      )}
       {group.kind === 'agent' && <span className="sr-only"> (agent)</span>}
     </span>
   );

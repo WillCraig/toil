@@ -31,10 +31,14 @@ span.read-badge { display: inline-flex; align-items: center; min-height: 32px; }
 .toil-project-bar__about { display: flex; align-items: center; gap: 0.25rem 0.75rem; color: var(--muted); font-size: 0.875rem; min-width: 0; }
 .toil-project-bar__about .source-badges { flex: none; }
 .toil-project-bar__desc { margin: 0; min-width: 0; flex: 0 1 auto; }
-/* One line: the description is cut to fit, with the whole of it in its tooltip; editing it opens the full field. */
+/* One line: the description is cut to fit, with the whole of it in its tooltip and behind a press on it (#649); editing it opens the full field. */
 .toil-project-bar__desc .editable--description:not(.editable--open) { display: flex; flex-wrap: nowrap; align-items: center; min-width: 0; }
 .toil-project-bar__desc .edit-pencil { flex: none; }
 .toil-project-bar__desc-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The description as its own press (#649): it looks like the bar's text, and opens the whole description wrapped in place. */
+.toil-project-bar__desc-toggle { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.toil-project-bar__desc-text[data-truncate-open] { overflow: visible; }
+.toil-project-bar__desc-text[data-truncate-open] .toil-project-bar__desc-toggle { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
 .toil-project-bar__about:has(.editable--open) { flex-wrap: wrap; }
 .toil-project-bar__about:has(.editable--open) .toil-project-bar__desc { flex: 1 1 100%; }
 .agents-open__short { display: none; }
@@ -51,6 +55,7 @@ span.read-badge { display: inline-flex; align-items: center; min-height: 32px; }
   .agents-open__label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
   .toil-project-bar__about { flex-wrap: wrap; }
   .toil-project-bar__desc-text { white-space: normal; }
+  .toil-project-bar__desc-toggle { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
 }
 
 /* The tabs: one row that scrolls sideways when it doesn't fit, the whole row is theirs. */
@@ -131,7 +136,9 @@ span.read-badge { display: inline-flex; align-items: center; min-height: 32px; }
 
 .overview-metrics { display: grid; gap: 0.3rem; min-width: 0; }
 
-/* A ticket chip: key, title and status, the title cut to fit with the whole of it in the tooltip. */
+/* A ticket chip: key, title and status, the title cut to fit with the whole of it in the tooltip, and a way in on touch (#649): its link, or its More press where it has none. */
+.ticket-chip__more { font: inherit; font-size: 0.75rem; color: var(--link); background: none; border: 0; padding: 0.3rem 0.2rem; cursor: pointer; flex: none; }
+.ticket-chip[data-truncate-open] .ticket-chip__title { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; overflow-wrap: anywhere; }
 .ticket-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; list-style: none; padding: 0; margin: 0; min-width: 0; }
 .ticket-chips > li { min-width: 0; max-width: 100%; }
 .ticket-chip {

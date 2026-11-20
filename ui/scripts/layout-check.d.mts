@@ -21,3 +21,9 @@ export interface PersonalNeedles {
   segment: string | null;
 }
 export declare function personalNeedles(info?: { username: string; homedir: string } | null, home?: string): PersonalNeedles;
+export interface LayoutFinding {
+  kind: string;
+  at: string;
+  detail: string;
+}
+export declare function inspect(cards: string, headerFits: boolean): LayoutFinding[];

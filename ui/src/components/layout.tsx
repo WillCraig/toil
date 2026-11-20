@@ -209,14 +209,16 @@ export function Copy({ value, what }: { value: string; what: string }) {
  * and the end (the file's name) always shows. A path under the home folder is
  * shown from `~` (#653), tooltip included, so the account name stays off
  * screen. A screen reader and a selection get the path as shown; the copy
- * button copies all of it.
+ * button copies all of it, which is its way in on touch (`data-truncate="copy"`,
+ * ui/README.md, Cut-off text). Without the button it is not declared a
+ * truncation at all, and the layout check holds it to fitting.
  */
 export function Path({ value, what = 'path', copy = true }: { value: string; what?: string; copy?: boolean }) {
   const shown = homeShort(value);
   const [head, tail] = splitTail(shown);
   return (
     <span className="l-path">
-      <code className="l-path__text" title={shown} data-truncate="">
+      <code className="l-path__text" title={shown} data-truncate={copy ? 'copy' : undefined}>
         <span className="l-path__head">{head}</span>
         <span className="l-path__tail">{tail}</span>
       </code>

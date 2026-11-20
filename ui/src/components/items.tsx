@@ -222,11 +222,13 @@ function detailLines(item: WorkItem | undefined, pr: Change | undefined, theme?:
  * name it reads out. With `detail` (#395), hovering or focusing it shows a tooltip
  * with its type, assignee, estimate, sprint and last update (a pull
  * request's repository, author and checks); otherwise the whole line is in
- * its title. An id the toil project doesn't hold stays the bare id, marked
+ * its title, and reachable on touch the way Cut-off text (ui/README.md) says.
+ * An id the toil project doesn't hold stays the bare id, marked
  * missing, as every citation does.
  */
 export function TicketChip({ id, detail = false }: { id: string; detail?: boolean }) {
   const { byId, prById, toilProject } = useData();
+  const [expanded, setExpanded] = useState(false);
   const item = byId.get(id);
   const pr = item ? undefined : prById?.get(id);
   if (!item && !pr) return <code className="missing">{id}</code>;
@@ -271,13 +273,18 @@ export function TicketChip({ id, detail = false }: { id: string; detail?: boolea
       </TooltipTrigger>
     );
   }
+  // Cut-off text keeps a way in on touch (#649, ui/README.md, Cut-off text): the chip's own link opens
+  // the item or pull request with the whole title (`detail`); with nowhere to go, a press opens it inline (`expand`).
   return href ? (
-    <a className="ticket-chip" href={href} title={label} data-truncate="">
+    <a className="ticket-chip" href={href} title={label} data-truncate="detail">
       {body}
     </a>
   ) : (
-    <span className="ticket-chip" title={label} data-truncate="">
+    <span className="ticket-chip" title={label} data-truncate="expand" data-truncate-open={expanded || undefined}>
       {body}
+      <Button className="ticket-chip__more" aria-expanded={expanded} aria-label={`${expanded ? 'Less' : 'More'}: ${label}`} onPress={() => setExpanded(!expanded)}>
+        {expanded ? 'Less' : 'More'}
+      </Button>
     </span>
   );
 }

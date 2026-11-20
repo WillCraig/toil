@@ -471,6 +471,13 @@ describe('Apply', () => {
     expect(cells[0]).toMatch(/^SHOP-\d+$/);
     expect(cells[2]).toMatch(/^(Feature|Keep the lights on)$/);
     expect(cells[3]).toMatch(/^(\+ (feature|ktlo)|\w+ \u2192 (feature|ktlo))/);
+    // The title is cut to its cell, and what a person approves is a press away on touch (#649): it opens in the cell.
+    const titleCell = first.children[1] as HTMLElement;
+    expect(titleCell.getAttribute('data-truncate')).toBe('expand');
+    const titleToggle = within(first).getByRole('button', { name: /\(show the whole title\)$/ });
+    await act(async () => void fireEvent.click(titleToggle));
+    expect(titleCell.getAttribute('data-truncate-open')).toBe('true');
+    expect(titleToggle.getAttribute('aria-expanded')).toBe('true');
     expect(card.textContent!.match(/Nothing is written until you press Apply\./g)).toHaveLength(1);
     expect(document.querySelector("[data-pending]")!.textContent!.match(/Nothing is written until you press Apply./g)).toHaveLength(1);
     expect(card.querySelector('.apply__command code')!.textContent).toMatch(/^toil jira issue categorize .*--allow-write$/);
