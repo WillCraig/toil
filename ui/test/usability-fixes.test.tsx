@@ -92,7 +92,12 @@ describe('the project header', () => {
     const about = document.querySelector('.toil-project-bar__about')!;
     expect(about.lastElementChild).toBe(more);
     expect(document.querySelectorAll('[data-edit], .edit-pencil')).toHaveLength(0);
-    expect(screen.queryByRole('button', { name: /Rename|description/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Rename/ })).toBeNull();
+    // The description itself is a press that opens the whole of it in place (#649), never an edit.
+    const desc = screen.getByRole('button', { name: 'Show the whole description of card-payments' });
+    await userEvent.click(desc);
+    expect(desc.getAttribute('aria-expanded')).toBe('true');
+    expect(desc.closest('.toil-project-bar__desc-text')!.getAttribute('data-truncate-open')).toBe('true');
     await userEvent.click(more);
     const edit = (await screen.findByRole('menu')).querySelector('[data-edit-project]')!;
     expect(edit.getAttribute('href')).toBe('#/settings/projects/card-payments/sources');
