@@ -5,13 +5,14 @@ import type { SupportedVersion } from '../../core/supported.js';
 
 /**
  * Split.IO (Harness FME) feature flags through the Admin API under
- * `/internal/api/v2`: workspaces, environments, flags, and change requests.
+ * `/internal/api/v2`: workspaces, environments, flags, segments, flag sets
+ * (on v3), traffic types, rollout statuses and change requests.
  * Every change to a flag is filed as a change request for someone else to
  * approve, so even the write commands only ever ask.
  */
 export const splitioArea = defineArea({
   name: 'splitio',
-  description: 'Split.IO feature flags: workspaces, environments, flags and change requests through the Admin API',
+  description: 'Split.IO feature flags: workspaces, environments, flags, segments, flag sets and change requests through the Admin API',
   connection: z.object({
     baseUrl: z.url().describe('Admin API root, e.g. https://api.split.io'),
     adminApiKey: z.string().min(1).describe('Split Admin API key'),
@@ -46,6 +47,6 @@ export const splitioArea = defineArea({
 export const splitioSupported: SupportedVersion = {
   product: 'Split.IO Admin API',
   minimum: null,
-  api: 'Admin API v2',
-  note: 'toil calls the Admin API under /internal/api/v2 with an Admin API key sent as a Bearer header. It has not been run against a live Split account yet.',
+  api: 'Admin API v2 (flag sets v3)',
+  note: 'toil calls the Admin API under /internal/api/v2 (flag sets under /internal/api/v3) with an Admin API key sent as a Bearer header. It has not been run against a live Split account yet.',
 };
