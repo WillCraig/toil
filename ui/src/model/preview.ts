@@ -15,17 +15,17 @@ import { burnup } from './burnup.ts';
 import { doneAt } from './flow.ts';
 import { people } from './people.ts';
 import { waitOf } from './prs.ts';
-import { daysLeft, health } from './sprint.ts';
+import { daysLeft, health, sprintPoints } from './sprint.ts';
 
 export interface PreviewSprint {
   name: string;
   /** Working days left, and in the sprint. */
   daysLeft: number;
   daysTotal: number;
-  /** Points done and in scope now. */
-  done: number;
-  scope: number;
-  /** Each day's scope and done points, for the small burn-up. */
+  /** Points done and in scope now; both null when no item in the sprint has points (#652). */
+  done: number | null;
+  scope: number | null;
+  /** Each day's scope and done points, for the small burn-up; empty when no points were read. */
   burn: Array<{ scope: number; done: number }>;
   /** Calendar days still to come after the last one in `burn`, so the burn-up keeps room for them. */
   ahead: number;
@@ -92,13 +92,14 @@ export function previewOf(d: ToilProjectData, now: string, since: string | null)
   let sprint: PreviewSprint | null = null;
   if (h) {
     const b = burnup(h, now);
+    const pts = sprintPoints(h);
     sprint = {
       name: h.sprint.name,
       daysLeft: daysLeft(h.days),
       daysTotal: h.days.total,
-      done: h.done.points,
-      scope: h.done.points + h.remaining.points,
-      burn: b.days.map((x) => ({ scope: x.scope, done: x.done })),
+      done: pts?.done ?? null,
+      scope: pts?.total ?? null,
+      burn: pts ? b.days.map((x) => ({ scope: x.scope, done: x.done })) : [],
       ahead: b.ahead,
     };
   }

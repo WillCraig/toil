@@ -27,6 +27,8 @@
       "--limit <n>",
       "--offset <n>",
       "--flag-set <name>",
+      "--tag <tag>",
+      "--search <text>",
       "--ws <id>"
     ]
   },
@@ -190,6 +192,188 @@
       "--rollout-status <id>",
       "--ws <id>",
       "--allow-write"
+    ]
+  },
+  {
+    "name": "segment list",
+    "tool": "splitio_segment_list",
+    "description": "List segments in a workspace, or those enabled in one environment",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "--environment <id>",
+      "--limit <n>",
+      "--offset <n>",
+      "--ws <id>"
+    ]
+  },
+  {
+    "name": "segment keys",
+    "tool": "splitio_segment_keys",
+    "description": "List the keys in a segment in one environment",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "<segment>",
+      "--environment <id>",
+      "--limit <n>",
+      "--offset <n>"
+    ]
+  },
+  {
+    "name": "segment add-keys",
+    "tool": "splitio_segment_add_keys",
+    "description": "Submit a Change Request to add keys to a segment in an environment",
+    "writes": true,
+    "connection": true,
+    "flags": [
+      "<segment>",
+      "--environment <id>",
+      "--key <key>",
+      "--keys-file <path>",
+      "--mnemonic <text>",
+      "--description <text>",
+      "--change-number <CHG>",
+      "--approvers <ids>",
+      "--ws <id>",
+      "--allow-write"
+    ]
+  },
+  {
+    "name": "segment remove-keys",
+    "tool": "splitio_segment_remove_keys",
+    "description": "Submit a Change Request to remove keys from a segment in an environment",
+    "writes": true,
+    "connection": true,
+    "flags": [
+      "<segment>",
+      "--environment <id>",
+      "--key <key>",
+      "--keys-file <path>",
+      "--mnemonic <text>",
+      "--description <text>",
+      "--change-number <CHG>",
+      "--approvers <ids>",
+      "--ws <id>",
+      "--allow-write"
+    ]
+  },
+  {
+    "name": "large-segment list",
+    "tool": "splitio_large_segment_list",
+    "description": "List large segments in a workspace, or those enabled in one environment",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "--environment <id>",
+      "--ws <id>"
+    ]
+  },
+  {
+    "name": "large-segment get",
+    "tool": "splitio_large_segment_get",
+    "description": "Get a large segment by name",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "<name>",
+      "--ws <id>"
+    ]
+  },
+  {
+    "name": "rule-based-segment list",
+    "tool": "splitio_rule_based_segment_list",
+    "description": "List rule-based segments in a workspace, or those enabled in one environment",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "--environment <id>",
+      "--ws <id>"
+    ]
+  },
+  {
+    "name": "rule-based-segment get",
+    "tool": "splitio_rule_based_segment_get",
+    "description": "Get a rule-based segment by name",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "<name>",
+      "--ws <id>"
+    ]
+  },
+  {
+    "name": "rule-based-segment update",
+    "tool": "splitio_rule_based_segment_update",
+    "description": "Submit a Change Request to replace a rule-based segment's rules in an environment",
+    "writes": true,
+    "connection": true,
+    "flags": [
+      "<name>",
+      "--environment <id>",
+      "--input-file <path>",
+      "--mnemonic <text>",
+      "--description <text>",
+      "--change-number <CHG>",
+      "--approvers <ids>",
+      "--ws <id>",
+      "--allow-write"
+    ]
+  },
+  {
+    "name": "flag-set list",
+    "tool": "splitio_flag_set_list",
+    "description": "List flag sets in a workspace",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "--limit <n>",
+      "--cursor <cursor>",
+      "--ws <id>"
+    ]
+  },
+  {
+    "name": "flag-set get",
+    "tool": "splitio_flag_set_get",
+    "description": "Get a flag set by ID",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "<id>"
+    ]
+  },
+  {
+    "name": "traffic-type list",
+    "tool": "splitio_traffic_type_list",
+    "description": "List traffic types in a workspace",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "--ws <id>"
+    ]
+  },
+  {
+    "name": "attribute list",
+    "tool": "splitio_attribute_list",
+    "description": "List the attributes of a traffic type",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "--traffic-type <id>",
+      "--prefix <text>",
+      "--limit <n>",
+      "--cursor <cursor>",
+      "--ws <id>"
+    ]
+  },
+  {
+    "name": "rollout-status list",
+    "tool": "splitio_rollout_status_list",
+    "description": "List the rollout statuses a Change Request can set (--rollout-status)",
+    "writes": false,
+    "connection": true,
+    "flags": [
+      "--ws <id>"
     ]
   },
   {

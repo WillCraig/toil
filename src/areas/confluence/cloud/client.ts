@@ -114,6 +114,14 @@ export async function getSpace(ctx: ConfluenceCloudContext, key: string): Promis
   return space;
 }
 
+// POST /wiki/api/v2/spaces: a key, a name and an optional plain-text description.
+export function createSpace(ctx: ConfluenceCloudContext, opts: { key: string; name: string; description?: string | undefined }): Promise<Space> {
+  return confluenceCloud(ctx, `${V2}/spaces`, {
+    method: 'POST',
+    body: { key: opts.key, name: opts.name, ...(opts.description !== undefined ? { description: { value: opts.description, representation: 'plain' } } : {}) },
+  });
+}
+
 // GET /wiki/api/v2/spaces
 export function listSpaces(ctx: ConfluenceCloudContext, opts: { type?: string | undefined; cap?: number | undefined; cursor?: string | undefined }): Promise<Paged<Space>> {
   return list<Space>(ctx, 'Confluence Cloud spaces', `${V2}/spaces`, opts.type ? { type: opts.type } : {}, opts);

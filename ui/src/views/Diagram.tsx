@@ -19,6 +19,7 @@
  * remembered to press Save, which makes it exactly as current as the wiki.
  */
 
+import { NavButton } from '../components/nav-button.tsx';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button } from 'react-aria-components';
 import { C4Picture, layoutNotice, layoutOf } from '../components/c4-picture.tsx';
@@ -235,7 +236,9 @@ function Provenance({ shown, at }: { shown: ShownDiagram; at: number }) {
   return (
     <div className="c4-prov-block">
       <p className="note c4-prov" data-diagram-provenance="">
-        <span title={dateTime(shown.savedAt)}>{savedAgo(shown.savedAt, at)}</span> · revision {shown.revision} · <a href={jobHref(toilProject.name, 'map-codebase')}>Draw it again</a>
+        <span title={dateTime(shown.savedAt)}>{savedAgo(shown.savedAt, at)}</span> · revision {shown.revision} <NavButton href={jobHref(toilProject.name, 'map-codebase')} kind="quiet" size="sm">
+          Draw it again
+        </NavButton>
       </p>
       {shown.file && (
         <details data-diagram-kept="">

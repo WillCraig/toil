@@ -8,6 +8,7 @@ import { adoDeployments, changeRef, included, iso } from '../src/model/delivery.
 import { entry } from '../src/model/sprint.ts';
 import { trace } from '../src/model/trace.ts';
 import { healthOf, loaded } from './harness.ts';
+import { duplicateWhy, isSeedMark } from '../src/model/duplicates.ts';
 
 /** The models, on each toil project as the dashboard loads it through the fixture `execute()`. */
 
@@ -22,8 +23,8 @@ describe('card-payments: Jira, Bitbucket, Jenkins, OpenShift', () => {
     expect(h.items).toHaveLength(7); // The epic sits outside any sprint.
     expect(ids(h, 'carried')).toEqual(['corp-jira:PAY-104']);
     expect(ids(h, 'added')).toEqual(['corp-jira:PAY-107']);
-    expect(h.done).toEqual({ count: 2, points: 3 });
-    expect(h.remaining).toEqual({ count: 5, points: 18 });
+    expect(h.done).toEqual({ count: 2, points: 3, unestimated: 1 });
+    expect(h.remaining).toEqual({ count: 5, points: 18, unestimated: 1 });
   });
 
   it('flags each risk, the failing Jenkins build included', async () => {
@@ -58,8 +59,8 @@ describe('settlement: Azure DevOps Server Boards, Repos and Pipelines', () => {
     // 2305 is a task created inside the sprint, which is scope added.
     expect(ids(h, 'added')).toEqual(['corp-ado:2305', 'corp-ado:2306']);
     expect(h.otherUnits).toEqual(['corp-ado:2305']);
-    expect(h.done).toEqual({ count: 2, points: 1 });
-    expect(h.remaining).toEqual({ count: 4, points: 15 });
+    expect(h.done).toEqual({ count: 2, points: 1, unestimated: 1 });
+    expect(h.remaining).toEqual({ count: 4, points: 15, unestimated: 0 });
     expect(reasons(h)).toEqual({ 'corp-ado:2303': ['blocked'], 'corp-ado:2304': ['carried'] });
   });
 
@@ -187,5 +188,16 @@ describe('review round 1 (#229)', () => {
       ['payments-core in mixed-dev', '4e1d2a9', ['bitbucket:PAY/payments-core#290', 'bitbucket:PAY/payments-core#296', 'bitbucket:PAY/payments-core#298']],
       ['payments-web in mixed-dev', '5a7e3f1', ['github:imagile/payments-web#48', 'github:imagile/payments-web#49', 'github:imagile/payments-web#50']],
     ]);
+  });
+});
+
+describe("a possible duplicate's Why? (#657, round 3)", () => {
+  it('says the shared words, labels, parent and link in plain words, and never a seed mark', () => {
+    const why = { titleTerms: ['stored', 'charge'], bodyTerms: ['card'], trigram: 0.65, labels: ['card-payments', 'seed:cp-pbi-2', 'toil-seed'], parent: 'jira:SCRUM-6', link: { type: 'blocks' as const, direction: 'inward' as const, name: 'is blocked by' }, titleOnly: false };
+    const text = duplicateWhy(why, (id) => (id === 'jira:SCRUM-6' ? 'Jira SCRUM-6' : id));
+    expect(text).toBe('Both titles say stored, charge. Both descriptions mention card. The titles are 65% alike letter for letter. Both are labelled card-payments. They share the parent Jira SCRUM-6. They are linked (is blocked by).');
+    expect(text).not.toMatch(/seed|trigram/);
+    expect(duplicateWhy({ ...why, titleTerms: [], bodyTerms: [], trigram: 0, labels: ['toil-seed'], parent: null, link: null })).toBe('Nothing in common beyond the score.');
+    expect([isSeedMark('toil-seed'), isSeedMark('seed:x'), isSeedMark('card-payments')]).toEqual([true, true, false]);
   });
 });

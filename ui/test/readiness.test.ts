@@ -44,7 +44,7 @@ describe('the verdict', () => {
 
   it('counts each verdict', () => {
     const all = readinessAll([item('A'), item('B', { body: null }), done], settings());
-    expect(tally(all)).toEqual({ ready: 1, thin: 1, blocked: 1 });
+    expect(tally(all)).toEqual({ ready: 1, thin: 1, blocked: 1, unread: 0 });
   });
 });
 
@@ -55,7 +55,7 @@ describe('acceptance criteria', () => {
     expect(rowOf(i, 'acceptance', [done], s)).toMatchObject({ state: 'pass', reason: '3 words in customfield_10500.', source: 'field customfield_10500' });
     // An empty field doesn't count, and the message names it.
     const empty = item('B', { body: { format: 'markdown', content: WORDS(30) }, native: { 'jira issue search': { fields: { customfield_10500: '' } } } });
-    expect(rowOf(empty, 'acceptance', [done], s)).toMatchObject({ state: 'thin', reason: 'None found. customfield_10500 is empty, and the description has no acceptance criteria heading or checklist.' });
+    expect(rowOf(empty, 'acceptance', [done], s)).toMatchObject({ state: 'thin', reason: 'None found. The acceptance criteria field is empty, and the description has no acceptance criteria heading or checklist.' });
     const tbd = item('C', { body: { format: 'markdown', content: WORDS(30) }, native: { 'jira issue search': { fields: { customfield_10500: 'TBD' } } } });
     expect(rowOf(tbd, 'acceptance', [done], s).state).toBe('thin');
   });
@@ -120,14 +120,14 @@ describe('the description', () => {
 describe('the done state', () => {
   it('fails an item already done, and passes one whose type reached Done in the Toil project, citing it', () => {
     expect(rowOf(done, 'done')).toMatchObject({ state: 'fail', reason: 'Already done (Done).' });
-    expect(rowOf(item('A'), 'done')).toMatchObject({ state: 'pass', reason: 'Open (To Do), and another Story here reached Done ([[jira:DONE-1]]), so the workflow gets there.', source: 'cache' });
+    expect(rowOf(item('A'), 'done')).toMatchObject({ state: 'pass', reason: 'Open (To Do), and another Story here reached Done ([[jira:DONE-1]]), so the workflow gets there.', source: 'last sync' });
     // A move into Done in another item's history counts too, even if it was reopened.
     const reopened = item('R', { history: { transitions: [{ from: 'To Do', to: 'Done', fromCategory: 'TODO', toCategory: 'DONE', at: '2026-10-01T00:00:00Z', by: null }], iterations: [] } });
     expect(rowOf(item('A'), 'done', [reopened]).state).toBe('pass');
   });
 
   it("is thin when no item of the type has reached Done, or the category is unknown, and passes any open GitHub issue", () => {
-    expect(rowOf(item('A', { typeName: 'Epic', type: 'EPIC' }), 'done')).toMatchObject({ state: 'thin', source: 'cache' });
+    expect(rowOf(item('A', { typeName: 'Epic', type: 'EPIC' }), 'done')).toMatchObject({ state: 'thin', source: 'last sync' });
     expect(rowOf(item('A', { statusCategory: 'UNKNOWN', status: 'Parked' }), 'done').state).toBe('thin');
     const gh = item('A', { source: { area: 'github', connection: 'github', key: 'imagile/payments-web#41', command: 'github issue get' }, status: 'open', typeName: null });
     expect(rowOf(gh, 'done', [], { ...settings(), sources: ['github'] }).state).toBe('pass');
@@ -190,7 +190,7 @@ describe('the settings', () => {
       "The jira section's readiness.templates isn't a list of template texts, so no template is taken out of descriptions.",
       'The github section\'s "readiness" isn\'t an object of minWords and templates, so the defaults apply.',
     ]);
-    expect(readReadiness(null)).toEqual({ sources: [], repos: [], areas: {}, notes: [] });
+    expect(readReadiness(null)).toEqual({ sources: [], repos: [], areas: {}, notes: [], standards: [] });
   });
 });
 
@@ -200,10 +200,11 @@ describe('the sample Toil projects', () => {
     return Object.fromEntries(readinessAll(data.items, data.readiness).filter((r) => data.items.find((i) => i.id === r.id)!.statusCategory !== 'DONE').map((r) => [r.id, r.verdict]));
   };
 
-  it('card-payments: PAY-101 is ready, its chain is blocked, and the rest are thin', async () => {
+  it('card-payments: PAY-101 waits only on its ticket rules being read, its chain is blocked, and the rest are thin', async () => {
+    // card-payments names ticket rules, and none were read here: PAY-101 passes every other check, which isn't ready (principle 12).
     expect(await verdicts('card-payments')).toEqual({
       'corp-jira:PAY-100': 'thin',
-      'corp-jira:PAY-101': 'ready',
+      'corp-jira:PAY-101': 'unread',
       'corp-jira:PAY-102': 'blocked',
       'corp-jira:PAY-103': 'blocked',
       'corp-jira:PAY-104': 'thin',

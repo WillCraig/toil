@@ -41,6 +41,8 @@ export interface FormField {
   choices?: FormChoices;
   appliesTo?: readonly string[];
   requiredFor?: readonly string[];
+  /** On a pairing setting: the secret it borrows and when toil offers that (`ConnectionField.borrows` in src/api.ts). */
+  borrows?: { area: string; key: string; when?: Readonly<Record<string, string>>; sameHost?: boolean; match?: readonly string[] };
 }
 
 export interface FormArea {
@@ -60,6 +62,8 @@ export interface FormState {
   secrets: Record<string, string>;
   /** Which kind of token the person says they hold (a credential kind's id). */
   tokenKind: string | null;
+  /** Secrets the person chose to borrow from another connection instead of typing, by key: connection name. */
+  borrow?: Record<string, string>;
 }
 
 export type Need = 'required' | 'optional' | 'hidden';
@@ -256,6 +260,8 @@ export function reportOf(area: FormArea, state: FormState, existing: readonly st
     if (need === 'hidden') continue;
     const sel = f.choices ? selectedOption(area, f, state) : null;
     if (f.secret) {
+      // A secret borrowed from another connection is toil's to check when it offers the reuse, not the form's.
+      if (state.borrow?.[f.name]) continue;
       const check = checkSecret(state.secrets[f.name] ?? '', secretRules(f));
       if (check.status === 'refused') {
         add(f.name, { level: 'error', message: check.message, fix: check.fix });
@@ -354,6 +360,66 @@ export function submission(area: FormArea, report: Report): Record<string, strin
     if (f.secret || report.needs[f.name] === 'hidden') continue;
     const v = report.settings[f.name];
     if (v !== undefined && v !== '') out[f.name] = v;
+  }
+  return out;
+}
+
+/** What a form knows of a connection that could lend its secret: a row of `toil connections list`. */
+export interface LenderRow {
+  name: string;
+  area: string;
+  isDefault: boolean;
+  host: string | null;
+  deployment?: string;
+  values: Readonly<Record<string, string>>;
+}
+
+/** One secret the form may offer to borrow instead of asking for, and the connection it would come from. */
+export interface BorrowChoice {
+  /** The secret's key (`apiToken`). */
+  key: string;
+  /** The pairing setting (`apiTokenFrom`). */
+  field: string;
+  /** The other area's connection toil would offer (the default first, then by name). */
+  from: string;
+  /** The settings the borrowed secret only works with (`email`). */
+  match: readonly string[];
+}
+
+/**
+ * The secrets a connection with these settings could borrow, judged as `toil
+ * connections add` and `login` judge it (src/connections/borrow.ts) from what
+ * a form can see: the pairing setting's `borrows`, the connection's own
+ * settings (`own`: the form's applicable settings, or a row's host and
+ * deployment), and the other area's rows. A row's other settings aren't in
+ * the list, so a `when` key other than `deployment` is left to toil, which
+ * decides for certain when the call is made, as does whether the lender's
+ * secret reads.
+ */
+export function borrowChoices(area: FormArea, own: { settings: Readonly<Record<string, string>>; host?: string | null }, rows: readonly LenderRow[], self?: string): BorrowChoice[] {
+  const hostOf = (url: string | undefined) => {
+    try {
+      return url ? new URL(url).host.toLowerCase() : null;
+    } catch {
+      return null;
+    }
+  };
+  const ownValue = (k: string) => own.settings[k] ?? fieldOf(area, k)?.default ?? '';
+  const ownHost = own.host?.toLowerCase() ?? hostOf(own.settings.baseUrl);
+  const out: BorrowChoice[] = [];
+  for (const f of area.connection) {
+    const b = f.borrows;
+    if (!b) continue;
+    const when = Object.entries(b.when ?? {});
+    if (!when.every(([k, v]) => ownValue(k) === v)) continue;
+    if (b.sameHost && !ownHost) continue;
+    const lender = rows
+      // As toil requires: the lender's token is a store reference in the file, never an env var the next shell may lack.
+      .filter((r) => r.name !== self && r.area === b.area && r.values[b.key] === 'store')
+      .filter((r) => when.every(([k, v]) => k !== 'deployment' || r.deployment === v))
+      .filter((r) => !b.sameHost || r.host?.toLowerCase() === ownHost)
+      .sort((x, y) => Number(y.isDefault) - Number(x.isDefault) || x.name.localeCompare(y.name))[0];
+    if (lender) out.push({ key: b.key, field: f.name, from: lender.name, match: b.match ?? [] });
   }
   return out;
 }

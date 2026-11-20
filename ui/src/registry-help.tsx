@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { AgentSettingsClient } from './server-client.ts';
+import { homeShort } from './home-path.ts';
 
 export type RegistryClient = Partial<Pick<AgentSettingsClient, 'setRegistry'>>;
 
@@ -19,7 +20,7 @@ export function RegistryHelp({ client }: { client: RegistryClient | null }) {
     if (!client?.setRegistry) return;
     try {
       const done = await client.setRegistry(url);
-      setResult({ ok: true, text: `Saved registry=${done.registry} in ${done.file}${done.previous ? `, replacing ${done.previous}` : ''}. Press Try again.` });
+      setResult({ ok: true, text: `Saved registry=${done.registry} in ${homeShort(done.file)}${done.previous ? `, replacing ${done.previous}` : ''}. Press Try again.` });
     } catch (e) {
       setResult({ ok: false, text: e instanceof Error ? e.message : String(e) });
     }

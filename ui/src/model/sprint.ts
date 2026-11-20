@@ -11,6 +11,7 @@
  */
 
 import type { ChangeRef, WorkItem } from '../toil.ts';
+import { sumPoints } from '../../../src/core/brief/points.ts';
 
 const DAY = 86_400_000;
 
@@ -110,7 +111,10 @@ export interface Risk {
 
 export interface Tally {
   count: number;
-  points: number;
+  /** Points of the items that have them; null when none of them has points (unknown, not zero: #652). */
+  points: number | null;
+  /** Every item in the tally with no points read (done, epics and hours included), left out of `points`. Not `Health.unestimated`, which lists only open work that needs an estimate. */
+  unestimated: number;
 }
 
 export interface Health {
@@ -119,6 +123,8 @@ export interface Health {
   entries: Map<string, Entry>;
   /** Working days (Monday to Friday, UTC) gone and in total. */
   days: { gone: number; total: number };
+  /** Every item in the sprint. */
+  scope: Tally;
   planned: Tally;
   added: Tally;
   carried: Tally;
@@ -126,13 +132,25 @@ export interface Health {
   remaining: Tally;
   /** Items estimated in another unit, left out of every points total and listed instead. */
   otherUnits: string[];
+  /** Open work that needs an estimate (`needsEstimate`), for the at-risk list; a tally's `unestimated` counts every item with no points read. */
   unestimated: string[];
   risks: Risk[];
 }
 
 const isDone = (item: WorkItem) => item.statusCategory === 'DONE';
-const points = (item: WorkItem) => (item.estimate?.unit === 'points' ? item.estimate.value : 0);
-const tally = (items: WorkItem[]): Tally => ({ count: items.length, points: items.reduce((n, i) => n + points(i), 0) });
+const tally = (items: WorkItem[]): Tally => ({ count: items.length, ...sumPoints(items) });
+
+/**
+ * The sprint's points done and left, of its points in all; null when no item
+ * in it has points, so every points figure is unknown (#652). Once any is
+ * read, done and left split those points between them, so a side with no
+ * points of its own holds a real 0 of them; the items with none are counted
+ * in each tally's `unestimated`.
+ */
+export function sprintPoints(h: Pick<Health, 'scope' | 'done' | 'remaining'>): { done: number; left: number; total: number } | null {
+  if (h.scope.points === null) return null;
+  return { done: h.done.points ?? 0, left: h.remaining.points ?? 0, total: h.scope.points };
+}
 
 /** Working days (Monday to Friday, UTC) of a sprint gone at `now`, and in total: what "day 7 of 10" reads. */
 export function sprintDays(start: string, end: string, now: string): { gone: number; total: number } {
@@ -194,6 +212,7 @@ export function health(all: WorkItem[], changes: ChangeRef[], now: string): Heal
     items,
     entries,
     days: sprintDays(sprint.start!, sprint.end!, now),
+    scope: tally(items),
     planned: tally(kind('planned')),
     added: tally(kind('added')),
     carried: tally(kind('carried')),

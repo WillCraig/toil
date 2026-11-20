@@ -4,7 +4,7 @@ import { allowWriteField } from '../../../core/run.js';
 import { adoMoves, intentOf, oneOfTransition, resolveTransition, type AdoState, type TransitionReport } from '../../../core/transition-intent.js';
 import { adoArea } from '../area.js';
 import { API, API_COMMENTS, PATCH, ado, adoFeed, adoSkipPages, baseUrlOf, cursorField, enc, exampleCursor, limitField, pageOf, pageOptions, projectPath, toInt, where, type AdoContext } from './client.js';
-import { FEED_FIELDS, FEED_SINCE, REVISIONS_DESCRIPTION, fieldList, revisionsInput } from '../feed.js';
+import { FEED_FIELDS, FEED_SINCE, LINKS_DESCRIPTION, LINKS_SINCE, REVISIONS_DESCRIPTION, fieldList, linksInput, revisionsInput, type FeedLink } from '../feed.js';
 import { buildFieldPatch, mergeWithOverrides, parseFieldArgs, readJsonInputFile, resolveAtFileRef, splitWorkFieldsDictionary, type JsonPatchOp } from './fields.js';
 import { andWhere, checkFlat, wiqlInstant } from './wiql.js';
 
@@ -378,6 +378,28 @@ export const workFeedCommand = adoArea.command({
   },
 });
 
+export const workLinkFeedCommand = adoArea.command({
+  path: ['ado', 'work-item', 'link-feed'],
+  description: 'The project\'s link change feed: every link between work items added or removed since a date',
+  toolDescription: LINKS_DESCRIPTION,
+  input: z.object({ ...linksInput, limit: limitField('link changes'), cursor: cursorField }),
+  writes: false,
+  // Every link change in the project can be a long read, as the revision feed is.
+  timeLimitMs: 600_000,
+  options: [{ flags: '--updated-since <iso>', field: 'updatedSince', description: LINKS_SINCE }, ...pageOptions('link changes')],
+  examples: [
+    { ...AT },
+    { ...AT, updatedSince: '2026-10-01T09:00:00Z' },
+    { ...AT, limit: 1 },
+    { ...AT, limit: 1, cursor: exampleCursor('813;42;2') },
+  ],
+  run: (input, ctx) => {
+    const w = where(ctx);
+    // startDateTime goes on the first request only, as on the revision feed (feed.ts).
+    return adoFeed<FeedLink>(ctx, `${projectPath(w)}/_apis/wit/reporting/workitemlinks`, { 'api-version': API }, input.updatedSince === undefined ? undefined : wiqlInstant(input.updatedSince), `link changes in Azure DevOps project ${w.project}`, pageOf(input));
+  },
+});
+
 /** The most ids the batch endpoint takes in one request. */
 export const BATCH_SIZE = 200;
 /** The most ids one get-many call takes: five requests, then a bound rather than a loop. */
@@ -514,6 +536,7 @@ export const workItemCommands = [
   workSearchCommand,
   workRevisionsCommand,
   workFeedCommand,
+  workLinkFeedCommand,
   workGetBatchCommand,
   workListCommentsCommand,
   workAddCommentCommand,

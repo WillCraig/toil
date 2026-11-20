@@ -78,9 +78,9 @@ describe('the Classify view', () => {
     open(`${TEAM}/board/classify`);
     const h1 = await screen.findByRole('heading', { level: 1, name: 'Sort work into categories' });
     expect(h1.getAttribute('title')).toBe('In toil: Classify');
-    const views = screen.getByRole('navigation', { name: 'Board views' });
-    expect(within(views).getAllByRole('link').map((l) => l.textContent)).toEqual(['Board', 'Ready to start?', 'Sort work into categories']);
-    expect(within(views).getByRole('link', { name: 'Sort work into categories' }).getAttribute('aria-current')).toBe('page');
+    // A drill-in from the Summary's Work mix (#657): one way back, and the Summary's tab lit.
+    expect(document.querySelector('[data-back]')!.getAttribute('href')).toBe(TEAM);
+    expect(document.querySelector('[data-tab="overview"]')!.getAttribute('aria-current')).toBe('page');
     await waitFor(() => expect(rows().length).toBeGreaterThan(5));
     const first = rows()[0]!;
     expect(first.dataset.kind).toBe('unsure');
@@ -88,7 +88,9 @@ describe('the Classify view', () => {
     expect(choiceButtons(first).map((b) => b.textContent)).toEqual(['Keep the lights on K', 'Feature F', 'Unsure U']);
     expect(document.body.textContent).not.toMatch(/Nothing has settled this one/);
     expect(within(first).queryByRole('button', { name: 'Confirm' })).toBeNull();
-    expect((await whyOf(first)).text).toMatch(/Nothing has settled this one: no label, rule or parent says what it is\./);
+    // Why an unsure row is here is said once, in the header's (i) (#657); the row itself has none.
+    expect(first.querySelector('[data-why]')).toBeNull();
+    expect(document.querySelector('[data-needs-why]')!.getAttribute('aria-label')).toBe('About why these items need an answer');
     // The page names no code and no path.
     expect(document.body.textContent).not.toMatch(/signal:|~\/\.toil|classify correct|TOIL_/);
   });
@@ -204,7 +206,7 @@ describe('the Classify view', () => {
     expect(correct).not.toHaveBeenCalled();
   });
 
-  it('keeps the page quiet: one short lede, a compact legend of the keys, and a row that is an item, one segmented control and one (i)', async () => {
+  it('keeps the page quiet: one short lede, a compact legend of the keys, and a row that is an item and one segmented control, with one (i) in the header', async () => {
     open(`${TEAM}/board/classify`);
     await waitFor(() => expect(rows().length).toBeGreaterThan(5));
     expect(document.querySelector('.lede')!.textContent!.length).toBeLessThan(80);
@@ -212,7 +214,8 @@ describe('the Classify view', () => {
     expect(document.body.textContent).not.toMatch(/Pick a category for each row, then Confirm/);
     const row = rows()[0]!;
     expect(row.querySelectorAll('[data-choice]').length).toBe(3);
-    expect(row.querySelectorAll('[data-why]').length).toBe(1);
+    expect(row.querySelectorAll('[data-why]').length).toBe(0);
+    expect(document.querySelectorAll('[data-needs-why]').length).toBe(1);
     expect(row.querySelectorAll('p').length).toBe(1);
   });
 
@@ -222,8 +225,9 @@ describe('the Classify view', () => {
     const tags = [...document.querySelectorAll<HTMLElement>('[data-tag]')].map((t) => t.textContent!);
     expect(tags.length).toBeGreaterThan(0);
     for (const t of tags) expect(t).toMatch(/^(\d+ follow|(label|field) and rules disagree)( · \d+ follow)?$/);
-    const epic = rows().find((r) => r.querySelector('[data-tag]'))!;
-    expect((await whyOf(epic)).text).toMatch(/under it in this list follows? its answer\./);
+    // A disagreement keeps its own (i), since its reason is that row's alone.
+    const disagree = rows().find((r) => r.dataset.kind === 'disagree');
+    if (disagree) expect((await whyOf(disagree)).text).toMatch(/but .+ says/);
   });
 
   it('shows an empty state that says everything is sorted, with the way on', async () => {
@@ -567,7 +571,7 @@ describe('Apply', () => {
 describe("How it's doing", () => {
   it('opens on the figures, in plain words, and offers to improve the categories once there are ten corrections', async () => {
     open(`${TEAM}/board/classify`);
-    const doing = await doingWith(/^How it's doing: people agreed with 55% of 22 checked$/);
+    const doing = await doingWith(/^How it's doing\. Agreement: 55% of 22 checked$/);
     expect(doing.querySelector('[data-share="agreement"]')!.textContent).toBe('55%');
     expect(doing.querySelector('[data-overruled]')!.textContent).toBe('The bug or incident type was overruled 4 of 4 times, all to Feature.');
     expect(doing.textContent).not.toMatch(/signal:/);
@@ -580,7 +584,7 @@ describe("How it's doing", () => {
     const base = await api.ledger('sample-team');
     const empty: LedgerView = { ...base, stats: { ...SAMPLE_SCHEME_STATS, agreement: { ...SAMPLE_SCHEME_STATS.agreement, overall: null, checked: 0 }, sources: [{ source: 'parent', checked: 0, confirmed: 0, overruled: 0, overruledTo: {}, agreement: null }], sinceLastTune: 2 } };
     open(`${TEAM}/board/classify`, { ...api, ledger: async () => empty });
-    const doing = await doingWith(/^How it's doing: nothing has been checked yet$/);
+    const doing = await doingWith(/^How it's doing\. Agreement: – \(not checked yet\)$/);
     expect(doing.querySelector('[data-share="agreement"]')!.textContent).toBe('—');
     expect(doing.querySelector('[data-share="source"]')!.textContent).toBe('—');
     expect(doing.textContent).toMatch(/Nobody has checked an answer yet, so there is no figure/);
@@ -597,13 +601,13 @@ describe("How it's doing", () => {
     const doing = await doingWith(/how it's doing is not read yet: nope\./, true);
     expect(doing.textContent).toMatch(/The record could not be read, so this is not read yet/);
     expect(doing.querySelector('[data-share="agreement"]')!.textContent).toBe('—');
-    expect(doing.querySelector('summary')!.textContent).toBe("How it's doing: not read yet");
+    expect(doing.querySelector('summary')!.textContent).toBe("How it's doing. Agreement: – (not read yet)");
     expect(doing.querySelector('[data-since-tune]')!.textContent).toMatch(/not read yet/);
   });
 
   it("shows the agent's proposed changes beside the scores, and Use this version is a press that the sample refuses in words", async () => {
     open(`${TEAM}/board/classify`);
-    const doing = await doingWith(/people agreed with/);
+    const doing = await doingWith(/Agreement: \d+%/);
     await act(async () => void fireEvent.click(await within(doing).findByRole('button', { name: 'Improve with your AI agent' })));
     const tune = await until<HTMLElement>('[data-tune]');
     expect(tune.textContent).toMatch(/Adds the rule "new-exports": when its title contains export, the category is Feature\./);
@@ -624,7 +628,7 @@ describe("How it's doing", () => {
       tune: async () => ({ id: 'rev-1', by: 'a scripted sample', before: scheme, after: sampleRevision(scheme), changes: ['Adds the guidance: Be careful.'], backtest: { heldBack: 5, before: { agreed: 4, agreement: 0.8 }, after: { agreed: 2, agreement: 0.4 }, worse: true }, warnings: [] }),
       applyRevision,
     });
-    const doing = await doingWith(/people agreed with/);
+    const doing = await doingWith(/Agreement: \d+%/);
     await act(async () => void fireEvent.click(await within(doing).findByRole('button', { name: 'Improve with your AI agent' })));
     const tune = await until<HTMLElement>('[data-tune]');
     const score = tune.querySelector<HTMLElement>('[data-backtest="worse"]')!;
@@ -648,7 +652,8 @@ describe('changing a category from where it is shown', () => {
     cleanup();
     open(`${TEAM}/item/${encodeURIComponent(id)}`, api);
     const chip = await until<HTMLButtonElement>('button.cat-chip--button');
-    expect(chip.textContent).toBe('Unsure');
+    // An unknown says so plainly (principle 12, #657), not "Unsure", which read as the app doubting itself.
+    expect(chip.textContent).toBe('Not sorted yet');
     await userEvent.click(chip);
     const form = await until<HTMLElement>('[data-reclassify-form]');
     expect(within(form).getAllByRole('radio').map((r) => r.closest('label')!.textContent)).toEqual(['Keep the lights on', 'Feature', 'Unsure']);
@@ -664,7 +669,7 @@ describe('changing a category from where it is shown', () => {
     const notice = await until<HTMLElement>('[data-classify-notice="changed"]');
     await userEvent.click(within(notice).getByRole('button', { name: 'Undo' }));
     await until('[data-classify-notice="reverted"]');
-    await waitFor(() => expect(document.querySelector('button.cat-chip--button')!.textContent).toMatch(/^(Unsure|Feature)/));
+    await waitFor(() => expect(document.querySelector('button.cat-chip--button')!.textContent).toMatch(/^(Not sorted yet|Feature)/));
   });
 
   it('records the category an item already has as a confirmation', async () => {
@@ -823,14 +828,13 @@ describe('the Classification editor, quieted', () => {
 });
 
 describe('Settings, General, Board', () => {
-  it('keeps "Saved in this browser only." as the note and leaves the explanation to the (i)', async () => {
+  it('says "Saved in this browser only." once for the page and leaves the explanation to the (i) (#657)', async () => {
     window.location.hash = '#/settings/general';
     render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     const box = await screen.findByRole('checkbox', { name: 'Apply board moves when I drop a card' });
-    const note = document.querySelector('.board-moves-setting .note')!;
-    expect(note.textContent).toBe('Saved in this browser only. ');
+    expect(document.querySelector('.board-moves-setting .note')).toBeNull();
     await userEvent.click(box);
-    expect(note.textContent).toBe('Saved in this browser only. ');
+    expect(document.body.textContent!.match(/Saved in this browser only\./g)).toHaveLength(1);
     expect(document.querySelector('.board-moves-setting')!.textContent).not.toMatch(/stays a proposal|command to run yourself/);
     expect(document.querySelector('[data-help="board-moves"]')).toBeTruthy();
   });

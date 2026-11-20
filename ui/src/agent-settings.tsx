@@ -30,6 +30,8 @@ import { SAMPLE_AS_OF as FIXTURE_NOW } from './fixtures/now.ts';
 import { AdaptersCard, InstallDialog, helperState, needsInstall, statusLines, STATE_WORD } from './agent-install.tsx';
 import { usePlain } from './plain-words.ts';
 import { SAMPLE_ADAPTER_STATUS } from './fixtures/agent-status.ts';
+import { homeText } from './home-path.ts';
+import { SummaryChevron } from './components/disclosure.tsx';
 
 const ENDPOINT_LABEL: Record<string, string> = { anthropic: 'Anthropic API', bedrock: 'Amazon Bedrock', foundry: 'Microsoft Foundry', vertex: 'Google Vertex AI' };
 
@@ -113,7 +115,7 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
     <Card as="section" className="panel" aria-labelledby="agent-settings">
       <h2 id="agent-settings">{plain.pw('Agent', 'Your AI agents')}</h2>
       <p className="note">{plain.text('Each runs on the subscription you already have, through its own program on this machine. Toil UI stores no keys, and the agent can only read: a change it suggests comes back as a proposal for you to apply.')}</p>
-      {status?.problem && <p className="failure">{status.problem}</p>}
+      {status?.problem && <p className="failure">{homeText(status.problem)}</p>}
       {problem && (
         <p role="alert" className="failure">
           {problem}
@@ -154,12 +156,12 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
                   )}
                   {state === 'fix' && (
                     <p className="agent-notice helper-row__wide" data-needs-fix="">
-                      {a.cli.problem ?? 'Its command-line program was not found.'}
+                      {homeText(a.cli.problem ?? 'Its command-line program was not found.')}
                       {a.cli.fix ? ` ${a.cli.fix}` : ''}
                     </p>
                   )}
                   <details className="agent-details helper-row__wide">
-                    <summary>Details for whoever sets it up</summary>
+                    <summary><SummaryChevron />Details for whoever sets it up</summary>
                     {statusLines(a).map((line, i) => (
                       <p key={i} className="note">
                         {line}
@@ -172,7 +174,7 @@ export function AgentSettingsPanel({ client, onChange, toilProject }: AgentSetti
           </RadioGroup>
           <p className="note">Install runs one npm command, shown to you first, at the version Toil UI was tested with. Nothing runs until you press Install in that window.</p>
           <details className="agent-advanced" data-advanced="">
-            <summary>Advanced: models, program path and endpoint</summary>
+            <summary><SummaryChevron />Advanced: models, program path and endpoint</summary>
             <fieldset className="agent-models">
               <legend>Models, each empty for its program's default</legend>
               <p className="note">Each one runs with its own model, whether it answers by default, in a chat switched to it, or on an assignment.</p>

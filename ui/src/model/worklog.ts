@@ -25,6 +25,7 @@
 import type { Answer } from '../agent.ts';
 import type { ChangeRef, Deployment, Person, StatusCategory, WorkItem } from '../toil.ts';
 import { sprints } from './sprint.ts';
+import { sumPoints, unreadItems } from '../../../src/core/brief/points.ts';
 
 export type WorklogKind =
   | 'status'
@@ -488,8 +489,10 @@ export function observedEvents(before: Snapshot | null, after: Snapshot, at: str
       if (!(end > Date.parse(previousSync) && end <= Date.parse(at))) continue;
       const items = after.items.filter((i) => i.iteration?.name === sprint.name);
       const done = items.filter((i) => i.statusCategory === 'DONE');
-      const pts = (list: WorkItem[]) => list.reduce((n, i) => n + (i.estimate?.unit === 'points' ? i.estimate.value : 0), 0);
-      const figures = [`${done.length} of ${items.length} ${items.length === 1 ? 'item' : 'items'} done`, ...(pts(items) ? [`${pts(done)} of ${pts(items)} points done`] : [])];
+      // Points only where some were read, and the items with none said beside them, never summed as 0 (#652).
+      const all = sumPoints(items);
+      const ptsDone = sumPoints(done).points ?? 0;
+      const figures = [`${done.length} of ${items.length} ${items.length === 1 ? 'item' : 'items'} done`, ...(all.points !== null ? [`${ptsDone} of ${all.points} points done${all.unestimated ? ` (${unreadItems(all.unestimated)})` : ''}`] : [])];
       out.push({
         key: `sprint-ended:${sprint.name}:${isoOf(sprint.end!)}`,
         kind: 'sprint-ended',

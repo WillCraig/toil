@@ -15,15 +15,14 @@ import { findSecrets } from '../secret-shapes.js';
 import {
   CATEGORY_ID,
   CLASSIFY_AREAS,
-  RULE_KEYS,
   SCHEME_NAME,
   UNSURE,
   type Category,
   type Rule,
-  type RuleWhen,
   type Scheme,
   type SchemeExample,
 } from './types.js';
+import { readWhen } from './when.js';
 
 /** A tracker label: no space (Jira) and no comma or semicolon (Azure DevOps splits tags on `;`). */
 export const LABEL_FORM = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,49}$/;
@@ -174,43 +173,13 @@ export function readScheme(raw: unknown, where: string): { scheme: Scheme; warni
           ok = false;
           bad(`${at}.id`, `"${r.id}" is used by two rules.`);
         } else seen.add(r.id);
-        const when: RuleWhen = {};
-        if (!isRecord(r.when)) {
-          ok = false;
-          bad(`${at}.when`, `"when" must be an object with at least one of ${RULE_KEYS.join(', ')}.`);
-        } else {
-          for (const key of Object.keys(r.when)) {
-            if (!(RULE_KEYS as readonly string[]).includes(key)) {
-              ok = false;
-              bad(`${at}.when.${key}`, `"${key}" isn't something a rule can match on; "when" takes ${RULE_KEYS.join(', ')}.`);
-              continue;
-            }
-            const values = (r.when as Record<string, unknown>)[key];
-            if (!Array.isArray(values) || values.length === 0 || values.length > SCHEME_LIMITS.whenValues) {
-              ok = false;
-              bad(`${at}.when.${key}`, `"${key}" must be a list of 1 to ${SCHEME_LIMITS.whenValues} texts.`);
-              continue;
-            }
-            const kept: string[] = [];
-            values.forEach((v: unknown, j: number) => {
-              const why = textProblem(v, 1, 200);
-              if (why) {
-                ok = false;
-                bad(`${at}.when.${key}[${j}]`, `A value ${why}`);
-              } else kept.push((v as string).trim());
-            });
-            when[key as keyof RuleWhen] = kept;
-          }
-          if (Object.keys(r.when).length === 0) {
-            ok = false;
-            bad(`${at}.when`, `"when" must name at least one of ${RULE_KEYS.join(', ')}.`);
-          }
-        }
+        const when = readWhen(r.when, `${at}.when`, bad, textProblem);
+        if (when === undefined) ok = false;
         if (typeof r.then !== 'string' || !categoryIds.has(r.then)) {
           ok = false;
           bad(`${at}.then`, `"then" must be one of the scheme's category ids${categories.length ? ` (${categories.map((c) => c.id).join(', ')})` : ''}.`);
         }
-        if (ok) rules.push({ id: r.id as string, when, then: r.then as string });
+        if (ok && when) rules.push({ id: r.id as string, when, then: r.then as string });
       });
     }
   }

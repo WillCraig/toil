@@ -1,6 +1,7 @@
 /* The blocker Gantt (#396). Colours by meaning, from the theme's tokens, and
    never by colour alone: blocked is hatched and outlined, in progress solid,
-   failing checks a thin strip under the bar, since some themes give danger and
+   failing checks a thin strip under the bar, the plan dashed and unfilled, a due
+   date a flag (filled once passed), since some themes give danger and
    accent the same hue. Every mark a reader needs is drawn in a token held to
    at least 3:1 on the card (WCAG 1.4.11); the gridlines and the chain's band
    are decoration and may be fainter. */
@@ -18,10 +19,18 @@
 .gantt-diamond { fill: var(--ink); }
 
 .gantt-seg--progress { fill: var(--accent); }
-.gantt-seg--blocked { stroke: var(--danger); stroke-width: 1.5; }
+/* Blocked time is a light hatch in the muted ink, its outline held to 3:1 and its lines fainter texture inside it. Only
+   the critical chain's blocked time is red, and a light red at that (#657): the outline keeps 3:1, the hatch inside is
+   thin and faint. Lateness is the filled due flag's, the one strong mark, so long waits don't read as alarms. */
+.gantt-seg--blocked { stroke: var(--muted); stroke-width: 1.25; }
+.gantt-seg--strong { stroke: var(--danger); stroke-width: 1.25; }
 .gantt-hatch-bg { fill: var(--surface); }
-.gantt-hatch-line { stroke: var(--danger); stroke-width: 2.5; }
+.gantt-hatch-line { stroke: var(--muted); stroke-width: 1.25; stroke-opacity: 0.45; }
+.gantt-hatch-line--strong { stroke: var(--danger); stroke-width: 1.25; stroke-opacity: 0.5; }
 .gantt-seg--checks { fill: var(--warn); }
+.gantt-seg--planned { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 2; }
+.gantt-due { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; }
+.gantt-due--over { fill: var(--danger); stroke: var(--danger); }
 .gantt-done { fill: none; stroke: var(--ok); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .gantt-arrow { fill: none; stroke: var(--muted); stroke-width: 1.5; }
@@ -33,8 +42,15 @@
 .gantt-today { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 2 3; }
 .gantt-today-label { fill: var(--ink); font-size: 11px; font-weight: 600; }
 
+/* The key, folded behind a "Key" line beside the critical chain's sentence, so only the chart shows until asked (#657). */
+.gantt-keybox > summary { min-height: 44px; padding: 0 0.25rem; border-radius: var(--radius); font-weight: 600; }
+.gantt-keybox .gantt-legend { margin-top: 0.4rem; }
 .gantt-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1.25rem; margin: 0; padding: 0; list-style: none; font-size: 0.875rem; }
 .gantt-legend li { display: inline-flex; align-items: center; gap: 0.4rem; }
 .gantt-swatch { flex: none; overflow: visible; }
 .gantt-chain { margin: 0; }
+.gantt-more { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 
+/* The folded parts of the Dependencies tab (this table, the links graph and its list): a summary line with room to press. */
+.deps-more > summary { min-height: 44px; padding: 0 0.25rem; border-radius: var(--radius); font-weight: 600; }
+.deps-more .graph { margin-top: 0.5rem; }

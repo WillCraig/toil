@@ -10,8 +10,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request } from 'node:http';
 import { cookieHeader, letInto } from './let-in.ts';
-import { afterAll, describe, expect, it } from 'vitest';
-import { actorOf, branchName, inboxMatch, proposalDiff, settledState, type AdapterChoice, type AssignmentEvent } from '../src/assign/model.ts';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { actorOf, applyResultText, branchName, inboxMatch, liveLine, proposalDiff, richText, settledState, writesOffText, type AdapterChoice, type AssignmentEvent } from '../src/assign/model.ts';
 import { AssignError, AssignmentQueue, RunStopped, type QueueOptions, type RunContext, type RunResult } from '../src/assign/queue.ts';
 import { sampleQueue, SAMPLE_INBOX } from '../src/fixtures/assignments.ts';
 import { loadToilProject } from '../src/load.ts';
@@ -136,7 +136,7 @@ describe('the assignment queue', () => {
     await h.tick();
     const tried = await h.queue.apply(a.id, 'p1');
     expect(tried.state).toBe('needs-you');
-    expect(tried.proposals[0]).toMatchObject({ status: 'failed', outcome: { ok: false, message: 'Writes are off on corp-jira. toil connections writes corp-jira on' } });
+    expect(tried.proposals[0]).toMatchObject({ status: 'failed', outcome: { ok: false, message: 'Writes are off on corp-jira. toil connections writes corp-jira on', code: 'WRITE_DISABLED' } });
     expect(h.queue.dismiss(a.id, 'p1').state).toBe('done');
   });
 
@@ -217,6 +217,38 @@ describe('the assignment queue', () => {
   });
 });
 
+describe('an applied fix settles (#657, round 4)', () => {
+  it('is done, not needs you, once every proposal is applied, even with a question left for the tracker', async () => {
+    const h = harness({}, { questions: ['What context applies?'] });
+    const a = await h.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    h.runs[0]!.resolve(h.result());
+    await h.tick();
+    expect(h.queue.get(a.id).state).toBe('needs-you');
+    const after = await h.queue.apply(a.id, 'p1');
+    expect(after.state).toBe('done');
+    expect(after.questions).toEqual(['What context applies?']);
+    // The event the bell and the notices hear says it no longer needs anyone.
+    expect(h.events.at(-1)).toMatchObject({ id: a.id, kind: 'state', state: 'done', previous: 'needs-you', pending: 0 });
+    // A run with only questions and nothing applied still waits on a person.
+    expect(settledState({ proposals: [{ status: 'dismissed' }] as never, questions: ['why?'], stop: null })).toBe('needs-you');
+    expect(settledState({ proposals: [{ status: 'applied' }, { status: 'failed' }] as never, questions: [], stop: null })).toBe('needs-you');
+  });
+
+  it('settles a record saved as needs you after its proposal was applied, when Toil UI starts again', async () => {
+    const seed = harness({}, { questions: ['What context applies?'] });
+    const a = await seed.queue.assign({ toilProject: 'card-payments', item: 'corp-jira:PAY-107', mode: 'refine', adapter: 'codex' });
+    seed.runs[0]!.resolve(seed.result());
+    await seed.tick();
+    // As an older Toil UI left it: the proposal applied, the questions holding it on needs you.
+    const old = seed.keeper.load().find((r) => r.id === a.id)!;
+    old.proposals[0]!.status = 'applied';
+    old.state = 'needs-you';
+    seed.keeper.save(old);
+    const reopened = harness({ keeper: seed.keeper });
+    expect(reopened.queue.get(a.id).state).toBe('done');
+  });
+});
+
 describe('the assignment model', () => {
   it('names the branch after the item key, in characters every shell takes', () => {
     expect(branchName(item('corp-jira:PAY-107'))).toBe('agent/PAY-107');
@@ -236,10 +268,59 @@ describe('the assignment model', () => {
     const i = item('corp-jira:PAY-102');
     expect(proposalDiff({ input: { toilProject: 'card-payments', key: 'PAY-102', summary: 'New', field: ['Story Points=5'] } }, i)).toEqual([
       { field: 'summary', before: i.title, after: 'New' },
-      { field: 'Story Points', before: null, after: '5' },
+      // Read from the Jira record the sync kept, by the command that read it.
+      { field: 'Story Points', before: '3', after: '5' },
+    ]);
+    // PAY-103's acceptance criteria field was read and holds nothing: empty, not unknown (#657); a field no read returned stays unknown.
+    expect(proposalDiff({ input: { key: 'PAY-103', field: ['customfield_10500=Scenario: x', 'customfield_99999=y'] } }, item('corp-jira:PAY-103'))).toEqual([
+      { field: 'customfield_10500', before: '', after: 'Scenario: x' },
+      { field: 'customfield_99999', before: null, after: 'y' },
     ]);
     expect(settledState({ proposals: [], questions: ['why?'], stop: null })).toBe('needs-you');
     expect(actorOf('abc12345')).toBe('assignment-abc12345');
+  });
+});
+
+describe('a diff of rich text (#657)', () => {
+  const ADF = {
+    type: 'doc',
+    version: 1,
+    content: [
+      { type: 'paragraph', content: [{ type: 'text', text: 'As a merchant, I want to charge a stored token.' }] },
+      { type: 'paragraph', content: [{ type: 'text', text: 'Acceptance criteria' }, { type: 'hardBreak' }, { type: 'text', text: '- Charging works' }, { type: 'hardBreak' }, { type: 'text', text: '- Errors are handled' }] },
+    ],
+  };
+  const READ = 'As a merchant, I want to charge a stored token.\n\nAcceptance criteria\n- Charging works\n- Errors are handled';
+
+  it("shows a Jira Cloud description as its text, not the document's JSON", () => {
+    const i = { ...item('corp-jira:PAY-102'), body: { format: 'adf' as const, content: ADF } };
+    const [row] = proposalDiff({ input: { key: 'PAY-102', description: 'Given a token' } }, i);
+    expect(row).toEqual({ field: 'description', before: READ, after: 'Given a token' });
+    expect(row!.before).not.toContain('"type"');
+    // A diff stored before this fix holds the document as JSON text; the page reads that back too.
+    expect(richText(JSON.stringify(ADF))).toBe(READ);
+    // A native record's ADF field, and an ADF value a proposal sets, read the same way.
+    expect(richText(ADF)).toBe(READ);
+  });
+
+  it('shows Azure DevOps HTML and Jira wiki markup with their line breaks, and leaves plain text alone', () => {
+    expect(richText('<div>Story</div><ul><li>One &amp; two</li><li>Three</li></ul>', 'html')).toBe('Story\n\n- One & two\n- Three');
+    expect(richText('<p>First</p><p>Second</p>')).toBe('First\nSecond');
+    expect(richText('h2. Goal\nShip it', 'wiki')).toBe('## Goal\nShip it');
+    expect(richText('Plain <text> stays\n\n\nas typed', 'markdown')).toBe('Plain <text> stays\n\n\nas typed');
+    expect(richText('3')).toBe('3');
+    expect(richText({ a: 1 })).toBe('{"a":1}');
+  });
+});
+
+describe('the line after Apply (#657)', () => {
+  const with_ = (status: 'applied' | 'failed' | 'pending') => ({ proposals: [{ id: 'p1', status } as never] });
+  it('says Applied only when the proposal was applied', () => {
+    expect(applyResultText(with_('applied'), 'p1', 'Rewrite SCRUM-15')).toBe('Applied: Rewrite SCRUM-15.');
+    // The write gate's refusal comes back as a failed proposal, not a thrown error.
+    expect(applyResultText(with_('failed'), 'p1', 'Rewrite SCRUM-15')).toBe('Not applied: Rewrite SCRUM-15. toil refused it; the card below says why.');
+    expect(applyResultText(with_('pending'), 'p1', 'Rewrite SCRUM-15')).not.toMatch(/^Applied/);
+    expect(applyResultText({ proposals: [] }, 'p1', 'Rewrite SCRUM-15')).not.toMatch(/^Applied/);
   });
 });
 
@@ -452,6 +533,12 @@ describe('the assignment routes', () => {
       expect(events.status).toBe(200);
       expect(JSON.parse(events.body.split('\n')[0]!)).toMatchObject({ seq: expect.any(Number), kind: expect.any(String) });
       // since=latest (#306) skips what already happened: the first line is the next event, carrying what a notice says.
+      // The investigate run made above ends on its own clock; wait for it, so its last event can't be the next one.
+      const madeId = (JSON.parse(made.body) as { id: string }).id;
+      await vi.waitFor(async () => {
+        const now = JSON.parse((await call(origin, '/api/assignments?toilProject=card-payments')).body) as { assignments: Array<{ id: string; state: string }> };
+        expect(now.assignments.find((x) => x.id === madeId)?.state).not.toMatch(/^(queued|working)$/);
+      });
       const next = call(origin, '/api/assignments/events?since=latest');
       await new Promise((r) => setTimeout(r, 50));
       await call(origin, '/api/assignments', { method: 'POST', headers: post, body: { toilProject: 'card-payments', item: 'corp-jira:PAY-103', mode: 'refine', adapter: 'codex' } });
@@ -511,5 +598,32 @@ describe('a Toil project renamed (#342)', () => {
     expect(h.keeper.saved.get(a.id)!.toilProject).toBe('payments-v2');
     expect(h.events.at(-1)).toMatchObject({ kind: 'renamed', toilProject: 'payments-v2' });
     expect(h.queue.renameToilProject('card-payments', 'payments-v2')).toBe(0);
+  });
+});
+
+describe('the plain words on an assignment page (#657, round 3)', () => {
+  const t = (kind: 'tool' | 'text' | 'prompt' | 'activity', title: string, detail?: string) => ({ at: '2026-01-01T00:00:00Z', kind, title, ...(detail ? { detail } : {}) });
+  const name = (id: string) => (id === 'jira:SCRUM-15' ? 'Jira SCRUM-15' : id === 'jira:SCRUM-6' ? 'Jira SCRUM-6' : id);
+  const parentOf = (id: string) => (id === 'jira:SCRUM-15' ? 'jira:SCRUM-6' : null);
+
+  it("says what a working run is doing, from its own transcript, and nothing it didn't record", () => {
+    const base = { adapter: 'claude' as const, item: 'jira:SCRUM-15' };
+    expect(liveLine({ ...base, transcript: [t('prompt', 'Task', 'x')] }, name, parentOf)).toBe('Claude has started on Jira SCRUM-15.');
+    expect(liveLine({ ...base, transcript: [t('tool', 'Called: owi_get', '{"id":"jira:SCRUM-15"}')] }, name, parentOf)).toBe('Claude is reading Jira SCRUM-15…');
+    const two = [t('tool', 'Called: owi_get', '{"id":"jira:SCRUM-15"}'), t('tool', 'Called: owi_get', '{"id":"jira:SCRUM-6"}')];
+    expect(liveLine({ ...base, transcript: two }, name, parentOf)).toBe('Claude is reading Jira SCRUM-15 and its parent… 2 steps so far.');
+    expect(liveLine({ ...base, transcript: [...two, t('text', 'The agent answered', 'done')] }, name, parentOf)).toBe('Claude is writing up what it found… 2 steps so far.');
+    expect(liveLine({ ...base, adapter: 'codex', transcript: [t('tool', 'Called: proposal_fields', '{}')] }, name)).toBe('Codex is checking which fields it can change…');
+    expect(liveLine({ ...base, transcript: [t('tool', 'Called: jira_issue_get', '{"key":"SCRUM-15"}')] }, name)).toBe('Claude is using jira_issue_get…');
+  });
+
+  it('turns a writes-off refusal into plain words naming the tracker and the connection, and leaves any other refusal as toil said it', () => {
+    const off = { ok: false, code: 'WRITE_DISABLED', message: 'jira issue update changes data in jira, and writes are off for connection jira. To allow writes, set "writes": true on connection "jira" in your toil config (or TOIL_JIRA_WRITES=true), then pass --allow-write.' };
+    expect(writesOffText(off, 'Jira')).toBe('Not applied. Writes to Jira are off on this computer, so nothing changed. Turn writes on for the jira connection, then press Apply again.');
+    // A record from before codes were kept reads the same.
+    expect(writesOffText({ ok: false, message: off.message }, 'Jira')).toContain('Turn writes on for the jira connection');
+    expect(writesOffText({ ok: false, code: 'WRITE_DISABLED', message: 'jira issue update changes data in jira, and connection jira was chosen by your toil project, not by you.' }, 'Jira')).toBeNull();
+    expect(writesOffText({ ok: false, code: 'HTTP', message: 'writes are off for connection jira.' }, 'Jira')).toBeNull();
+    expect(writesOffText({ ok: true, message: 'Applied.' }, 'Jira')).toBeNull();
   });
 });

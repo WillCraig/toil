@@ -82,12 +82,12 @@ const identityKey = (area: string, id: string) => `${area}\u0000${lower(id)}`;
 const keyOf = (i: Identity) => identityKey(i.area, i.id);
 
 /** The identity a person has in an area: their entry for that area. */
-function idIn(person: PersonEntry, area: string): string | undefined {
+function idIn(person: Pick<PersonEntry, 'ids'>, area: string): string | undefined {
   return person.ids[area];
 }
 
 /** Whether a person is this account: their identity for its area is the account's id or its email. */
-export function isPerson(person: PersonEntry, who: Identity): boolean {
+export function isPerson(person: Pick<PersonEntry, 'ids'>, who: Identity): boolean {
   const id = idIn(person, who.area);
   return id !== undefined && (lower(id) === lower(who.id) || (who.email !== null && lower(id) === lower(who.email)));
 }
@@ -105,10 +105,39 @@ export interface Who {
 }
 
 export const personKey = (name: string) => `person:${name}`;
+
+/**
+ * An account as the person the toil project maps it to: their name, and one id for all their accounts (`person:<name>`), so
+ * someone with a Jira, a GitHub and an Azure DevOps account is one person, with one avatar, on every screen that lists people.
+ * An account nobody maps comes back as it is.
+ */
+export function asMapped(entries: ReadonlyArray<Pick<PersonEntry, 'name' | 'ids'> & { email?: string | null }>, area: string, p: Person | null | undefined): Person | null {
+  if (!p) return null;
+  const entry = entries.find((e) => isPerson(e, { area, id: p.id, name: p.name, email: p.email }));
+  return entry ? { id: personKey(entry.name), name: entry.name, email: entry.email ?? p.email } : p;
+}
 export const identityWhoKey = (i: Pick<Identity, 'area' | 'id'>) => `id:${i.area}:${i.id}`;
 
 /** A matcher for one card's subject: does this account belong to them? */
 type Matcher = (i: Identity) => boolean;
+
+/**
+ * A pull request with every person on it (author, reviewers, reviews) named as the toil project's people name them. Only the
+ * name changes: the id stays the account's, because asking for a review and telling the author from a reviewer go by account.
+ */
+export function withMappedNames(c: Change, entries: ReadonlyArray<Pick<PersonEntry, 'name' | 'ids'>>): Change {
+  if (!entries.length) return c;
+  const named = (p: Person): Person => {
+    const entry = entries.find((e) => isPerson(e, { area: c.source.area, id: p.id, name: p.name, email: p.email }));
+    return entry && entry.name !== p.name ? { ...p, name: entry.name } : p;
+  };
+  return {
+    ...c,
+    author: c.author ? named(c.author) : c.author,
+    reviewers: c.reviewers.map((r) => ({ ...r, person: named(r.person) })),
+    reviews: c.reviews ? c.reviews.map((r) => ({ ...r, by: named(r.by) })) : c.reviews,
+  };
+}
 
 // The data, by account ------------------------------------------------------------------
 

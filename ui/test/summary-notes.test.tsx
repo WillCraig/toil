@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.tsx';
 import { plainNote } from '../src/model/briefing.ts';
@@ -40,7 +40,7 @@ const view = async (limit: boolean) => {
   window.location.hash = '#/project/card-payments';
   render(<App execute={withGaps(limit)} agent={scriptedAgent()} now={FIXTURE_NOW} preview />);
   const region = await screen.findByRole('region', { name: 'Briefing' });
-  await waitFor(() => expect(region.querySelector('[data-unchecked], [data-partly-checked]')).not.toBeNull());
+  await waitFor(() => expect(region.querySelector('[data-unchecked], [data-partly-checked], [data-no-limit]')).not.toBeNull());
   return region;
 };
 const noCommand = (text: string) => expect(text).not.toMatch(/\(toil |--|wip-limit|map pr/);
@@ -59,11 +59,14 @@ describe('the Overview notes on what was not checked', () => {
 
   it('says a missing work-in-progress limit in plain words, with a way to set one', async () => {
     const region = await view(false);
-    const unchecked = region.querySelector('[data-unchecked]')!;
-    expect(unchecked.textContent).toContain("Couldn't check.");
-    expect(unchecked.textContent).toContain('No work-in-progress limit is set.');
+    // The row is its own action (#657): said as not set, never as nobody over it, with the button that sets one.
+    const unchecked = region.querySelector('[data-no-limit]')!;
+    expect(unchecked.textContent).toContain('Load not checked. No work-in-progress limit is set.');
     noCommand(unchecked.textContent!);
-    expect(unchecked.querySelector('a')!.getAttribute('href')).toBe('#/settings/projects/card-payments/wip');
+    const set = within(unchecked as HTMLElement).getByRole('link', { name: 'Set a work-in-progress limit' });
+    expect(set.getAttribute('href')).toBe('#/settings/projects/card-payments/wip');
+    expect(set.className).toMatch(/btn--secondary/);
+    expect(region.querySelector('[data-unchecked]')?.textContent ?? '').not.toContain('work-in-progress limit');
     // With no limit the load check did not run, so nothing is said to be partly checked for assignees.
     expect(region.querySelector('[data-partly-checked]')?.textContent ?? '').not.toMatch(/nobody assigned/);
   });
@@ -75,7 +78,8 @@ describe('plainNote', () => {
   const cases: Array<[string, Partial<Lens>, string]> = [
     ['no limit', { id: 'load', checked: false, note: 'The toil project sets no WIP limit (toil projects wip-limit).' }, 'No work-in-progress limit is set.'],
     ['no sprint', { id: 'sprint', checked: false, note: 'No item is in a sprint running now.' }, 'No item is in a sprint running now.'],
-    ['no points', { id: 'sprint', checked: false, note: 'No item in the sprint has a points estimate.' }, 'No item in the sprint has a points estimate.'],
+    ['no points', { id: 'sprint', checked: false, note: 'No points were read for any item in the sprint.' }, 'No points were read for any item in the sprint.'],
+    ['no points, an older note', { id: 'sprint', checked: false, note: 'No item in the sprint has a points estimate.' }, 'No points were read for any item in the sprint.'],
     ['readiness', { id: 'ready', checked: false, note: 'Readiness is worked out in Toil UI, not from OWI records.' }, "Readiness isn't worked out in this summary."],
     ['unassigned, many', { id: 'load', untested: 3, note: "3 items couldn't be tested: no assignee." }, '3 items in progress have nobody assigned.'],
     ['unassigned, one', { id: 'load', untested: 1, note: "1 item couldn't be tested: no assignee." }, '1 item in progress has nobody assigned.'],

@@ -173,7 +173,9 @@ describe("editing a Toil project's name and description in place (#342)", () => 
     const bar = document.querySelector('.toil-project-bar') as HTMLElement;
     expect(bar.textContent).toContain('Card payments v2');
     expect(bar.textContent).toContain('Sprint 42: day 7 of 10');
-    expect(within(bar).getByRole('list', { name: 'Sources' })).toBeTruthy();
+    // The sources fold behind one button that opens them (#657), and when the data was read is a badge by the name.
+    expect(within(bar).getByRole('button', { name: /^\d+ sources?$/ })).toBeTruthy();
+    expect(bar.querySelector('[data-read-badge]')!.textContent).toMatch(/^Read /);
     expect(within(bar).getByRole('region', { name: 'Ask about card-payments' })).toBeTruthy();
   });
 });
@@ -185,7 +187,8 @@ describe('a place the sync could not read (#542)', () => {
     await open('#/project/card-payments/prs', { execute: without('card-payments', 'bitbucket pr list') });
     const note = screen.getByText(/^bitbucket:/);
     expect(note.className).toBe('note');
-    expect(within(note).getByRole('link', { name: 'pull requests not read' }).getAttribute('href')).toBe('#queue');
+    expect(note.textContent).toMatch(/code reviews not read$/);
+    expect(note.querySelector('a')).toBeNull();
     cleanup();
     await open('#/project/card-payments/board', { execute: without('card-payments', 'bitbucket pr list') });
     expect(document.body.textContent).not.toContain('bitbucket: pull requests not read');

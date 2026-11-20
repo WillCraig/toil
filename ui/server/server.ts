@@ -59,7 +59,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { homedir } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import { checkRegistry, npmrcPath, RegistryError, setRegistry } from './agents/npmrc.ts';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
@@ -90,6 +90,8 @@ import { WorklogRefusal, type ExportWhat, type WorklogApi } from '../src/worklog
 import type { UsageControl } from './usage.ts';
 import { assignmentRoute, type AssignmentControl } from './assign/routes.ts';
 import { ClassifyRefusal, MAX_ITEMS, type ClassifyBackend } from './classify.ts';
+import { StandardsRefusal } from './standards.ts';
+import type { RulesApi } from '../src/rules.ts';
 import { BoardRefusal, type BoardBackend } from './board.ts';
 import { isMoveColumn } from '../src/board-api.ts';
 import { AssignError } from '../src/assign/queue.ts';
@@ -125,6 +127,8 @@ export interface UiServerOptions {
   assignments?: AssignmentControl;
   /** Sorting work into categories (#566): `api/classify/*`, every step through toil's own commands (ui/server/classify.ts). */
   classify?: ClassifyBackend;
+  /** Ticket rules (#657): `api/standards`, toil's own `standards check` over the cache (ui/server/standards.ts), or the sample's. */
+  standards?: RulesApi;
   /** The Board's drop (`api/board/move`): the move a person made, applied through toil's own command behind the connection's `writes`, or the sample's refusal of it. */
   board?: BoardBackend;
   /**
@@ -140,6 +144,8 @@ export interface UiServerOptions {
   /** The 32 bytes that sign the browser's cookie (machine-secret.ts). A real start reads the file in the data folder; a test without one gets a fresh secret. */
   machineSecret?: Buffer;
   viewer?: Viewer;
+  /** The home folders the page writes as `~` in the paths it shows (#653): `homeFolders()`, unless a test names them. */
+  homes?: readonly string[];
 }
 
 export interface ToilProjectRenames {
@@ -147,6 +153,22 @@ export interface ToilProjectRenames {
   hold(): () => void;
   blocked(toilProject: string): { message: string; fix: string } | null;
   moved(from: string, to: string): Promise<string[]>;
+}
+
+/**
+ * The home folders a path on screen is shortened from (#653): HOME's (USERPROFILE's on
+ * Windows), which a demo or scratch home moves, and the account's own from the OS, which
+ * it doesn't, so a clone under the real home is shortened too. Either may be missing.
+ */
+export function homeFolders(home: () => string = homedir, account: () => string = () => userInfo().homedir): string[] {
+  const read = (f: () => string) => {
+    try {
+      return f();
+    } catch {
+      return '';
+    }
+  };
+  return [...new Set([read(home), read(account)].filter((h) => h !== ''))];
 }
 
 /** toil's toil project names: lowercase letters, digits and single hyphens. */
@@ -410,6 +432,8 @@ export function createUiServer(options: UiServerOptions): UiServer {
     assignments: options.assignments !== undefined,
     sample: store.sample,
     now: store.now(),
+    // So a screen can show `~/.toil-ui/…` and keep the account name in the home folder's path off screen (#653).
+    homes: (options.homes ?? homeFolders()).map((h) => h.replace(/\\/g, '/')),
   });
 
   /** The agent's settings, or a 404 saying the sample always uses the scripted agent. */
@@ -684,8 +708,23 @@ export function createUiServer(options: UiServerOptions): UiServer {
     }
   };
 
+  /** `GET api/standards?toilProject=<name>` (#657): the ticket rules checked over the Toil project's synced items, read-only. */
+  const standardsCall = async (res: ServerResponse, url: URL) => {
+    const service = options.standards;
+    if (!service) throw new HttpError(404, 'This Toil UI checks no ticket rules.', 'Start toil-ui with its cache, or with --sample for the sample.');
+    const toilProject = url.searchParams.get('toilProject');
+    if (!toilProject || !TOIL_PROJECT_NAME.test(toilProject)) throw new HttpError(400, 'Name the Toil project by its name.', 'Ask api/standards?toilProject=<name>.');
+    try {
+      json(res, 200, await service.check(toilProject));
+    } catch (e) {
+      if (e instanceof StandardsRefusal) throw new HttpError(e.status, e.message, e.fix);
+      throw e;
+    }
+  };
+
   const api = async (req: IncomingMessage, res: ServerResponse, route: string, url: URL, ctx: RequestContext) => {
     const key = `${req.method === 'HEAD' ? 'GET' : req.method} ${route}`;
+    if (key === 'GET standards') return standardsCall(res, url);
     if (key === 'POST agent/mcp') return mcpCall(req, res, ctx);
     if (await assignmentRoute(key, req, res, url, options.assignments, { readJson, json, headers: SECURITY_HEADERS })) return;
     if (/^(GET|POST) classify\//.test(key)) return classifyCall(key, req, res, url, ctx);

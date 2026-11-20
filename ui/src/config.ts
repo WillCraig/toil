@@ -21,7 +21,7 @@
  */
 
 import type { Envelope } from './toil.ts';
-import type { FormChoices } from '../../src/core/connection-form.ts';
+import type { FormChoices, FormField } from '../../src/core/connection-form.ts';
 import type { DescribedScopes } from '../../src/core/scopes.ts';
 
 /** The reads the pages make: run read-only, even on the config path. The audit reads fill Usage (#309). */
@@ -77,6 +77,8 @@ export interface ConnectionField {
   choices?: FormChoices;
   appliesTo?: readonly string[];
   requiredFor?: readonly string[];
+  /** On a pairing setting (`apiTokenFrom`): the secret it borrows and when toil offers that (older toil: absent). */
+  borrows?: FormField['borrows'];
 }
 
 export interface AreaInfo {
@@ -91,7 +93,7 @@ export interface AreaInfo {
 
 /** What a person typed for one call: answers by question id, and secrets by key. */
 export interface ConfigAnswers {
-  /** `setting:<key>`, `area`, `confirm`, `confirm-name`, and `unwrap:<key>` (`n` keeps a secret's quotes or `Bearer ` prefix as typed). */
+  /** `setting:<key>`, `area`, `confirm`, `confirm-name`, `unwrap:<key>` (`n` keeps a secret's quotes or `Bearer ` prefix as typed), and `borrow:<key>` (`y` reuses another connection's secret instead of one typed). */
   answers?: Record<string, string>;
   /** Secret values by connection key. Only a hidden question is answered from these. */
   secrets?: Record<string, string>;
@@ -128,6 +130,8 @@ export interface ConnectionRow {
   isDefault: boolean;
   host: string | null;
   writes: boolean;
+  /** Which deployment, for an area with Data Center and Cloud (older toil: absent). */
+  deployment?: string;
   values: Record<string, 'env' | 'ci' | 'file' | 'store' | 'defaults'>;
   /** Absent from an older toil: then a connection whose every value is from env or CI counts as env-defined. */
   definedIn?: 'file' | 'env';

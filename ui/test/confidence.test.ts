@@ -14,11 +14,11 @@ describe('how sure', () => {
   it('is High when every read worked, the data is under 24 hours old, and at most 1 in 10 items lacks what the question needs', () => {
     const s = sure({});
     expect([s.level, s.word, s.reasons]).toEqual(['high', 'High', []]);
-    expect(s.because).toBe('Every saved read worked, the data was read 2 hours ago, and there are 12 items to go on.');
+    expect(s.because).toBe('All the saved data was read, 2 hours ago, across 12 items.');
   });
 
   it('says it vouched only for the reads the answer depends on, when the check was scoped to them', () => {
-    expect(sure({ scoped: true }).because).toBe('Every read this answer depends on worked, the data was read 2 hours ago, and there are 12 items to go on.');
+    expect(sure({ scoped: true }).because).toBe('All the data this answer needs was read, 2 hours ago, across 12 items.');
   });
 
   it('is High with nothing lacking to count, and for a typed question that names none', () => {
@@ -55,7 +55,7 @@ describe('how sure', () => {
   it('counts the base in pull requests for a question about reviews, and says none plainly', () => {
     expect(sure({ items: 2, noun: 'pull request' }).because).toBe('There are only 2 pull requests to go on.');
     expect(sure({ items: 0, noun: 'code review' }).because).toBe('There are no code reviews to go on.');
-    expect(sure({ items: 12, noun: 'code review' }).because).toContain('12 code reviews to go on');
+    expect(sure({ items: 12, noun: 'code review' }).because).toContain('across 12 code reviews.');
   });
 
   it('caps the level when the answer names items its tools never returned: Medium for one, Low for more or for half of them', () => {

@@ -245,7 +245,7 @@ function rules(toilProject: string, now: string): string[] {
     '{"item": "<owi id>", "title": "<one line>", "reason": "<why, citing [[ids]]>", "command": "<the toil write command, such as jira issue update, or null if toil has none>", "input": {"<field>": "<value>"}, "note": "<anything to check first, or null>"}',
     '```',
     `   The input is the toil command's MCP input, without toilProject and without allowWrite: call proposal_fields with the command first and use only its fields, or the card shows no command line. Never say a change was made: it is only proposed. Write at most ${MAX_PROPOSALS} proposals, the ones that matter most: the page shows no more than that.`,
-    '4. Be brief and specific: short paragraphs of plain text (no Markdown, no headings, no bold), figures where you have them. Say plainly when the data does not show something.',
+    '4. Be brief and specific: short paragraphs of plain text (no Markdown, no headings, no bold), figures where you have them. Say plainly when the data does not show something, in the person\'s words ("the tickets don\'t say why"), never in terms of the cache.',
   ];
 }
 

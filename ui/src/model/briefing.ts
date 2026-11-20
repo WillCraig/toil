@@ -86,7 +86,7 @@ export function plainNote(lens: Brief['lenses'][number]): string {
   if (!lens.checked) {
     if (lens.id === 'ready') return "Readiness isn't worked out in this summary.";
     if (lens.id === 'load') return 'No work-in-progress limit is set.';
-    if (lens.id === 'sprint' && lens.note && /points estimate/.test(lens.note)) return 'No item in the sprint has a points estimate.';
+    if (lens.id === 'sprint' && lens.note && /points (estimate|were read)/.test(lens.note)) return 'No points were read for any item in the sprint.';
     if (lens.id === 'sprint') return 'No item is in a sprint running now.';
   } else if (n > 0) {
     if (lens.id === 'failing') return 'Some code reviews have no checks read.';

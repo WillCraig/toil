@@ -126,6 +126,15 @@ export const routes: Route[] = [
   // check-toil-project's lookup: the space with no expand.
   { path: `${API}/space/DOCS`, query: {}, respond: json(spaces[0]) },
   { path: `${API}/space/DOCS`, query: { expand: 'description.plain' }, respond: json({ ...spaces[0], description: { plain: { value: 'Product documentation', representation: 'plain' } } }) },
+  // space create: the space as Data Center returns it, shaped from its REST docs, not captured.
+  {
+    method: 'POST',
+    path: `${API}/space`,
+    respond: (req: RecordedRequest) => {
+      const sent = JSON.parse(req.body!) as { key: string; name: string; description?: unknown };
+      return json({ id: 98310, key: sent.key, name: sent.name, type: 'global', ...(sent.description ? { description: sent.description } : {}), _links: selfLinks(`/space/${sent.key}`, `/display/${sent.key}`) });
+    },
+  },
 
   // Attachments.
   { path: `${API}/content/12345/child/attachment`, respond: (req: RecordedRequest) => listPage([attachment()], req, `${API}/content/12345/child/attachment`) },

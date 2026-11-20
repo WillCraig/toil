@@ -13,13 +13,14 @@
 
 import type { Verdict } from '../../../src/core/classify/types.ts';
 import {
-  addDays, applyFilters, dayOf, DIMENSION_MENU, NONE_KEY, parseDimension, pivot, releaseScope, valuesOf,
+  addDays, applyFilters, computeMeasure, dayOf, DIMENSION_MENU, NONE_KEY, parseDimension, pivot, releaseScope, valuesOf,
   type Filter, type InsightsCategory, type InsightsPerson, type PivotAxisValue, type PivotCell, type PivotResult, type PivotSpec, type ReleaseScope, type ValuesContext,
 } from '../../../src/core/insights/index.ts';
 import { bucketLabel, bucketsBetween, bucketStart } from '../../../src/core/insights/dimensions.ts';
 import { day, sourceLabel } from '../format.ts';
 import { categoriesOf, classifyItems, insightsPeople, schemeFor, schemeSummary, withHistory, type Classification } from '../insights-input.ts';
 import type { ToilProjectData } from '../load.ts';
+import { asMapped } from './people.ts';
 import type { WorkItem } from '../toil.ts';
 
 export const DEFAULT_PERIOD_DAYS = 90;
@@ -101,8 +102,43 @@ const sentence = (names: string[]) => (names.length < 2 ? names.join('') : `${na
  */
 export const resolveScheme = schemeFor;
 
+/**
+ * What the screens call an item no rule, label, agent or person has put in a category. toil's pivot calls it "Unsure", which
+ * a person read as the product failing; it is an unknown, so it says so plainly (principle 12, #657). Only the words change:
+ * the key stays the pivot's own `none`, so a filter, a drill or a saved view keeps working.
+ */
+export const NOT_SORTED = 'Not sorted yet';
+
+const isCategory = (spec: string | null | undefined) => spec !== null && spec !== undefined && parseDimension(spec).base === 'category';
+const relabelAxis = (values: PivotResult['rows']) => values.map((v) => (v.kind === 'none' ? { ...v, label: NOT_SORTED } : v));
+
+/** A pivot's result in the screens' words: a category split's or across's none row reads Not sorted yet. */
+function inScreenWords(r: PivotResult): PivotResult {
+  const split = isCategory(r.split?.spec);
+  const across = isCategory(r.across?.spec);
+  if (!split && !across) return r;
+  return {
+    ...r,
+    rows: split ? relabelAxis(r.rows) : r.rows,
+    columns: across ? relabelAxis(r.columns) : r.columns,
+    allValues: split ? r.allValues.map((v) => (v.key === NONE_KEY ? { ...v, label: NOT_SORTED } : v)) : r.allValues,
+  };
+}
+
+/** A dimension's none label in the screens' words. */
+const noneLabelOf = (d: { base: string; noneLabel: string | null }) => (d.base === 'category' ? NOT_SORTED : d.noneLabel);
+
 export function buildInsights(data: Pick<ToilProjectData, 'items' | 'people'>, now: string, schemeName?: string | null, extra: Classification = {}): WorkInsights {
-  return makeInsights(data.items, insightsPeople(data.people), now, schemeName, undefined, extra);
+  return makeInsights(data.items.map((i) => withMappedAssignee(i, data.people)), insightsPeople(data.people), now, schemeName, undefined, extra);
+}
+
+/**
+ * The item with its assignee as the person the toil project maps them to, so the assignee dimension (the filter bar's Assignee,
+ * a lane, a person's mix) has one value per person, not one per account. An item whose assignee nobody maps is the same object.
+ */
+function withMappedAssignee(item: WorkItem, people: ToilProjectData['people']): WorkItem {
+  const assignee = asMapped(people ?? [], item.source.area, item.assignee);
+  return assignee === item.assignee ? item : { ...item, assignee };
 }
 
 /**
@@ -121,7 +157,7 @@ function makeInsights(items: WorkItem[], people: InsightsPerson[], now: string, 
   const run = (spec: PivotSpec): PivotResult => {
     const key = JSON.stringify(spec);
     let r = memo.get(key);
-    if (!r) memo.set(key, (r = pivot({ items: readable, spec, asOf: now, people, categories, scheme: summary })));
+    if (!r) memo.set(key, (r = inScreenWords(pivot({ items: readable, spec, asOf: now, people, categories, scheme: summary }))));
     return r;
   };
   const areas = [...new Set(items.map((i) => i.source.area))].sort();
@@ -141,7 +177,7 @@ function makeInsights(items: WorkItem[], people: InsightsPerson[], now: string, 
     const keep = new Set(ids);
     const key = `${[...keep].sort().join('|')}#${JSON.stringify(spec)}`;
     let r = overMemo.get(key);
-    if (!r) overMemo.set(key, (r = pivot({ items: readable.filter((i) => keep.has(i.id)), spec, asOf: now, people, categories, scheme: summary })));
+    if (!r) overMemo.set(key, (r = inScreenWords(pivot({ items: readable.filter((i) => keep.has(i.id)), spec, asOf: now, people, categories, scheme: summary }))));
     return r;
   };
   const valueMemo = new Map<string, ReturnType<WorkInsights['valuesIn']>>();
@@ -154,7 +190,7 @@ function makeInsights(items: WorkItem[], people: InsightsPerson[], now: string, 
       const v = valuesOf(item, d, vctx);
       if (v.unread) continue;
       read++;
-      const held = v.values.length === 0 ? (d.noneLabel === null ? [] : [{ key: NONE_KEY, label: d.noneLabel, short: undefined as string | undefined, order: '\uffff' }]) : v.values.map((e) => ({ ...e, order: e.order ?? '' }));
+      const held = v.values.length === 0 ? (noneLabelOf(d) === null ? [] : [{ key: NONE_KEY, label: noneLabelOf(d)!, short: undefined as string | undefined, order: '\uffff' }]) : v.values.map((e) => ({ ...e, order: e.order ?? '' }));
       for (const e of held) {
         const t = tally.get(e.key) ?? { key: e.key, label: e.label, ...(e.short ? { short: e.short } : {}), count: 0, order: e.order };
         t.count++;
@@ -169,7 +205,7 @@ function makeInsights(items: WorkItem[], people: InsightsPerson[], now: string, 
     const d = parseDimension(dimension);
     const v = valuesOf(item, d, vctx);
     if (v.unread) return null;
-    return v.values.length === 0 ? (d.noneLabel ?? 'None') : v.values.map((e) => e.label).join(', ');
+    return v.values.length === 0 ? (noneLabelOf(d) ?? 'None') : v.values.map((e) => e.label).join(', ');
   };
   const narrowed = new Map<string, WorkInsights>();
   const self: WorkInsights = {
@@ -211,7 +247,7 @@ export function periodWords(today: string, p: { from: string; to: string }): str
 
 export interface MixLine {
   key: string;
-  /** What a person reads: the category's name, "Unsure" for none. */
+  /** What a person reads: the category's name, Not sorted yet for none. */
   name: string;
   /** The short form, for a tooltip only. */
   short?: string;
@@ -221,7 +257,7 @@ export interface MixLine {
   items: string[];
 }
 
-/** The category shares of a result with a category split and no across: biggest first, Unsure last. Null when nothing was counted, never an empty mix of zeros. */
+/** The category shares of a result with a category split and no across: biggest first, Not sorted yet last. Null when nothing was counted, never an empty mix of zeros. */
 export function mixLines(result: PivotResult): MixLine[] | null {
   if (!result.split?.read || result.rows.length === 0) return null;
   const totals = result.rowTotals;
@@ -371,7 +407,25 @@ export function mixOverview(ins: WorkInsights, f: { from?: string; to?: string; 
   return { result, lines: mixLines(result), period };
 }
 
-/** "Feature 55% · Keep the lights on 35% · Unsure 10%", worked out from one result; null when nothing was counted. */
+/**
+ * How the items a mix counted were decided, for the panel beside it (#657). For Items finished that is only the items
+ * finished in the period, judged by the pivot's own throughput measure, so the panel's Not sorted yet and the headline's
+ * count the same items, with the same verdicts and one rule for unsure (no category). For the other units it is every
+ * item the measure holds, since their shares are of points or days and the panel's are of items.
+ */
+export function mixDecided(ins: WorkInsights, lead: { result: PivotResult; period: { from: string; to: string } }, unit: MixUnit = 'items'): MixSources {
+  const measure = MIX_UNITS.find((u) => u.id === unit)!.measure;
+  const byId = new Map(ins.items.map((i) => [i.id, i]));
+  const ctx = { asOf: ins.asOf, period: lead.period, unit: 'points' as const, days: new Map<string, number | null>() };
+  const counted = (id: string) => {
+    if (measure !== 'throughput') return true;
+    const item = byId.get(id);
+    return item !== undefined && computeMeasure('throughput', [item], ctx).value === 1;
+  };
+  return mixSources(lead.result.total.items.flatMap((id) => (counted(id) && ins.verdicts.get(id) ? [ins.verdicts.get(id)!] : [])));
+}
+
+/** "Feature 55% · Keep the lights on 35% · Not sorted yet 10%", worked out from one result; null when nothing was counted. */
 export const mixSentence = (lines: MixLine[]): string => lines.map((l) => `${l.name} ${percentText(l.share)}`).join(' · ');
 
 export interface ReleaseLine {

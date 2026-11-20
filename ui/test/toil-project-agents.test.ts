@@ -67,7 +67,8 @@ describe('the order the agent is chosen in', () => {
     expect(sourceHint(false, { name: 'claude', source: 'settings' })).toBe('your default');
     expect(sourceHint(true, { name: 'claude', source: 'settings' })).toBe('picked for this chat');
     expect(sourceHint(false, { name: 'claude', source: 'ready', skippedDefault: true })).toBe("your default can't run");
-    expect(sourceHint(false, { name: 'claude', source: 'ready' })).toBe('the first one ready');
+    // The first one ready, with no default set, needs no note beside the name.
+    expect(sourceHint(false, { name: 'claude', source: 'ready' })).toBeNull();
     expect(sourceHint(false, null)).toBeNull();
   });
 });

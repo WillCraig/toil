@@ -26,6 +26,7 @@ import { buildViewContext, viewContextMarkdown } from '../../view-context.ts';
 import { csvName, figuresCsv, plainResult } from './format.ts';
 import { dimensionChoices } from '../../model/explore.ts';
 import type { HelpTopicId } from '../../help.ts';
+import { AgentMark } from '../../components/agent-mark.tsx';
 
 /** Opens a list of items: as a click handler, or as the link behind a number. */
 export function useDrill() {
@@ -41,7 +42,7 @@ export function useDrill() {
 export function Door({ drill, children, label }: { drill: Drill; children: ReactNode; label?: string }) {
   const { href } = useDrill();
   return (
-    <a className="door" href={href(drill)} {...(label ? { 'aria-label': label } : {})} data-door="">
+    <a className="door" href={href(drill)} {...(label ? { 'aria-label': label } : {})} data-door="" data-press="">
       {children}
     </a>
   );
@@ -182,6 +183,7 @@ export function ChartPanel({ main = false, questions = [], result: raw, title, a
           {questions.map((q) => (
             <li key={q}>
               <button type="button" className="btn btn--small chart-asks__chip" onClick={() => askAboutChart(context, q)}>
+                <AgentMark />
                 {q}
               </button>
             </li>

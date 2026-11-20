@@ -16,10 +16,11 @@
 import { loadToilProject, type ToilProjectData } from '../load.ts';
 import type { Proposal } from '../proposal.ts';
 import type { Envelope, Execute, WorkItem } from '../toil.ts';
-import { ADAPTER_NAME, branchName, proposalDiff, type AdapterChoice, type AssignmentRecord, type AssignmentsApi, type AssignSettings, type StartedOn } from '../assign/model.ts';
+import { ADAPTER_NAME, branchName, proposalDiff, type AdapterChoice, type AssignedRule, type AssignmentRecord, type AssignmentsApi, type AssignSettings, type StartedOn } from '../assign/model.ts';
 import { AssignmentQueue, type Keeper, type RunContext, type RunResult, type Runner } from '../assign/queue.ts';
 import { FIXTURE_NOW, fixtureExecute } from './execute.ts';
 import { sampleAnswerUsage } from './model-usage.ts';
+import { fixtureStandards } from './standards.ts';
 import type { Fingerprint } from '../fingerprint.ts';
 
 export const SAMPLE_ASSIGN_SETTINGS: AssignSettings = { concurrent: 2, timeLimitMinutes: 20 };
@@ -89,6 +90,66 @@ function refineProposals(toilProject: string, item: WorkItem): Proposal[] {
     note: 'A suggested size. Agree it with the team before applying.',
   });
   return out;
+}
+
+/** The headings a bug-repro rule's section goes by, for the sample's canned fix. */
+const SECTION: Record<string, string> = { steps: 'Steps to reproduce', expected: 'Expected result', actual: 'Actual result' };
+
+/**
+ * The sample's worked rewrites, by item key: what a run that read the item and
+ * its links might propose, so the demo shows a real answer rather than a form
+ * with blanks. Any other item gets the general shape, gaps and all.
+ */
+const WORKED: Record<string, { text: string[]; question: string; said: string }> = {
+  'PAY-103': {
+    text: ['Scenario: Charge a stored token', '  Given a customer with a saved card token', '  When they confirm a payment', '  Then the card is charged once and a receipt is shown'],
+    question: 'What should the customer see when the stored token is declined?',
+    said: 'as one Given/When/Then scenario: a customer with a saved card token confirms a payment, and the card is charged once with a receipt shown. The item says nothing about a declined token, so that is asked as a question.',
+  },
+};
+
+/** Where toil read a rule's text, leaving out what it couldn't read ("description; not read: field …" read the description). */
+const readFrom = (source: string) => source.split(/;?\s*not read:/)[0]!;
+
+/**
+ * The sample's canned "Fix with AI agent" (#657): one rewrite of the place
+ * toil read, meeting every rule it was given (one, or a standard's "Fix all"),
+ * and at most one question for what the item doesn't say. A real run writes
+ * from the item; this one shows the shape, and a worked answer for PAY-103.
+ * `criteriaField` is the Toil project's acceptance criteria field, where a
+ * rule that read the acceptance criteria is fixed.
+ */
+export function ruleFix(toilProject: string, item: WorkItem, rules: readonly AssignedRule[], criteriaField: string | null = null): { proposal: Proposal; questions: string[]; said: string } {
+  const r = rules[0]!;
+  const read = readFrom(r.source);
+  // toil names a field it read ("field customfield_10500 (acceptanceCriteria)"), or says it read the acceptance criteria: the fix goes there.
+  const field = /\bfield ([^\s(),;]+)/.exec(read)?.[1] ?? (/criteria/i.test(read) ? criteriaField : null);
+  const key = item.source.key;
+  const worked = r.standard === 'gherkin' ? WORKED[key] : undefined;
+  const bug = r.standard === 'bug-repro';
+  const text = worked
+    ? worked.text.join('\n')
+    : bug
+      ? rules.flatMap((x) => [`## ${SECTION[x.rule] ?? x.name}`, x.rule === 'actual' ? item.title : x.rule === 'expected' ? '[the correct behaviour: see the question]' : '1. [the first step: see the question]', '']).join('\n')
+      : [`Scenario: ${item.title}`, '  Given [the starting point: see the question]', `  When someone does what the item asks: ${item.title.toLowerCase()}`, '  Then [what a person sees when it worked]'].join('\n');
+  const question = worked?.question ?? (bug ? `What exact steps make "${item.title}" happen, and what should have happened instead?` : `What has to be true before "${item.title}" starts: which account, card or data does it begin from?`);
+  const place = field ? 'the acceptance criteria' : 'the description';
+  const jira = item.source.area.startsWith('jira');
+  const names = rules.length === 1 ? `"${r.name}"` : `${rules.length} ticket rules`;
+  return {
+    proposal: {
+      id: `agent:${item.id}:rule:${r.standard}/${rules.map((x) => x.rule).join('+')}`,
+      from: 'agent',
+      item: item.id,
+      title: `Rewrite ${place} of ${key} to meet ${names}`,
+      reason: worked ? `Rewrites ${place} of [[${item.id}]] ${worked.said}` : `${rules.map((x) => x.reason).join(' ')} The rewrite keeps what [[${item.id}]] says and leaves what it doesn't as a gap, asked about below.`,
+      command: jira ? 'jira issue update' : null,
+      input: jira ? { toilProject, key, ...(field ? { field: [`${field}=${text}`] } : { description: text }) } : null,
+      note: jira ? `Replaces ${place}.` : 'The sample proposes this for Jira items only; make the change by hand.',
+    },
+    questions: [question],
+    said: worked ? `The proposal rewrites ${place} of [[${item.id}]] ${worked.said}` : `[[${item.id}]] missed ${rules.length === 1 ? `"${r.name}"` : rules.map((x) => `"${x.name}"`).join(', ')}. The proposal rewrites ${place} to meet ${rules.length === 1 ? 'it' : 'them'}, keeping what the item says and leaving what it doesn't as a gap, with one question.`,
+  };
 }
 
 /** The seeded assignments, one in every state, worked out from the sample's own items. */
@@ -226,8 +287,11 @@ export function sampleRecords(cards: ToilProjectData): AssignmentRecord[] {
   ];
 }
 
-/** Canned results for a run started in the sample, a step every `delay` ms. */
-export function scriptedRunner(delay = 600): Runner {
+/**
+ * Canned results for a run started in the sample, a step every `delay` ms.
+ * `criteriaField` names a Toil project's acceptance criteria field for an area, where a canned fix writes.
+ */
+export function scriptedRunner(delay = 600, criteriaField: (toilProject: string, area: string) => string | null = () => null): Runner {
   const wait = (ms: number, signal: AbortSignal) =>
     new Promise<void>((resolve, reject) => {
       const t = setTimeout(resolve, ms);
@@ -246,6 +310,18 @@ export function scriptedRunner(delay = 600): Runner {
       ctx.record({ kind: 'tool', title: 'Called: owi_similar', detail: JSON.stringify({ id: item.id }) });
       await wait(delay, signal);
       const cite = `[[${item.id}]]`;
+      if (a.rules?.length) {
+        const fix = ruleFix(a.toilProject, item, a.rules, criteriaField(a.toilProject, item.source.area));
+        return {
+          report: { parts: [{ text: fix.said }], citations: [item.id], unverified: [], warnings: [] },
+          proposals: [fix.proposal],
+          questions: fix.questions,
+          injection: null,
+          usage: sampleAnswerUsage(a.id, 1, a.toilProject),
+          startedOn: startedOn(item.id, a.adapter!, FIXTURE_NOW, READ_TOOLS),
+          branch: null,
+        };
+      }
       const report = {
         parts: [{ text: a.mode === 'investigate' ? `${cite} is ${item.status ?? 'open'}. This is the sample's canned report; a real run reads the Toil project's sources and cites each one.` : `${cite}: the sample's canned ${a.mode} run. A real run would ${a.mode === 'refine' ? 'draft criteria and an estimate' : 'clone the repository and stage a change'}.` }],
         citations: [item.id],
@@ -291,6 +367,7 @@ export interface SampleQueue {
 
 /** The sample's queue: the real one, on the sample's items, its seeds and the scripted runner. */
 export function sampleQueue(execute: Execute = fixtureExecute().execute, o: { delay?: number; now?: () => string; restartNeeded?: () => string | null } = {}): SampleQueue {
+  const rules = fixtureStandards(execute);
   const data = new Map<string, ToilProjectData>();
   let seq = 0;
   // The sample's clock starts at its own fixed day and runs from there, so seeds and new runs share one timeline.
@@ -301,7 +378,7 @@ export function sampleQueue(execute: Execute = fixtureExecute().execute, o: { de
     for (const name of ['card-payments', 'settlement', 'checkout-web']) data.set(name, await loadToilProject(execute, name));
     queue = new AssignmentQueue({
       keeper: memory(sampleRecords(data.get('card-payments')!)),
-      runner: scriptedRunner(o.delay),
+      runner: scriptedRunner(o.delay, (toilProject, area) => data.get(toilProject)?.readiness.areas[area]?.acceptanceField ?? null),
       items: (toilProject) => {
         const items = data.get(toilProject)?.items ?? null;
         return items?.map((i) => (i.id === SAMPLE_INBOX.item ? { ...i, labels: [...i.labels, SAMPLE_INBOX.label] } : i)) ?? null;
@@ -309,6 +386,7 @@ export function sampleQueue(execute: Execute = fixtureExecute().execute, o: { de
       people: async (toilProject) => data.get(toilProject)?.people ?? [],
       repos: async (toilProject) => (toilProject === 'card-payments' ? [{ name: 'payments-core', path: '~/src/payments-core' }] : []),
       apply: async (_a, p) => refuse(p.command ?? 'that'),
+      ruleFor: (toilProject, item, standard, rule) => rules.ruleFor(toilProject, item, standard, rule),
       settings: () => SAMPLE_ASSIGN_SETTINGS,
       current: () => SAMPLE_FINGERPRINT_NOW,
       ...(o.restartNeeded ? { restartNeeded: o.restartNeeded } : {}),

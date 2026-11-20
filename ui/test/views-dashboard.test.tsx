@@ -16,7 +16,7 @@ describe('a dashboard', () => {
   ])('%s names the tools that fed each panel', async (name, work, prs, builds, deployments) => {
     await open(`#/project/${name}/board`);
     const fed = (region: HTMLElement) => region.querySelector('.fed-by')!.textContent!;
-    for (const t of work) expect(fed(panel('Sprint 42 board'))).toContain(t);
+    for (const t of work) expect(fed(panel('Sprint board'))).toContain(t);
     for (const t of prs) expect(fed(panel('Stories, code reviews, builds and deployments'))).toContain(t);
     for (const t of builds) expect(fed(panel('Builds'))).toContain(t);
     for (const t of deployments) expect(fed(panel('Deployments'))).toContain(t);

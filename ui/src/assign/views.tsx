@@ -11,20 +11,24 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Button, Dialog, DialogTrigger, Heading, Input, Label, Modal, ModalOverlay, Radio, RadioGroup, TextField } from 'react-aria-components';
+import { NavButton } from '../components/nav-button.tsx';
 import { ItemLink } from '../components/items.tsx';
 import { Card, CardGrid, Cluster, Stack } from '../components/layout.tsx';
 import { useData } from '../data.ts';
-import { boardHref, toilProjectHref } from '../format.ts';
+import { boardHref, shortKey, sourceLabel, toilProjectHref } from '../format.ts';
 import { Empty, EmptyLink } from '../components/empty.tsx';
-import { Help } from '../components/help.tsx';
+import { Help, InfoTip } from '../components/help.tsx';
+import { DisclosureBody, SummaryChevron } from '../components/disclosure.tsx';
 import { ADAPTER_LABEL, addUp, usageParts } from '../model-usage.ts';
 import type { PersonEntry } from '../model/people.ts';
 import type { WorkItem } from '../toil.ts';
-import { ADAPTER_NAME, MODES, STATE_LABEL, modeInfo, renewRefusal, runMs, runText, type AssignAdapter, type Assignment, type AssignmentList, type AssignMode } from './model.ts';
+import { ADAPTER_NAME, MODES, allApplied, STATE_LABEL, modeInfo, renewRefusal, runMs, runText, type AssignAdapter, type Assignment, type AssignmentList, type AssignMode } from './model.ts';
 import { useChatScope } from '../components/ask.tsx';
 import { StaleChip, StaleNote } from '../components/stale.tsx';
 import { usePlain } from '../plain-words.ts';
 import './assign.css';
+import { homeShort } from '../home-path.ts';
+import { AgentMark } from '../components/agent-mark.tsx';
 
 export const assignmentHref = (toilProject: string, id: string) => `${toilProjectHref(toilProject)}/assignment/${encodeURIComponent(id)}`;
 
@@ -63,8 +67,9 @@ export function useAssignments(toilProject: string): { list: AssignmentList | nu
   return { list, error, reload };
 }
 
-/** The state as a chip, worded and coloured by state. */
-export function StateChip({ a }: { a: Pick<Assignment, 'state' | 'waiting'> }) {
+/** The state as a chip, worded and coloured by state; a finished assignment whose every proposal was applied says Applied. */
+export function StateChip({ a }: { a: Pick<Assignment, 'state' | 'waiting'> & Partial<Pick<Assignment, 'proposals'>> }) {
+  if (allApplied(a)) return <span className="assign-state assign-state--done assign-state--applied">Applied</span>;
   const words = a.state === 'queued' && a.waiting === 'start' ? 'Queued, waiting for Start' : STATE_LABEL[a.state];
   return <span className={`assign-state assign-state--${a.state}`}>{words}</span>;
 }
@@ -77,7 +82,7 @@ export function usageText(a: Pick<Assignment, 'usage'>): string {
   return `${a.usage.sample ? 'sample figures: ' : ''}${parts.join(', ')}`;
 }
 
-/** One assignment on a card: state, mode, adapter, item, run time and usage. */
+/** One assignment on its item's page: state, mode, adapter and run time; the usage is on the assignment's Run details. */
 export function AssignmentCard({ a, now }: { a: Assignment; now: string }) {
   const plain = usePlain();
   const pending = a.proposals.filter((p) => p.status === 'pending').length;
@@ -86,13 +91,11 @@ export function AssignmentCard({ a, now }: { a: Assignment; now: string }) {
       <Stack gap="xs">
         <Cluster className="assign-card__top">
           <StateChip a={a} />
-          <span className="assign-mode">{modeInfo(a.mode, plain.on).label}</span>
+          <span className="assign-mode">{a.rules?.length ? 'Fix with AI agent' : modeInfo(a.mode, plain.on).label}</span>
         </Cluster>
-        <p className="assign-card__item">
-          <ItemLink id={a.item} /> <span className="assign-card__title">{a.itemTitle}</span>
-        </p>
+        {/* The card sits on its item's page, so it doesn't name the item again; what the run used is on its Run details (#657). */}
         <p className="note">
-          {a.adapter ? ADAPTER_NAME[a.adapter] : 'No adapter chosen yet'} · {runText(a.ranMs ?? runMs(a, now))} · {usageText(a)}
+          {a.adapter ? ADAPTER_NAME[a.adapter] : 'No adapter chosen yet'} · {runText(a.ranMs ?? runMs(a, now))}
         </p>
         {a.state === 'needs-you' && (
           <p className="assign-needs">
@@ -101,11 +104,18 @@ export function AssignmentCard({ a, now }: { a: Assignment; now: string }) {
         )}
         {a.stop && a.state === 'failed' && <p className="assign-stop">{a.stop.message}</p>}
         {a.stale && <StaleNote stale={a.stale} />}
-        {a.renewedBy && <p className="note">Renewed as <a href={assignmentHref(a.toilProject, a.renewedBy)}>a fresh assignment</a>.</p>}
+        {a.renewedBy && (
+          <p className="note">
+            Renewed as a fresh assignment.{' '}
+            <NavButton href={assignmentHref(a.toilProject, a.renewedBy)} kind="quiet" size="sm">
+              Open it
+            </NavButton>
+          </p>
+        )}
         <p>
-          <a href={assignmentHref(a.toilProject, a.id)}>
-            Open the assignment<span className="sr-only"> on {a.item}</span>
-          </a>
+          <NavButton href={assignmentHref(a.toilProject, a.id)} size="sm">
+            Open the assignment<span className="sr-only"> on {a.itemTitle}</span>
+          </NavButton>
         </p>
       </Stack>
     </Card>
@@ -155,7 +165,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
         <ItemLink id={item.id} /> {item.title}
       </p>
       <RadioGroup className="agent-adapters" value={adapter ?? ''} onChange={(v) => setAdapter(v as AssignAdapter)}>
-        <Label>{plain.pw('Adapter', 'Which AI')}</Label>
+        <Label>{plain.pw('Adapter', 'Which AI agent')}</Label>
         {list.adapters.map((a) => (
           <Radio key={a.name} value={a.name} className="agent-choice" isDisabled={a.problem !== null}>
             <strong>{a.label}</strong>
@@ -189,7 +199,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
           {list.repos.map((r) => (
             <Radio key={r.name} value={r.name} className="agent-choice">
               <strong>{r.name}</strong>
-              <span className="note any-break">{r.path}</span>
+              <span className="note any-break">{homeShort(r.path)}</span>
             </Radio>
           ))}
         </RadioGroup>
@@ -207,6 +217,7 @@ export function AssignForm({ item, list, start, close, onDone }: { item: Pick<Wo
       )}
       <div className="assign-actions">
         <Button type="submit" className="btn btn--accent" isDisabled={!canSend}>
+          <AgentMark />
           {busy ? plain.pw('Assigning…', 'Asking…') : start ? 'Start' : plain.pw('Assign', 'Ask the AI agent')}
         </Button>
         <Button className="btn" onPress={close}>
@@ -272,9 +283,208 @@ export function AssignButton({ item }: { item: Pick<WorkItem, 'id' | 'title'> })
   return (
     <DialogTrigger>
       <Button className="btn" data-assign-open="">
+        <AgentMark />
         Assign to agent<span className="sr-only"> {item.id}</span>
       </Button>
       <AssignModal item={item} />
+    </DialogTrigger>
+  );
+}
+
+/** A ticket rule a "Fix with AI agent" is about (#657): its name and text, and toil's reason the item misses it. */
+export interface RuleToFix {
+  standard: string;
+  rule: string;
+  name: string;
+  text: string | null;
+  reason: string;
+}
+
+/** The item a fix is for: its tracker names who holds the text until a person applies the rewrite. */
+type FixItem = Pick<WorkItem, 'id' | 'title' | 'source'>;
+
+/**
+ * "Fix with AI agent" on a thin or failed ticket-rule row (#657): a refine held
+ * to that rule, or to every rule of one standard the item misses ("Fix all 3").
+ * The agent suggests one rewrite and asks about what the item doesn't say;
+ * nothing changes until a person applies the proposal. Where no AI agent can
+ * run here, the dialog says so and links to setting one up, as Ask does,
+ * rather than offering a button that can only fail.
+ */
+function FixRuleForm({ item, rules, list, close }: { item: FixItem; rules: readonly RuleToFix[]; list: AssignmentList; close: () => void }) {
+  const { assignments: api, toilProject } = useData();
+  const usable = list.adapters.filter((a) => !a.problem);
+  const [adapter, setAdapter] = useState<AssignAdapter | null>(usable.find((a) => a.name === list.preferred)?.name ?? usable[0]?.name ?? null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const canSend = Boolean(api && !api.disabled && adapter && !busy);
+  const one = rules.length === 1;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!canSend || !api || !adapter) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      const standard = one ? { standard: rules[0]!.standard, rule: rules[0]!.rule } : { standard: rules[0]!.standard, rules: rules.map((r) => r.rule) };
+      const a = await api.assign({ toilProject: toilProject.name, item: item.id, mode: 'refine', adapter, standard });
+      close();
+      window.location.hash = assignmentHref(a.toilProject, a.id);
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form className="assign-form" onSubmit={submit} noValidate data-fix-rule="">
+      <Heading slot="title" level={2} id="assign-title">
+        Fix with AI agent
+      </Heading>
+      <p className="note">
+        <ItemLink id={item.id} /> {item.title}
+      </p>
+      <dl className="fix-rule">
+        <dt>{one ? 'Ticket rule' : 'Ticket rules'}</dt>
+        <dd>
+          {rules.map((r) => (
+            <p key={r.rule}>
+              {/* The rule's own words are its explanation, so they sit in its (i), and the dialog leads with the name and the miss (#657). */}
+              <strong>{r.name}</strong>
+              {r.text && (
+                <>
+                  {' '}
+                  <InfoTip label={r.name} tip={r.text} triggerProps={{ 'data-rule-text': r.rule }}>
+                    <p>{r.text}</p>
+                  </InfoTip>
+                </>
+              )}
+            </p>
+          ))}
+        </dd>
+        <dt>What's missing</dt>
+        <dd>
+          {rules.map((r) => (
+            <p key={r.rule}>{r.reason}</p>
+          ))}
+        </dd>
+      </dl>
+      <p>
+        An AI agent suggests a rewrite that meets {one ? 'the rule' : 'the rules'}. <strong>Nothing changes in {sourceLabel(item.source.area)} until you apply it.</strong>
+      </p>
+      {usable.length === 0 ? (
+        <div className="agent-notice" data-no-agent="">
+          <p>
+            No AI agent is set up on this computer yet.{' '}
+            <NavButton href="#/settings/agent" size="sm">
+              Set up an AI agent
+            </NavButton>
+          </p>
+          {list.adapters.some((a) => a.problem) && (
+            <details>
+              <summary>
+                <SummaryChevron />
+                Details for whoever sets it up
+              </summary>
+              <ul className="plain">
+                {list.adapters.map((a) => (
+                  <li key={a.name} className="note">
+                    {a.label}: {a.problem}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      ) : usable.length > 1 ? (
+        <RadioGroup className="agent-adapters" value={adapter ?? ''} onChange={(v) => setAdapter(v as AssignAdapter)}>
+          <Label>Which AI agent</Label>
+          {usable.map((a) => (
+            <Radio key={a.name} value={a.name} className="agent-choice">
+              <strong>{a.label}</strong>
+            </Radio>
+          ))}
+        </RadioGroup>
+      ) : (
+        <p className="note">It runs on {usable[0]!.label}, on your own AI subscription, for up to {list.settings.timeLimitMinutes} minutes.</p>
+      )}
+      {list.settings.problem && <p className="failure">{list.settings.problem}</p>}
+      {api?.disabled && <p className="failure">{api.disabled}</p>}
+      {problem && (
+        <p role="alert" className="failure">
+          {problem}
+        </p>
+      )}
+      <div className="assign-actions">
+        {usable.length > 0 && (
+          <Button type="submit" className="btn btn--accent" isDisabled={!canSend}>
+            <AgentMark />
+            {busy ? 'Asking…' : 'Ask for a rewrite'}
+          </Button>
+        )}
+        <Button className="btn" onPress={close}>
+          {usable.length > 0 ? 'Cancel' : 'Close'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function FixRuleBody({ item, rules, close }: { item: FixItem; rules: readonly RuleToFix[]; close: () => void }) {
+  const { assignments: api, toilProject } = useData();
+  const [list, setList] = useState<AssignmentList | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    if (!api) return void setProblem('This view has no AI agent assignments.');
+    if (api.disabled) return void setProblem(api.disabled);
+    let live = true;
+    api.list(toilProject.name, { inbox: false }).then(
+      (l) => live && setList(l),
+      (e: unknown) => live && setProblem(e instanceof Error ? e.message : String(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, toilProject.name]);
+  if (list) return <FixRuleForm item={item} rules={rules} list={list} close={close} />;
+  return (
+    <div className="assign-form">
+      <Heading slot="title" level={2} id="assign-title">
+        Fix with AI agent
+      </Heading>
+      <p className={problem ? 'failure' : 'note'}>{problem ?? 'Reading the AI agents on this computer…'}</p>
+      <div className="assign-actions">
+        <Button className="btn" onPress={close}>
+          Close
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "Fix with AI agent" for ticket rules on one item, and the dialog it opens:
+ * one rule, or "Fix all 3 with AI agent" for every rule of one standard the
+ * item misses, which asks for one rewrite that meets them all. Absent where
+ * nothing can be assigned.
+ */
+export function FixRuleButton({ item, rules, primary = false }: { item: FixItem; rules: readonly RuleToFix[]; primary?: boolean }) {
+  const { assignments: api } = useData();
+  if (!api || rules.length === 0) return null;
+  const one = rules.length === 1;
+  return (
+    <DialogTrigger>
+      <Button className={primary ? 'btn btn--accent btn--sm' : 'btn btn--sm'} data-fix-rule-open={one ? `${rules[0]!.standard}/${rules[0]!.rule}` : rules[0]!.standard}>
+        <AgentMark />
+        {one ? 'Fix with AI agent' : `Fix all ${rules.length} with AI agent`}
+        <span className="sr-only">: {rules.map((r) => r.name).join(', ')}</span>
+      </Button>
+      <ModalOverlay className="feedback-overlay" data-backdrop="" isDismissable>
+        <Modal className="feedback-modal">
+          <Dialog className="feedback-dialog" aria-labelledby="assign-title">
+            {({ close }) => <FixRuleBody item={item} rules={rules} close={close} />}
+          </Dialog>
+        </Modal>
+      </ModalOverlay>
     </DialogTrigger>
   );
 }
@@ -290,6 +500,7 @@ export function InboxRow({ a, onStarted }: { a: Assignment; onStarted: () => voi
           <ItemLink id={a.item} /> {a.itemTitle}: <strong>{modeInfo(a.mode, plain.on).label.toLowerCase()}</strong>
         </span>
         <Button className="btn btn--accent btn--small" onPress={() => setOpen(true)} data-inbox-start="">
+          <AgentMark />
           Start<span className="sr-only"> {a.item}</span>…
         </Button>
       </Cluster>
@@ -394,6 +605,7 @@ export function RenewAll({ list, onDone }: { list: AssignmentList; onDone: () =>
       {rows.length > 0 && (
       <Cluster>
         <Button className="btn" onPress={() => (setSaid(null), setShown(rows), setOpen(true))} data-renew-all="">
+          <AgentMark />
           {plain.pw('Renew all stale…', 'Restart out-of-date…')}
         </Button>
         <span className="note">
@@ -451,15 +663,17 @@ export function ItemAssignments({ item }: { item: WorkItem }) {
   if (!api) return null;
   const mine = list?.assignments.filter((a) => a.item === item.id) ?? [];
   return (
-    <Card as="section" className="panel" aria-labelledby="item-agents">
-      <h2 id="item-agents">Agents</h2>
+    <Card as="section" className="panel item-agents" aria-labelledby="item-agents">
+      {/* What an assignment does is an explanation, so it is the heading's (i), not a paragraph beside the button (#657). */}
+      <h2>
+        <span id="item-agents">AI agents</span> <Help topic="assignments" note="Refine, investigate or implement it with Claude, Copilot or Codex. Its proposals wait for you." />
+      </h2>
       <Cluster>
         <AssignButton item={item} />
-        <span className="note">Refine, investigate or implement it with Claude, Copilot or Codex. Its proposals wait for you.</span>
       </Cluster>
       {error && <p className="failure">{error}</p>}
       {mine.length > 0 && (
-        <CardGrid min="sm" className="assign-lane" aria-label={`Assignments on ${item.id}`}>
+        <CardGrid min="sm" className="assign-lane" aria-label={`Assignments on ${shortKey(item)}`}>
           {mine.map((a) => (
             <li key={a.id}>
               <AssignmentCard a={a} now={now} />
@@ -486,8 +700,13 @@ export function AgentAssignments({ people }: { people: readonly PersonEntry[] })
   const adapters = [...new Set(list.assignments.flatMap((a) => (a.adapter ? [a.adapter] : [])))].sort();
   return (
     <section className="people-section" aria-labelledby="agent-assignments">
-      <h2 id="agent-assignments">{plain.pw("Agents' assignments", "AI agents' work")}</h2>
-      <p className="note">{plain.pw("What each agent was assigned from Toil UI, as a teammate's plate: its own runs, not the pull requests above.", "What each AI agent was asked to do from Toil UI, as a teammate's plate: its own runs, not the code reviews above.")}</p>
+      {/* What the section is lives in its heading's (i) (#657), not two lines under it. */}
+      <h2>
+        <span id="agent-assignments">{plain.pw("Agents' assignments", "AI agents' work")}</span>{' '}
+        <InfoTip label="AI agents' work" tip={plain.pw("What each agent was assigned from Toil UI, as a teammate's plate: its own runs, not the pull requests above.", "What each AI agent was asked to do from Toil UI, as a teammate's plate: its own runs, not the code reviews above.")}>
+          <p>{plain.pw("What each agent was assigned from Toil UI, as a teammate's plate: its own runs, not the pull requests above.", "What each AI agent was asked to do from Toil UI, as a teammate's plate: its own runs, not the code reviews above.")}</p>
+        </InfoTip>
+      </h2>
       {adapters.length ? (
         <CardGrid min="md" className="people-cards">
           {adapters.map((adapter) => {
@@ -498,21 +717,38 @@ export function AgentAssignments({ people }: { people: readonly PersonEntry[] })
                 <Card className="assign-agent">
                   <Stack gap="xs">
                     <h3>{who ? `${who.name} (${ADAPTER_NAME[adapter]})` : ADAPTER_NAME[adapter]}</h3>
-                    <p className="note">
-                      {STATE_ORDER.map((s) => [s, mine.filter((a) => a.state === s).length] as const)
-                        .filter(([, n]) => n)
-                        .map(([s, n]) => `${n} ${STATE_LABEL[s].toLowerCase()}`)
-                        .join(', ')}
-                    </p>
+                    <p className="note">{stateCounts(mine)}</p>
                     {mine.some((a) => a.stale) && (
                       <p className="note" data-stale="">
                         <StaleChip /> {mine.filter((a) => a.stale).length} started on instructions that have changed since.
                       </p>
                     )}
-                    <ul className="rows">
-                      {mine.map((a) => (
-                        <li key={a.id}>
-                          <StateChip a={a} /> {a.stale && <StaleChip />} <a href={assignmentHref(a.toilProject, a.id)}>{modeInfo(a.mode, plain.on).label}</a> <ItemLink id={a.item} /> <span className="note">{runText(a.ranMs ?? runMs(a, now))}</span>
+                    {/* One line per kind of work ("Tidy up · 8"), each opening to its runs: eight near-identical rows were a wall. */}
+                    <ul className="assign-kinds">
+                      {kindsOf(mine).map(([mode, runs]) => (
+                        <li key={mode}>
+                          <details className="assign-kind" data-assign-kind={mode}>
+                            <summary>
+                              <SummaryChevron />
+                              <span>
+                                {modeInfo(mode, plain.on).label} · {runs.length}
+                              </span>
+                              <span className="note">{stateCounts(runs)}</span>
+                            </summary>
+                            <DisclosureBody>
+                              <ul className="rows">
+                                {runs.map((a) => (
+                                  <li key={a.id}>
+                                    <StateChip a={a} /> {a.stale && <StaleChip />}{' '}
+                                    <NavButton href={assignmentHref(a.toilProject, a.id)} kind="quiet" size="sm">
+                                      {modeInfo(a.mode, plain.on).label}
+                                    </NavButton>{' '}
+                                    <ItemLink id={a.item} /> <span className="note">{runText(a.ranMs ?? runMs(a, now))}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </DisclosureBody>
+                          </details>
                         </li>
                       ))}
                     </ul>
@@ -530,3 +766,18 @@ export function AgentAssignments({ people }: { people: readonly PersonEntry[] })
 }
 
 const STATE_ORDER = ['working', 'needs-you', 'queued', 'done', 'failed'] as const;
+
+/** "1 working, 7 done": how many runs are in each state, in the order a person acts on them. */
+export function stateCounts(runs: ReadonlyArray<Pick<Assignment, 'state'>>): string {
+  return STATE_ORDER.map((s) => [s, runs.filter((a) => a.state === s).length] as const)
+    .filter(([, n]) => n)
+    .map(([s, n]) => `${n} ${STATE_LABEL[s].toLowerCase()}`)
+    .join(', ');
+}
+
+/** An agent's runs by kind of work, in the order each kind first appears, so the newest kind leads as the list did. */
+export function kindsOf<T extends Pick<Assignment, 'mode'>>(runs: readonly T[]): Array<[AssignMode, T[]]> {
+  const kinds = new Map<AssignMode, T[]>();
+  for (const a of runs) (kinds.get(a.mode) ?? kinds.set(a.mode, []).get(a.mode)!).push(a);
+  return [...kinds.entries()];
+}

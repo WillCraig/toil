@@ -9,6 +9,24 @@
    word looks the same whatever the theme; only its colour follows the theme. */
 :root { --font-brand: 'Fredoka', ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif; }
 
+/* Colour fills a whole surface or isn't there (principle 11, the maintainer's call,
+   2026-11-19, #657): a callout that carries a tone is a quiet tint of it over the
+   raised fill with a full border a step stronger than the line, never a stroke down
+   one side. Every theme gets these from its own tokens, so none has to restate them.
+   The tint stays light enough that ink on it keeps the contrast ink has on raised. */
+:root {
+  --tint-warn: color-mix(in srgb, var(--warn) 9%, var(--raised));
+  --tint-danger: color-mix(in srgb, var(--danger) 8%, var(--raised));
+  --tint-ok: color-mix(in srgb, var(--ok) 8%, var(--raised));
+  --tint-accent: color-mix(in srgb, var(--accent) 8%, var(--raised));
+  --tint-info: color-mix(in srgb, var(--link) 7%, var(--raised));
+  --edge-warn: color-mix(in srgb, var(--warn) 45%, var(--line));
+  --edge-danger: color-mix(in srgb, var(--danger) 45%, var(--line));
+  --edge-ok: color-mix(in srgb, var(--ok) 40%, var(--line));
+  --edge-accent: color-mix(in srgb, var(--accent) 45%, var(--line));
+  --edge-info: color-mix(in srgb, var(--link) 35%, var(--line));
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 * { margin: 0; }
 
@@ -28,6 +46,8 @@ h2 { font-size: 1.15rem; line-height: 1.3; }
 h3 { font-size: 1rem; line-height: 1.35; }
 h1:focus { outline: none; }
 h1:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+/* The focus the app moves to a new page's heading (focusQuietly in App.tsx) draws no ring; a keyboard's own focus does (#657). */
+[data-nav-focus]:focus, [data-nav-focus]:focus-visible { outline: none; }
 
 :focus-visible {
   outline: 3px solid var(--focus);
@@ -66,7 +86,7 @@ h1:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
 /* Notices of agent state changes (#306), under the header and in its flow: nothing fixed over the page. */
 .notices { display: grid; gap: 0.5rem; padding: 0 16px; }
 .notices:not(:empty) { padding-block: 0.5rem; }
-.notice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 1rem; padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-inline-start: 4px solid var(--warn); border-radius: 6px; background: var(--raised); color: var(--ink); overflow-wrap: anywhere; }
+.notice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 1rem; padding: 0.5rem 0.75rem; border: 1px solid var(--edge-warn); border-radius: 6px; background: var(--tint-warn); color: var(--ink); overflow-wrap: anywhere; }
 .notice__title { margin: 0; }
 .notice__lines { flex: 1 1 16rem; min-width: 0; margin: 0; padding-inline-start: 1.1rem; }
 .notify-states { display: grid; gap: 0.25rem; margin: 0 0 0.5rem; padding: 0; border: 0; }
@@ -161,9 +181,12 @@ h1:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
   text-decoration: none;
 }
 .top nav a:hover, .nav-menu nav a:hover { background: var(--surface); }
+/* The page you are on is marked, never a filled primary (#657): a header link is navigation, and the accent fill is
+   kept for the one action a screen leads with. */
 .top nav a[aria-current="page"], .nav-menu nav a[aria-current="page"] {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--surface);
+  box-shadow: inset 0 -3px 0 var(--accent);
+  color: var(--ink);
   font-weight: 600;
 }
 .settings { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-left: auto; }
@@ -234,6 +257,8 @@ button { cursor: pointer; text-align: left; }
 button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 button:disabled { cursor: progress; }
 
+/* The button kinds (primary, secondary, quiet) and the small size are in views.css, after .btn, so they win over it. */
+
 .sync { padding: 0.5rem 16px; color: var(--muted); font-size: 0.875rem; }
 
 main {
@@ -279,6 +304,12 @@ main {
 .env { font-family: var(--font-mono); font-size: 0.9375rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 
 .item-link { text-decoration: none; }
+/* An item as a row (ItemRow): the key in the source colour, the title in ink, the chevron at its end; it wraps rather than widens. */
+.item-rows { display: grid; gap: 0.1rem; margin: 0; padding: 0; }
+.item-row.btn--row { justify-content: flex-start; font-weight: 400; overflow-wrap: anywhere; }
+.item-row .btn__text { flex: 1; min-width: 0; }
+.item-row .source { color: var(--link); }
+.item-rows__more { justify-self: start; align-self: start; }
 .item-link .key { display: inline; }
 .item-link .source { color: var(--link); }
 .item-link .title { color: var(--ink); }
@@ -341,3 +372,7 @@ tbody th { font-weight: 400; }
 
 /* A link alone in a note, or an item named in an evidence line, has a hit area of at least 24px (WCAG 2.5.8) without changing how it reads. */
 .back-link, .evidence .item-link { display: inline-block; min-height: 24px; padding-block: 2px; box-sizing: border-box; }
+
+/* A line's source as a badge (SourceTip): small and muted, its detail in the tooltip; a 24px hit area keeps it pressable. */
+.source-tip { display: inline-flex; align-items: center; min-height: 24px; padding: 0 0.45rem; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 0.75rem; cursor: help; vertical-align: baseline; }
+.source-tip[data-hovered], .source-tip[data-focus-visible] { color: var(--ink); border-color: var(--ink); }

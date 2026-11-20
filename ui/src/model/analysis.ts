@@ -20,7 +20,7 @@ import { citationsOf, type Answer, type AnswerPart } from '../agent.ts';
 import type { AnswerUsage } from '../model-usage.ts';
 import type { Proposal } from '../proposal.ts';
 import type { WorkItem } from '../toil.ts';
-import { health } from './sprint.ts';
+import { health, sprintPoints, type Health } from './sprint.ts';
 
 /** The most issues an analysis shows: the prompt asks for three at most, and any more go to the evidence. */
 export const MAX_ISSUES = 3;
@@ -111,11 +111,16 @@ export interface AnalysisSnapshot {
   blocked: Array<{ id: string; by: string[] }>;
   /** Every item estimated in points, by id. */
   points: Record<string, number>;
-  /** The current sprint's points done and left, or null with no sprint running. */
-  sprint: { name: string; done: number; remaining: number } | null;
+  /** The current sprint's points done and left, or null with no sprint running; the figures are null when no item in it has points (#652). */
+  sprint: { name: string; done: number | null; remaining: number | null } | null;
 }
 
 const open = (i: WorkItem) => i.statusCategory !== 'DONE';
+
+function sprintSnapshot(h: Health): NonNullable<AnalysisSnapshot['sprint']> {
+  const p = sprintPoints(h);
+  return { name: h.sprint.name, done: p?.done ?? null, remaining: p?.left ?? null };
+}
 
 /** The snapshot of a toil project's items at a moment, by the same blocks rule the sprint panel uses. */
 export function snapshotOf(items: readonly WorkItem[], now: string): AnalysisSnapshot {
@@ -129,7 +134,7 @@ export function snapshotOf(items: readonly WorkItem[], now: string): AnalysisSna
   const points: Record<string, number> = {};
   for (const item of items) if (item.estimate?.unit === 'points') points[item.id] = item.estimate.value;
   const h = health([...items], [], now);
-  return { blocked: blocked.sort((a, b) => a.id.localeCompare(b.id)), points, sprint: h ? { name: h.sprint.name, done: h.done.points, remaining: h.remaining.points } : null };
+  return { blocked: blocked.sort((a, b) => a.id.localeCompare(b.id)), points, sprint: h ? sprintSnapshot(h) : null };
 }
 
 /** One analysis, as the history keeps it. */
@@ -227,7 +232,9 @@ export function changesBetween(before: AnalysisRecord | null, after: AnalysisRec
   });
   const a = before.snapshot.sprint;
   const b = after.snapshot.sprint;
-  const sprintMoved = a?.name !== b?.name || a?.done !== b?.done || a?.remaining !== b?.remaining;
+  // A snapshot saved before #652 holds 0 and 0 where a newer one holds null for no points read; that is not a move.
+  const same = (x: number | null | undefined, y: number | null | undefined) => x === y || (x === 0 && y === null) || (x === null && y === 0);
+  const sprintMoved = a?.name !== b?.name || !same(a?.done, b?.done) || !same(a?.remaining, b?.remaining);
   const cited = after.citations.filter((id) => !before.citations.includes(id));
   const dropped = before.citations.filter((id) => !after.citations.includes(id));
   const recommendationChanged = (before.recommendation ?? '') !== (after.recommendation ?? '');

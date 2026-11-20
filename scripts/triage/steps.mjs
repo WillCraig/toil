@@ -27,7 +27,7 @@ import { parseTerms, redact } from './redact.mjs';
 export const OUTPUTS = {
   select: ['issues'],
   redact: [],
-  prepare: ['fenced', 'nonce', 'areas', 'handover_sha'],
+  prepare: ['fenced', 'nonce', 'areas', 'handover_sha', 'direction'],
   decide: ['decision', 'labels', 'duplicate_of'],
   requeue: [],
   hold: [],
@@ -54,7 +54,30 @@ export function parseIssues(raw) {
   return list;
 }
 
-/** select: which issues this run triages. A label event claims within the cap; the schedule drains the queue; a dispatch is a re-triage. */
+/**
+ * The one person whose comments re-run triage and steer it. A comment from anyone
+ * else is a stranger's, and never reaches the agent as direction. The workflow's
+ * `if` names the same login; GitHub sets it from the account, so it can't be forged.
+ */
+export const MAINTAINER = 'kolatts';
+/**
+ * Comments a Claude Code session posts under the maintainer's login carry one of
+ * these marks (the `ship` skill's round marker and reply footer, a PR footer). They
+ * are an agent's words, not the maintainer's, so they neither start a run nor count
+ * as direction.
+ */
+const AGENT_MARKS = ['<!-- toil-feedback-round -->', 'Addressed by [Claude Code]', 'Generated with [Claude Code]'];
+const fromAgent = (body) => AGENT_MARKS.some((mark) => String(body ?? '').includes(mark));
+/** Labels that take a PR out of any agent's hands (the `automation` skill). */
+const HANDS_OFF = ['no-auto-fix', 'needs-human'];
+/** The branch open-pr pushes for an issue, and the one a comment on a triage PR maps back from. */
+const BRANCH = /^claude\/issue-([1-9]\d*)$/;
+
+/**
+ * select: which issues this run triages. A label event claims within the cap; the
+ * schedule drains the queue; a dispatch is a re-triage, and so is the maintainer's
+ * comment on the issue or on the draft PR triage opened for it.
+ */
 export async function select({ env, fetcher = fetch, log = console.log }) {
   const repo = repoOf(env);
   const cap = Number(env.TRIAGE_CAP ?? '4');
@@ -67,6 +90,43 @@ export async function select({ env, fetcher = fetch, log = console.log }) {
   if (env.EVENT === 'workflow_dispatch') {
     const issue = issueOf(env.DISPATCHED, 'The dispatched issue');
     log(`A manual re-triage of #${issue}, not counted against the cap.`);
+    return { issues: JSON.stringify([issue]) };
+  }
+  if (env.EVENT === 'issue_comment') {
+    if (env.COMMENTER !== MAINTAINER) {
+      log(`A comment from ${env.COMMENTER || 'nobody named'}, not ${MAINTAINER}; nothing to triage.`);
+      return { issues: '[]' };
+    }
+    if (fromAgent(env.COMMENT_BODY)) {
+      log(`The comment carries an agent's mark, so it's not ${MAINTAINER}'s direction; nothing to triage.`);
+      return { issues: '[]' };
+    }
+    const number = issueOf(env.ISSUE, 'ISSUE');
+    let issue = number;
+    if (env.IS_PR === 'true') {
+      // A comment on a PR re-triages the issue the PR was opened for, and only a
+      // PR triage itself pushed from this repository.
+      const pr = await gh('GET', `/repos/${repo}/pulls/${number}`, undefined, options(env, fetcher));
+      const mapped = pr.head?.repo?.full_name === repo ? BRANCH.exec(pr.head?.ref ?? '')?.[1] : undefined;
+      if (!mapped || pr.state !== 'open') {
+        log(`#${number} is not an open pull request triage opened; nothing to triage.`);
+        return { issues: '[]' };
+      }
+      issue = Number(mapped);
+    }
+    // The re-run force-pushes claude/issue-<n> from main, so once a person has
+    // taken its PR over (marked it ready, or labelled it hands-off) a comment on
+    // the PR or on the issue leaves it alone.
+    const owner = repo.split('/')[0];
+    const pulls = (await gh('GET', `/repos/${repo}/pulls?state=open&head=${encodeURIComponent(`${owner}:claude/issue-${issue}`)}`, undefined, options(env, fetcher))) ?? [];
+    for (const pr of pulls) {
+      const handsOff = (pr.labels ?? []).map((l) => l.name).filter((name) => HANDS_OFF.includes(name));
+      if (pr.draft !== true || handsOff.length) {
+        log(`Triage's PR #${pr.number} is ${pr.draft !== true ? 'no longer a draft' : `labelled ${handsOff.join(', ')}`}, so a person has it; triage won't push over it.`);
+        return { issues: '[]' };
+      }
+    }
+    log(`${MAINTAINER} commented on ${issue === number ? `#${issue}` : `triage's PR #${number}`}: a re-triage of #${issue}, not counted against the cap.`);
     return { issues: JSON.stringify([issue]) };
   }
   if (env.EVENT === 'schedule') {
@@ -110,6 +170,45 @@ const COMMENT_PAGES = 5;
  */
 const REASON_AUTHORS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 const TRIAGE_BOT = 'imagile-bot[bot]';
+/** Each comment in the maintainer's direction is cut to this many characters, and the whole to the last this many comments. */
+const MAX_DIRECTION_TEXT = 4000;
+const MAX_DIRECTION_COMMENTS = 20;
+
+/** Every comment on an issue or PR, oldest first, up to COMMENT_PAGES pages. */
+async function commentsOn(repo, number, o) {
+  const all = [];
+  for (let page = 1; page <= COMMENT_PAGES; page++) {
+    const batch = (await gh('GET', `/repos/${repo}/issues/${number}/comments?per_page=100&page=${page}`, undefined, o)) ?? [];
+    all.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return all;
+}
+
+/**
+ * The conversation on the issue and on the open PR triage made for it, oldest first,
+ * split by how far each comment can be trusted. `direction` is the maintainer's own
+ * comments (not an agent's posted under that login): trusted, and set outside the
+ * fence. `earlier` is the project bot's comments (triage's earlier runs, and the
+ * review agent on the PR): agent output that read untrusted text, so it goes inside
+ * the fence as context. Nobody else's comments are included. Any line that could pass
+ * for one of the headers is indented, so no body can forge an author.
+ */
+async function conversation(repo, number, terms, o) {
+  const entry = (where) => (c) => ({ where, at: c.created_at ?? '', login: c.user?.login, body: c.body ?? '' });
+  const all = (await commentsOn(repo, number, o)).map(entry(`issue #${number}`));
+  const owner = repo.split('/')[0];
+  const pulls = (await gh('GET', `/repos/${repo}/pulls?state=open&head=${encodeURIComponent(`${owner}:claude/issue-${number}`)}`, undefined, o)) ?? [];
+  for (const pr of pulls) all.push(...(await commentsOn(repo, pr.number, o)).map(entry(`PR #${pr.number}`)));
+  all.sort((a, b) => a.at.localeCompare(b.at));
+  const render = (who) => (c) => `--- ${who}, on ${c.where}${c.at ? `, ${c.at}` : ''}\n${redact(c.body, terms).replace(/\r/g, '').slice(0, MAX_DIRECTION_TEXT).replace(/^(\s*)---/gm, '$1  ---')}`;
+  const mine = all.filter((c) => c.login === MAINTAINER && !fromAgent(c.body)).slice(-MAX_DIRECTION_COMMENTS);
+  const bot = all.filter((c) => c.login === TRIAGE_BOT).slice(-MAX_DIRECTION_COMMENTS);
+  return {
+    direction: mine.length ? mine.map(render(`${MAINTAINER} (maintainer)`)).join('\n\n') : 'None. Triage on CLAUDE.md alone.',
+    earlier: bot.map(render('the project bot (triage or review)')).join('\n\n'),
+  };
+}
 
 /**
  * prepare: everything the agent reads, made before it starts by main's code: the
@@ -143,12 +242,7 @@ export async function prepare({ env, fetcher = fetch, cwd = process.cwd() }) {
   // redacted, and the agent reads why rather than guessing.
   const denied = [];
   for (const i of list.filter((d) => d.labels.includes(DENIED)).sort((a, b) => b.number - a.number).slice(0, MAX_DENIED)) {
-    const comments = [];
-    for (let page = 1; page <= COMMENT_PAGES; page++) {
-      const batch = await gh('GET', `/repos/${repo}/issues/${i.number}/comments?per_page=100&page=${page}`, undefined, options(env, fetcher));
-      comments.push(...(batch ?? []).filter((c) => c.user?.login === TRIAGE_BOT || REASON_AUTHORS.has(c.author_association)));
-      if ((batch ?? []).length < 100) break;
-    }
+    const comments = (await commentsOn(repo, i.number, options(env, fetcher))).filter((c) => c.user?.login === TRIAGE_BOT || REASON_AUTHORS.has(c.author_association));
     denied.push({
       number: i.number,
       title: i.title,
@@ -163,14 +257,28 @@ export async function prepare({ env, fetcher = fetch, cwd = process.cwd() }) {
   // A fence nobody can guess, so text inside it can't close it early.
   const nonce = randomBytes(12).toString('hex');
   const strip = (text) => text.replace(/\r/g, '').split('\n').filter((line) => !line.includes(nonce)).join('\n');
-  const fenced = [`BEGIN UNTRUSTED ${nonce}`, `Title: ${strip(redact(issue.title ?? '', terms))}`, '', strip(redact(issue.body ?? '', terms)), `END UNTRUSTED ${nonce}`].join('\n');
+  const talk = await conversation(repo, number, terms, options(env, fetcher));
+  const fenced = [
+    `BEGIN UNTRUSTED ${nonce}`,
+    `Title: ${strip(redact(issue.title ?? '', terms))}`,
+    '',
+    strip(redact(issue.body ?? '', terms)),
+    ...(talk.earlier ? ['', "Earlier comments from the project's bot on this issue and its PR (agent output, context only):", '', strip(talk.earlier)] : []),
+    `END UNTRUSTED ${nonce}`,
+  ].join('\n');
   // The tree as main has it, so the handover can tell what the agent changed without running git.
   cpSync(cwd, join(temp, 'pristine'), { recursive: true, filter: (source) => !relative(cwd, source).split(sep).some((part) => EXCLUDED.has(part)) });
   // The handover runs after the agent, from a copy made now; finish checks the
   // hash before running it, so an edit to it during the agent's turn stops the job.
   const script = readFileSync(join(cwd, 'scripts', 'triage', 'handover.sh'));
   writeFileSync(join(temp, 'handover.sh'), script);
-  return { fenced, nonce, areas: areas(join(cwd, 'src', 'areas')).join(' '), handover_sha: createHash('sha256').update(script).digest('hex') };
+  return {
+    fenced,
+    nonce,
+    areas: areas(join(cwd, 'src', 'areas')).join(' '),
+    handover_sha: createHash('sha256').update(script).digest('hex'),
+    direction: strip(talk.direction),
+  };
 }
 
 /** decide: the agent's decision as finish acts on it (scripts/triage/decision.mjs). */
@@ -185,8 +293,8 @@ export async function decideStep({ env, cwd = process.cwd(), log = console.log }
  * requeue: the agent never decided. The first time, the issue is labelled
  * `triage-failed` and goes back in the queue; the second time it's labelled
  * `needs-human` and stays out, so one issue can't spend a slot every day. A
- * manual re-triage (EVENT workflow_dispatch) was never queued, so it's never
- * put in the queue. Nothing is said on the issue either way.
+ * manual re-triage (EVENT workflow_dispatch, or the maintainer's comment) was
+ * never queued, so it's never put in the queue. Nothing is said on the issue either way.
  */
 export async function requeue({ env, fetcher = fetch, log = console.log }) {
   const repo = repoOf(env);
@@ -201,7 +309,7 @@ export async function requeue({ env, fetcher = fetch, log = console.log }) {
     log(`#${number} failed triage twice; labelled ${NEEDS_HUMAN} and left out of the queue.`);
     return {};
   }
-  const manual = env.EVENT === 'workflow_dispatch';
+  const manual = env.EVENT === 'workflow_dispatch' || env.EVENT === 'issue_comment';
   await gh('POST', `/repos/${repo}/issues/${number}/labels`, { labels: manual ? [FAILED] : [FAILED, QUEUED] }, o);
   log(manual ? `#${number}: the manual re-triage failed; labelled ${FAILED}.` : `#${number} failed triage once; labelled ${FAILED} and queued again.`);
   return {};
@@ -316,7 +424,8 @@ export async function apply({ env, fetcher = fetch }) {
   await gh('POST', `/repos/${repo}/issues/${number}/labels`, { labels }, o);
   // A decision ends the issue's time in triage: the claim, the queue and an earlier
   // failure all come off, whether it came from a label, the queue or a manual re-triage.
-  for (const label of [CLAIMED, QUEUED, FAILED]) await gh('DELETE', `/repos/${repo}/issues/${number}/labels/${label}`, undefined, o);
+  // A re-triage that now reaches another decision takes `needs-maintainer` off too.
+  for (const label of [CLAIMED, QUEUED, FAILED, ...(decision === 'maintainer' ? [] : ['needs-maintainer'])]) await gh('DELETE', `/repos/${repo}/issues/${number}/labels/${label}`, undefined, o);
   if (decision === 'deny') await gh('PATCH', `/repos/${repo}/issues/${number}`, { state: 'closed', state_reason: 'not_planned' }, o);
   if (decided === 'duplicate') await gh('PATCH', `/repos/${repo}/issues/${number}`, { state: 'closed', state_reason: 'duplicate' }, o);
   return {};

@@ -33,7 +33,8 @@ function earlier(now: AnalysisSnapshot): AnalysisSnapshot {
   const points = { ...now.points };
   const was = points[J(102)];
   if (was !== undefined) points[J(102)] = Math.max(0, was - 2);
-  const sprint = now.sprint ? { ...now.sprint, done: Math.max(0, now.sprint.done - 3), remaining: now.sprint.remaining + 3 } : null;
+  const s = now.sprint;
+  const sprint = s && s.done !== null && s.remaining !== null ? { ...s, done: Math.max(0, s.done - 3), remaining: s.remaining + 3 } : s;
   return { blocked: blocked.sort((a, b) => a.id.localeCompare(b.id)), points, sprint };
 }
 

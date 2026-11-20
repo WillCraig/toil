@@ -43,6 +43,10 @@ export const day = (iso: string) => DATE.format(new Date(iso));
 /** A date and time in UTC; an empty or unparsable one reads as unknown rather than breaking the view. */
 export const dateTime = (iso: string) => (Number.isNaN(Date.parse(iso)) ? 'at an unknown time' : `${DATE_TIME.format(new Date(iso))} UTC`);
 
+const CLOCK = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' });
+/** A time as "22:39 UTC" when it falls on the same UTC day as `today`, else the whole date and time; unknown reads as unknown. */
+export const timeOnDay = (iso: string, today: string) => (Number.isNaN(Date.parse(iso)) ? 'at an unknown time' : day(iso) === (Number.isNaN(Date.parse(today)) ? '' : day(today)) ? `${CLOCK.format(new Date(iso))} UTC` : dateTime(iso));
+
 /** A person by name, else by the id the source gave (GitHub gives only a login). */
 export const personText = (p: Person | null) => (p ? (p.name ?? p.id) : 'Unassigned');
 

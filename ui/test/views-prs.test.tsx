@@ -3,7 +3,10 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { render } from '@testing-library/react';
 import { open, panel, tabs, resetBrowserState } from './views-kit.tsx';
+import { Flow } from '../src/views/PullRequests.tsx';
+import { prMetrics } from '../src/model/prs.ts';
 
 beforeEach(resetBrowserState);
 
@@ -57,29 +60,22 @@ describe('the pull requests view', () => {
     }
   });
 
-  it('lists the flags with their evidence, and every flow figure with its sample size, split by author kind', async () => {
+  it('keeps the flags in the queue, the merged ones one press in, and every flow figure with its sample size, split by author kind', async () => {
     await open('#/project/checkout-web/prs');
-    const flags = panel('Flags');
-    // Grouped by kind, and only the first three flags show until asked for the rest.
-    const groups = () => Array.from(flags.querySelectorAll('[data-flag-group] h3')).map((h) => h.textContent);
-    const flagged = () => flags.querySelectorAll('[data-flag-group] li');
-    expect(flagged()).toHaveLength(3);
-    await userEvent.click(within(flags).getByRole('button', { name: 'Show 2 more' }));
-    expect(flagged()).toHaveLength(5);
-    expect(groups().map((g) => g!.replace(/\s*\d+$/, ''))).toEqual([
-      'Work item done, pull request still open',
-      'Merged, work item not done',
-      'No first review in 2 working days',
-      'Checks failing for over a day',
-      'No linked work item',
-    ]);
+    // No Flags panel (#657): an open one's flags are its row's Flags column, and only merged or closed ones' are listed apart, one press in.
+    expect(screen.queryByRole('region', { name: 'Flags' })).toBeNull();
+    const queue = panel('Waiting now');
+    expect(queue.querySelector('.flags')).not.toBeNull();
+    const closed = queue.querySelector<HTMLDetailsElement>('[data-closed-flags]')!;
+    expect(closed.open).toBe(false);
+    expect(closed.textContent).toMatch(/Merged, work item not done/);
     const flow = panel('Flow');
     const pickup = within(flow).getAllByRole('row').find((r) => r.textContent!.includes('Pickup'))!;
     expect(within(pickup).getAllByRole('cell').map((c) => c.textContent)).toEqual([
-      expect.stringContaining('(n=4'),
-      expect.stringContaining('(n=3'),
-      'AgentsNo data (n=0)',
-      expect.stringContaining('(n=1)'),
+      expect.stringContaining('n=4'),
+      expect.stringContaining('n=3'),
+      'AgentsNo datan=0',
+      expect.stringContaining('n=1'),
     ]);
     expect(flow.textContent).toContain('1 merged pull request has no merge time on record');
   });
@@ -87,15 +83,42 @@ describe('the pull requests view', () => {
   it('suggests reviewers from CODEOWNERS as proposals, never applying them', async () => {
     await open('#/project/checkout-web/prs');
     const reviewers = panel('Suggested reviewers');
-    expect(reviewers.textContent).toContain('imagile/payments-web: CODEOWNERS read from .github/CODEOWNERS.');
-    expect(reviewers.textContent).toContain('Ask bo-web to review payments-web #51');
+    // No file path on the page (#657).
+    expect(reviewers.textContent).not.toContain('.github/CODEOWNERS');
+    expect(reviewers.textContent).toContain('Ask Bo W. (bo-web) to review payments-web #51');
     expect(reviewers.textContent).toContain("toil github pr add-reviewers '51'");
   });
 
-  it("is a tab of the Toil project's, current on its own page", async () => {
+  it('names an author kind with nothing in the period once, never as a column of "No data" (#657)', async () => {
     await open('#/project/settlement/prs');
-    const tab = within(tabs('settlement')).getByRole('link', { name: 'Code reviews' });
-    expect(tab.getAttribute('href')).toBe('#/project/settlement/prs');
-    expect(tab.getAttribute('aria-current')).toBe('page');
+    const flow = panel('Flow');
+    expect(flow.textContent).toContain('None by bots in this period.');
+    const metrics = flow.querySelector('.pr-metrics')!;
+    expect(within(metrics as HTMLElement).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Median', 'All', 'People', 'Agents']);
+    expect(flow.querySelector('.pr-spark svg')).not.toBeNull();
+  });
+
+  it('collapses an empty Flow to one line that says whether nothing was read or nothing happened (#657, principle 12)', () => {
+    const m = prMetrics([], '2026-10-19T12:00:00Z');
+    const unread = render(<Flow m={m} read={false} />);
+    expect(unread.container.textContent).toBe('– No pull requests read yet, so there is no flow to measure.');
+    expect(unread.container.querySelector('table, svg')).toBeNull();
+    unread.unmount();
+    const zero = render(<Flow m={m} read />);
+    expect(zero.container.textContent).toMatch(/^No pull requests opened or merged in the \d+ weeks from .*, so there is no flow to measure\.$/);
+  });
+
+  it('gathers the pull requests with no one to suggest into one line', async () => {
+    await open('#/project/checkout-web/prs');
+    const lines = panel('Suggested reviewers').querySelectorAll('[data-no-suggestion]');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.textContent).toBe('No one to suggest for GitHub payments-web #53 (opens in a new tab): no CODEOWNERS rule and no earlier review covers its paths.');
+    expect(panel('Suggested reviewers').textContent!.match(/No one to suggest/g)).toHaveLength(1);
+  });
+
+  it('is a drill-in from the Summary, with its own address and a Back to Summary (#657)', async () => {
+    await open('#/project/settlement/prs');
+    expect(within(tabs('settlement')).getByRole('link', { name: 'Summary' }).getAttribute('aria-current')).toBe('page');
+    expect(document.querySelector('[data-back]')!.getAttribute('href')).toBe('#/project/settlement');
   });
 });

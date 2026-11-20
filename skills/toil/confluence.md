@@ -10,10 +10,10 @@ Server** (the Server REST API under `/rest/api`) and **Confluence Cloud**
 (`https://<your-site>.atlassian.net`, REST API v2, with v1 where v2 has no endpoint). One
 command tree and one set of MCP tools serve both; each call goes to the deployment of the
 connection it resolves. Verification level: `unit` for both. Data Center's behavior is the
-one the command contract records; Cloud was built from Atlassian's API documentation and has
-never run against a live site.
+one the command contract records; Cloud was built from Atlassian's API documentation, and its
+common commands have since been run against a live site (see Supported versions).
 
-**Supported versions:** Confluence Data Center 7.9 or later (Server REST API). toil authenticates to Data Center with a personal access token, which Confluence Data Center added in 7.9. No release has been verified yet. Confluence Cloud (a connection with `deployment` cloud) is always current: toil calls REST API v2 (`/wiki/api/v2`) and, where v2 has no endpoint, v1 (`/wiki/rest/api`: CQL search, adding and removing labels, attachment uploads), with an Atlassian account email and API token sent as Basic auth. Nothing has been run against a live Cloud site yet.
+**Supported versions:** Confluence Data Center 7.9 or later (Server REST API). toil authenticates to Data Center with a personal access token, which Confluence Data Center added in 7.9. No release has been verified yet. Confluence Cloud (a connection with `deployment` cloud) is always current: toil calls REST API v2 (`/wiki/api/v2`) and, where v2 has no endpoint, v1 (`/wiki/rest/api`: CQL search, adding and removing labels, attachment uploads), with an Atlassian account email and API token sent as Basic auth. Run live against a Confluence Cloud site on 16 November 2026: space create and get, page create, update, find and list, page labels, label and unlabel, and connections test. Data Center has not been run.
 
 ## Data Center and Cloud
 
@@ -55,14 +55,34 @@ account → Security → API tokens → Create API token). toil sends
 is no password, OAuth app or browser login. The token acts with the account's own
 permissions, so a read sees what that account can see.
 
-**The Jira token works too.** When the default Confluence connection has no token of its own
-in env (`TOIL_CONFLUENCE_API_TOKEN`), it uses `TOIL_JIRA_API_TOKEN`, the default Jira
-connection's env value, but only when both connections are the same deployment: a Data
-Center Jira's token is never lent to the Atlassian cloud, nor a Cloud Jira's to a server.
-Any Confluence connection can instead borrow a Jira connection's token, env or stored, by
-naming it: `"apiTokenFrom": "corp-jira"`. `meta.context.shared` says when the token came
-from Jira, never the value. Only the token is borrowed: on Cloud `email` is always this
-connection's own, and must be the address the token belongs to.
+**The Jira token works too, on Cloud.** An Atlassian API token belongs to the account, not
+to one product, so the token a Jira Cloud connection uses also signs in to Confluence Cloud on
+the same site (`https://<your-site>.atlassian.net`), with the same email. On Data Center it
+doesn't: Jira and Confluence are separate servers, each issuing its own personal access
+tokens, so a Confluence server always needs its own.
+
+So when you set up, or find, a Jira Cloud connection and a Confluence Cloud connection on the
+same site, tell the person they can use one token for both, and that
+`toil connections login <confluence-connection>` will offer to reuse the Jira connection's
+(`Use the apiToken from corp-jira (jira) instead of entering one? y/n`), with Jira's email as
+the default answer. A yes writes `"apiTokenFrom": "<jira-connection>"` and stores no secret;
+the token stays with Jira. `toil connections add` asks the same question, and Toil UI's
+Settings shows it as a choice between the connection's own token and Jira's. It is only
+offered when both connections are `deployment` cloud, both base URLs are on the same host,
+and the Jira token resolves. `toil connections add --set` never sets `apiTokenFrom` (an agent
+never moves a secret, so it's refused); when the reuse applies, its `SECRET_NEEDED` warning
+says so and `data.secretReusable` names the Jira connection (`{ "apiToken": "corp-jira" }`),
+for you to pass on. If the person types a different email, the question says the token won't
+work with it: the email must be the address of the account the token belongs to.
+
+The same pairing can be set by hand on any Confluence connection: `"apiTokenFrom":
+"corp-jira"` borrows that Jira connection's token, env or stored. And the default Confluence
+connection, with no token of its own in env (`TOIL_CONFLUENCE_API_TOKEN`), uses
+`TOIL_JIRA_API_TOKEN`, the default Jira connection's, but only from a Jira of the same
+deployment: a Data Center Jira's token is never lent to the Atlassian cloud, nor a Cloud
+Jira's to a server. `meta.context.shared` says when the token came from Jira, never the
+value. Only the token is borrowed: on Cloud `email` is always this connection's own, and must
+be the address the token belongs to.
 
 ## Configuration
 
@@ -146,6 +166,7 @@ is refused the same way.
 | `page unlabel` ✎ | `<id> --label` | `{ removed, from }` |
 | `space list` | `--type --limit`, `--cursor` (Cloud) | Every space (or `--limit` of them) |
 | `space get` | `<key>` | The space, with its plain-text description |
+| `space create` ✎ | `<key> --name --description` | The created global space; Cloud adds `homepageId`. Confluence makes the homepage itself |
 | `page attachments` | `<id>` | Every attachment on the page |
 | `page attach` ✎ | `<id> --input-file --comment` | The attachments created |
 | `attachment download` | `<attachment-id> --dir` | `{ saved, filename, size }`; saves to `.toil/` by default |
@@ -163,6 +184,7 @@ toil confluence page get 12345
 toil confluence page find --space DOCS --title "Release notes"
 toil confluence page search --cql 'space=DOCS AND type=page AND text~"runbook"' --limit 10
 toil confluence page list --space DOCS --limit 50
+toil confluence space create KW --name "Kettlewell Engineering" --description "How we build and run payments." --allow-write
 toil confluence page create --space DOCS --title "Runbook" --body-file runbook.html --parent-id 12345 --allow-write
 toil confluence page update 12345 --body-file runbook.html --allow-write
 toil confluence page label 12345 --labels runbook,ops --allow-write

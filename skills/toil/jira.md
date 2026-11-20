@@ -60,6 +60,16 @@ AUTHENTICATED_FAILED`. toil reports that as `AUTH`, with the API token fix, what
 status, so a wrong token doesn't show up as no projects or a `NOT_FOUND`. Check `email`
 first: it must be the address of the Atlassian account that made the token.
 
+**One token for Jira and Confluence, on Cloud only.** The Atlassian API token signs in to
+Confluence Cloud on the same site too, with the same email. When a person has, or is setting
+up, Confluence Cloud on the same site, tell them they need not enter the token twice:
+`toil connections login <confluence-connection>` offers to reuse this connection's token
+(`confluence.md`, Credential). Set up Jira first: Confluence borrows from Jira, not the other
+way round, so if Confluence already holds the token, the person enters it for Jira and then
+runs `toil connections login <confluence-connection>` to switch Confluence to Jira's, leaving
+one token to rotate. On Data Center, Jira and Confluence are separate servers with separate
+personal access tokens, so each needs its own.
+
 ## Configuration
 
 | Key | Env var | Required | Meaning |

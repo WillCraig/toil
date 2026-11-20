@@ -98,6 +98,15 @@ export const spaces = [
 ];
 
 export const routes: Route[] = [
+  // space create: the space as v2 returns it, shaped from the REST v2 docs; the shape (id, key, homepageId) matched a live Cloud site's answer on 16 November 2026.
+  {
+    method: 'POST',
+    path: `${V2}/spaces`,
+    respond: (req: RecordedRequest) => {
+      const sent = JSON.parse(req.body!) as { key: string; name: string; description?: { value: string } };
+      return json({ id: '98310', key: sent.key, name: sent.name, type: 'global', status: 'current', authorId: ACCOUNT, createdAt: '2026-11-16T09:00:00.000Z', homepageId: '10010', ...(sent.description ? { description: { plain: { representation: 'plain', value: sent.description.value } } } : {}), _links: { webui: `/spaces/${sent.key}` } });
+    },
+  },
   // Spaces: a key is looked up with ?keys= first, since v2 wants the id.
   { method: 'GET', path: `${V2}/spaces`, query: { keys: 'DOCS', 'description-format': 'plain' }, respond: json({ results: [{ ...spaces[0], description: { plain: { representation: 'plain', value: 'Product documentation' } } }], _links: base }) },
   {

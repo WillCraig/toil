@@ -51,6 +51,8 @@ export interface Transition {
   agent: string;
   /** The item, where there is one: its id and title. */
   item: string | null;
+  /** The item as a person reads it ("Jira PAY-103"), where the event carried one; the id stands in where not. */
+  itemName?: string;
   itemTitle: string | null;
   /** One line on why, in plain words: "asked a question", "3 proposals to review". */
   why: string;
@@ -73,7 +75,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n === 1 ? 'a' : 
 export function transitionOf(e: AssignmentEvent, o: { mine: boolean; href: string }): Transition | null {
   if (e.kind !== 'state' || e.state === e.previous) return null;
   const agent = e.adapter ? ADAPTER_NAME[e.adapter as AssignAdapter] : 'An agent';
-  const base = { key: `assignment:${e.id}`, event: e.seq, state: e.state, agent, item: e.item, itemTitle: e.itemTitle ?? null, toilProject: e.toilProject, href: o.href, mine: o.mine };
+  const base = { key: `assignment:${e.id}`, event: e.seq, state: e.state, agent, item: e.item, ...(e.itemName ? { itemName: e.itemName } : {}), itemTitle: e.itemTitle ?? null, toilProject: e.toilProject, href: o.href, mine: o.mine };
   return { ...base, ...notableOf(e.state, e) };
 }
 
@@ -91,10 +93,29 @@ function notableOf(state: AssignState, e: Pick<AssignmentEvent, 'stop' | 'pendin
     if (e.stop === 'interrupted') return { notable: 'failed', why: 'Toil UI stopped while it ran' };
     // The run's own reason, on one line: what failed, as the assignment page says it.
     const said = e.message.split('\n')[0]!.trim();
-    return { notable: 'failed', why: said ? (said.length > 160 ? `${said.slice(0, 157)}...` : said) : 'failed' };
+    return { notable: 'failed', why: said ? clip(said, 160) : 'failed' };
   }
   return { notable: null, why: state };
 }
+
+/**
+ * A line cut to at most `max` characters for a notice: at the last sentence end that leaves most of it, else at the last
+ * word, with an ellipsis, so a notice never ends mid-word ("purcha..."). The whole message stays on the assignment's page.
+ */
+export function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const room = text.slice(0, max - 1);
+  const sentence = Math.max(room.lastIndexOf('. '), room.lastIndexOf('! '), room.lastIndexOf('? '));
+  if (sentence >= max / 2) return text.slice(0, sentence + 1);
+  const word = room.lastIndexOf(' ');
+  return `${(word > 0 ? room.slice(0, word) : room).replace(/[\s,;:(]+$/, '')}…`;
+}
+
+/**
+ * Whether an assignment event means it no longer waits on a person: a notice or bell entry that said it needs you is
+ * then settled, since what it asked for is done (#657, round 4: an applied proposal kept counting).
+ */
+export const settles = (e: Pick<AssignmentEvent, 'state'>) => e.state !== 'needs-you';
 
 /** A time of day as quiet hours take it: H:MM or HH:MM, 00:00 to 23:59. */
 export const HHMM = /^([01]?\d|2[0-3]):([0-5]\d)$/;
@@ -169,7 +190,7 @@ const VERB: Record<Notable, [string, string]> = {
 };
 
 /** One line for one change: "Codex needs you on PAY-102 Store tokens in the vault: asked a question". */
-export const lineOf = (t: Transition) => `${t.agent} ${VERB[t.notable!][0]}${t.item ? ` on ${t.item}${t.itemTitle ? ` ${t.itemTitle}` : ''}` : ` in ${t.toilProject}`}: ${t.why}`;
+export const lineOf = (t: Transition) => `${t.agent} ${VERB[t.notable!][0]}${t.item ? ` on ${t.itemName ?? t.item}${t.itemTitle ? ` ${t.itemTitle}` : ''}` : ` in ${t.toilProject}`}: ${t.why}`;
 
 /** The notice for what one window gathered: its title, and one line per change. */
 export function summaryOf(changes: readonly Transition[]): { title: string; lines: string[] } {

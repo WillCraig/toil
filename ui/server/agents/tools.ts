@@ -31,7 +31,7 @@ import type { DraftDiagram } from '../../src/agent.ts';
 import type { AuthorKind, Change, Envelope, Execute, WorkItem } from '../../src/toil.ts';
 import { flagsOf, KINDS, linked, PR_FLAG_LABEL, prMetrics, sizeOf, waitOf, workingDays, type Sample, type WaitingOn } from '../../src/model/prs.ts';
 import { people, readPeople, type Card } from '../../src/model/people.ts';
-import { CHECK_LABEL, readiness, readReadiness, tally, VERDICTS, type Readiness } from '../../src/model/readiness.ts';
+import { CHECK_LABEL, readiness, readReadiness, tally, VERDICTS, type Readiness, type RulesReading } from '../../src/model/readiness.ts';
 import { SimilarityIndex } from '../../../src/core/owi/similar.ts';
 import { applyFilters, DIMENSION_MENU, isDay as isPivotDay, MAX_TOP, MEASURES, parseDimension, parseWhere, pivot, type Filter, type PivotResult, type PivotSpec } from '../../../src/core/insights/index.ts';
 import { insightsBase, valuesContext, type Classification, type PersonLike } from '../../src/insights-input.ts';
@@ -52,6 +52,8 @@ export interface AgentData {
   worklog?(day: string): Promise<WorklogPage>;
   /** The stand-up report for a range of UTC days (#345), as the Worklog view's Stand-up builds it; absent where there is no worklog. */
   standup?(from: string, to: string): Promise<StandupReport>;
+  /** The ticket rules as toil checked them (#657), the reading the page's rule rows come from; absent, a toil project that names rules shows them as not read yet. */
+  rules?(): Promise<RulesReading>;
 }
 
 /**
@@ -547,17 +549,18 @@ const verdictBrief = (item: WorkItem, r: Readiness) => ({
 export function readinessTools(toilProject: string, data: AgentData, ledger: Ledger, readToilProject: ReadToilProject): ToolSpec[] {
   const note = () => ({ toilProject, syncedAt: data.syncedAt() });
   const RULE =
-    'Verdicts come from the cached records with no model call: ready means all five checks pass (acceptance criteria, description, done state, blockers, scope); thin means something a person could waive is missing; blocked means it cannot be worked on as it is. Only ready items are slated for an agent. Cite every item by its id.';
+    "Verdicts come from the cached records with no model call: ready means all five checks pass (acceptance criteria, description, done state, blockers, scope) and toil checked every ticket rule the Toil project names that applies to the item (its team's rules for writing an item) and each passed; thin means something a person could waive is missing; blocked means it cannot be worked on as it is; unread (rules not read yet) means nothing fails or is thin, but toil hasn't read a ticket rule on the item (the check hasn't run, failed, has no result for it, or skipped a rule it couldn't read), so it isn't known to be ready. Only ready items are slated for an agent: never treat an unread item as ready. Cite every item by its id.";
   const settingsNow = async () => {
     const shown = await readToilProject();
     const settings = readReadiness(shown.toilProject);
     if (shown.error) settings.notes.unshift(`${shown.error} So no source, repository or readiness setting is known, and every item fails scope.`);
+    if (data.rules && settings.standards.length > 0) settings.rules = await data.rules();
     return settings;
   };
   return [
     {
       name: 'readiness_list',
-      description: `Every work item in the Toil project "${toilProject}" with its readiness verdict for agent work (ready, thin or blocked) and, for each that isn't ready, which of the five checks (${Object.values(CHECK_LABEL).join(', ')}) didn't pass and why, from Toil UI's cache. Done items are left out unless includeDone is true. Also the count of each verdict among open items, and the Toil project's readiness settings. ${RULE}`,
+      description: `Every work item in the Toil project "${toilProject}" with its readiness verdict for agent work (ready, thin, blocked, or unread when its ticket rules weren't read) and, for each that isn't ready, which of the five checks (${Object.values(CHECK_LABEL).join(', ')}) or ticket rules didn't pass and why, from Toil UI's cache. Done items are left out unless includeDone is true. Also the count of each verdict among open items, and the Toil project's readiness settings. ${RULE}`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -585,6 +588,9 @@ export function readinessTools(toilProject: string, data: AgentData, ledger: Led
             sources: settings.sources,
             repositories: settings.repos,
             areas: Object.fromEntries(Object.entries(settings.areas).map(([a, s]) => [a, { acceptanceCriteriaField: s.acceptanceField, acceptanceCriteriaFieldFrom: s.acceptanceFrom, minWords: s.minWords, templateLines: s.templateLines.length }])),
+            ticketRules: settings.standards,
+            ticketRulesRead: settings.standards.length === 0 ? null : (settings.rules?.state ?? 'unread'),
+            ...(settings.rules?.warnings.length ? { ticketRuleWarnings: settings.rules.warnings } : {}),
           },
           notes: settings.notes,
           total: matches.length,
@@ -596,7 +602,7 @@ export function readinessTools(toilProject: string, data: AgentData, ledger: Led
     },
     {
       name: 'readiness_get',
-      description: `One work item's readiness in "${toilProject}", by its OWI id: its verdict and all five rows (each pass, thin or fail, with its reason and where the answer came from). ${RULE}`,
+      description: `One work item's readiness in "${toilProject}", by its OWI id: its verdict and all its rows, the five checks and then one per ticket rule that applies (each pass, thin, fail or skipped, with its reason and where the answer came from). ${RULE}`,
       inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'The OWI id.' } }, required: ['id'], additionalProperties: false },
       async run(input) {
         const id = str(input.id);

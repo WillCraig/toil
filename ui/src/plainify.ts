@@ -13,10 +13,12 @@ const keepCase = (from: string, to: string) => (from[0] === from[0]!.toUpperCase
  * calls it that too (#555). A `toil …` command is left alone, since a command is
  * typed exactly, and so is an agent inside an id, a package or a file name
  * (`@anthropic-ai/claude-agent-sdk`, `ui/server/agents/install.ts`,
- * `AGENTS.md`, `user-agent`).
+ * `AGENTS.md`, `user-agent`). An agent already called an AI agent is left as it
+ * is, so the swap can run over copy that says "AI agent" already, or run twice,
+ * and never print "AI AI agent".
  */
 export function plainify(text: string): string {
   return text
     .replace(/\b(pull request)(s?)\b/gi, (_m, w: string, s: string) => keepCase(w, 'code review') + s)
-    .replace(/(?<![\w:/@.-])(agent)(s?)\b(?![\w:/-]|\.\w)/gi, (_m, w: string, s: string) => keepCase(w, 'AI agent') + s);
+    .replace(/(?<![\w:/@.-])(?<!\bAI\s)(agent)(s?)\b(?![\w:/-]|\.\w)/gi, (_m, w: string, s: string) => keepCase(w, 'AI agent') + s);
 }

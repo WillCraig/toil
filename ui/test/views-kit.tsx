@@ -21,13 +21,15 @@ import { fixtureWorklog } from '../src/fixtures/worklog.ts';
 import type { WorklogApi } from '../src/worklog.ts';
 import type { AnalysesApi } from '../src/analyses.ts';
 import { fixtureAnalyses } from '../src/fixtures/analyses.ts';
+import type { RulesApi } from '../src/rules.ts';
+import type { AssignmentsApi } from '../src/assign/model.ts';
 
 export const item = (toilProject: string, id: string) => `#/project/${toilProject}/item/${encodeURIComponent(id)}`;
 export const ROUTES = ['#/', '#/project/sample-team', '#/project/sample-team/board', '#/project/sample-team/dependencies', '#/project/sample-team/prs', '#/project/sample-team/people', '#/project/sample-team/command-center', '#/project/sample-team/board/classify', '#/project/sample-team/job/classify', '#/project/card-payments', '#/project/card-payments/board', '#/project/card-payments/dependencies', '#/project/card-payments/summary/briefings', '#/project/card-payments/summary/briefings/sample-analysis-2', '#/project/settlement', '#/project/checkout-web', '#/project/checkout-web/prs', '#/project/card-payments/prs', '#/project/checkout-web/people', '#/project/card-payments/people', '#/project/settlement/people', '#/project/card-payments/board/person%3AJ.%20Smith', '#/project/card-payments/worklog', '#/project/checkout-web/worklog/2026-10-12', item('card-payments', 'corp-jira:PAY-101'), '#/project/card-payments/command-center', '#/project/settlement/command-center', '#/settings', '#/settings/projects', '#/settings/general', '#/settings/usage', '#/settings/agent'];
 
-export async function open(hash: string, { preview = true, execute = fixtureExecute().execute, agent = scriptedAgent(), config = fixtureConfig(), agentSettings, worklog = fixtureWorklog(), analyses = fixtureAnalyses() }: { preview?: boolean; execute?: Execute; agent?: Agent; config?: ConfigApi; agentSettings?: AgentSettingsPanelProps; worklog?: WorklogApi | null; analyses?: AnalysesApi | null } = {}) {
+export async function open(hash: string, { preview = true, execute = fixtureExecute().execute, agent = scriptedAgent(), config = fixtureConfig(), agentSettings, worklog = fixtureWorklog(), analyses = fixtureAnalyses(), rules, assignments }: { preview?: boolean; execute?: Execute; agent?: Agent; config?: ConfigApi; agentSettings?: AgentSettingsPanelProps; worklog?: WorklogApi | null; analyses?: AnalysesApi | null; rules?: RulesApi; assignments?: AssignmentsApi } = {}) {
   window.location.hash = hash;
-  const view = render(<App execute={execute} agent={agent} config={config} now={FIXTURE_NOW} preview={preview} {...(agentSettings ? { agentSettings } : {})} {...(worklog ? { worklog } : {})} {...(analyses ? { analyses } : {})} />);
+  const view = render(<App execute={execute} agent={agent} config={config} now={FIXTURE_NOW} preview={preview} {...(agentSettings ? { agentSettings } : {})} {...(worklog ? { worklog } : {})} {...(analyses ? { analyses } : {})} {...(rules ? { rules } : {})} {...(assignments ? { assignments } : {})} />);
   await waitFor(() => expect(document.querySelector('h1, [data-tab-panel]')).toBeTruthy(), { timeout: 3000 });
   return view;
 }

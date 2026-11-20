@@ -30,7 +30,7 @@ export function classifySchemeCommands(): AnyCommand[] {
     path: ['classify', 'scheme', 'list'],
     description: 'List every classification scheme toil can see, and where each lives',
     toolDescription:
-      "Lists the classification schemes toil can read, each name once from the highest place it is found: your own (~/.toil/classify), the repository the folder is in (.toil/classify), and the two built in (ktlo-feature, the default, and balance). Each has its name, revision, source (user, repo or built-in), file, and its categories with id, short name, name and label. A file that can't be read is a warning naming its key path. Reads local files only.",
+      "Lists the classification schemes toil can read, each name once from the highest place it is found: your own (~/.toil/classify), the repository the folder is in (.toil/classify), and the three built in (ktlo-feature, the default; balance; and flow, which sorts work into feature, defect, risk and debt). Each has its name, revision, source (user, repo or built-in), file, and its categories with id, short name, name and label. A file that can't be read is a warning naming its key path. Reads local files only.",
     input: z.object({ cwd: cwdField }),
     writes: false,
     writesLocal: false,

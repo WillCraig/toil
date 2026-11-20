@@ -89,7 +89,7 @@ describe('the setup wizard', () => {
 
   it('lists the common tools first, from the registry, and the rest behind More', async () => {
     const { common, more } = groupAreas(FIXTURE_AREAS);
-    expect(common.map((a) => a.name)).toEqual(['github', 'jira', 'ado', 'bitbucket']);
+    expect(common.map((a) => a.name)).toEqual(['github', 'jira', 'ado', 'bitbucket', 'confluence']);
     expect(more.map((a) => a.name)).toEqual(['jenkins', 'openshift']);
     await open(emptyMachine().config);
     await press('Start');

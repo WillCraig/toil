@@ -110,4 +110,20 @@ SELECT m.name AS merchant, count(*) AS short_refunds, sum(r.requested_minor - r.
 FROM refunds r JOIN payments p ON p.id = r.payment_id JOIN merchants m ON m.id = p.merchant_id
 WHERE r.refunded_minor < r.requested_minor GROUP BY m.name;
 
+-- Dollars for the screen: cents divided by 100 come back as numeric with sixteen
+-- decimals, so these round to cents once, here, as numeric(12,2).
+CREATE VIEW merchant_totals AS
+SELECT m.name AS merchant, m.state, count(p.*) AS payments,
+       round(coalesce(sum(p.amount_minor) FILTER (WHERE p.status = 'captured'), 0) / 100.0, 2)::numeric(12, 2) AS captured_usd,
+       round(coalesce((SELECT sum(r.refunded_minor) FROM refunds r JOIN payments q ON q.id = r.payment_id WHERE q.merchant_id = m.id), 0) / 100.0, 2)::numeric(12, 2) AS refunded_usd
+FROM merchants m LEFT JOIN payments p ON p.merchant_id = m.id
+GROUP BY m.id, m.name, m.state;
+
+-- The past week stays in, paid or not: it holds the paid half of Lumen Games' split.
+CREATE VIEW upcoming_payouts AS
+SELECT m.name AS merchant, o.scheduled_for, o.period_start, o.period_end,
+       round(o.amount_minor / 100.0, 2)::numeric(12, 2) AS amount_usd, o.status
+FROM payouts o JOIN merchants m ON m.id = o.merchant_id
+WHERE o.scheduled_for >= current_date - 7;
+
 COMMENT ON SCHEMA payments IS 'Made-up demo data for Toil UI recordings: Overdraft Federal, its merchants and this data do not exist.';

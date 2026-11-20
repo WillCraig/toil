@@ -238,7 +238,8 @@ export function codexRuntime(o: CodexOptions = {}): Runtime {
           } else if (e.type === 'turn.failed') {
             throw new Error(`Codex stopped without an answer: ${(e.error as { message?: string } | undefined)?.message ?? 'no message'}.`);
           } else if (e.type === 'error') {
-            throw new Error(`Codex failed: ${String(e.message ?? 'no message')}.`);
+            // The host says "Codex failed:" once, in front of the CLI's own words (failure.ts).
+            throw new Error(String(e.message ?? 'no message'));
           }
         }
         return last;

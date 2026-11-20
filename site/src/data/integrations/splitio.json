@@ -3,7 +3,7 @@
   "name": "Split.IO",
   "group": "testing",
   "order": 2,
-  "covers": "Feature flags, environments, change requests",
+  "covers": "Feature flags, segments, flag sets, environments, change requests",
   "credential": "Admin API key",
   "credentialWhere": "Admin settings → API keys → Create API key, type Admin",
   "status": "unit",
@@ -11,7 +11,7 @@
   "supported": {
     "product": "Split.IO Admin API",
     "minimum": null,
-    "api": "Admin API v2",
-    "note": "toil calls the Admin API under /internal/api/v2 with an Admin API key sent as a Bearer header. It has not been run against a live Split account yet."
+    "api": "Admin API v2 (flag sets v3)",
+    "note": "toil calls the Admin API under /internal/api/v2 (flag sets under /internal/api/v3) with an Admin API key sent as a Bearer header. It has not been run against a live Split account yet."
   }
 }

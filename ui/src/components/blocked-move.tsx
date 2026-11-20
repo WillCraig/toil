@@ -19,6 +19,9 @@ import type { NextLink, NextStep } from '../board-api.ts';
 import { connectionEditHref, toilProjectEditHref } from '../format.ts';
 import { commandLine } from '../proposal.ts';
 import { useShell } from './proposal.tsx';
+import { SummaryChevron } from './disclosure.tsx';
+import { ExternalLink } from './external-link.tsx';
+import { NavButton } from './nav-button.tsx';
 
 /** Where a next step's link goes: the app's own screens by kind, GitHub by the address toil read. */
 function hrefOf(link: NextLink, toilProject: string): { href: string; external: boolean } {
@@ -42,17 +45,21 @@ export function BlockedMove({ toilProject, title, reason, next, onDismiss }: { t
           {next.link && link && (
             <>
               {' '}
-              <a href={link.href} {...(link.external ? { target: '_blank', rel: 'noreferrer' } : {})} data-blocked-link={next.link.kind}>
-                {next.link.label}
-                {link.external && <span className="sr-only"> (opens in a new tab)</span>}
-              </a>
-              .
+              {link.external ? (
+                <ExternalLink href={link.href} data-blocked-link={next.link.kind}>
+                  {next.link.label}
+                </ExternalLink>
+              ) : (
+                <NavButton href={link.href} size="sm" data-blocked-link={next.link.kind}>
+                  {next.link.label}
+                </NavButton>
+              )}
             </>
           )}
         </p>
         {(line || next.template) && (
           <details className="proposal-command" data-blocked-command="">
-            <summary>Show the command</summary>
+            <summary><SummaryChevron />Show the command</summary>
             {line?.line ? (
               <pre className="command">
                 <code>{line.line}</code>

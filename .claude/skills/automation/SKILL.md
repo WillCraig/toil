@@ -24,6 +24,13 @@ ever turns auto-merge on, and the fix agent never does either. Auto-merge relies
     read-only. Formal APPROVE needs no extra repo setting, because that setting
     only gates `GITHUB_TOKEN`. The App can't approve its own PRs, so those are
     skipped.
+  - **Only release-please's token asks for `workflows`.** The App's installation
+    holds Workflows: write since 2026-11-17 (the maintainer's call), because
+    tagging a release PR's merge commit after `main` has changed a workflow needs
+    it (#619). That token goes to the release-please step alone; the job's
+    checkout, build and push mint a second one without it. Every bot token names
+    its permissions, since one with none inherits the installation's, and
+    `test/release-workflow.test.ts` fails on either.
   - It reviews against CLAUDE.md and the skills and can run the gate (`npm test`, `typecheck`,
     `lint`, `build`, `check:pure`), so findings are backed by inputs it ran.
   - **A merge of `main` alone is re-approved without the agent.** On `synchronize`,
@@ -84,10 +91,42 @@ but only after redaction, within the daily cap, under the safeguards below, and 
 through PRs that a human merges. `.github/workflows/triage.yml` is that agent. It
 starts on the `from-website` or `from-terminal` label (set by the feedback backend,
 `functions/feedback/`, as the Imagile Bot), on `claude-triage` added by a
-maintainer, on `workflow_dispatch` with an issue number, and on a daily schedule
-for the queue. Only `imagile-bot` is accepted as a bot actor, in the job's `if` and
+maintainer, on `workflow_dispatch` with an issue number, on a comment from the
+maintainer (below), and on a daily schedule for the queue. Only `imagile-bot` is accepted as a bot actor, in the job's `if` and
 in `allowed_bots`, and its `claude-triage` counts only on an issue it filed from
 outside, so nothing can pull in an issue nobody chose.
+
+**The maintainer steers by commenting** (the maintainer's call, 2026-11-19, #671). A
+comment from `kolatts`, and from nobody else (the job's `if` and `MAINTAINER` in
+`scripts/triage/steps.mjs` name the login, and `test/workflow-wiring.test.ts` holds
+them equal), on an open issue triage takes or on a `from-triage` PR, re-runs triage
+for that issue outside the cap, like a dispatch. A comment carrying an agent's mark
+(`ship`'s round marker or reply footer, a Claude Code PR footer) is an agent posting
+under that login, and starts nothing. A comment on a PR maps back to its issue only
+when its head is `claude/issue-<n>` in this repository. The re-run force-pushes that
+branch from `main`, so once its PR is marked ready or labelled `no-auto-fix` or
+`needs-human`, a comment on the PR or on the issue starts nothing. The maintainer's
+comments that pass the job's label test share one concurrency group, since a PR
+comment can't name its issue in the expression; every other comment gets a group of
+its own, so it can't displace a re-run that is waiting. `prepare` splits the conversation on the issue
+and its open PR: the maintainer's own comments, redacted, are the `direction` output,
+which the prompt puts outside the untrusted fence, where they settle a design choice
+and answer triage's question but never override a principle or widen what triage may
+touch; the project bot's comments (triage's earlier runs, the PR review) are agent
+output that read untrusted text, so they go inside the fence as context. A line in any
+body that could pass for an author header is indented. Nobody else's comment starts a
+run or reaches the agent. A re-triage that reaches any decision but `maintainer`
+takes `needs-maintainer` off, and `open-pr` force-pushes the branch and updates the
+same PR.
+
+**Being unsure is a reason to fix, not to wait** (same call). An unconfirmed API
+detail or an open design choice is a `fix`: the agent builds on the best API knowledge
+it can confirm, picks the option that relies on nothing unconfirmed, opens the draft,
+says in it what's assumed and what live check would settle it, and asks the one
+question that would change direction. The maintainer answers on the issue or the PR.
+It never changes behavior the command contract records (a suspected bug there stays
+`maintainer`, with the write-up in the comment), labels a canned response written from
+the docs as such, and leaves the area's verification level alone.
 
 **The boundary is the job, not the prompt.** Code the agent writes must never run
 in this workflow at all, and the credential that writes must never sit where the
@@ -146,8 +185,8 @@ new workflow with handed-on outputs joins the wiring test. The one script after 
 agent, `scripts/triage/handover.sh`, is shell only and runs from a copy whose hash
 `prepare` took before the agent started.
 
-The actor the agent action sees is always a person (a maintainer's label or
-dispatch, or the schedule) or the Imagile Bot, the one name in `allowed_bots`. The
+The actor the agent action sees is always a person (a maintainer's label,
+dispatch or comment, or the schedule) or the Imagile Bot, the one name in `allowed_bots`. The
 daily run triages the queue itself as a matrix rather than dispatching runs: a run
 started by `GITHUB_TOKEN` has `github-actions[bot]` as its actor, which the action
 refuses.
@@ -156,8 +195,8 @@ refuses.
   `scripts/triage/cap.mjs`: a run claims its issue with `triage-claimed` and ranks
   today's claims by label-event id, so concurrent runs agree without a lock. The
   fifth gets `triage-queued`; the daily run drains the queue oldest first, along with
-  anything a run missed, triaging them in the same run as a matrix. A manual dispatch
-  is a re-triage and isn't counted.
+  anything a run missed, triaging them in the same run as a matrix. A manual dispatch or a
+  maintainer's comment is a re-triage and isn't counted.
 - **Redaction first.** The issue arrives already redacted by the feedback function.
   `scripts/triage/redact.mjs` rewrites the issue's title and body in place again
   before the agent starts (a no-op unless the denylist has grown), and again on what the agent is shown; the
@@ -196,8 +235,8 @@ refuses.
     (`site/`, except the per-area data files the tests generate or check,
     `site/src/data/integrations|commands|settings/<area>.json`) and the Azure Function
     backend (`functions/`, and `infra/`, which provisions it): a person reviews those
-    first, and triage edits none of it. Also for a bug the agent cannot confirm (the comment
-    says what it needs), and for what it cannot do without running anything:
+    first, and triage edits none of it. Also for a bug the agent cannot confirm and has no
+    plausible fix for (the comment says what it needs), and for what it cannot do without running anything:
     `package.json`, a lockfile, a new dependency (no npm, so no resolve and no 14-day check).
   - **`deny`** (closed, `denied`): only what directly violates CLAUDE.md's principles
     (telemetry, a native binary, loosening the write gate or the secrets rules), with the

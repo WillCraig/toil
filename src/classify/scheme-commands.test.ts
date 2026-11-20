@@ -59,7 +59,7 @@ describe('classify scheme list and show', () => {
   it('lists each scheme once, with its source, file and categories', async () => {
     const d = disk({ 'home/.toil/classify/team.json': team(), 'work/.toil/classify/repo.json': team({ name: 'repo' }) });
     const out = data(await cli(d, ['classify', 'scheme', 'list']));
-    expect(out.schemes.map((s: any) => [s.name, s.source])).toEqual([['team', 'user'], ['repo', 'repo'], ['ktlo-feature', 'built-in'], ['balance', 'built-in']]);
+    expect(out.schemes.map((s: any) => [s.name, s.source])).toEqual([['team', 'user'], ['repo', 'repo'], ['ktlo-feature', 'built-in'], ['balance', 'built-in'], ['flow', 'built-in']]);
     expect(out.schemes[0]).toEqual({ name: 'team', revision: 3, source: 'user', file: forwardSlashes(join(d.home, '.toil', 'classify', 'team.json')), categories: [{ id: 'ktlo', short: 'KTLO', name: 'KTLO', label: 'ktlo' }, { id: 'feature', short: 'FEATURE', name: 'FEATURE', label: 'feature' }] });
     expect(out.schemes[2]).not.toHaveProperty('file');
   });
@@ -67,7 +67,7 @@ describe('classify scheme list and show', () => {
   it('reports a broken file as a warning, not a failure', async () => {
     const d = disk({ 'home/.toil/classify/broken.json': { name: 'broken' } });
     const e = await cli(d, ['classify', 'scheme', 'list']);
-    expect(data(e).schemes).toHaveLength(2);
+    expect(data(e).schemes).toHaveLength(3);
     expect(e.meta.warnings?.[0]).toMatchObject({ code: 'SCHEME_INVALID' });
     expect(e.meta.warnings?.[0]?.message).toContain('categories:');
   });
@@ -85,7 +85,7 @@ describe('classify scheme list and show', () => {
     const d = disk();
     const s = await mcp(d);
     const listed = await s.call('classify_scheme_list', {});
-    expect(data(listed.envelope).schemes.map((x: any) => x.name)).toEqual(['ktlo-feature', 'balance']);
+    expect(data(listed.envelope).schemes.map((x: any) => x.name)).toEqual(['ktlo-feature', 'balance', 'flow']);
     expect(data((await s.call('classify_scheme_show', { name: 'balance' })).envelope).source).toBe('built-in');
   });
 });

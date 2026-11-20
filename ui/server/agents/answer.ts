@@ -53,6 +53,12 @@ export interface Finish {
   fold?: boolean;
   /** The Diagram job's (#582): the answer carries the draft diagram from the ledger's last passing check, or says there is none. */
   drafts?: boolean;
+  /**
+   * Ids the run handed the agent itself, fenced as data in its prompt: an assignment's own item, which is also
+   * the item a ticket rule was checked on (#657). The agent knows them without a tool call, so naming them is
+   * no invention. Every other id still has to come back from a tool.
+   */
+  known?: readonly string[];
 }
 
 /** What the Diagram job's answer says when the agent never passed a check: plain, and with no Save to offer. */
@@ -187,7 +193,8 @@ export function finish(raw: string, f: Finish): Answer {
     else proposals.push(p);
   }
 
-  const ledgerIds = f.ledger.ids;
+  // The ledger's ids, plus what the prompt itself handed over: the citation check and the "rests on none" notice read the same set.
+  const ledgerIds: ReadonlySet<string> = f.known?.length ? new Set([...f.ledger.ids, ...f.known]) : f.ledger.ids;
   const connections = new Set([...ledgerIds].map((id) => id.slice(0, id.indexOf(':'))));
   const keyOf = new Set([...ledgerIds].map((id) => id.slice(id.indexOf(':') + 1)));
   const unverified = new Set<string>();

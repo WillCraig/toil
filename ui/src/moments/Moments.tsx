@@ -201,7 +201,8 @@ export function Loader({ message, detail = null, size = 'view', live = true, imm
     <div className={`loader loader--${size} loader--themed`} data-moments="" data-level={level} data-loader={theme.name} data-loading="">
       <div className="loader__stage" aria-hidden="true">
         <Art theme={theme} art={m.loader.art} className="loader__art" loop={m.loader.loop} />
-        <Track theme={theme} m={m} />
+        {/* A one-piece track is the art again, small: under the art it would only repeat it. */}
+        {(m.loader.track?.count ?? 0) > 1 && <Track theme={theme} m={m} />}
       </div>
       <p className="loader__progress" {...(live ? { role: 'status' } : {})}>
         {text}

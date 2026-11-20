@@ -22,9 +22,10 @@ import { PRESETS } from './presets.ts';
 import './ambient.css';
 
 export function Ambient({ theme, scheme }: { theme: string; scheme: 'light' | 'dark' }) {
-  const particlesOn = useParticlesAllowed(theme);
+  const ambient = THEMES.find((t) => t.name === theme)?.ambient;
+  const particlesOn = useParticlesAllowed(theme, ambient?.default !== 'off');
   const canvas = useRef<HTMLCanvasElement>(null);
-  const named = THEMES.find((t) => t.name === theme)?.ambient?.particles;
+  const named = ambient?.particles;
   const preset = particlesOn && named ? PRESETS[named] : undefined;
 
   useEffect(() => {

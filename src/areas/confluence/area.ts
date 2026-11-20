@@ -64,7 +64,17 @@ export const confluenceArea = defineArea({
   // deployment: a Data Center token is never lent to the Atlassian cloud, nor a
   // Cloud one to a server. Any connection can name a Jira connection to borrow
   // from with apiTokenFrom, which is the user's call. The email is never borrowed.
-  shares: { area: jiraArea, keys: ['apiToken'], fallbackWhen: (jira, own) => String(jira.deployment ?? 'server') === String(own.deployment ?? 'server') },
+  // `connections add` and `login` offer that pairing only where it can work: an
+  // Atlassian API token belongs to the account, so it signs in to Jira Cloud and
+  // Confluence Cloud on the same site with the same email (Basic auth, below). A
+  // Data Center personal access token belongs to one server, so Jira's is never
+  // offered to a Confluence server, which issues its own.
+  shares: {
+    area: jiraArea,
+    keys: ['apiToken'],
+    fallbackWhen: (jira, own) => String(jira.deployment ?? 'server') === String(own.deployment ?? 'server'),
+    offer: { when: { deployment: 'cloud' }, sameHost: true, match: ['email'] },
+  },
   examples: { email: 'you@example.com' },
   // The current user; Confluence answers an anonymous caller with a 200 and type "anonymous".
   probe: (connection) => ({
@@ -104,5 +114,5 @@ export const confluenceSupported: SupportedVersion = {
   product: 'Confluence Data Center',
   minimum: '7.9',
   api: 'Server REST API',
-  note: 'toil authenticates to Data Center with a personal access token, which Confluence Data Center added in 7.9. No release has been verified yet. Confluence Cloud (a connection with deployment cloud) is always current: toil calls REST API v2 (/wiki/api/v2) and, where v2 has no endpoint, v1 (/wiki/rest/api: CQL search, adding and removing labels, attachment uploads), with an Atlassian account email and API token sent as Basic auth. Nothing has been run against a live Cloud site yet.',
+  note: 'toil authenticates to Data Center with a personal access token, which Confluence Data Center added in 7.9. No release has been verified yet. Confluence Cloud (a connection with deployment cloud) is always current: toil calls REST API v2 (/wiki/api/v2) and, where v2 has no endpoint, v1 (/wiki/rest/api: CQL search, adding and removing labels, attachment uploads), with an Atlassian account email and API token sent as Basic auth. Run live against a Confluence Cloud site on 16 November 2026: space create and get, page create, update, find and list, page labels, label and unlabel, and connections test. Data Center has not been run.',
 };

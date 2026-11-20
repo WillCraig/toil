@@ -6,12 +6,19 @@
 .people-section > h2 { margin-bottom: 0.5rem; }
 .people-section > .note { margin-bottom: 0.75rem; max-width: 70ch; }
 
-.team-strip { margin-top: 0.5rem; }
-.team-tile { padding: 0.75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); min-width: 0; height: 100%; box-sizing: border-box; }
+.team-strip { margin-top: 0.5rem; align-items: start; }
+.team-tile { padding: 0.75rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); min-width: 0; box-sizing: border-box; }
 .team-tile h3 { font-size: 1rem; margin: 0; }
 .team-figure { font-family: var(--font-display); font-size: 2rem; font-weight: 700; line-height: 1; color: var(--ink); }
 
 .person-card { background: var(--raised); overflow-wrap: anywhere; }
+/* Each card is its summary line until opened, so cards in a row keep their own heights. */
+.people-cards { align-items: start; }
+.person-more > summary { min-height: 44px; border-radius: var(--radius); padding-inline: 0.25rem; }
+.person-plate { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.9375rem; }
+.person-plate b { font-variant-numeric: tabular-nums; }
+.person-more .disclosure-body { margin-top: 0.5rem; }
+.team-more > summary { min-height: 44px; font-size: 0.875rem; border-radius: var(--radius); }
 .person-card h4 { font-size: 0.9375rem; margin: 0.25rem 0 0; }
 .person-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
 .person-head h3 { margin: 0; font-size: 1.125rem; }
@@ -26,11 +33,11 @@
 .any-break { overflow-wrap: anywhere; }
 
 /* The dashboard's board, filtered to one person from here. */
-.board-filter { margin-bottom: 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); background: var(--surface); }
+.board-filter { margin-bottom: 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--edge-accent); border-radius: var(--radius); background: var(--tint-accent); }
 
 /* Mapping an account to a person (#561): the form opens in place under the card, and its explanations stay behind a disclosure. */
 .map-identity { display: grid; gap: 0.5rem; }
-.map-form { padding: 0.75rem; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); background: var(--surface); min-width: 0; }
+.map-form { padding: 0.75rem; border: 1px solid var(--edge-accent); border-radius: var(--radius); background: var(--tint-accent); min-width: 0; }
 .map-ids { display: grid; gap: 0.5rem; border: 0; padding: 0; margin: 0; min-width: 0; }
 .map-ids legend { font-weight: 600; padding: 0; margin-bottom: 0.25rem; }
 .save-to-repo details { max-width: 60ch; }

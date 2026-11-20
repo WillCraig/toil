@@ -223,9 +223,10 @@
     var(--raised);
 }
 
-/* A claim that's wanted wears a rust edge, like the border of a wanted poster. */
+/* A claim that's wanted wears a rust frame, like the border of a wanted poster. */
 [data-theme="frontier"] .card--attention {
-  border-left: 4px solid var(--danger);
+  border-color: var(--edge-danger);
+  background: var(--tint-danger);
 }
 
 /* Each tally and metric carries a small pressure gauge in its corner. */
@@ -244,16 +245,7 @@
 
 [data-theme="frontier"] .column {
   border: 1px solid var(--frontier-edge);
-  border-top: 4px solid var(--frontier-edge);
   border-radius: 2px;
-}
-
-[data-theme="frontier"] .column--in_progress {
-  border-top-color: var(--accent);
-}
-
-[data-theme="frontier"] .column--done {
-  border-top-color: var(--ok);
 }
 
 [data-theme="frontier"] button,
@@ -278,7 +270,6 @@
 
 /* Copper buttons, lit from above. The ink on them keeps 7:1. */
 [data-theme="frontier"] .btn--accent,
-[data-theme="frontier"] .top nav a[aria-current="page"],
 [data-theme="frontier"] button[aria-pressed="true"] {
   background: linear-gradient(180deg, var(--frontier-copper-top), var(--accent) 55%, var(--frontier-copper-bottom));
 }
@@ -366,8 +357,7 @@
 
 /* The operator at the telegraph key. */
 [data-theme="frontier"] .frontier-operator {
-  border: 1px solid var(--frontier-edge);
-  border-left: 4px solid #b08d3c;
+  border: 1px solid #b08d3c;
   border-radius: 2px;
   background: var(--raised);
 }

@@ -6,8 +6,9 @@
  * it, each one line, the first open; each item a row that opens its drawer;
  * what is on track counted, not listed; and, one step in, anything the
  * toil project's focus left out or the code flagged that Analyze didn't mention.
- * The numbers wait behind a fold, and every other view is a quiet link away
- * as well as a tab. Analyze writes it when its latest answer is current;
+ * The numbers wait behind a fold. Every card is a drill-in (#657), and the
+ * board is one "Open the board" button away: the tracker shows the board
+ * already, so it is never this page's focus. Analyze writes it when its latest answer is current;
  * otherwise code does, and the page says which (principle 4). Get a briefing is
  * here, beside the briefing it replaces, and the new one lands in this place
  * (#567); earlier ones are a step in, at `…/summary/briefings`. Between the
@@ -25,15 +26,20 @@ import { useChatScope } from '../components/ask.tsx';
 import { ANALYZE } from '../agent.ts';
 import { SummaryCharts } from './summary-charts.tsx';
 import { useBriefingPrefs } from '../briefing-prefs.ts';
-import { AnswerHero, NeedsAttention } from '../components/summary.tsx';
+import { AnswerHero, ExtraCard, NeedsAttention } from '../components/summary.tsx';
+import { NavButton } from '../components/nav-button.tsx';
+import { FixRuleButton } from '../assign/views.tsx';
+import { firstToFix, fixable, lineWhat, ruleLines } from '../rules.ts';
+import { blockedBesidesRules } from '../model/readiness.ts';
 import { answerOf, cardsOf, contextOf } from '../model/summary.ts';
 import { parseRoute } from '../App.tsx';
 import { Help } from '../components/help.tsx';
 import { Cited, PrLink } from '../components/items.tsx';
 import { useData, useDerived } from '../data.ts';
-import { analysesHref, analysisHref, boardHref, dependenciesHref, diagramHref, itemHref, peekHref, peopleHref, personText, prsHref, shortKey, sourceLabel, standupHref, toilProjectEditHref, worklogHref } from '../format.ts';
+import { analysesHref, analysisHref, boardHref, commandCenterHref, itemHref, peekHref, personText, prsHref, shortKey, sourceLabel, toilProjectEditHref } from '../format.ts';
 import { Empty, TrackerAction } from '../components/empty.tsx';
 import { burnup } from '../model/burnup.ts';
+import { sprintPoints } from '../model/sprint.ts';
 import { aging, cycleTimes, throughput } from '../model/flow.ts';
 import { WAITING_LABEL, daysText, openQueue } from '../model/prs.ts';
 import type { BriefingReason } from '../model/briefing.ts';
@@ -42,6 +48,9 @@ import { usePlain } from '../plain-words.ts';
 import { StandupCard } from '../components/standup-card.tsx';
 import { Aging, CycleTime, SprintDetail, Throughput } from './Flow.tsx';
 import { Splittable } from './split-modal.tsx';
+import { homeShort } from '../home-path.ts';
+import { AgentMark } from '../components/agent-mark.tsx';
+import { SummaryChevron } from '../components/disclosure.tsx';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -64,27 +73,32 @@ export function Overview() {
   // The red reasons no card above already tells: the biggest risk is the first reason, and the other two cards are the blocked and waiting lenses.
   const covered = new Set<string>([cards.some((c) => c.id === 'risk') ? (view.reasons[0]?.lens ?? '') : '', cards.some((c) => c.id === 'blocked') ? 'blocked' : '', cards.some((c) => c.id === 'review') ? 'waiting' : '']);
   const alerts = view.reasons.filter((r) => r.severity === 'danger' && !covered.has(r.lens));
+  // A load check with no limit to check against becomes its own action in the row under the cards; the rest stay together.
+  const noLimit = view.unchecked.find((u) => u.lens === 'load') ?? null;
+  const unchecked = view.unchecked.filter((u) => u !== noLimit);
   const here = typeof window === 'undefined' ? '#/' : window.location.hash;
   // Whose settings tuned this briefing, whenever a toil project tunes it (#494): its file, and whether it's the reader's own.
   const tuned = toilProject.analyze && Object.keys(toilProject.analyze).length ? toilProject.origin : null;
   return (
     <section className="briefing" aria-label="Briefing" data-rec-source={view.by === 'analyze' ? 'analysis' : 'code'}>
-      <AnswerHero answer={answer} />
-      {/* The sprint and its day are on the header's chip; saying it twice is a second signature on the same form. */}
-      <p className="briefing__meta">
-        <span className="briefing__by source" data-briefing-by={view.by}>
-          {briefingSource(view, plain.on)}
-          {view.stale && `. ${view.stale}`}
+      {/* Worked out by the app's own rules: a badge on the headline says so. Written by an AI agent: who and when stays a line, since that is news (principle 4). */}
+      <AnswerHero answer={answer} {...(view.by === 'analyze' ? {} : { badge: { text: 'Rules, no AI', title: briefingSource(view, plain.on) } })} />
+      {(view.by === 'analyze' || view.stale) && (
+        <p className="briefing__meta">
+          <span className="briefing__by source" data-briefing-by={view.by}>
+            {view.by === 'analyze' ? briefingSource(view, plain.on) : ''}
+            {view.stale && `${view.by === 'analyze' ? '. ' : ''}${view.stale}`}
+          </span>
           {view.analysis && (
             <>
-              {' · '}
-              <a href={analysisHref(toilProject.name, view.analysis.id)} data-rec-analysis="" title={plain.title('Open the analysis')}>
+              {' '}
+              <NavButton href={analysisHref(toilProject.name, view.analysis.id)} kind="secondary" size="sm" data-rec-analysis="" title={plain.title('Open the analysis')}>
                 {plain.pw('Open the analysis', 'Open that briefing')}
-              </a>
+              </NavButton>
             </>
           )}
-        </span>
-      </p>
+        </p>
+      )}
       <BriefingActions view={view} onWritten={() => setFullOpen(true)} />
       {/* A briefing that didn't parse, or named items this toil project lacks, is said up here: a layout fold never hides it. */}
       {view.problems.map((p) => (
@@ -97,9 +111,27 @@ export function Overview() {
           {plain.pw('Analyze', 'The briefing')} named {view.unknown.length === 1 ? 'an item' : `${view.unknown.length} items`} that {view.unknown.length === 1 ? "isn't" : "aren't"} {"this Toil project's"}: <code>{view.unknown.join(', ')}</code>. Treat {view.unknown.length === 1 ? 'it' : 'them'} as unverified.
         </p>
       )}
-      <NeedsAttention cards={cards} />
+      <NeedsAttention cards={cards} extra={<TicketRulesCard />} />
+      {/* One row of quiet steps under the cards (#657): a load check that couldn't run for want of a limit is its own action, said as
+          not set (never as nobody over it, principle 12), and the board one press away beside it. */}
+      <div className="sum-drill">
+        {noLimit && (
+          <p className="sum-drill__note" data-no-limit="">
+            <span className="reason__dot" aria-hidden="true" />
+            <span>
+              <b>Load not checked.</b> {noLimit.note}
+            </span>
+            <NavButton href={toilProjectEditHref(toilProject.name, 'wip')} kind="secondary" size="sm">
+              Set a work-in-progress limit
+            </NavButton>
+          </p>
+        )}
+        <NavButton href={boardHref(toilProject.name)} kind="secondary" size="sm" data-open-board="">
+          Open the board
+        </NavButton>
+      </div>
       {/* What principle 4 keeps on screen when the fold is closed: a red reason no card covers, and what couldn't be read. */}
-      {(alerts.length > 0 || view.unchecked.length > 0 || view.partlyChecked.length > 0) && (
+      {(alerts.length > 0 || unchecked.length > 0 || view.partlyChecked.length > 0) && (
         <div className="reasons briefing__alerts" data-alerts="">
           {alerts.map((r) => (
             <p key={r.lens} className="reason reason--line" data-alert={r.lens}>
@@ -114,7 +146,7 @@ export function Overview() {
           {/* A lens that didn't run and one that ran with items it couldn't test are different news, so each has its own line. */}
           {(
             [
-              ['unchecked', "Couldn't check.", view.unchecked],
+              ['unchecked', "Couldn't check.", unchecked],
               ['partly-checked', 'Partly checked.', view.partlyChecked],
             ] as const
           ).map(
@@ -131,12 +163,6 @@ export function Overview() {
                     {list.map((u) => (
                       <p key={u.label}>
                         {u.label}: {u.note}
-                        {id === 'unchecked' && u.lens === 'load' && (
-                          <>
-                            {' '}
-                            <a href={toilProjectEditHref(toilProject.name, 'wip')}>Set one in the Toil project's settings</a>.
-                          </>
-                        )}
                       </p>
                     ))}
                   </div>
@@ -148,7 +174,7 @@ export function Overview() {
       {worklog && <StandupCard api={worklog} />}
       <SummaryCharts />
       <div className="briefing__full" data-full-briefing="">
-        <Button className="briefing__toggle" aria-expanded={fullOpen} aria-controls="full-briefing-body" onPress={() => setFullOpen((o) => !o)} data-full-toggle="">
+        <Button className="btn btn--secondary btn--sm briefing__toggle" aria-expanded={fullOpen} aria-controls="full-briefing-body" onPress={() => setFullOpen((o) => !o)} data-full-toggle="">
           {fullOpen ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />}
           {fullOpen ? 'Hide the full briefing' : 'Show the full briefing'}
         </Button>
@@ -157,7 +183,7 @@ export function Overview() {
         {tuned && (
           <p className="briefing__meta">
             <span className="source" data-focus-from="">
-              {plain.pw('Analyze settings', 'Briefing settings')} from {tuned.file}, {tuned.adopted ? 'your own Toil project' : "a Toil project you haven't adopted"}
+              {plain.pw('Analyze settings', 'Briefing settings')} from {homeShort(tuned.file)}, {tuned.adopted ? 'your own Toil project' : "a Toil project you haven't adopted"}
             </span>
           </p>
         )}
@@ -226,22 +252,55 @@ export function Overview() {
         )}
         </Links>
         <details className="briefing__numbers" open={prefs.numbersOpen}>
-          <summary>The numbers</summary>
+          <summary><SummaryChevron />The numbers</summary>
           <MetricStrip />
         </details>
         </div>
       </div>
-      <nav className="briefing__links" aria-label={`More on ${toilProject.name}`}>
-        <span className="briefing__label">Go to</span>
-        <a href={boardHref(toilProject.name)}>Board</a>
-        <a href={dependenciesHref(toilProject.name)} title={plain.title('Dependencies')}>{plain.pw('Dependencies', 'What blocks what')}</a>
-        <a href={diagramHref(toilProject.name)} data-diagram-link="">Architecture</a>
-        <a href={prsHref(toilProject.name)} title={plain.title('Pull requests')}>{plain.pw('Pull requests', 'Code reviews')}</a>
-        <a href={peopleHref(toilProject.name)}>People</a>
-        {worklog && <a href={standupHref(toilProject.name)}>Stand-up</a>}
-        <a href={worklogHref(toilProject.name)} title={plain.title('Worklog')}>{plain.pw('Worklog', 'What happened')}</a>
-      </nav>
     </section>
+  );
+}
+
+/**
+ * The Ticket rules card (#657): the rule the open items miss most, as one line, the card a button to Tickets filtered to
+ * those items, and Fix with AI agent for the first of them, a small secondary button: the card is already a button, so it never carries a second primary (#657). Absent while nothing
+ * misses a rule; a check that failed says so on the card (principle 4); a check not read yet shows nothing here, and
+ * Tickets says "not read yet".
+ */
+function TicketRulesCard() {
+  const { toilProject, rules } = useData();
+  const checked = rules?.view?.result ?? null;
+  if (rules?.reading.state === 'failed') {
+    return <ExtraCard id="rules" tone="danger" kicker="Ticket rules" title="Couldn't check the ticket rules" why={rules.reading.message ?? 'The check failed.'} href={commandCenterHref(toilProject.name)} />;
+  }
+  if (!checked) return null;
+  const open = toilProject.items.filter((i) => i.statusCategory !== 'DONE');
+  const lines = ruleLines(checked, open).filter((r) => r.miss > 0).sort((a, b) => b.miss - a.miss);
+  const top = lines[0];
+  if (!top) return null;
+  // The first open item that misses the top line's rules and could start once it meets them (one another item blocks can't,
+  // so it leads only when every one is blocked), and every rule of that standard it misses: what Fix with AI agent asks to rewrite.
+  const openIds = new Set(open.map((i) => i.id));
+  const byItem = new Map(toilProject.items.map((i) => [i.id, i]));
+  const hit = firstToFix(checked, top.standard, openIds, (id) => {
+    const it = byItem.get(id);
+    return it ? blockedBesidesRules(it, toilProject.readiness, byItem) : false;
+  });
+  const item = hit ? toilProject.items.find((i) => i.id === hit.id) : undefined;
+  const text = (rule: string) => checked.standards.find((st) => st.name === top.standard)?.rules.find((r) => r.id === rule)?.text ?? null;
+  const fix = hit && item ? hit.results.filter((r) => r.standard === top.standard && fixable(r.state)).map((r) => ({ standard: r.standard, rule: r.rule, name: r.name, text: text(r.rule), reason: r.reason })) : [];
+  const more = lines.length - 1;
+  return (
+    <ExtraCard
+      id="rules"
+      tone="warn"
+      kicker="Ticket rules"
+      title={`${top.miss} of ${top.applies} ${top.noun(top.applies)}: ${lineWhat(top)}`}
+      why={item ? `The first is ${shortKey(item)} ${item.title}.` : 'Tickets lists them.'}
+      {...(more > 0 ? { more: `and ${more} more ${more === 1 ? 'rule' : 'rules'} missed` } : {})}
+      href={`${commandCenterHref(toilProject.name)}?rule=${encodeURIComponent(top.ref)}`}
+      action={item && fix.length ? <FixRuleButton item={item} rules={fix} /> : undefined}
+    />
   );
 }
 
@@ -293,7 +352,7 @@ function BriefingActions({ view, onWritten }: { view: ReturnType<typeof useBrief
     <p className="briefing__actions" data-briefing-actions="">
       {chat && (
         <Button
-          className="btn btn--small"
+          className="btn btn--secondary btn--sm"
           isDisabled={chat.busy}
           onPress={() => {
             asked.current = { was: seen.current };
@@ -302,13 +361,14 @@ function BriefingActions({ view, onWritten }: { view: ReturnType<typeof useBrief
           }}
           data-get-briefing=""
         >
+          <AgentMark />
           {running ? 'Writing the briefing…' : label}
         </Button>
       )}
       {earlier > 0 && (
-        <a href={analysesHref(toilProject.name)} data-earlier-briefings="">
+        <NavButton href={analysesHref(toilProject.name)} kind="secondary" size="sm" data-earlier-briefings="">
           {plain.pw('Earlier analyses', 'Earlier briefings')} ({earlier})
-        </a>
+        </NavButton>
       )}
       {said && (
         <span className={said.ok ? 'note' : 'failure'} role="status" data-briefing-said="">
@@ -438,7 +498,9 @@ function MetricStrip() {
     }),
     [h, toilProject, now, byId],
   );
-  const last = b?.days.at(-1);
+  // A sprint whose items have no points read has no burn-up figure: a dash, not 0 of 0 (#652).
+  const read = h ? sprintPoints(h) !== null : false;
+  const last = read ? b?.days.at(-1) : undefined;
   const full = t.weeks.filter((w) => !w.partial);
   const mean = full.length ? full.reduce((n, w) => n + w.items.length, 0) / full.length : 0;
   const waits = queue.map((r) => r.wait.days ?? 0);
@@ -452,9 +514,9 @@ function MetricStrip() {
         <Metric
           id="burnup"
           label={pw('Burn-up', 'Points done')}
-          value={last ? `${last.done} of ${last.scope}` : 'No sprint'}
-          unit={last ? 'points' : ''}
-          spark={<Sparkline values={b?.days.map((d) => d.done) ?? []} against={b?.days.map((d) => d.scope) ?? []} />}
+          value={last ? `${last.done} of ${last.scope}` : h ? '–' : 'No sprint'}
+          unit={last ? 'points' : h ? 'no points read' : ''}
+          spark={<Sparkline values={read ? (b?.days.map((d) => d.done) ?? []) : []} against={read ? (b?.days.map((d) => d.scope) ?? []) : []} />}
           title={h ? `${h.sprint.name}: day ${h.days.gone} of ${h.days.total}` : 'Sprint'}
         >
           {h ? (
@@ -513,7 +575,10 @@ function MetricStrip() {
             <p>No pull request is open, apart from drafts.</p>
           )}
           <p>
-            <a href={prsHref(toilProject.name)}>{pw('The Pull requests tab', 'The Code reviews tab')}</a> has the whole queue, its flags and its flow.
+            The whole queue, its flags and its flow are a press away.{' '}
+            <NavButton href={prsHref(toilProject.name)} size="sm">
+              {pw('Open pull requests', 'Open code reviews')}
+            </NavButton>
           </p>
         </Metric>
       </ul>

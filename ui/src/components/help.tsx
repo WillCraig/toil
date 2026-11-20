@@ -27,6 +27,7 @@ import { usePlain } from '../plain-words.ts';
 import { ChevronDownIcon, EditIcon, InfoIcon } from './icons.tsx';
 import { NewDot } from './whats-new.tsx';
 import './help.css';
+import { ExternalLink } from './external-link.tsx';
 
 /**
  * The one (i) in Toil UI: the info icon from the icon set (icons.tsx) in a
@@ -83,9 +84,9 @@ export function Help({ topic, note }: { topic: HelpTopicId; note?: string }) {
     <InfoTip label={title} tip={text} triggerProps={{ 'data-help': topic }}>
       <p>{text}</p>
       <p>
-        <a href={helpHref(t)} target="_blank" rel="noopener noreferrer" data-read-more="">
-          Read more<span className="sr-only"> about {title} in the docs (opens in a new tab)</span>
-        </a>
+        <ExternalLink href={helpHref(t)} data-read-more="">
+          Read more<span className="sr-only"> about {title} in the docs</span>
+        </ExternalLink>
       </p>
       {t.glossary && <Glossary entries={t.glossary} />}
     </InfoTip>
@@ -107,9 +108,9 @@ export function Glossary({ entries }: { entries: readonly GlossaryEntry[] }) {
           <span>
             <strong>{g.term}</strong>: {g.text}{' '}
           </span>
-          <a href={glossaryHref(g)} target="_blank" rel="noopener noreferrer" data-learn-link="">
-            Read more on Context Overflow<span className="sr-only"> about {g.term} (opens in a new tab)</span>
-          </a>
+          <ExternalLink href={glossaryHref(g)} data-learn-link="">
+            Read more on Context Overflow<span className="sr-only"> about {g.term}</span>
+          </ExternalLink>
         </li>
       ))}
     </ul>

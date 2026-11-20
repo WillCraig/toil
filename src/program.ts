@@ -82,7 +82,7 @@ export function groupSummary(key: string, commands: readonly AnyCommand[]): stri
 export function buildProgram(options: ProgramOptions): { program: Command; result: { exitCode: number } } {
   const { io } = options;
   const result = { exitCode: 0 };
-  const quiet = (cmd: Command): Command => cmd.exitOverride().configureOutput({ writeOut: io.stdout, writeErr: io.stderr });
+  const quiet = (cmd: Command): Command => cmd.exitOverride().configureOutput({ writeOut: io.stdout, writeErr: io.stderr, outputError: (str, write) => write(scrubUsageMessage(str)) });
 
   const program = quiet(
     new Command('toil')
@@ -358,18 +358,59 @@ export function buildProgram(options: ProgramOptions): { program: Command; resul
 }
 
 /**
- * Prints the envelope, or writes it to --output-file. False when that write
- * failed; the error envelope then goes to stdout. For a write command the
- * command has already run by then, so the error says so.
+ * Prints the envelope, or writes it to --output-file. False when the envelope
+ * as produced couldn't be printed or written; a small failure envelope then
+ * goes to stdout instead. For a write command the command has already run
+ * by then, so the error says so.
  */
 function emit(envelope: Envelope, globals: GlobalOptions, io: CliIO, writes = false): boolean {
   const json = (e: Envelope) => `${JSON.stringify(e, null, globals.pretty ? 2 : undefined)}\n`;
+  // A result JSON.stringify refuses (nested past the stack, circular, a
+  // BigInt) still leaves exactly one envelope: this small failure drops
+  // data (and a failure's details), so it is shallow enough to print itself.
+  const unprintable = (err: unknown): Envelope => {
+    const cause = toToilError(err);
+    if (!envelope.ok) return failure(new ToilError(envelope.error.code, envelope.error.message, envelope.error.fix ? { fix: envelope.error.fix } : {}), envelope.meta);
+    if (writes) {
+      return failure(
+        new ToilError('INTERNAL', `${envelope.meta.command} ran, and the change may already have been applied, but its result couldn't be printed as JSON: ${cause.message}`, {
+          fix: 'Check whether the change was made before retrying. Then narrow the result, for example with --select, so it can be printed.',
+        }),
+        envelope.meta,
+      );
+    }
+    return failure(new ToilError('INTERNAL', `The result of ${envelope.meta.command} couldn't be printed as JSON: ${cause.message}`, { fix: 'Narrow the result, for example with --select, so it can be printed.' }), envelope.meta);
+  };
+  const printUnprintable = (err: unknown): void => {
+    try {
+      io.stdout(json(unprintable(err)));
+    } catch {
+      // Meta itself refused: this last resort names only the command.
+      io.stdout(
+        json(
+          failure(new ToilError('INTERNAL', `The result of ${envelope.meta.command} couldn't be printed as JSON.`, { fix: 'Narrow the result, for example with --select, so it can be printed.' }), {
+            command: envelope.meta.command,
+            durationMs: envelope.meta.durationMs,
+            version: envelope.meta.version,
+          }),
+        ),
+      );
+    }
+  };
+  let text: string;
+  try {
+    text = json(envelope);
+  } catch (err) {
+    // Nothing has reached stdout or --output-file yet, so say so on stdout.
+    printUnprintable(err);
+    return false;
+  }
   if (!globals.outputFile) {
-    io.stdout(json(envelope));
+    io.stdout(text);
     return true;
   }
   try {
-    io.writeFile(globals.outputFile, json(envelope), globals);
+    io.writeFile(globals.outputFile, text, globals);
     return true;
   } catch (err) {
     // The result never reached the file, so say so where the caller is looking.
@@ -410,7 +451,6 @@ async function parseCommandLine(options: ProgramOptions, words: string[]): Promi
   let captured: { def: AnyCommand; input: Record<string, unknown>; globals: GlobalOptions } | undefined;
   // The envelope carries a parse error; the help commander prints after one would only repeat it on stderr.
   const { program } = buildProgram({ ...options, io: { ...options.io, stderr: () => {} }, capture: (call) => (captured = call) });
-  const line = `toil ${words.join(' ')}`;
   // Said plainly before parsing, in MCP's words, rather than as an unknown command whose fix names one that works.
   const named = commandFromArgv(words, options.commands);
   if (options.commands.some((def) => def.dispatches && commandName(def) === named)) {
@@ -421,18 +461,33 @@ async function parseCommandLine(options: ProgramOptions, words: string[]): Promi
   } catch (err) {
     if (!(err instanceof CommanderError)) throw err;
     if (INFORMATIONAL.has(err.code)) return { help: true };
-    const message = err.message.replace(/^error:\s*/, '');
-    return { error: new ToilError('INVALID_INPUT', `The command after toil wait -- didn't parse: ${message}`, { fix: `Check that it runs on its own first: ${line}.` }) };
+    const message = scrubUsageMessage(err.message.replace(/^error:\s*/, ''));
+    // The failed line itself is never rebuilt here: its arguments and flag values may hold a credential.
+    return { error: new ToilError('INVALID_INPUT', `The command after toil wait -- didn't parse: ${message}`, { fix: 'Check that the command after -- runs on its own first.' }) };
   }
   const call = captured as { def: AnyCommand; input: Record<string, unknown>; globals: GlobalOptions } | undefined;
   if (!call) {
-    return { error: new ToilError('INVALID_INPUT', `${line} isn't a command toil wait can repeat.`, { fix: 'Name a read command after --, for example toil wait --until "result != null" -- jenkins run get <job> <n>.' }) };
+    return { error: new ToilError('INVALID_INPUT', `toil ${named} isn't a command toil wait can repeat.`, { fix: 'Name a read command after --, for example toil wait --until "result != null" -- jenkins run get <job> <n>.' }) };
   }
   const outer = OUTER_GLOBALS.find(([key]) => call.globals[key] !== undefined && call.globals[key] !== false);
   if (outer) {
     return { error: new ToilError('INVALID_INPUT', `${outer[1]} goes before wait, not in the command after --.`, { fix: `Run toil ${outer[1]} ... wait --until <expression> -- <command>.` }) };
   }
   return { def: call.def, input: call.input };
+}
+
+/**
+ * Takes typed values out of the two commander usage errors that quote them:
+ * the argument list after "too many arguments" and the `=value` of an unknown
+ * option. An argument can be a credential — a JWT handed to `util jwt decode`
+ * — and error output is what gets pasted into issues and CI logs, so neither
+ * stderr nor the envelope may repeat it. The counts and the flag name stay;
+ * they are all the fix needs.
+ */
+function scrubUsageMessage(message: string): string {
+  return message
+    .replace(/(too many arguments(?: for '[^']*')?\. Expected \d+ arguments? but got \d+):[^\n]*/gi, '$1.')
+    .replace(/(unknown option ')(-{1,2}[^'=\s]+)=[^'\n]*(')/gi, '$1$2$3');
 }
 
 /** Commander exits these ways on purpose; they are output, not errors. */
@@ -470,7 +525,7 @@ export async function runProgram(options: ProgramOptions, argv: string[], from: 
     const userArgs = from === 'node' ? argv.slice(2) : argv;
     const globals = globalsFromArgv(userArgs);
     const command = commandFromArgv(userArgs, options.commands);
-    const message = err.message.replace(/^error:\s*/, '');
+    const message = scrubUsageMessage(err.message.replace(/^error:\s*/, ''));
     // A path under an area that was folded into another: say where it went, not just that it's unknown.
     const gone = err.code === 'commander.unknownCommand' ? renamedArea(commandWords(userArgs)[0] ?? '') && commandWords(userArgs)[0] : undefined;
     if (gone) {

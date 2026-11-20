@@ -24,31 +24,51 @@
  * - **Scope**: it comes from one of the toil project's sources, and the toil project
  *   names a repository to work in.
  *
+ * Then one row for each ticket rule (#657) that applies to the item, from the
+ * toil project's `standards.use`, as toil's own `standards check` worked it
+ * out (src/core/standards/check.ts). Until that check has been read, or when
+ * it failed or returned nothing for the item, the rules are one row, "Ticket
+ * rules", saying so; a rule whose text wasn't in the record read is `skipped`.
+ *
  * A row is `pass`, `thin` (missing something a person can decide to live
- * with) or `fail` (it can't be worked on as it is). The verdict is `blocked`
- * when any row fails, `thin` when any is thin, and `ready` only when all pass.
+ * with), `fail` (it can't be worked on as it is) or `skipped` (a ticket rule
+ * nobody could check). The verdict is `blocked` when any row fails, `thin`
+ * when any is thin, `unread` ("Rules not read yet") when nothing fails or is
+ * thin but a ticket rule wasn't checked, and `ready` only when every row
+ * passes. A rule nobody read is unknown, not a pass (principle 12), so an item
+ * is never slated for an agent on rules toil hasn't read.
  * Five boxes, ticked by a function, which is the only kind of committee that
  * has ever finished on time.
  */
 
+import { ADO_ACCEPTANCE_FIELD } from '../../../src/core/standards/check.ts';
+import { acceptanceInBody, lines, normalise, realText, textOf, wordCount } from '../../../src/core/standards/text.ts';
+import type { RuleResult } from '../../../src/core/standards/types.ts';
 import type { StatusCategory, WorkItem } from '../toil.ts';
 
-export type Verdict = 'ready' | 'thin' | 'blocked';
-export type RowState = 'pass' | 'thin' | 'fail';
-export type CheckId = 'acceptance' | 'description' | 'done' | 'blockers' | 'scope';
+// The body reader is toil's (src/core/standards/text.ts), so a ticket rule and these rows read a description one way.
+export { ADO_ACCEPTANCE_FIELD, acceptanceInBody, realText, textOf, wordCount };
 
-export const CHECKS: readonly CheckId[] = ['acceptance', 'description', 'done', 'blockers', 'scope'];
-export const CHECK_LABEL: Record<CheckId, string> = {
+/** `unread`: nothing fails or is thin, but a ticket rule the toil project names wasn't checked on the item, so it isn't known to be ready. */
+export type Verdict = 'ready' | 'thin' | 'blocked' | 'unread';
+export type RowState = 'pass' | 'thin' | 'fail' | 'skipped';
+/** The five fixed checks. */
+export type FixedCheckId = 'acceptance' | 'description' | 'done' | 'blockers' | 'scope';
+/** A fixed check, a ticket rule (`rule:<standard>/<rule>`), or `rules`: the one row for ticket rules not read yet, or that failed to read. */
+export type CheckId = FixedCheckId | 'rules' | `rule:${string}`;
+
+export const CHECKS: readonly FixedCheckId[] = ['acceptance', 'description', 'done', 'blockers', 'scope'];
+export const CHECK_LABEL: Record<FixedCheckId, string> = {
   acceptance: 'Acceptance criteria',
   description: 'Description',
   done: 'Done state',
   blockers: 'Blockers',
   scope: 'Scope',
 };
-export const VERDICT_LABEL: Record<Verdict, string> = { ready: 'Ready', thin: 'Thin', blocked: 'Blocked' };
-/** The same three, in plain words (src/plain-words.ts). */
-export const VERDICT_PLAIN: Record<Verdict, string> = { ready: 'Ready', thin: 'Needs more detail', blocked: 'Blocked' };
-export const VERDICTS: readonly Verdict[] = ['ready', 'thin', 'blocked'];
+export const VERDICT_LABEL: Record<Verdict, string> = { ready: 'Ready', thin: 'Thin', blocked: 'Blocked', unread: 'Rules not read yet' };
+/** The same four, in plain words (src/plain-words.ts). */
+export const VERDICT_PLAIN: Record<Verdict, string> = { ready: 'Ready', thin: 'Needs more detail', blocked: 'Blocked', unread: 'Rules not read yet' };
+export const VERDICTS: readonly Verdict[] = ['ready', 'thin', 'blocked', 'unread'];
 
 /** One check's row: its state, and why, with any item it names written as `[[id]]`. */
 export interface Row {
@@ -56,23 +76,22 @@ export interface Row {
   label: string;
   state: RowState;
   reason: string;
-  /** Where the row's answer came from: a field, the body, the cache, or the live command. */
+  /** Where the row's answer came from: a field, the body, the last sync (the cache, in plain words), or the live command. */
   source: string;
+  /** A ticket rule's row: which rule it is, for "Fix with AI agent". */
+  rule?: { standard: string; rule: string };
 }
 
 export interface Readiness {
   id: string;
   verdict: Verdict;
   rows: Row[];
-  /** The rows that aren't `pass`, worst first: why it isn't ready, in one place. */
+  /** The rows that aren't `pass`, worst first (a skipped rule last): why it isn't ready, in one place. */
   why: Row[];
 }
 
 /** Description words a ready item needs when the toil project sets no number. */
 export const DEFAULT_MIN_WORDS = 25;
-/** Azure DevOps' own acceptance criteria field, on every process that has one. */
-export const ADO_ACCEPTANCE_FIELD = 'Microsoft.VSTS.Common.AcceptanceCriteria';
-
 /** What one area's section says about readiness. */
 export interface AreaReadiness {
   /** The field holding acceptance criteria, or null when there is none to look in. */
@@ -93,13 +112,68 @@ export interface ReadinessSettings {
   areas: Record<string, AreaReadiness>;
   /** What couldn't be used, in words the views show. */
   notes: string[];
+  /** The ticket rules the toil project names (`standards.use`), in order; empty when it names none, and then no rule row shows. */
+  standards: string[];
+  /** The ticket rules as toil checked them, once read; absent, a toil project that names some shows them as not read yet. */
+  rules?: RulesReading;
 }
+
+/** Tracker fields whose everyday name is known, by id in lower case (Azure DevOps' without `System.`). */
+const KNOWN_FIELDS: Record<string, string> = {
+  title: 'Title',
+  summary: 'Title',
+  description: 'Description',
+  body: 'Comment',
+  priority: 'Priority',
+  labels: 'Labels',
+  'story points': 'Story points',
+  storypoints: 'Story points',
+  'microsoft.vsts.scheduling.storypoints': 'Story points',
+  'microsoft.vsts.common.acceptancecriteria': 'Acceptance criteria',
+  'microsoft.vsts.tcm.reprosteps': 'Repro steps',
+};
+
+/**
+ * A field's everyday name for a proposal's table (#657): "Acceptance criteria"
+ * for the field the Toil project names as its acceptance criteria
+ * (`<area>.fields.acceptanceCriteria`, often a `customfield_…`), else a name
+ * every tracker shares; null when there is none, and the id is shown instead.
+ */
+export function fieldName(field: string, settings: Pick<ReadinessSettings, 'areas'>, area: string | null): string | null {
+  const f = field.toLowerCase().replace(/^system\./, '');
+  const criteria = (area ? [settings.areas[area]] : Object.values(settings.areas)).some((a) => a?.acceptanceField?.toLowerCase() === field.toLowerCase());
+  return criteria ? 'Acceptance criteria' : (KNOWN_FIELDS[f] ?? null);
+}
+
+/**
+ * What toil's `standards check` said, as the page holds it: not read yet (the
+ * call hasn't come back, or the toil project never synced), read, or failed,
+ * with toil's message. Unread is never an empty result (principle 12).
+ */
+export interface RulesReading {
+  state: 'unread' | 'read' | 'failed';
+  /** Each item's rule results, by OWI id; only when read. */
+  byItem: ReadonlyMap<string, readonly RuleResult[]>;
+  /** Why the read failed, in toil's words; null otherwise. */
+  message: string | null;
+  /**
+   * What toil said about reading the rules that isn't a failure, each in toil's own words (its `meta.warnings`): a
+   * standard set aside or skipped (STANDARDS_SKIPPED, STANDARD_SHADOWS_BUILTIN), a file that couldn't be used
+   * (STANDARD_PATH_INVALID), a key it ignored (STANDARD_UNKNOWN_KEY, STANDARD_DUPLICATE_KEY). Empty when unread or failed.
+   */
+  warnings: readonly string[];
+}
+
+export const RULES_UNREAD: RulesReading = { state: 'unread', byItem: new Map(), message: null, warnings: [] };
+
+/** The gate's settings with the ticket rules as last read. */
+export const withRules = (settings: ReadinessSettings, rules: RulesReading | undefined): ReadinessSettings => (rules ? { ...settings, rules } : settings);
 
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** Keys at the top of a toil project that aren't area sections (src/core/toil-project.ts, TOP_LEVEL). */
-const NOT_SECTIONS = new Set(['$schema', 'name', 'description', 'env', 'repos', 'environments', 'people', 'wipLimit']);
+const NOT_SECTIONS = new Set(['$schema', 'name', 'description', 'env', 'repos', 'environments', 'people', 'wipLimit', 'archived', 'analyze', 'classify', 'standards', 'dimensions', 'views']);
 
 /**
  * The gate's settings, from the toil project as `projects show` prints it. Each
@@ -135,116 +209,8 @@ export function readReadiness(toilProject: unknown): ReadinessSettings {
     }
     areas[area] = { acceptanceField: named ?? fallback, acceptanceFrom: named ? 'toilProject' : fallback ? 'default' : null, minWords, templateLines };
   }
-  return { sources, repos, areas, notes };
-}
-
-// Text out of a body ---------------------------------------------------------------
-
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
-/** A numeric entity's character; one outside Unicode reads as U+FFFD, as a browser shows it, rather than throwing on text a tracker sent. */
-const codePoint = (n: number) => (Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '\ufffd');
-const decode = (s: string) => s.replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (m, e: string) => (e[0] === '#' ? codePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : (ENTITIES[e.toLowerCase()] ?? m)));
-
-/** HTML as lines of text: block ends become line breaks, a checkbox becomes `[ ]`, every other tag goes. */
-function htmlText(html: string): string {
-  return decode(
-    html
-      .replace(/<input\b[^>]*type=["']?checkbox[^>]*>/gi, '[ ] ')
-      .replace(/<h([1-6])\b[^>]*>/gi, (_, n: string) => `\n${'#'.repeat(Number(n))} `)
-      .replace(/<li\b[^>]*>/gi, '\n- ')
-      .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/ul|\/ol)\b[^>]*>/gi, '\n')
-      .replace(/<[^>]+>/g, ''),
-  );
-}
-
-/** Atlassian Document Format as lines: a heading as `#`, a task as `[ ]`, each block on its own line. */
-function adfText(node: unknown): string {
-  if (!isRec(node)) return '';
-  if (node.type === 'text' && typeof node.text === 'string') return node.text;
-  const inner = (Array.isArray(node.content) ? node.content : []).map(adfText).join('');
-  switch (node.type) {
-    case 'heading':
-      return `\n${'#'.repeat(isRec(node.attrs) && typeof node.attrs.level === 'number' ? node.attrs.level : 1)} ${inner}\n`;
-    case 'taskItem':
-      return `\n[ ] ${inner}\n`;
-    case 'listItem':
-      return `\n- ${inner}\n`;
-    case 'paragraph':
-    case 'blockquote':
-    case 'codeBlock':
-      return `\n${inner}\n`;
-    case 'hardBreak':
-      return '\n';
-    default:
-      return inner;
-  }
-}
-
-/** Jira wiki markup's headings (`h2. Goal`) as Markdown's, so one reading covers both. */
-const wikiText = (s: string) => s.replace(/^\s*h([1-6])\.\s+/gim, (_, n: string) => `${'#'.repeat(Number(n))} `);
-
-/** A body, or a field's value, as plain lines of text. */
-export function textOf(value: unknown, format?: string): string {
-  if (value === null || value === undefined) return '';
-  if (isRec(value)) return adfText(value);
-  if (typeof value !== 'string') return '';
-  if (format === 'html' || (format === undefined && /<\/?[a-z][\s\S]*?>/i.test(value))) return htmlText(value);
-  if (format === 'wiki') return wikiText(value);
-  return value;
-}
-
-const lines = (text: string) => text.split(/\r?\n/);
-/** A line as a template compares it: no heading or list marks, no case, single spaces, no trailing colon. */
-const normalise = (line: string) =>
-  line
-    .replace(/^\s*(?:(?:#{1,6}|[-*+]|\d+[.)]|\[[ xX]?\])\s*)+/, '')
-    .replace(/[:.]\s*$/, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-
-const WORD = /[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu;
-export const wordCount = (text: string) => text.match(WORD)?.length ?? 0;
-
-/** A line that is only a placeholder: TBD, TODO, N/A, lorem ipsum, a `<fill this in>` or a run of punctuation. */
-const PLACEHOLDER_LINE = /^(tbd|tba|todo|to do|n\/?a|none|nothing|wip|placeholder|description|details|lorem ipsum.*|[-_.=*#~]+)$/i;
-/** A `<what goes here>` or `{what goes here}` inside a line: template slots nobody filled. */
-const SLOT = /<[^<>\n]{1,60}>|\{[^{}\n]{1,60}\}/g;
-
-/** The words in a body that count as description: template lines, placeholder lines and empty slots taken out. */
-export function realText(text: string, templateLines: readonly string[]): string {
-  const template = new Set(templateLines);
-  return lines(text)
-    .filter((l) => {
-      const n = normalise(l);
-      return n !== '' && !template.has(n) && !PLACEHOLDER_LINE.test(n);
-    })
-    .map((l) => l.replace(SLOT, ' '))
-    .join('\n');
-}
-
-/** A heading line: the words alone, or followed by a colon and text; a sentence that starts with them ("Acceptance criteria are still to come") isn't one. */
-const AC_HEADING = /^\s*(?:#{1,6}\s*|\*{1,2})?(acceptance criteria|definition of done|done when)\s*\**\s*(?::\s*(.*))?$/i;
-const CHECKBOX = /^\s*(?:[-*+]\s*)?\[[ xX]?\]\s+\S/;
-
-/**
- * Acceptance criteria in a body: a heading (or a leading "Acceptance criteria:")
- * with text under it, or a checklist. Text counts as the description check counts
- * it (`realText`), so "Acceptance criteria: TBD" or a heading over "N/A" doesn't.
- */
-export function acceptanceInBody(text: string, templateLines: readonly string[] = []): 'heading' | 'checklist' | null {
-  const words = (line: string) => wordCount(realText(line, templateLines));
-  const ls = lines(text);
-  for (let i = 0; i < ls.length; i++) {
-    const m = AC_HEADING.exec(ls[i]!);
-    if (!m) continue;
-    if (words(m[2] ?? '') > 0) return 'heading';
-    for (let j = i + 1; j < ls.length; j++) {
-      if (/^\s*#{1,6}\s/.test(ls[j]!)) break;
-      if (words(ls[j]!) > 0) return 'heading';
-    }
-  }
-  return ls.some((l) => CHECKBOX.test(l) && words(l) > 0) ? 'checklist' : null;
+  const use = isRec(d.standards) && Array.isArray(d.standards.use) ? d.standards.use.filter((u): u is string => typeof u === 'string' && u !== '') : [];
+  return { sources, repos, areas, notes, standards: use };
 }
 
 /**
@@ -321,7 +287,7 @@ export interface GateInput {
   live?: LiveWorkflow;
 }
 
-const row = (check: CheckId, state: RowState, reason: string, source: string): Row => ({ check, label: CHECK_LABEL[check], state, reason, source });
+const row = (check: FixedCheckId, state: RowState, reason: string, source: string): Row => ({ check, label: CHECK_LABEL[check], state, reason, source });
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 function acceptance(item: WorkItem, area: AreaReadiness | undefined, body: string): Row {
@@ -335,7 +301,8 @@ function acceptance(item: WorkItem, area: AreaReadiness | undefined, body: strin
   }
   const inBody = acceptanceInBody(body, area?.templateLines ?? []);
   if (inBody) return row('acceptance', 'pass', inBody === 'heading' ? 'A heading in the description lists them.' : 'The description has a checklist.', 'description');
-  const where = field ? `${field} is empty, and the description has` : 'The description has';
+  // The field by what it holds, not its tracker id: the raw key stays in the source line, where a person checking it looks.
+  const where = field ? 'The acceptance criteria field is empty, and the description has' : 'The description has';
   return row('acceptance', 'thin', `None found. ${where} no acceptance criteria heading or checklist.`, field ? `field ${field}, description` : 'description');
 }
 
@@ -371,8 +338,8 @@ function doneState(item: WorkItem, byId: Map<string, WorkItem>, live: LiveWorkfl
   if (item.statusCategory === 'UNKNOWN') return row('done', 'thin', `toil couldn't tell what category the status ${item.status ?? '(none)'} is in, so it isn't known to be open.`, 'status');
   if (item.source.area === 'github') return row('done', 'pass', `Open (${item.status ?? 'open'}); a GitHub issue closes from any state.`, 'status');
   const seen = [...byId.values()].find((other) => other.id !== item.id && sameType(other, item) && reachedDone(other));
-  if (seen) return row('done', 'pass', `Open (${item.status ?? 'open'}), and another ${type} here reached Done ([[${seen.id}]]), so the workflow gets there.`, 'cache');
-  return row('done', 'thin', `Open (${item.status ?? 'open'}), but no ${type} in this Toil project has reached Done, so a way there isn't known from the cache. Check the workflow live.`, 'cache');
+  if (seen) return row('done', 'pass', `Open (${item.status ?? 'open'}), and another ${type} here reached Done ([[${seen.id}]]), so the workflow gets there.`, 'last sync');
+  return row('done', 'thin', `Open (${item.status ?? 'open'}), but no ${type} in this Toil project has reached Done, so a way there isn't known from the last sync. Check the workflow live.`, 'last sync');
 }
 
 function blockers(item: WorkItem, byId: Map<string, WorkItem>): Row {
@@ -398,16 +365,50 @@ function scope(item: WorkItem, settings: ReadinessSettings): Row {
   return row('scope', 'pass', `${item.source.area} is one of the Toil project's sources, which names ${plural(repos.length, 'repository', 'repositories')} (${repos.join(', ')}); one is chosen when it starts.`, 'Toil project repos');
 }
 
-const ORDER: Record<RowState, number> = { fail: 0, thin: 1, pass: 2 };
+/** The label of the one row that stands for ticket rules nobody has read. */
+export const RULES_LABEL = 'Ticket rules';
 
-/** The verdict and its five rows for one item. */
+/**
+ * The item's ticket-rule rows: one per rule that applies, once read; until
+ * then one row saying they weren't read yet, or why the read failed. A read
+ * that holds no result for the item (it synced after the check, say) is one
+ * such row too, never "no rule applies". None when the toil project names no
+ * rules and nothing was read.
+ */
+function ruleRows(item: WorkItem, settings: ReadinessSettings): Row[] {
+  const rules = settings.rules ?? (settings.standards.length > 0 ? RULES_UNREAD : undefined);
+  if (!rules) return [];
+  const source = `ticket rules: ${settings.standards.join(', ')}`;
+  if (rules.state === 'read') {
+    const results = rules.byItem.get(item.id);
+    if (results) return results.map((r) => ({ check: `rule:${r.standard}/${r.rule}` as const, label: r.name, state: r.state, reason: r.reason, source: `${r.source} (ticket rules: ${r.standard})`, rule: { standard: r.standard, rule: r.rule } }));
+    if (settings.standards.length === 0) return [];
+    return [{ check: 'rules', label: RULES_LABEL, state: 'skipped', reason: "Not read yet: toil's last check of the ticket rules has no result for this item. Sync again to check it.", source }];
+  }
+  if (settings.standards.length === 0) return [];
+  const reason = rules.state === 'failed' ? `Couldn't be checked: ${rules.message ?? 'toil gave no reason.'}` : 'Not read yet.';
+  return [{ check: 'rules', label: RULES_LABEL, state: 'skipped', reason, source }];
+}
+
+const ORDER: Record<RowState, number> = { fail: 0, thin: 1, pass: 2, skipped: 3 };
+
+/** The verdict and its rows for one item: the five checks, then its ticket rules. */
 export function readiness({ item, settings, byId, live }: GateInput): Readiness {
   const area = settings.areas[item.source.area];
   const body = item.body ? textOf(item.body.content, item.body.format) : '';
-  const rows = [acceptance(item, area, body), description(item, area, body), doneState(item, byId, live), blockers(item, byId), scope(item, settings)];
-  const verdict: Verdict = rows.some((r) => r.state === 'fail') ? 'blocked' : rows.some((r) => r.state === 'thin') ? 'thin' : 'ready';
+  const rows = [acceptance(item, area, body), description(item, area, body), doneState(item, byId, live), blockers(item, byId), scope(item, settings), ...ruleRows(item, settings)];
+  const verdict: Verdict = rows.some((r) => r.state === 'fail') ? 'blocked' : rows.some((r) => r.state === 'thin') ? 'thin' : rows.some((r) => r.state === 'skipped') ? 'unread' : 'ready';
+  // A skipped rule isn't a miss, but nor is it a pass: it is in why, after the misses, since it is what keeps an item from ready.
   const why = rows.filter((r) => r.state !== 'pass').sort((a, b) => ORDER[a.state] - ORDER[b.state]);
   return { id: item.id, verdict, rows, why };
+}
+
+/**
+ * Whether the item would still be Blocked with every ticket rule passing: blocked by an open item, done already, or outside
+ * the Toil project. Fixing its ticket rules can't make such an item ready, so it is not the one to lead a fix with.
+ */
+export function blockedBesidesRules(item: WorkItem, settings: ReadinessSettings, byId: Map<string, WorkItem>): boolean {
+  return readiness({ item, settings: { ...settings, standards: [], rules: RULES_UNREAD }, byId }).verdict === 'blocked';
 }
 
 /** Every item's readiness, in the toil project's order. */
@@ -416,9 +417,28 @@ export function readinessAll(items: WorkItem[], settings: ReadinessSettings): Re
   return items.map((item) => readiness({ item, settings, byId }));
 }
 
+/** What makes an item Blocked, as the Tickets page says it under its Blocked figure. */
+export const BLOCKED_WHY = 'Waiting on another item, done already, outside the Toil project, or failing a ticket rule.';
+
+/** The open items whose verdict is Blocked: the Tickets page's Blocked figure, which its tab's badge repeats. */
+export function blockedOpen(items: WorkItem[], settings: ReadinessSettings): number {
+  return readinessAll(items, settings).filter((r, i) => r.verdict === 'blocked' && items[i]!.statusCategory !== 'DONE').length;
+}
+
+/**
+ * The Blocked figure with whether it is exact (#657, principle 12): a ticket rule can fail an item, which makes it
+ * Blocked, so while any open item's rules are unread (not read yet, failed to read, or no result for it) the count is
+ * only a floor and may grow once they are read. The Tickets tab's badge and the page's figure show it as a floor (or a
+ * dash) while `exact` is false, never as the exact count.
+ */
+export function blockedOpenReading(items: WorkItem[], settings: ReadinessSettings): { count: number; exact: boolean } {
+  const open = readinessAll(items, settings).filter((_, i) => items[i]!.statusCategory !== 'DONE');
+  return { count: open.filter((r) => r.verdict === 'blocked').length, exact: !open.some((r) => r.rows.some((row) => row.check === 'rules')) };
+}
+
 /** How many items have each verdict. */
 export function tally(list: Readiness[]): Record<Verdict, number> {
-  const out: Record<Verdict, number> = { ready: 0, thin: 0, blocked: 0 };
+  const out: Record<Verdict, number> = { ready: 0, thin: 0, blocked: 0, unread: 0 };
   for (const r of list) out[r.verdict]++;
   return out;
 }

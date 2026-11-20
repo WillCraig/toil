@@ -127,7 +127,7 @@ describe('the burn-up', () => {
       const { h } = await healthOf(name);
       const last = burnup(h, FIXTURE_NOW).days.at(-1)!;
       expect(last.done, name).toBe(h.done.points);
-      expect(last.scope, name).toBe(h.done.points + h.remaining.points);
+      expect(last.scope, name).toBe(h.scope.points);
     }
   });
 });

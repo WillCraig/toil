@@ -9,7 +9,7 @@ describe('the favicon', () => {
 
   it("is each built-in theme's own mark, with one per scheme for Plain", () => {
     for (const theme of THEMES.filter((t) => t.name !== 'plain')) expect(theme.assets.mark, theme.name).toBe('assets/mark.svg');
-    expect(THEMES.find((t) => t.name === 'plain')!.assets).toEqual({ mark: 'assets/mark-light.svg', markDark: 'assets/mark-dark.svg' });
+    expect(THEMES.find((t) => t.name === 'plain')!.assets).toMatchObject({ mark: 'assets/mark-light.svg', markDark: 'assets/mark-dark.svg' });
     // The build hands back a URL or, for a small file, the file inlined; either way, one per theme and scheme.
     const icons = [...THEMES.map((t) => faviconFor(t.name, 'light')), faviconFor('plain', 'dark')];
     expect(new Set(icons).size).toBe(THEMES.length + 1);

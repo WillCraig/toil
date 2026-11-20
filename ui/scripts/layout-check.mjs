@@ -36,6 +36,10 @@
 // is on, so an animation caught mid-flight can't fail a run; `npm run smoke` then runs
 // MOTION_ROUTES again with motion on, where the moments play.
 //
+// Every view and state is also read for this machine's account (#653): its
+// home folders, or its name as a home folder in a path, in the text, a title or an
+// aria-label fail the run, so a full local path can't come back onto a screen.
+//
 // On a toil project's Board tab the board is also dragged as a hand drags it
 // (#393): real mouse input through the DevTools protocol, a finger at 375
 // pixels, with moves in between. Mid-drag the copy of the card must be under
@@ -51,10 +55,10 @@
 //   node scripts/layout-check.mjs --base http://127.0.0.1:4173/ [--theme crate] [--route '#/settings/projects'] [--width 375] [--font <pair id>] [--motion full] [--shots <dir>] [--json <file>]
 //
 // Repo tooling only; nothing here ships. It measures twice and files once.
-/* global document, window, getComputedStyle, CSS -- inspect(), covered(), dragPlan(), hitTest() and dragMid() run in the page */
+/* global document, window, getComputedStyle, CSS -- inspect(), covered(), personal(), dragPlan(), hitTest() and dragMid() run in the page */
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { availableParallelism } from 'node:os';
+import { availableParallelism, homedir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { findChrome, openBrowser } from './chrome.mjs';
@@ -152,6 +156,8 @@ export const ROUTES = [
   '#/project/sample-team/standup',
   '#/project/card-payments/standup',
   '#/project/settlement/standup/2026-10-12',
+  // The sprint's first day: the team line's sprint moves are long (the whole iteration path and who moved it), and a chip has to cut inside a phone's width (#644).
+  '#/project/settlement/standup/2026-10-05',
   '#/project/checkout-web/standup/yesterday',
   item('card-payments', 'corp-jira:PAY-100'),
   item('settlement', 'corp-ado:2304'),
@@ -183,6 +189,10 @@ export const MOTION_ROUTES = ['#/', '#/project/card-payments', '#/project/card-p
 export const FIRST_RUN_ROUTE = '#/?first-run';
 /** What counts as a card. LAYOUT_CARDS widens it, to measure a build from before the Card primitive. */
 const CARDS = process.env.LAYOUT_CARDS ?? '[data-card]';
+
+/** Read once: the account the check runs as (personalNeedles, below). */
+let PERSONAL_CACHE = null;
+const personalOnce = () => (PERSONAL_CACHE ??= personalNeedles());
 
 /**
  * What runs in the page: one pass over the layout, returning findings. It is
@@ -281,6 +291,49 @@ function inspect(cards, headerFits) {
     const bg = getComputedStyle(overlay).backgroundColor;
     const alpha = /rgba?\(([^)]+)\)/.exec(bg)?.[1].split(/[ ,/]+/).filter(Boolean)[3];
     if (bg === 'transparent' || (alpha !== undefined && Number(alpha) < 0.3)) add('backdrop', overlay, `the backdrop is ${bg}, which doesn't dim the page`);
+  }
+  return findings;
+}
+
+/**
+ * What would say on screen who is signed in to this machine (#653): the home
+ * folder of the account running the check, in either slash, and the account
+ * name as a home folder in a path (`/Users/<name>`, `/home/<name>`,
+ * `C:\\Users\\<name>`), whatever the home is. The name elsewhere is not
+ * looked for: it may also be a person's name, a login in a URL or a branch
+ * prefix that the data rightly shows.
+ * Read from the OS, not HOME, so a demo or scratch home doesn't hide it.
+ */
+export function personalNeedles(info = safeUserInfo(), home = homedir()) {
+  const homes = [...new Set([info?.homedir, home].filter((h) => h && h.length > 3))];
+  const name = info?.username && info.username.length > 1 ? info.username : null;
+  return {
+    texts: homes.flatMap((h) => [h.replace(/\\/g, '/'), h.replace(/\//g, '\\')]),
+    segment: name ? `(^|[\\\\/])(Users|home)[\\\\/]${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\\\/]|$)` : null,
+  };
+}
+
+function safeUserInfo() {
+  try {
+    return userInfo();
+  } catch {
+    // An account with no entry in the password file has no name to leak, and no form to file about it.
+    return null;
+  }
+}
+
+/** Every place on the page's text or tooltips that names the account (personalNeedles). */
+function personal(needles) {
+  const findings = [];
+  const re = needles.segment ? new RegExp(needles.segment, 'i') : null;
+  const hit = (t) => needles.texts.some((n) => t.toLowerCase().includes(n.toLowerCase())) || (re !== null && re.test(t));
+  const text = document.body.innerText ?? '';
+  for (const line of text.split('\n')) if (hit(line)) findings.push({ kind: 'personal', at: 'page text', detail: `names this machine's account: "${line.trim().slice(0, 80)}"` });
+  for (const el of document.querySelectorAll('[title], [aria-label]')) {
+    for (const a of ['title', 'aria-label']) {
+      const v = el.getAttribute(a);
+      if (v && hit(v)) findings.push({ kind: 'personal', at: `${el.tagName.toLowerCase()}[${a}]`, detail: `names this machine's account: "${v.slice(0, 80)}"` });
+    }
   }
   return findings;
 }
@@ -519,7 +572,8 @@ function states(route, width, sample = true) {
   // The readiness gate (#307): an item's workflow read live, and the Command Center's verdict filter open. Only
   // the sample's Jira and Azure DevOps items are pressed: a GitHub issue has no read to make, and a done item none either.
   if (/\/item\/corp-(jira|ado)%3A/.test(route)) out.push({ name: 'workflow-live', setup: clickUntil(clickAll('.readiness-live button', '/Check the workflow live|Read the workflow again/'), "(() => { const b = document.querySelector('.readiness-live button'); return b && !b.disabled && !/Reading the workflow/.test(b.textContent ?? ''); })()", 'the live workflow read') });
-  if (/\/command-center$/.test(route)) out.push({ name: 'verdict-filter', setup: afterClick(clickAll('.readiness-filters > div.choice:first-of-type .choice-button'), '[role="listbox"]'), undo: 'Escape' });
+  // Tickets filters through one bar (#657): the verdict is a tile, every other dimension the filter bar's Add filter, held open here.
+  if (/\/command-center$/.test(route)) out.push({ name: 'items-filter', setup: afterClick(clickAll('[data-filter-add]'), '.filter-popover__dialog'), undo: 'Escape' });
   // An answered question (#295): its usage footer, and the chat's running total and context meter in the pane's head.
   // Then, once a question has its answer, the Suggestions menu the starters fold into (#343).
   // Analyze (#343) on the next toil project: its pulse check, pressed in the bar, in the focused view.
@@ -791,6 +845,42 @@ export function layoutWorkers(runs) {
   return Math.max(1, Math.min(want, runs.length));
 }
 
+const INCLUDE_TESTS = 'the smoke takes --include-tests layout, layout:k/N with 1 <= k <= N (such as layout:3/8) or none';
+
+/**
+ * Reads the smoke's arguments: nothing or `--include-tests layout` for the whole layout check, `--include-tests
+ * layout:k/N` for shard k of N (CI's Linux layout matrix, 1-based), `--include-tests none` for no layout check (CI's
+ * Windows, macOS and Node 26 jobs). The install, gate, live and wipe checks run whichever it says. Anything else is
+ * an error saying what it takes, never a quiet run of everything.
+ */
+export function parseIncludeTests(argv) {
+  if (argv.length === 0) return { layout: true, shard: null };
+  const [flag, value, ...rest] = argv;
+  if (flag !== '--include-tests' || value === undefined || rest.length) throw new Error(`${INCLUDE_TESTS}, not ${JSON.stringify(argv.join(' '))}.`);
+  if (value === 'none') return { layout: false, shard: null };
+  if (value === 'layout') return { layout: true, shard: null };
+  const m = /^layout:(\d+)\/(\d+)$/.exec(value);
+  const index = m ? Number(m[1]) : 0;
+  const count = m ? Number(m[2]) : 0;
+  if (!m || count < 1 || index < 1 || index > count) throw new Error(`${INCLUDE_TESTS}, not ${JSON.stringify(value)}.`);
+  return { layout: true, shard: { index, count } };
+}
+
+/**
+ * The part of the check one shard runs. A unit is one theme scheme on one view, counted in `runs` × `routes` order, and
+ * unit i belongs to shard (i mod N) + 1, the way the root parity suite's shards claim their work: no list of themes or
+ * views is kept anywhere, so a new one lands in a shard by existing. Returns the runs with any unit in the shard, each
+ * carrying its own `routes`; with no shard, the runs as given. Splitting by unit rather than by theme keeps the shards
+ * even, since a theme is nine minutes of work and a view a few seconds.
+ */
+export function shardRuns(runs, routes, shard) {
+  if (!shard) return runs;
+  let unit = 0;
+  return runs
+    .map((run) => ({ ...run, routes: routes.filter(() => unit++ % shard.count === shard.index - 1) }))
+    .filter((run) => run.routes.length);
+}
+
 /**
  * Runs the check. `urlFor(theme, scheme, route)` is the address of one view
  * in one theme. Resolves with the problems that fail the run, the report-only
@@ -801,6 +891,7 @@ export function layoutWorkers(runs) {
  * Each scheme's findings are kept apart and joined in scheme order, so the
  * report reads the same however many workers ran.
  *
+ * A run may carry its own `routes` (shardRuns), which it checks instead of `routes`.
  * `shotsFor(run)` says which schemes are shot into `shots` (all, unless set), so a caller can mix strict and other schemes in one call.
  * `sample` (on unless set false) says the data is the sample's, whose states always have something to open; real data may not (see `states`).
  * `headerFits` (on unless set false) fails a header folded into its Menu at
@@ -847,7 +938,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
   let checked = 0;
   const shoot = async (name) => shots && writeFileSync(join(shots, `${name}.png`), await page.screenshot());
   const label = `${run.theme} ${run.scheme}`;
-  for (const route of routes) {
+  for (const route of run.routes ?? routes) {
     await page.size(widths[0]);
     await page.goto(urlFor(run.theme, run.scheme, route));
     if (!(await page.evaluate(SETTLED))) problems.push(`${label} ${route}: the layout was still changing 3s after the view had its heading`);
@@ -869,6 +960,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
       if (!(await page.evaluate(STABLE()))) problems.push(`${where}: the layout was still changing 3s after every <details> was opened`);
       record('', await page.evaluate(`(${inspect})(${JSON.stringify(CARDS)}, ${headerFits})`));
       record('', await page.evaluate(`(${covered})()`));
+      record('', await page.evaluate(`(${personal})(${JSON.stringify(personalOnce())})`));
       checked++;
       const violations = await axeRun(page, axeSource);
       for (const v of violations) {
@@ -904,6 +996,7 @@ async function checkRun({ page, run, urlFor, routes, widths, shots, axeSource, l
         await page.evaluate(ANIMATIONS_DONE);
         await shoot(`${slug}__${state.name}`);
         record(state.name, await page.evaluate(`(${inspect})(${JSON.stringify(CARDS)}, ${headerFits})`));
+        record(state.name, await page.evaluate(`(${personal})(${JSON.stringify(personalOnce())})`));
         // An open sheet covers the page on purpose, like a dialog; only the page's own states must clear the dock.
         if (state.name === 'shown') record(state.name, await page.evaluate(`(${covered})()`));
         const stateViolations = run.strict && state.name !== 'shown' ? await axeRun(page, axeSource) : [];

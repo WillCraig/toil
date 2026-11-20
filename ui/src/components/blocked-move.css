@@ -1,5 +1,5 @@
 /* The notice for a move no command can make yet, and the hint on a column that can't take the card in hand. */
-.board-notice--blocked { border-left-color: var(--danger); align-items: flex-start; }
+.board-notice--blocked { border-color: var(--edge-danger); background: var(--tint-danger); align-items: flex-start; }
 .board-notice__body { flex: 1 1 16rem; display: grid; gap: 0.35rem; min-width: 0; }
 .board-notice__body > p { margin: 0; }
 .board-notice__body .command { margin: 0.25rem 0 0; }

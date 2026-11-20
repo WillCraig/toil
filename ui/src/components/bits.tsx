@@ -6,6 +6,7 @@
  * lanyard.
  */
 
+import { Button, Tooltip, TooltipTrigger } from 'react-aria-components';
 import { groupInsights, INSIGHT_LABEL, type Insight, type InsightCode, type InsightGroup } from '../model/insights.ts';
 import { STATUS_CATEGORY_LABEL } from '../format.ts';
 import { usePlain } from '../plain-words.ts';
@@ -116,4 +117,21 @@ function groupTitle(g: InsightGroup, word: string, titles?: ReadonlyMap<string, 
  */
 export function Outcome({ of }: { of: Pick<ChangeRef, 'state' | 'outcome'> }) {
   return <span className={`outcome outcome--${of.outcome}`}>{of.state}</span>;
+}
+
+/**
+ * Where a line came from, shrunk to a badge (principle 4, #657): "Source" to the eye, and the record it was read from
+ * (`history.transitions`) in its tooltip and its accessible name, so it is one hover or focus away and never gone.
+ */
+export function SourceTip({ source }: { source: string }) {
+  return (
+    <TooltipTrigger delay={300} closeDelay={150}>
+      <Button className="source-tip" aria-label={`Source: ${source}`} data-source={source}>
+        Source
+      </Button>
+      <Tooltip className="cite-tooltip" offset={6}>
+        Source: <code>{source}</code>
+      </Tooltip>
+    </TooltipTrigger>
+  );
 }

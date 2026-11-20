@@ -16,7 +16,8 @@ import { useData } from '../data.ts';
 import { peekHref, personText, shortKey, sourceLabel, STATUS_CATEGORY_LABEL } from '../format.ts';
 import { useWorkInsights } from '../insights-data.ts';
 import { decodeDrill, resolveDrill } from '../model/drill.ts';
-import { labelOfDimension } from '../model/work-insights.ts';
+import { asMapped } from '../model/people.ts';
+import { labelOfDimension, NOT_SORTED } from '../model/work-insights.ts';
 import type { WorkItem } from '../toil.ts';
 import { StatusChip } from './bits.tsx';
 import { ReclassifyChip } from './reclassify.tsx';
@@ -36,7 +37,9 @@ const estimateShort = (item: WorkItem): string => {
 const tie = (a: WorkItem, b: WorkItem) => a.id.localeCompare(b.id, undefined, { numeric: true });
 
 export function ItemsDrawer({ spec }: { spec: string }) {
-  const { byId } = useData();
+  const { byId, toilProject } = useData();
+  // The assignee as the toil project's people name them, so a person's two accounts sort and read as one name.
+  const assigneeText = (i: WorkItem) => personText(asMapped(toilProject.people ?? [], i.source.area, i.assignee));
   const ins = useWorkInsights();
   const heading = useRef<HTMLHeadingElement>(null);
   const here = typeof window === 'undefined' ? '#/' : window.location.hash;
@@ -79,13 +82,13 @@ export function ItemsDrawer({ spec }: { spec: string }) {
   const dims = list.dimensions;
   const categoryName = (i: WorkItem) => {
     const id = ins.verdicts.get(i.id)?.category ?? null;
-    return id === null ? '￿Unsure' : (ins.definitions[id]?.name ?? id);
+    return id === null ? `\uffff${NOT_SORTED}` : (ins.definitions[id]?.name ?? id);
   };
   const text = (i: WorkItem, by: SortKey): string | number => {
     if (by === 'key') return `${sourceLabel(i.source.area)} ${shortKey(i)}`;
     if (by === 'title') return i.title;
     if (by === 'status') return i.status ?? STATUS_CATEGORY_LABEL[i.statusCategory];
-    if (by === 'assignee') return personText(i.assignee);
+    if (by === 'assignee') return assigneeText(i);
     if (by === 'estimate') return i.estimate ? i.estimate.value : -1;
     if (by === 'category') return categoryName(i);
     return ins.valueText(i, by.slice(4)) ?? '';
@@ -128,7 +131,7 @@ export function ItemsDrawer({ spec }: { spec: string }) {
     },
     { header: header('Title', 'title'), label: 'Title', className: 'drill-col drill-col--title', sort: sortOf('title'), cell: (i) => <span className="drill-title" title={i.title}>{i.title}</span> },
     { header: header('Status', 'status'), label: 'Status', className: 'drill-col drill-col--status', sort: sortOf('status'), cell: (i) => <StatusChip category={i.statusCategory} status={i.status} /> },
-    ...(hasAssignee ? [{ header: header('Assignee', 'assignee'), label: 'Assignee', className: 'drill-col drill-col--assignee', sort: sortOf('assignee'), cell: (i: WorkItem) => personText(i.assignee) } satisfies Column<WorkItem>] : []),
+    ...(hasAssignee ? [{ header: header('Assignee', 'assignee'), label: 'Assignee', className: 'drill-col drill-col--assignee', sort: sortOf('assignee'), cell: (i: WorkItem) => assigneeText(i) } satisfies Column<WorkItem>] : []),
     ...(hasEstimate ? [{ header: header('Estimate', 'estimate'), label: 'Estimate', className: 'drill-col drill-col--estimate', sort: sortOf('estimate'), cell: (i: WorkItem) => (i.estimate ? estimateShort(i) : <span aria-label="no estimate">–</span>) } satisfies Column<WorkItem>] : []),
     ...shownDims.map(
       (d): Column<WorkItem> => ({ header: header(labelOfDimension(d), `dim:${d}`), label: labelOfDimension(d), className: 'drill-col drill-col--dim', sort: sortOf(`dim:${d}`), cell: (i) => ins.valueText(i, d) ?? <span aria-label="not read yet">–</span> }),

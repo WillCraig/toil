@@ -136,7 +136,9 @@ the signature segment as the text it is, once that segment has passed the base64
 
 The token goes nowhere but the decoder. toil doesn't log it, and no error the decoder
 returns repeats it. A usage error from the command line (an extra argument, an unknown
-`--flag=<token>`) echoes what you typed, token included, so pass the token with `-`.
+`--flag=<token>`) has the typed values taken out before it is shown, so it doesn't
+repeat the token either. Passing the token with `-` still keeps it out of the process
+list and your shell history.
 
 ### `toil util deps scan`
 

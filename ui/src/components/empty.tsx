@@ -51,6 +51,19 @@ export function EmptyButton({ onPress, children, disabled = false }: { onPress: 
 }
 
 /**
+ * For a panel only points fill (#652): the stories may have points the toil
+ * project doesn't name the field for, so the way in is naming it. Finding the
+ * field reads Jira only, so another tracker goes to the field names themselves.
+ */
+export function PointsAction({ toilProject, jira }: { toilProject: string; jira: boolean }) {
+  return (
+    <EmptyLink edit href={toilProjectEditHref(toilProject, jira ? 'find-fields' : 'fields')}>
+      Name the points field
+    </EmptyLink>
+  );
+}
+
+/**
  * Sync now where the page can sync (the local app), else the link given: for a
  * panel a newer read of the tracker would fill, in the preview too.
  */

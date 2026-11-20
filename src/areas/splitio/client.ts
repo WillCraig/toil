@@ -17,11 +17,42 @@ export type SplitioConnection = Connection<z.output<typeof splitioArea.connectio
 export type SplitioContext = CommandContext<SplitioConnection, { workspace?: string }>;
 
 const API = '/internal/api/v2';
+/** Flag sets live on v3 alone; everything else is still v2, a migration plan with no end date. */
+const API_V3 = '/internal/api/v3';
 
 export const seg = (value: string) => encodeURIComponent(value);
 
 export function split<T>(ctx: SplitioContext, path: string, req: ApiRequest = {}): Promise<T> {
   return apiRequest<T>(splitioArea, ctx, `${API}${path}`, { ...req, headers: { Accept: 'application/json', ...req.headers } });
+}
+
+/** The same request under `/internal/api/v3`, where Split serves flag sets. https://docs.split.io/reference/list-flag-sets */
+export function splitV3<T>(ctx: SplitioContext, path: string, req: ApiRequest = {}): Promise<T> {
+  return apiRequest<T>(splitioArea, ctx, `${API_V3}${path}`, { ...req, headers: { Accept: 'application/json', ...req.headers } });
+}
+
+/**
+ * The items of a Split list. Split answers lists in three shapes: a bare
+ * array (environments, traffic types), `{ objects }` (flags, segments) and
+ * `{ data }` (change requests, flag sets, attributes). Anything else is an
+ * error, never an empty list, since an empty list would claim Split has none.
+ */
+export function itemsOf(body: unknown, what: string): unknown[] {
+  if (Array.isArray(body)) return body;
+  if (typeof body === 'object' && body !== null) {
+    const record = body as Record<string, unknown>;
+    if (Array.isArray(record.objects)) return record.objects;
+    if (Array.isArray(record.data)) return record.data;
+  }
+  throw new ToilError('HTTP', `Split answered the ${what} list with something toil can't read as a list.`, {
+    fix: 'Check that baseUrl is the Admin API root (https://api.split.io), then run with --verbose to see the request.',
+  });
+}
+
+/** The total an offset-paged list reports (`totalCount`), or null when Split gave none: unknown, not zero. */
+export function totalOf(body: unknown): number | null {
+  const total = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).totalCount : undefined;
+  return typeof total === 'number' ? total : null;
 }
 
 /** The workspace from --ws or the connection; the command lists it as required, so core has already checked. */
@@ -60,6 +91,20 @@ export interface CrInput {
 
 export type CrOperation = 'UPDATE' | 'KILL' | 'RESTORE' | 'ARCHIVE';
 
+/** A segment's change request takes no rollout status: that is a flag's. */
+export const segmentCrFields = { mnemonic: crFields.mnemonic, description: crFields.description, changeNumber: crFields.changeNumber, approvers: crFields.approvers };
+export const segmentCrOptions = crOptions.filter((o) => o.field !== 'rolloutStatus');
+export type SegmentCrInput = Omit<CrInput, 'rolloutStatus'>;
+
+/** The title, comment and approvers every change request carries, whatever it changes. */
+function crCommon(input: SegmentCrInput, title: string) {
+  return {
+    title,
+    comment: `${input.description}\n\nChange number: ${input.changeNumber}`,
+    approvers: (input.approvers ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+  };
+}
+
 /**
  * A change request body as Split's Submit Change Request takes it: the flag
  * under `split`, flat, with the operation, title, comment and approvers
@@ -70,11 +115,19 @@ export function crBody(input: CrInput, operationType: CrOperation, flag: Record<
   return {
     split: flag,
     operationType,
-    title,
-    comment: `${input.description}\n\nChange number: ${input.changeNumber}`,
-    approvers: (input.approvers ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    ...crCommon(input, title),
     ...(input.rolloutStatus ? { rolloutStatus: { id: input.rolloutStatus } } : {}),
   };
+}
+
+/**
+ * A segment's change request, as Submit Change Request documents it: a
+ * standard segment under `segment` with `CREATE` to add keys and `ARCHIVE` to
+ * remove them, and a rule-based segment under `ruleBasedSegment` with `UPDATE`.
+ * https://docs.split.io/reference/create-change-request, https://docs.split.io/reference/createrbschangerequest
+ */
+export function segmentCrBody(input: SegmentCrInput, kind: 'segment' | 'ruleBasedSegment', operationType: 'CREATE' | 'ARCHIVE' | 'UPDATE', object: Record<string, unknown>): Record<string, unknown> {
+  return { [kind]: object, operationType, ...crCommon(input, input.mnemonic) };
 }
 
 /** POST /changeRequests/ws/{workspace}/environments/{environment}. https://docs.split.io/reference/create-change-request */

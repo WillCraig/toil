@@ -89,7 +89,7 @@ export function MiniBurnup({ sprint }: { sprint: PreviewSprint }) {
   const y = (v: number) => 28 - (26 * v) / top;
   const line = (pick: (d: { scope: number; done: number }) => number) => days.map((d, i) => `${x(i).toFixed(1)},${y(pick(d)).toFixed(1)}`).join(' ');
   return (
-    <svg className="mini-burnup" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label={`Burn-up: ${sprint.done} of ${sprint.scope} points done`}>
+    <svg className="mini-burnup" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label={sprint.scope === null ? 'Burn-up: no points read' : `Burn-up: ${sprint.done} of ${sprint.scope} points done`}>
       {days.length > 1 && (
         <>
           <polyline className="mini-burnup__scope" points={line((d) => d.scope)} vectorEffect="non-scaling-stroke" />
@@ -135,7 +135,7 @@ export function SprintLine({ sprint }: { sprint: PreviewSprint }) {
     <p className="sprint-line">
       <span className="sprint-line__name">{sprint.name}</span>{' '}
       <span className="note">
-        {plural(sprint.daysLeft, 'working day')} left of {sprint.daysTotal}, {sprint.done} of {plural(sprint.scope, 'point')} done
+        {plural(sprint.daysLeft, 'working day')} left of {sprint.daysTotal}, {sprint.scope === null ? 'no points read' : `${sprint.done} of ${plural(sprint.scope, 'point')} done`}
       </span>
     </p>
   );

@@ -29,6 +29,7 @@ const OWN_PAGES = {
   'core.md': '/docs/core/',
   'projects.md': '/docs/projects/',
   'classify.md': '/docs/classify/',
+  'standards.md': '/docs/standards/',
   'sample.md': '/docs/sample/',
   'install.md': '/docs/install/',
   'mcp.md': '/docs/mcp/',

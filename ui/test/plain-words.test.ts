@@ -30,6 +30,14 @@ describe('plainify', () => {
     expect(plainify('Ask the agent.')).toBe('Ask the AI agent.');
   });
 
+  it('never doubles an agent already called an AI agent, so running it twice changes nothing', () => {
+    expect(plainify('Fix with AI agent asks an AI agent to suggest a rewrite.')).toBe('Fix with AI agent asks an AI agent to suggest a rewrite.');
+    expect(plainify('Ask your AI agents, or an agent.')).toBe('Ask your AI agents, or an AI agent.');
+    const once = plainify('The agent reads pull requests; the AI agent never writes.');
+    expect(plainify(once)).toBe(once);
+    expect(once).not.toMatch(/AI AI/);
+  });
+
   it('leaves a toil command exactly as typed', () => {
     expect(plainify('Made with toil projects init.')).toBe('Made with toil projects init.');
     expect(plainify('Run toil projects describe card-payments, then ask the Toil project.')).toBe('Run toil projects describe card-payments, then ask the Toil project.');

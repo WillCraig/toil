@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { analyzeSettings } from '../../../src/core/brief/settings.ts';
 import { useData } from '../data.ts';
 import { ReclassifyChip } from './reclassify.tsx';
+import { ExternalIcon } from './icons.tsx';
 import { currentQuery } from '../address.ts';
 import { dateTime, toilProjectEditHref, itemHref, peekHref, personText, shortKey, sourceLabel, STATUS_CATEGORY_LABEL, estimateText, unpeekHref } from '../format.ts';
 import { usePlain } from '../plain-words.ts';
@@ -25,6 +26,7 @@ import { whoText } from './analysis.tsx';
 import { Cited, ItemHrefContext, PrLink } from './items.tsx';
 import { ProposalCard } from './proposal.tsx';
 import './briefing.css';
+import { NavButton } from './nav-button.tsx';
 
 /** The toil project's briefing: Analyze's when its latest is current, the code's otherwise. */
 export function useBriefing(): BriefingView {
@@ -123,9 +125,10 @@ export function ItemDrawer({ id }: { id: string }) {
         {item.status ?? STATUS_CATEGORY_LABEL[item.statusCategory]} · <ReclassifyChip item={item} /> · {personText(item.assignee)} · {estimateText(item)}
         {item.url && (
           <>
-            {' · '}
-            <a href={item.url} target="_blank" rel="noreferrer" data-drawer-tracker="">
-              Open in {sourceLabel(item.source.area)}
+            {' '}
+            <a className="btn btn--secondary btn--sm item-open" href={item.url} target="_blank" rel="noopener noreferrer" data-drawer-tracker="">
+              Open in {sourceLabel(item.source.area)} <ExternalIcon size={14} className="icon--external-link" />
+              <span className="sr-only"> (opens a new tab)</span>
             </a>
           </>
         )}
@@ -233,7 +236,7 @@ export function Customize({ lenses }: { lenses: Array<{ lens: string; label: str
     <details className="customize">
       <summary className="btn btn--small">Customize</summary>
       <div className="customize__panel">
-        <p className="source">Just for you, in this browser. What {pw('Analyze', 'a briefing')} looks for is {"the Toil project's"}: <a href={toilProjectEditHref(toilProject.name, 'analyze')}>{pw('How Analyze briefs', 'How briefings are made for')} {toilProject.name}</a>.</p>
+        <p className="source">Just for you, in this browser. What {pw('Analyze', 'a briefing')} looks for is {"the Toil project's"}: <NavButton href={toilProjectEditHref(toilProject.name, 'analyze')} size="sm">{pw('How Analyze briefs', 'How briefings are made for')} {toilProject.name}</NavButton></p>
         <fieldset>
           <legend className="briefing__label">Show</legend>
           <label className="customize__check">

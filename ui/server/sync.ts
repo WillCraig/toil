@@ -18,6 +18,13 @@
  *   item counts as changed when its issue's `updatedAt` moved.
  * - **Batches** (`ado work-item get-many`, `github issue get`) fetch only the
  *   changed and new items, merged into the last copy.
+ * - **Azure DevOps' link feed** (`ado work-item link-feed`, #664). Azure DevOps
+ *   records a link added or removed under the item's current revision without
+ *   moving `System.ChangedDate`, so the search "since" never lists that item and
+ *   `get-many` would keep its old links. Beside every incremental search the
+ *   sync reads the link changes since the watermark and counts both ends of each
+ *   as changed. When that read fails, says so and reads `get-many` whole, so a
+ *   removed link never outlives the sync that should have noticed it.
  * - **Histories** (`jira issue history`, `ado work-item history`, `github
  *   issue-events`) are fetched only for changed and new items; the rest are
  *   the last copy.
@@ -40,8 +47,9 @@
  *   watermark, so once a day (`RECONCILE_MS`) a source's search is also sent
  *   whole, asking for ids only where the command can (Jira's `--fields key`;
  *   a WIQL answer is ids already), and a cached item it no longer lists is
- *   dropped. Between those, the merge by id goes on as before. GitHub's
- *   issue list has no window, so it is left out. A whole listing that fails
+ *   dropped. On that day Azure DevOps' `get-many` is read whole too, which
+ *   catches anything the link feed missed. Between those, the merge by id
+ *   goes on as before. GitHub's issue list has no window, so it is left out. A whole listing that fails
  *   keeps the merged delta, says so in the job's messages and is tried again
  *   by the next sync.
  * - **The window.** The loader asks Jira and Azure DevOps for open items and
@@ -161,6 +169,8 @@ const BOARD = 'github project items';
 /** Azure DevOps' feed of every revision since a date, which stands in for each item's history (src/ado-revisions.ts). */
 const ADO_FEED = 'ado work-item feed';
 const ADO_SEARCH = 'ado work-item search';
+/** Azure DevOps' feed of link changes, which a revision and ChangedDate never show (#664). */
+const ADO_LINK_FEED = 'ado work-item link-feed';
 
 /** Commands whose NOT_FOUND says the thing isn't there, which is worth knowing: the loader looks for CODEOWNERS where GitHub would. */
 const ABSENT_IS_AN_ANSWER = new Set(['github repo file']);
@@ -218,6 +228,8 @@ interface Source {
   /** Searches this sync ran, and how many of them listed the source whole (a first read or a reconcile). */
   searches: number;
   fullSearches: number;
+  /** Read every batch whole this sync: the link feed failed, or it's the day of the whole listing (#664). */
+  rereadBatches: boolean;
 }
 
 interface Run {
@@ -437,7 +449,7 @@ export class SyncService {
   private source(run: Run, area: string): Source {
     let s = run.sources.get(area);
     if (!s) {
-      s = { area, calls: 0, error: null, changed: null, changedPrs: null, searches: 0, fullSearches: 0 };
+      s = { area, calls: 0, error: null, changed: null, changedPrs: null, searches: 0, fullSearches: 0, rereadBatches: false };
       run.sources.set(area, s);
     }
     return s;
@@ -465,6 +477,29 @@ export class SyncService {
     return last ? last.envelope : env;
   }
 
+  /**
+   * Both ends of every link added or removed in an Azure DevOps project since
+   * the watermark, added to the source's changed items, so `get-many` reads
+   * them again (#664). The search's own input, less its WIQL, names the project.
+   * A failure can't say which items changed, so every batch is read whole.
+   */
+  private async linkChanges(run: Run, source: Source, searchInput: Rec, watermark: string, signal: AbortSignal) {
+    const input = Object.fromEntries(Object.entries(searchInput).filter(([k]) => k !== 'wiql'));
+    const env = await this.call(ADO_LINK_FEED, { ...input, updatedSince: watermark }, signal);
+    if (!env.ok || !Array.isArray(env.data)) {
+      source.rereadBatches = true;
+      this.say(`${run.toilProject}: ${ADO_LINK_FEED} since ${watermark} failed, ${env.ok ? 'its answer was not a list' : env.error.message}; reading every work item again so no removed link stays`);
+      return;
+    }
+    // Azure DevOps Services nests a link change under `attributes`; the reference's example has it flat, so either is read.
+    const ends = recs(env.data).flatMap((l) => {
+      const a = isRec(l.attributes) ? l.attributes : l;
+      return [a.sourceId, a.targetId];
+    }).filter((id) => typeof id === 'number' || (typeof id === 'string' && id !== '')).map(String);
+    source.changed = new Set([...(source.changed ?? []), ...ends]);
+    this.say(`${run.toilProject}: ${ADO_LINK_FEED} since ${watermark}: ${env.data.length} changed links`);
+  }
+
   private async fetch(run: Run, source: Source, command: string, input: Rec, signal: AbortSignal): Promise<Envelope> {
     const { toilProject } = run;
     const state = this.cache.source(toilProject, source.area);
@@ -485,11 +520,14 @@ export class SyncService {
       const fresh = listOf(delta.data);
       source.changed = new Set([...(source.changed ?? []), ...fresh.map(search.id)]);
       this.say(`${toilProject}: ${command} since ${watermark}: ${fresh.length} changed`);
+      if (command === ADO_SEARCH) await this.linkChanges(run, source, input, watermark, signal);
       let merged = mergeById(listOf(last.envelope.data), fresh, search.id);
       // A search "since" never lists what was deleted or moved away, so once in a while the source is listed whole and what it no longer has is dropped.
       let removed = 0;
       const fullReadAt = state?.fullReadAt ?? null;
       if (search.reconcile && (fullReadAt === null || Date.parse(run.startedAt) - Date.parse(fullReadAt) >= RECONCILE_MS)) {
+        // A link change the feed missed would otherwise last for ever, so on this day the cached work items are read again too.
+        if (command === ADO_SEARCH) source.rereadBatches = true;
         const whole = await this.call(command, idsOnly(command, input), signal);
         if (whole.ok) {
           const present = new Set(listOf(whole.data).map(search.id));
@@ -576,7 +614,7 @@ export class SyncService {
       const stored = this.cache.all(toilProject, command).filter((r) => r.envelope.ok);
       const last = stored[0];
       const changed = source.changed;
-      if (changed === null || !last) return this.call(command, input, signal);
+      if (changed === null || !last || source.rereadBatches) return this.call(command, input, signal);
       const cached = new Map<string, Rec>();
       for (const row of stored) for (const r of recs((row.envelope.data as Rec)[batch.list])) if (!cached.has(batch.id(r))) cached.set(batch.id(r), r);
       const toFetch = wanted.filter((id) => changed.has(id) || !cached.has(id));

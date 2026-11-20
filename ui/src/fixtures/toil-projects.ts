@@ -22,6 +22,7 @@
  * Two set the readiness gate (#307): card-payments keeps acceptance criteria
  * in a Jira custom field and asks for 20 words of description, checkout-web
  * asks for 10 and names its issue template; settlement takes the defaults.
+ * card-payments also names ticket rules (#657), gherkin and bug-repro.
  *
  * Reference data (`jobs`, `builds`, `deployments`, `projects`) is the kind a
  * toil project keeps as written (docs/projects.md); the dashboard reads it to know
@@ -44,6 +45,8 @@ export interface ToilProjectFile {
   dimensions?: Record<string, Record<string, string>>;
   classify?: Record<string, unknown>;
   views?: Record<string, unknown>;
+  /** The ticket rules its work is held to (#657): built-in names here, read by fixtures/standards.ts. */
+  standards?: { use: string[] };
   [area: string]: unknown;
 }
 
@@ -69,6 +72,8 @@ export const TOIL_PROJECTS: ToilProjectFile[] = [
       { name: 'R. Patel', ids: { jira: 'rpatel' } },
     ],
     wipLimit: 2,
+    // Ticket rules (#657): stories state criteria as Given/When/Then, bugs say how to reproduce them.
+    standards: { use: ['gherkin', 'bug-repro'] },
   },
   {
     name: 'settlement',
@@ -117,7 +122,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 
 /** `toil projects show <name>`'s data. */
 export function showData(d: ToilProjectFile) {
-  const { name, description, env, repos, environments, people, wipLimit, dimensions, classify, views, ...sections } = d;
+  const { name, description, env, repos, environments, people, wipLimit, dimensions, classify, views, standards, ...sections } = d;
   const areaNames = new Set([...Object.keys(sections), ...Object.values(environments ?? {}).flatMap((e) => Object.keys(e))]);
   const areas: Record<string, unknown> = {};
   for (const area of [...areaNames].sort()) {
@@ -139,7 +144,7 @@ export function showData(d: ToilProjectFile) {
     repo: null,
     adopted: true,
     areas,
-    toilProject: { name, description, ...(env ? { env } : {}), repos, ...sections, ...(environments ? { environments } : {}), ...(people ? { people } : {}), ...(wipLimit ? { wipLimit } : {}), ...(dimensions ? { dimensions } : {}), ...(classify ? { classify } : {}), ...(views ? { views } : {}) },
+    toilProject: { name, description, ...(env ? { env } : {}), repos, ...sections, ...(environments ? { environments } : {}), ...(people ? { people } : {}), ...(wipLimit ? { wipLimit } : {}), ...(dimensions ? { dimensions } : {}), ...(classify ? { classify } : {}), ...(views ? { views } : {}), ...(standards ? { standards } : {}) },
     problems: [],
   };
 }

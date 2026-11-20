@@ -240,3 +240,40 @@ describe('work-item feed (the reporting feed)', () => {
     expect(t.http.calls).toHaveLength(1);
   });
 });
+
+describe('work-item link-feed (the reporting links feed, #664)', () => {
+  it('reads link changes from a start date, then follows the continuation token without the date, removals included', async () => {
+    const { calls, data, envelope } = await run('work-item link-feed', { ...AT, updatedSince: '2026-09-01' });
+    expect(calls[0]!.headers).toMatchObject({ authorization: expect.stringMatching(/^Basic /), accept: 'application/json' });
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+      `GET ${ADO}${COLL}/Imagile/_apis/wit/reporting/workitemlinks?api-version=7.1&startDateTime=2026-09-01T00%3A00%3A00.000Z`,
+      `GET ${ADO}${COLL}/Imagile/_apis/wit/reporting/workitemlinks?api-version=7.1&continuationToken=abc12345`,
+    ]);
+    // The removed link is reported, with isActive false: that is what a "changed since" search can't show.
+    const links = data as Array<{ rel: string; attributes: { linkType: string; sourceId: number; targetId: number; isActive: boolean } }>;
+    expect(links.map(({ attributes: a }) => `${a.sourceId}->${a.targetId} ${a.isActive}`)).toEqual(['42->7 true', '7->9 true', '42->7 false']);
+    // Passed through as Azure DevOps sends it: the topology in rel, the direction in attributes.linkType.
+    expect(links[0]).toMatchObject({ rel: 'System.LinkTypes.Dependency', attributes: { linkType: 'System.LinkTypes.Dependency-Forward' } });
+    expect(envelope.meta.page).toBeUndefined();
+  });
+
+  it('without a start date it sends none', async () => {
+    const { calls } = await run('work-item link-feed', { ...AT });
+    expect(calls.map((c) => c.url)).toEqual([`${ADO}${COLL}/Imagile/_apis/wit/reporting/workitemlinks?api-version=7.1`, `${ADO}${COLL}/Imagile/_apis/wit/reporting/workitemlinks?api-version=7.1&continuationToken=abc12345`]);
+  });
+
+  it('--limit stops inside a batch, and the cursor resumes from the token', async () => {
+    const first = await run('work-item link-feed', { ...AT, updatedSince: '2026-09-01', limit: 2 });
+    expect(first.calls).toHaveLength(1);
+    expect(first.envelope.meta.page).toEqual({ nextCursor: expect.any(String), limit: 2 });
+    const second = await run('work-item link-feed', { ...AT, updatedSince: '2026-09-01', limit: 2, cursor: first.envelope.meta.page!.nextCursor });
+    expect((second.data as Array<{ attributes: { isActive: boolean } }>).map((l) => l.attributes.isActive)).toEqual([false]);
+    expect(second.envelope.meta.page).toEqual({ nextCursor: null, limit: 2 });
+  });
+
+  it('refuses a zoneless start before anything is sent', async () => {
+    const zoneless = await run('work-item link-feed', { ...AT, updatedSince: '2026-09-01T09:00:00' });
+    expect(zoneless.envelope.error?.code).toBe('INVALID_INPUT');
+    expect(zoneless.calls).toHaveLength(0);
+  });
+});

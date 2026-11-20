@@ -2,10 +2,11 @@
 // The worklog is rebuilt from the cache on request, a convenience timesheets have never offered.
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FIXTURE_NOW } from '../src/fixtures/execute.ts';
 import { fixtureWorklog } from '../src/fixtures/worklog.ts';
 import { parseRoute } from '../src/App.tsx';
+import { setHomes } from '../src/home-path.ts';
 import type { WorklogApi, WorklogDay } from '../src/worklog.ts';
 import { open, AXE_TIMEOUT, violations, tabs, resetBrowserState } from './views-kit.tsx';
 
@@ -20,7 +21,8 @@ describe('the worklog (#308)', () => {
 
   it("opens on today's page, linked from the header, with the calendar of days that have one", async () => {
     await open('#/project/card-payments/worklog');
-    expect(within(tabs('card-payments')).getByRole('link', { name: 'What happened' }).getAttribute('aria-current')).toBe('page');
+    expect(within(tabs('card-payments')).getByRole('link', { name: 'Team' }).getAttribute('aria-current')).toBe('page');
+    expect(document.querySelector('[data-team-page="worklog"]')!.getAttribute('aria-current')).toBe('page');
     await screen.findByRole('heading', { name: 'Tuesday 13 October 2026' });
     const today = screen.getByRole('link', { name: /Tuesday 13 October 2026, today/ });
     expect(today.getAttribute('aria-current')).toBe('date');
@@ -63,14 +65,15 @@ describe('the worklog (#308)', () => {
     const day = await screen.findByRole('region', { name: 'Monday 12 October 2026' });
     for (const sentence of ['No pull requests opened, reviewed, merged or declined.', 'No builds or deployments failed or recovered.', 'No agent runs.', 'No notes.', 'No status changes, sprint changes or new blockers recorded.']) expect(day.textContent).not.toContain(sentence);
     const none = day.querySelector('[data-empties="none"]');
-    const named = (none?.textContent ?? '').split('·').map((t) => t.trim());
+    const named = (none?.textContent ?? '').replace(/^Nothing recorded: /, '').split('·').map((t) => t.trim());
     for (const title of ['Work items', 'Pull requests', 'Builds and deployments', 'Agent runs', 'Notes']) {
       const heading = within(day).queryByRole('heading', { name: title }) !== null;
       expect(heading !== named.includes(title), title).toBe(true);
     }
+    // A dash means "not read yet" (principle 12): a section read and empty is said in words.
     if (none) {
-      expect(none.querySelector('.sr-only')!.textContent).toBe('none');
-      expect(none.querySelector('[aria-hidden="true"]')!.textContent).toBe('–');
+      expect(none.textContent).toMatch(/^Nothing recorded: /);
+      expect(none.querySelector('[data-dash]')).toBeNull();
     }
   });
 
@@ -134,5 +137,27 @@ describe('the stand-up (#345)', () => {
     // One day is a one-day stand-up; anything that isn't a day is named on the page, never dropped quietly.
     expect(parseRoute('#/project/card-payments/standup/2026-10-09')).toEqual({ view: 'standup', toilProject: 'card-payments', from: '2026-10-09', to: '2026-10-09' });
     expect(parseRoute('#/project/card-payments/standup/2026-10-09/monday')).toEqual({ view: 'standup', toilProject: 'card-payments', from: null, to: null, ignored: 'monday' });
+  });
+});
+
+describe("the worklog page's own path (#653)", () => {
+  afterEach(() => setHomes(null));
+
+  it('is shown from ~, tooltip included, so the account name stays off screen, and copies whole', async () => {
+    setHomes(['/Users/someone']);
+    const file = '/Users/someone/toil-demo-home/.toil-ui/cache/worklog/card-payments/2026-10/2026-10-13.md';
+    const base = fixtureWorklog();
+    const worklog: WorklogApi = { ...base, day: async (toilProject, day) => ({ ...(await base.day(toilProject, day)), file }) };
+    const writes: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => void writes.push(t) }, configurable: true });
+    const { container } = await open('#/project/card-payments/worklog', { worklog });
+    // Where the page is kept sits with the Markdown, one press in (#657).
+    await screen.findByText(/^Kept at/);
+    const path = container.querySelector<HTMLElement>('.worklog-page .l-path__text')!;
+    expect(path.textContent).toBe('~/toil-demo-home/.toil-ui/cache/worklog/card-payments/2026-10/2026-10-13.md');
+    expect(path.title).toBe(path.textContent);
+    expect(container.textContent).not.toContain('someone');
+    await userEvent.click(screen.getByRole('button', { name: "Copy page's path" }));
+    await waitFor(() => expect(writes).toEqual([file]));
   });
 });

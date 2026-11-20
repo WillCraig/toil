@@ -9,6 +9,9 @@ import { Checkbox } from 'react-aria-components';
 import { useLearningLinks } from '../../learning.ts';
 import { Card } from '../../components/layout.tsx';
 import { CheckIcon } from '../../components/icons.tsx';
+import { InfoTip } from '../../components/help.tsx';
+
+const LEARNING_TIP = "With this on, Help, the agent's chat and the (i) beside AI terms link to Context Overflow's glossary and modules; with it off, nothing links there.";
 
 export function LearningSetting() {
   const [on, setOn] = useLearningLinks();
@@ -22,12 +25,11 @@ export function LearningSetting() {
           </span>
           Links to learning content
         </Checkbox>
+        {/* What the box does is its (i) (#657); "Saved in this browser" is said once, under the page's cards. */}
+        <InfoTip label="learning content" tip={LEARNING_TIP}>
+          <p>{LEARNING_TIP}</p>
+        </InfoTip>
       </div>
-      <p className="note">
-        {on
-          ? "Help, the agent's chat and the (i) beside AI terms link to Context Overflow's glossary and modules. Saved in this browser only."
-          : 'No links to Context Overflow anywhere. Saved in this browser only.'}
-      </p>
     </Card>
   );
 }

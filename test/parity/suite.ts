@@ -133,13 +133,23 @@ export async function defineParity(shard: number, shards: number): Promise<void>
     'work/.toil/classify/team.json': TEAM_SCHEME,
     'work/schemes/team-v2.json': { ...TEAM_SCHEME, guidance: ['A bug fix is KTLO.'], rules: [{ id: 'escalations', when: { label: ['customer-escalation'] }, then: 'ktlo' }] },
     'work/schemes/ktlo-feature-v2.json': { ...TEAM_SCHEME, name: undefined, guidance: ['Say it once.'] },
+    // The standards commands: a checked-in standard the check example names (one rule for every item, one on a field the records don't carry).
+    'work/.toil/standards/team.json': {
+      name: 'team',
+      revision: 1,
+      description: 'Titles say what changes; the risk field is filled in.',
+      rules: [
+        { id: 'title-words', name: 'A title of three words or more', text: 'Give the item a title of at least three words that says what changes.', check: { kind: 'words', in: ['title'], min: 3 } },
+        { id: 'risk', name: 'Risk filled in', text: 'Fill in the Risk field.', fail: 'fail', check: { kind: 'field', in: ['field:customfield_10777'] } },
+      ],
+    },
     'work/.toil/projects/team.json': { name: 'team', description: 'Shared by the team', repos: [{ name: 'payments-api', remotes: ['https://bitbucket.imagile.dev/scm/pay/payments-api.git'] }] },
   });
   afterAll(() => outsideDisk.cleanup());
   // An area fixture's own toil project (`toil-project`), as your own and named by TOIL_PROJECT, for its check-toil-project.
   const fixtureDisks = new Map<LoadedFixture, ReturnType<typeof toilProjectDisk>>();
   afterAll(() => fixtureDisks.forEach((d) => d.cleanup()));
-  type Local = { repo?: GitContext; git?: GitRunner; home?: Record<string, string>; toilProjects?: ReturnType<typeof toilProjectDisk>['catalog']; schemes?: ReturnType<typeof toilProjectDisk>['schemes']; ledger?: ReturnType<typeof toilProjectDisk>['ledger']; diagrams?: ReturnType<typeof toilProjectDisk>['diagrams']; configFile?: string };
+  type Local = { repo?: GitContext; git?: GitRunner; home?: Record<string, string>; toilProjects?: ReturnType<typeof toilProjectDisk>['catalog']; schemes?: ReturnType<typeof toilProjectDisk>['schemes']; standards?: ReturnType<typeof toilProjectDisk>['standards']; ledger?: ReturnType<typeof toilProjectDisk>['ledger']; diagrams?: ReturnType<typeof toilProjectDisk>['diagrams']; configFile?: string };
   function localOf(f: LoadedFixture): Local {
     const local: Local = { ...(f.repo ? { repo: f.repo } : {}), ...(f.git ? { git: f.git } : {}), ...(f.home ? { home: f.home } : {}) };
     if (f === outside) {
@@ -150,6 +160,7 @@ export async function defineParity(shard: number, shards: number): Promise<void>
         return outsideDisk.catalog(config, { areas: toilProjectAreas });
       };
       local.schemes = (config) => outsideDisk.schemes(config);
+      local.standards = (config) => outsideDisk.standards(config);
       local.diagrams = () => outsideDisk.diagrams();
       local.ledger = () => outsideDisk.ledger();
     } else if (f.toilProject) {

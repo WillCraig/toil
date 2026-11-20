@@ -64,7 +64,8 @@ describe('the chat', () => {
     await userEvent.click(within(screen.getByRole('group', { name: 'Starter questions' })).getAllByRole('button')[0]!);
     const first = await screen.findByRole('group', { name: 'What this answer used' });
     // The answer's one folded line carries the summary; the breakdown is the fold's contents.
-    expect(first.closest('details')!.querySelector('summary')!.textContent).toMatch(/ · no dollar figure reported$/);
+    // With no dollar figure the answer's line leaves the cost out rather than say it is missing; the tokens are in the fold.
+    expect(first.closest('details')!.querySelector('summary')!.textContent).toMatch(/^What it looked at · \d+ s$/);
     expect(first.closest('details')!.open).toBe(false);
     expect(first.textContent).toContain("Codex, the CLI's default model (not named by the SDK): 21k in · 380 out · 14k cached · cache write not reported · no dollar figure (add your rates under Settings, Usage)");
     // After the first question the starters are a Suggestions menu (#343).

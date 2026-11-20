@@ -15,6 +15,7 @@ import { DataTable } from './layout.tsx';
 import type { Burnup } from '../model/burnup.ts';
 import type { Week } from '../model/flow.ts';
 import type { DayCalls } from '../usage.ts';
+import { SummaryChevron } from './disclosure.tsx';
 
 const W = 560;
 const PAD = { left: 34, right: 12, top: 14, bottom: 26 };
@@ -23,7 +24,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 export function Figures({ caption, head, rows }: { caption: string; head: string[]; rows: ReactNode[][] }) {
   return (
     <details className="figures">
-      <summary>Show the figures</summary>
+      <summary><SummaryChevron />Show the figures</summary>
       <DataTable
         label={caption}
         caption={caption}
@@ -104,6 +105,7 @@ export function BurnupChart({ b, sprint }: { b: Burnup; sprint: string }) {
       <figcaption className="legend">
         <span className="key-swatch key-swatch--done" aria-hidden="true" /> Done points <span className="key-swatch key-swatch--scope" aria-hidden="true" /> Scope
         {b.unplaced.length > 0 && <span className="note"> {b.unplaced.length} done items have no recorded finish and aren't drawn.</span>}
+        {b.unestimated.length > 0 && <span className="note"> {b.unestimated.length === 1 ? '1 item has' : `${b.unestimated.length} items have`} no points read and {b.unestimated.length === 1 ? "isn't" : "aren't"} drawn.</span>}
       </figcaption>
       <Figures caption={`${sprint} burn-up by day`} head={['Day', 'Scope (points)', 'Done (points)']} rows={b.days.map((d) => [day(d.at), d.scope, d.done])} />
     </figure>

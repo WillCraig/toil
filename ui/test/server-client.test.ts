@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { httpAgent, httpExecute, readServerInfo, type ServerInfo } from '../src/server-client.ts';
+import { setHomes } from '../src/home-path.ts';
 
 /**
  * The page's side of the server (#561): it asks what the server is, and sends
@@ -53,6 +54,25 @@ describe('httpExecute', () => {
     expect(init.credentials).toBe('same-origin');
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
     expect(JSON.parse(String(init.body))).toEqual({ command: 'projects list', input: {} });
+  });
+
+  it("writes a home folder in the error, its fix and the warnings from ~, and leaves data as toil sent it (#653)", async () => {
+    setHomes(['/Users/someone']);
+    try {
+      const envelope = {
+        ok: false,
+        data: { folder: '/Users/someone/Code/toil' },
+        error: { code: 'INVALID_INPUT', message: 'No toil project applies to /Users/someone/Code/toil.', fix: 'Pass --cwd for a folder under /Users/someone.' },
+        meta: { command: 'projects show', durationMs: 0, version: 'x', contractVersion: 1, warnings: [{ code: 'W', message: 'Read /Users/someone/.toil/projects/a.json.' }] },
+      };
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(envelope), { status: 200 })));
+      const got = await httpExecute()('projects show', {}, { readOnly: true, caller: 'toil-ui' });
+      expect(got.error).toEqual({ code: 'INVALID_INPUT', message: 'No toil project applies to ~/Code/toil.', fix: 'Pass --cwd for a folder under ~.' });
+      expect(got.meta.warnings).toEqual([{ code: 'W', message: 'Read ~/.toil/projects/a.json.' }]);
+      expect(got.data).toEqual({ folder: '/Users/someone/Code/toil' });
+    } finally {
+      setHomes(null);
+    }
   });
 });
 

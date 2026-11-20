@@ -12,6 +12,7 @@ import { useData } from '../data.ts';
 import { chartsHref, toilProjectHref } from '../format.ts';
 import { DASHBOARDS, dashboardNamed } from './charts/index.ts';
 import './charts/charts.css';
+import { NavButton } from '../components/nav-button.tsx';
 
 export function Charts({ dashboard }: { dashboard?: string | null }) {
   const { toilProject } = useData();
@@ -30,7 +31,9 @@ export function Charts({ dashboard }: { dashboard?: string | null }) {
         <ul className="rows">
           {DASHBOARDS.map((d) => (
             <li key={d.id}>
-              <a href={chartsHref(toilProject.name, d.id)}>{d.title}</a>
+              <NavButton href={chartsHref(toilProject.name, d.id)} kind="quiet" size="sm">
+                {d.title}
+              </NavButton>
             </li>
           ))}
         </ul>

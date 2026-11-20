@@ -18,8 +18,9 @@ import { ADAPTER_NAME, type AssignmentsApi } from '../assign/model.ts';
 import { Card } from './layout.tsx';
 import { toilProjectHref } from '../format.ts';
 import { history } from '../history.ts';
-import { Coalescer, HHMM, inQuiet, NOTABLE_LABEL, NOTABLES, parseNotify, summaryOf, transitionOf, type NotifySettings, type Transition } from '../notify.ts';
+import { Coalescer, HHMM, inQuiet, NOTABLE_LABEL, NOTABLES, parseNotify, settles, summaryOf, transitionOf, type NotifySettings, type Transition } from '../notify.ts';
 import { CheckIcon } from './icons.tsx';
+import { Help } from './help.tsx';
 
 const SETTINGS_KEY = 'toil-ui.notify';
 const MINE_KEY = 'toil-ui.notify.mine';
@@ -175,6 +176,19 @@ export function NotifyProvider({ assignments, toilProject, mine, children }: { a
     const listen = () => {
       assignments.events!(since, (e) => {
         since = e.seq;
+        // An assignment that no longer needs you (its proposal applied, it was marked reviewed): its needs-you notice goes, and the bell stops counting it.
+        if (settles(e)) {
+          const key = `assignment:${e.id}`;
+          history.settle(`${key}:needs-you`);
+          setNotices((ns) =>
+            ns
+              .map((n) => {
+                const changes = n.changes.filter((c) => !(c.key === key && c.notable === 'needs-you'));
+                return changes.length === n.changes.length || !changes.length ? { ...n, changes } : { ...n, changes, title: summaryOf(changes).title };
+              })
+              .filter((n) => n.changes.length > 0),
+          );
+        }
         const t = transitionOf(e, { mine: mine().has(e.id), href: `${toilProjectHref(e.toilProject)}/assignment/${encodeURIComponent(e.id)}` });
         if (t) coalescer.push(t, e.previous);
       }, controller.signal).then(
@@ -265,7 +279,7 @@ export function Notices() {
   );
 }
 
-const lineOfLink = (c: Transition) => `${c.item ? `${c.item}${c.itemTitle ? ` ${c.itemTitle}` : ''}` : c.toilProject}: ${c.why}`;
+const lineOfLink = (c: Transition) => `${c.item ? `${c.itemName ?? c.item}${c.itemTitle ? ` ${c.itemTitle}` : ''}` : c.toilProject}: ${c.why}`;
 
 /** One checkbox in the settings, drawn as Settings, General draws its others. */
 function Check({ on, set, children }: { on: boolean; set: (on: boolean) => void; children: ReactNode }) {
@@ -322,8 +336,9 @@ export function NotifySetting() {
   };
   return (
     <Card as="section" className="panel notify-setting" aria-labelledby="notify-title">
-      <h2 id="notify-title">Notifications</h2>
-      <p className="note">A notice when an agent's state changes, never for a tool call or its progress. Changes within a few seconds become one notice. Saved in this browser only.</p>
+      <h2>
+        <span id="notify-title">Notifications</span> <Help topic="notifications" note="Changes within a few seconds become one notice." />
+      </h2>
       <fieldset className="notify-states">
         <legend>Notify when an agent is</legend>
         {NOTABLES.map((k) => (

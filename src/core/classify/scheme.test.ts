@@ -27,10 +27,18 @@ describe('the built-in schemes', () => {
     }
   });
 
-  it('are ktlo-feature, the default, and balance, each at revision 1', () => {
-    expect(BUILTIN_SCHEMES.map((s) => [s.name, s.revision])).toEqual([['ktlo-feature', 1], ['balance', 1]]);
+  it('are ktlo-feature, the default, balance and flow, each at revision 1', () => {
+    expect(BUILTIN_SCHEMES.map((s) => [s.name, s.revision])).toEqual([['ktlo-feature', 1], ['balance', 1], ['flow', 1]]);
     expect(defaultScheme().name).toBe(DEFAULT_SCHEME);
     expect(builtinScheme('balance')!.categories.map((c) => c.id)).toEqual(['new', 'improve', 'ktlo', 'productivity']);
+  });
+
+  it('has flow sort by rules alone, risk before defect, with no signals', () => {
+    const flow = builtinScheme('flow')!;
+    expect(flow.categories.map((c) => c.id)).toEqual(['feature', 'defect', 'risk', 'debt']);
+    expect(flow.rules.map((r) => [r.id, r.then])).toEqual([['risk', 'risk'], ['defect', 'defect'], ['defect-label', 'defect'], ['debt-title', 'debt'], ['tech-debt', 'debt'], ['story', 'feature']]);
+    expect(flow.signals).toBe(false);
+    expect(readScheme(JSON.parse(schemeContent(flow)), 'flow.json').scheme).toEqual(flow);
   });
 
   it('are handed out as copies, so a caller cannot change what the next call sees', () => {

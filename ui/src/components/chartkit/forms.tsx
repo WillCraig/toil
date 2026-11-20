@@ -39,6 +39,12 @@ import { Unread } from '../unread.tsx';
 
 const W = 560;
 const SURFACE_GAP = 2;
+/**
+ * Whether a segment's value fits inside it clear of its border: the 13px text plus the thickest edge on both sides (a
+ * double outline sits 4.5 in), so no label is drawn struck through by a border it doesn't fit inside. A segment too small
+ * keeps its figure in the table and the drill, one press away.
+ */
+const fitsLabel = (seg: { width: number; height: number }, text: string) => seg.height >= 22 && seg.width >= text.length * 7.8 + 10;
 
 /** Whole-number ticks up to `max`, about four of them. */
 export function niceTicks(max: number): number[] {
@@ -143,7 +149,7 @@ function Stacked({ view, horizontal }: { view: ChartView; horizontal: boolean })
                 const { mark, kind } = view.look(ri);
                 return (
                   <MarkRect key={ri} {...seg} mark={mark} kind={kind} frames={view.frames} {...view.cellMark(ri, ci, first())}>
-                    {seg.width >= 28 && <text className="ck-value" x={seg.x + seg.width / 2} y={seg.y + seg.height / 2 + 4} textAnchor="middle">{label(v)}</text>}
+                    {fitsLabel(seg, label(v)) && <text className="ck-value" x={seg.x + seg.width / 2} y={seg.y + seg.height / 2 + 4} textAnchor="middle">{label(v)}</text>}
                   </MarkRect>
                 );
               })}
@@ -189,7 +195,7 @@ function Stacked({ view, horizontal }: { view: ChartView; horizontal: boolean })
               const { mark, kind } = view.look(ri);
               return (
                 <MarkRect key={ri} {...seg} mark={mark} kind={kind} frames={view.frames} {...view.cellMark(ri, ci, first())}>
-                  {seg.height >= 16 && seg.width >= 28 && <text className="ck-value" x={cx} y={seg.y + seg.height / 2 + 4} textAnchor="middle">{label(v)}</text>}
+                  {fitsLabel(seg, label(v)) && <text className="ck-value" x={cx} y={seg.y + seg.height / 2 + 4} textAnchor="middle">{label(v)}</text>}
                 </MarkRect>
               );
             })}

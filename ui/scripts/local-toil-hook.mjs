@@ -1,5 +1,5 @@
 // A module resolve hook that runs Toil UI on toil built from this checkout
-// (#332). verify.mjs and dev-real.mjs start the built toil-ui with
+// (#332). verify.mjs, dev-real.mjs and demo-home.mjs --launch start the built toil-ui with
 // `node --import <this file>`, and only those processes get it: the bundle in
 // ui/dist/server/ still imports `@imagile-dev/toil/api`, and everywhere else
 // (the published package, `npm run smoke -w ui`, a plain `node toil-ui.js`)

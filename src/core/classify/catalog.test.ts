@@ -165,7 +165,7 @@ describe('list', () => {
       'home/.toil/classify/balance.json': scheme('balance'),
     });
     const { schemes, warnings } = catalog.list();
-    expect(schemes.map((s) => [s.scheme.name, s.source])).toEqual([['balance', 'user'], ['shared', 'user'], ['team', 'repo'], ['ktlo-feature', 'built-in']]);
+    expect(schemes.map((s) => [s.scheme.name, s.source])).toEqual([['balance', 'user'], ['shared', 'user'], ['team', 'repo'], ['ktlo-feature', 'built-in'], ['flow', 'built-in']]);
     expect(warnings).toEqual([]);
   });
 
@@ -178,7 +178,7 @@ describe('list', () => {
       'home/.toil/classify/good.json': scheme('good'),
     });
     const { schemes, warnings } = catalog.list();
-    expect(schemes.map((s) => s.scheme.name)).toEqual(['good', 'ktlo-feature', 'balance']);
+    expect(schemes.map((s) => s.scheme.name)).toEqual(['good', 'ktlo-feature', 'balance', 'flow']);
     expect(warnings.map((w) => w.code).sort()).toEqual(['SCHEME_INVALID', 'SCHEME_INVALID', 'SCHEME_INVALID', 'SCHEME_PATH_INVALID']);
     expect(warnings.find((w) => w.message.includes('broken.json'))!.message).toContain('categories:');
     expect(warnings.find((w) => w.message.includes('broken.json'))!.message).toContain(forwardSlashes(join(disk.home, '.toil', 'classify', 'broken.json')));
@@ -186,7 +186,7 @@ describe('list', () => {
 
   it('is only the built-ins when there is nothing else', () => {
     const { catalog } = setup();
-    expect(catalog.list().schemes.map((s) => [s.scheme.name, s.source])).toEqual([['ktlo-feature', 'built-in'], ['balance', 'built-in']]);
+    expect(catalog.list().schemes.map((s) => [s.scheme.name, s.source])).toEqual([['ktlo-feature', 'built-in'], ['balance', 'built-in'], ['flow', 'built-in']]);
   });
 });
 

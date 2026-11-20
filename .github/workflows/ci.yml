@@ -14,11 +14,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Pull requests and main run on Linux, on the supported Node floor, in two
-  # jobs side by side: toil's gate and Toil UI's (which a docs-and-config PR
-  # skips, see `changes`). Windows, macOS and Node 26 run
-  # daily and on the release PR (platforms.yml), so a platform break shows within
-  # a day and always before a release (#376). The floor was 24.14, the first
+  # Pull requests and main run toil's gate and Toil UI's side by side on Linux,
+  # on the supported Node floor (Toil UI's is its checks and its eight layout
+  # shards, which a docs-and-config PR skips, see `changes`), and both gates on
+  # Windows, macOS and Node 26 beside them (`platforms`, below), with the
+  # layout check left to Linux. The full layout check on every OS runs daily
+  # (platforms.yml). Every job has a time limit, so a hang fails in minutes,
+  # not at GitHub's six hours. The floor was 24.14, the first
   # release where both the OS certificate store and the proxy env vars can be
   # switched on from code (tls.setDefaultCACertificates,
   # http.setGlobalProxyFromEnv); it is now 24.22.1, the 24.x release patched for
@@ -27,6 +29,7 @@ jobs:
   gate:
     name: toil gate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -42,7 +45,7 @@ jobs:
       # No runtime deps, no install scripts, only Node built-ins, no spawning.
       - run: npm run check:pure
       # On the release PR only, which rebuilds the committed dist/toil.js
-      # (release.yml): it is exactly what the build just produced. platforms.yml
+      # (release.yml): it is exactly what the build just produced. `platforms`
       # checks the same on every OS. Every other PR leaves dist/ alone (dist-guard).
       - if: startsWith(github.head_ref, 'release-please--')
         run: npm run check:dist
@@ -59,6 +62,7 @@ jobs:
   changes:
     name: What changed
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       full: ${{ steps.scope.outputs.full }}
     steps:
@@ -90,14 +94,14 @@ jobs:
   # Toil UI (ui/, @imagile-dev/toil-ui), the root's npm workspace: never in
   # toil's tarball, but held to the same gate. check:package is its check:pure
   # (one dependency, toil pinned exactly, no install scripts, no native addon,
-  # the server imports only built-ins and toil, a tarball allowlist); its smoke
-  # installs both tarballs offline, opens the UI, and runs the layout check in
-  # the runner's Chrome (ui/scripts/layout-check.mjs), one Chrome per core.
+  # the server imports only built-ins and toil, a tarball allowlist). Its smoke
+  # runs in ui-layout below, beside this job.
   ui:
-    name: Toil UI gate
+    name: Toil UI checks
     needs: [changes]
     if: needs.changes.outputs.full != 'false'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -105,7 +109,7 @@ jobs:
           node-version: '24.22.1'
           cache: npm
       - run: npm ci --ignore-scripts
-      # The UI's smoke installs toil's packed tarball, so toil is built first.
+      # toil's build writes the generated sources (src/*.generated.ts) that Toil UI imports.
       - run: npm run build
       - run: npm run typecheck -w ui
       - run: npm run lint -w ui
@@ -117,7 +121,106 @@ jobs:
       # new pin over the previous toil's tarball, passes with a warning until
       # release.yml's lockfile PR merges (ui/scripts/package-rules.mjs, lockfileLag).
       - run: npm run check:lockfile -w ui
-      - run: npm run smoke -w ui
+
+  # Toil UI's smoke, in eight jobs side by side (#640). Each installs both
+  # tarballs offline, opens the UI and runs its security checks, holds its
+  # eighth of the layout check to the runner's Chrome
+  # (ui/scripts/layout-check.mjs), one Chrome per core, then runs the live and
+  # wipe checks. A unit of the layout check is one theme
+  # scheme on one view, and shard k takes every unit whose count modulo 8 is
+  # k - 1, so a new theme or view lands in a shard by existing. Run as one job
+  # the layout check took about 42 minutes. Each shard builds its own tarballs
+  # from the same commit, which takes seconds, rather than wait on a build job
+  # and an artifact. platforms.yml runs the whole smoke unsharded on every OS,
+  # daily. fail-fast is off so one round shows every shard's problems.
+  ui-layout:
+    name: Toil UI layout (${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: [changes]
+    if: needs.changes.outputs.full != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # The UI's smoke installs toil's packed tarball and its own, so both are built first.
+      - run: npm run build
+      - run: npm run build -w ui
+      # strategy.job-total is the matrix's length, so N is said once, in the list.
+      - run: npm run smoke -w ui -- --include-tests layout:${{ matrix.shard }}/${{ strategy.job-total }}
+
+  # Windows and macOS on both supported Node lines, and Linux on Node 26: every
+  # OS is first-class (principle 8), so a break on one blocks the merge like a
+  # break on Linux does. Both gates run here, toil's and Toil UI's, but Toil
+  # UI's smoke runs with --include-tests none: the install, the server's gates, the live
+  # store and the wipe, the parts most tied to the OS. The layout check stays in
+  # ui-layout on Linux on every PR and runs on every OS daily (platforms.yml):
+  # fonts and scrollbars do differ by OS, so this is a trade of cost for a day's
+  # delay, not a claim that they render alike. One job per OS and Node keeps a
+  # run's peak at about 18 jobs, inside GitHub Free's 20 at once (5 macOS),
+  # though two runs at once share that limit and queue. Toil UI's steps follow
+  # the scope check, like the jobs above; toil's run whenever it passed.
+  # Lint and check:lockfile read the same files on every OS, so they stay on
+  # Linux. The maintainer's call, 2026-11-17: a platform break should stop a
+  # merge, not wait for the next morning.
+  platforms:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    needs: [changes]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Linux on 24.22.1 is the gate and ui jobs above. Keep these in step
+        # with "engines" in package.json, src/core/runtime.ts and platforms.yml.
+        include:
+          - { os: windows-latest, node: '24.22.1' }
+          - { os: windows-latest, node: '26.12.1' }
+          - { os: macos-latest, node: '24.22.1' }
+          - { os: macos-latest, node: '26.12.1' }
+          - { os: ubuntu-latest, node: '26.12.1' }
+    env:
+      FULL: ${{ needs.changes.outputs.full }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      # A Windows runner's temp folder is on C:, where creating and flushing a
+      # file is slow enough to time tests out at random; D:, the work disk
+      # RUNNER_TEMP is on, is not (#328). os.tmpdir() reads TEMP and TMP.
+      - name: Temp folder on the work disk
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run check:pure
+      - if: startsWith(github.head_ref, 'release-please--')
+        run: npm run check:dist
+      - run: npm run smoke
+      - if: env.FULL != 'false'
+        run: npm run typecheck -w ui
+      - if: env.FULL != 'false'
+        run: npm test -w ui
+      - if: env.FULL != 'false'
+        run: npm run build -w ui
+      - if: env.FULL != 'false'
+        run: npm run check:package -w ui
+      - if: env.FULL != 'false'
+        run: npm run smoke -w ui -- --include-tests none
 
   # The committed dist/toil.js is the last released toil, and only the release
   # PR rebuilds it, so any other PR that changes dist/ fails here. The head
@@ -126,6 +229,7 @@ jobs:
     name: dist/ left to the release PR
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -134,6 +238,32 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.head_ref }}
+
+  # On the release PR only: the release waits while the daily run on every OS is
+  # failing. CI checks every OS on every PR, but Toil UI's layout check and the
+  # skill install run on Windows and macOS only daily (platforms.yml), and a
+  # failed or timed-out daily run keeps a platforms-failure issue open until a
+  # daily run passes, which closes it. So an open one means a known break on some
+  # OS, and nothing ships over it (principle 8; the maintainer's call,
+  # 2026-11-17). Once it closes, re-run this job.
+  release-platforms:
+    name: No open platforms failure
+    if: startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: read
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          open=$(gh issue list --label platforms-failure --state open --json number,url --jq '.[] | "#\(.number) \(.url)"')
+          if [ -n "$open" ]; then
+            echo "::error::The daily run on Windows, macOS and Linux is failing, so the release waits. Fix the break; the next passing daily run closes the issue (or run platforms.yml on main by hand), then re-run this job. Open: $open"
+            exit 1
+          fi
+          echo "No platforms-failure issue is open."
 
   # The database providers against real engines (`npm run test:integration`,
   # the `databases` skill). Each server engine is a service container from its
@@ -146,6 +276,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.full != 'false'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17
@@ -240,18 +371,20 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run test:integration
 
-  # The one check the ruleset on main requires, over both gates and the database
-  # integration job, so a database regression blocks a merge. Requiring one job
-  # by name, rather than each gate, keeps the ruleset right when jobs change.
+  # The one check the ruleset on main requires, over both gates (Toil UI's is its
+  # checks and its eight layout shards), Windows, macOS and Node 26, and the
+  # database integration job, so a regression on any of them blocks a merge. Requiring one job by name, rather than
+  # each gate, keeps the ruleset right when jobs change.
   # always() matters: a skipped required check counts as a pass, so this job
   # must run, and fail, when any of them fails. A long job may be skipped only
   # when the scope check itself passed and said full=false; if the scope check
   # fails, the long jobs skip and this fails, so nothing merges unchecked.
   ci-ok:
     name: CI ok
-    needs: [changes, gate, ui, integration, dist-guard]
+    needs: [changes, gate, ui, ui-layout, platforms, release-platforms, integration, dist-guard]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: The scope check passed
         env:
@@ -269,20 +402,67 @@ jobs:
             exit 1
           fi
           echo "toil's gate passed."
-      - name: Toil UI's gate passed
+      - name: Toil UI's checks passed
         env:
           RESULT: ${{ needs.ui.result }}
           FULL: ${{ needs.changes.outputs.full }}
         run: |
           if [ "$RESULT" = "skipped" ] && [ "$FULL" = "false" ]; then
-            echo "Toil UI's gate was skipped: this PR changes only docs and config."
+            echo "Toil UI's checks were skipped: this PR changes only docs and config."
             exit 0
           fi
           if [ "$RESULT" != "success" ]; then
-            echo "::error::Toil UI's gate finished as '$RESULT', not 'success'."
+            echo "::error::Toil UI's checks finished as '$RESULT', not 'success'."
             exit 1
           fi
-          echo "Toil UI's gate passed."
+          echo "Toil UI's checks passed."
+      # A matrix job's result is every shard's together: success only when all eight passed.
+      - name: Toil UI's layout shards passed
+        env:
+          RESULT: ${{ needs.ui-layout.result }}
+          FULL: ${{ needs.changes.outputs.full }}
+        run: |
+          if [ "$RESULT" = "skipped" ] && [ "$FULL" = "false" ]; then
+            echo "Toil UI's layout shards were skipped: this PR changes only docs and config."
+            exit 0
+          fi
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::Toil UI's layout shards finished as '$RESULT', not 'success'."
+            exit 1
+          fi
+          echo "Toil UI's layout shards passed."
+      # Skipped only when the scope check failed, which fails above; toil's gate
+      # runs on every OS on every PR, so only success passes. On a docs-and-config
+      # PR the jobs skip Toil UI's steps, and this says so rather than claim them.
+      - name: Windows, macOS and Node 26 passed
+        env:
+          RESULT: ${{ needs.platforms.result }}
+          FULL: ${{ needs.changes.outputs.full }}
+        run: |
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::The Windows, macOS and Node 26 jobs finished as '$RESULT', not 'success'."
+            exit 1
+          fi
+          if [ "$FULL" = "false" ]; then
+            echo "toil's gate passed on Windows, macOS and Node 26; Toil UI's steps were skipped there: this PR changes only docs and config."
+            exit 0
+          fi
+          echo "Windows, macOS and Node 26 passed."
+      # Runs only on the release PR; anywhere else a skip is expected.
+      - name: No open platforms failure on the release PR
+        env:
+          RESULT: ${{ needs.release-platforms.result }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            release-please--*) ;;
+            *) echo "Not the release PR: the open platforms-failure check doesn't apply."; exit 0 ;;
+          esac
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::The open platforms-failure check finished as '$RESULT', not 'success'."
+            exit 1
+          fi
+          echo "No platforms-failure issue is open."
       - name: The database integration job passed
         env:
           RESULT: ${{ needs.integration.result }}

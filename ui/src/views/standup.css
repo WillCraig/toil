@@ -6,11 +6,12 @@
 .standup-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
 .standup-days { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; min-width: 0; }
 .standup-select, .standup-date { font: inherit; font-size: 0.875rem; color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 0.35rem; padding: 0.3rem 0.5rem; min-height: 2rem; max-width: 100%; }
-.standup-copy { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
+.standup-copy { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .standup-fallback { flex: 1 1 100%; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 0.35rem; padding: 0.4rem; }
 .standup-problem { color: var(--warn); }
 
 .standup-source { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem; }
+.standup-team > .standup-chip { width: auto; }
 .standup-team { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.4rem; padding: 0.35rem 0; border-block: 1px solid var(--line); min-width: 0; }
 .standup-team__sprint { font-weight: 700; margin-inline-end: 0.35rem; }
 
@@ -30,42 +31,43 @@
 
 .standup-rows { display: grid; gap: 0; margin: 0; }
 .standup-row { display: grid; grid-template-columns: 5.2rem minmax(0, 1fr); gap: 0.4rem; align-items: start; }
-.standup-row dt { font-size: 0.75rem; color: var(--muted); line-height: 1.5; margin: 0; }
-.standup-row dd { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.3rem; min-width: 0; }
-.standup-row[data-bucket='comments'] dd { flex-direction: column; align-items: stretch; gap: 0.15rem; }
+.standup-row dt { font-size: 0.75rem; color: var(--muted); line-height: 1.5; margin: 0; padding-top: 0.45rem; }
+.standup-row dd { margin: 0; display: flex; flex-direction: column; align-items: stretch; gap: 0; min-width: 0; }
 .standup-dash { color: var(--muted); }
 
-.standup-chip { display: inline-flex; overflow: hidden; align-items: baseline; gap: 0.35rem; max-width: 100%; min-width: 0; padding: 0 0.4rem; border: 1px solid var(--line); border-radius: 0.35rem; background: var(--raised); font-size: 0.8125rem; line-height: 1.35; }
-.standup-key { font-weight: 600; white-space: nowrap; padding-block: 0.3rem; } /* the link is a 24px target (WCAG 2.2) inside a chip that stays one line */
+.standup-chip { display: flex; flex-wrap: wrap; overflow: hidden; align-items: center; gap: 0 0.35rem; width: 100%; max-width: 100%; min-width: 0; font-size: 0.8125rem; line-height: 1.35; }
+/* A chip's item is one quiet row button (#657): key then title, the title cut by the row's width with the whole of it on hover. */
+.standup-chip > .standup-row-btn { flex: 1 1 11rem; justify-content: flex-start; gap: 0.4rem; min-width: 0; padding-inline: 0.35rem; font-size: inherit; }
+.standup-row-btn { display: inline-flex; align-items: center; min-width: 0; overflow: hidden; }
+.standup-key { flex: none; font-family: var(--font-mono); font-weight: 600; white-space: nowrap; color: var(--muted); }
 .standup-title { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.standup-why { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.standup-chip--comment { display: flex; align-items: center; }
+.standup-why { flex: 0 1 auto; max-width: 100%; margin-inline-start: 0.35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .standup-excerpt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; color: var(--ink); }
-.standup-chip[data-outstanding] { border-color: var(--warn); }
+.standup-ext { flex: none; padding-inline: 0.35rem; }
 .standup-q { flex: none; display: inline-grid; place-items: center; width: 1.1rem; height: 1.1rem; color: var(--warn); }
-.standup-wait { flex: none; margin-inline-start: auto; color: var(--warn); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
-.standup-chip[data-cited] { box-shadow: inset 0 0 0 2px var(--accent); }
+.standup-wait { flex: none; color: var(--warn); white-space: nowrap; margin-inline-start: 0.35rem; }
+.standup-chip[data-cited] { border-radius: var(--radius); background: var(--tint-accent); box-shadow: 0 0 0 1px var(--accent); }
 .standup-fold { align-self: flex-start; font: inherit; font-size: 0.8125rem; color: var(--link, var(--accent)); background: none; border: 0; padding: 0.05rem 0.3rem; cursor: pointer; border-radius: 0.3rem; }
 .standup-fold:hover { text-decoration: underline; }
 
-.standup-more { border-top: 1px solid var(--line); padding-top: 0.5rem; }
-.standup-more > summary { cursor: pointer; font-size: 0.875rem; color: var(--muted); }
-.standup-more[open] > summary { margin-bottom: 0.5rem; }
+/* The write-up and the export (#657): one row of buttons, each with its (i), under a rule; the folder field opens under it. */
+.standup-writeup-body { border-top: 1px solid var(--line); padding-top: 0.75rem; }
 .standup-writeup-body, .standup-export { display: grid; gap: 0.5rem; min-width: 0; }
-.standup-writeup { border-left: 4px solid var(--accent); padding-left: 0.75rem; display: grid; gap: 0.5rem; min-width: 0; overflow-wrap: anywhere; }
+.standup-export__form { display: flex; flex-wrap: wrap; align-items: end; gap: 0.5rem; max-width: 40rem; }
+.standup-export__form .field-text { flex: 1 1 16rem; min-width: 0; }
+.standup-writeup { padding: 0.75rem; border: 1px solid var(--edge-accent); border-radius: var(--radius); background: var(--tint-accent); display: grid; gap: 0.5rem; min-width: 0; overflow-wrap: anywhere; }
 .standup-writeup h3 { margin: 0; font-size: 1rem; }
 .standup-writeup .btn--small { margin: 0 0.15rem; }
 
-/* The Summary's card: the same rows, a person's name in front of each. */
+/* The Summary's card: the same rows, a person's name in front of their buckets, one row per person. */
 .sum-standup__rows { display: grid; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
 .sum-standup__row { display: grid; grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr); gap: 0.4rem; align-items: start; }
-.sum-standup__row .standup-rows { display: contents; }
+.sum-standup__row .standup-rows { min-width: 0; }
 .sum-standup__row .standup-row { grid-template-columns: 5.2rem minmax(0, 1fr); }
 .sum-standup__line { font-size: 0.875rem; font-weight: 600; margin: 0; }
 
 /* On a phone or a tablet a comment has room to run to two lines before it is cut (the full text stays in the chip's tooltip). */
 @media (max-width: 800px) {
-  .standup-chip--comment { align-items: flex-start; }
   .standup-excerpt { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 }
 
@@ -73,3 +75,5 @@
   .standup-copy { margin-inline-start: 0; }
   .sum-standup__row { grid-template-columns: minmax(0, 1fr); }
 }
+.sum-standup__row { align-items: baseline; }
+.sum-standup__counts { font-size: 0.875rem; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }

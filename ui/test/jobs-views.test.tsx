@@ -118,14 +118,16 @@ describe('a job page', () => {
   it('says which connection is missing, and disables Run, instead of failing at the run', async () => {
     await open('#/project/card-payments/job/review?target=github%3Aimagile%2Fpayments-web%2343', onlyJira);
     await waitFor(() => expect(document.querySelector('[data-job-missing]')).not.toBeNull());
-    expect(document.querySelector('[data-job-missing]')!.textContent).toMatch(/^Needs a .* connection\. Add one in Settings, Connections\.$/);
+    expect(document.querySelector('[data-job-missing]')!.textContent).toMatch(/^Needs a .* connection\. Add one in Settings, Connections$/);
     expect(document.querySelector<HTMLButtonElement>('[data-job-run]')!.disabled).toBe(true);
   });
 
-  it('shows Diagram on a Toil project’s overview, as a link and not another button: the picture when one is kept', async () => {
+  it('shows Diagram in the project’s one More menu, beside Edit: the picture when one is kept', async () => {
     await open('#/project/card-payments');
-    await waitFor(() => expect(document.querySelector('.jobs-link [data-diagram-link]')).not.toBeNull());
-    expect(document.querySelector('.jobs-link [data-diagram-link]')!.getAttribute('href')).toBe('#/project/card-payments/summary/diagram');
-    expect(document.querySelector('.jobs-link button')).toBeNull();
+    await userEvent.click(await screen.findByRole('button', { name: 'More for card-payments' }));
+    const menu = await screen.findByRole('menu');
+    await waitFor(() => expect(menu.querySelector('[data-diagram-link]')).not.toBeNull());
+    expect(menu.querySelector('[data-diagram-link]')!.getAttribute('href')).toBe('#/project/card-payments/summary/diagram');
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['See its architecture', 'Edit card-payments']);
   });
 });

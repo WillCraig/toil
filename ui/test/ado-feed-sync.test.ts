@@ -64,7 +64,7 @@ describe('get-many in slices', () => {
     expect(named(toil, FEED).map((c) => c.input.fields)).toEqual([ADO_FEED_FIELDS]);
   });
 
-  it('on a second sync with the slices shifted fetches only the changed items, not every slice again', async () => {
+  it('on the day the slices shift, reads them whole (#664), and the sync after that fetches only the changed items', async () => {
     const toil = stubToil();
     const before = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.toilProject === 'settlement')!.data as { workItems: unknown[] }).workItems.length;
     extras(toil, MANY - before);
@@ -73,10 +73,17 @@ describe('get-many in slices', () => {
     expect(named(toil, 'ado work-item get-many').map((c) => (c.input.id as number[]).length)).toEqual([1000, 1]);
 
     // A day on, the search is listed whole and one item is gone, so the first slice now ends one id later and the second is empty.
+    // That day get-many is read whole too, which catches a link change the link feed missed (#664).
     advance(25 * HOUR);
     const first = (toil.canned.find((c) => c.command === 'ado work-item search' && c.input.toilProject === 'settlement')!.data as { workItems: Array<{ id: number }> }).workItems[0]!.id;
     toil.removeAdo(first);
-    toil.touchAdo(2302, 'Resolved', new Date(Date.parse(FIXTURE_NOW) + HOUR).toISOString());
+    toil.reset();
+    expect((await sync.run(ctx)).error).toBeNull();
+    expect(named(toil, 'ado work-item get-many').map((c) => (c.input.id as number[]).length)).toEqual([1000]);
+
+    // An hour on, one item changed, and only it is fetched.
+    advance(HOUR);
+    toil.touchAdo(2302, 'Resolved', new Date(Date.parse(FIXTURE_NOW) + 25 * HOUR + 30 * 60_000).toISOString());
     toil.reset();
     expect((await sync.run(ctx)).error).toBeNull();
     expect(named(toil, 'ado work-item get-many').map((c) => c.input.id)).toEqual([[2302]]);

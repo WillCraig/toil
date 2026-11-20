@@ -127,7 +127,7 @@ describe('the category chip', () => {
     expect(tip.definition).toBe(ins.definitions.ktlo!.definition);
     expect(tip.definition.length).toBeGreaterThan(20);
     expect(tip.decided).toMatch(/^Decided by (rules|label|AI agent|person)/);
-    expect(categoryTip(ins, null).title).toBe('Unsure');
+    expect(categoryTip(ins, null).title).toBe('Not sorted yet');
 
     shell(data, <CategoryChip ins={ins} itemId={id} />);
     const chip = document.querySelector<HTMLElement>('[data-category="ktlo"]')!;

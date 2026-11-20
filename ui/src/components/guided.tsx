@@ -27,6 +27,8 @@ import { TicketChip } from './items.tsx';
 import { UsageBreakdown, UsageNotices, usageLine } from './usage.tsx';
 import type { AnswerUsage } from '../model-usage.ts';
 import './guided.css';
+import { AgentMark } from './agent-mark.tsx';
+import { NavButton } from './nav-button.tsx';
 
 /** Below this width the questions come first and "Before you ask" folds to a line, so a phone opens on something to press. */
 export const PHONE = '(max-width: 699px)';
@@ -109,7 +111,10 @@ export function GuidedStart({ noAgent, notice, details, link, busy, onPick }: { 
         {notice && (
           <div className="agent-notice guided__notice" data-no-agent="">
             <p>
-              {plain.text(notice)} <a href="#/settings/agent">{link ?? plain.pw('Set up an agent', 'Set up an AI agent')}</a>
+              {plain.text(notice)}{' '}
+              <NavButton href="#/settings/agent" size="sm">
+                {link ?? plain.pw('Set up an agent', 'Set up an AI agent')}
+              </NavButton>
             </p>
             {details && (
               <details>
@@ -130,6 +135,7 @@ export function GuidedStart({ noAgent, notice, details, link, busy, onPick }: { 
                   return (
                     <li key={id} title={`Good for ${plain.text(q.good)}`}>
                       <Button className="guided-q" isDisabled={busy || noAgent} onPress={() => onPick(q, text)} data-question={id}>
+                        <AgentMark />
                         <span className="guided-q__text">{text}</span>
                         {q.note && <span className="guided-q__good">{q.note}</span>}
                       </Button>
@@ -184,7 +190,7 @@ export function AnswerChecks({ answer, prompt, analyze, ms, safe }: { answer: An
     lacking: lack ? { what: lack.what, count: among.filter(lack.lacks).length, of: among.length } : null,
   });
   const usage: AnswerUsage | undefined = answer.usage;
-  const line = ['What it looked at', ...(ms !== undefined ? [`${Math.max(1, Math.round(ms / 1000))} s`] : []), ...(usage ? [usageLine(usage)] : [])].join(' · ');
+  const line = ['What it looked at', ...(ms !== undefined ? [`${Math.max(1, Math.round(ms / 1000))} s`] : []), ...(usage && usageLine(usage) ? [usageLine(usage)!] : [])].join(' · ');
   return (
     <div className="ask-sure" data-how-sure="">
       <p className="ask-sure__sure">

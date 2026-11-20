@@ -279,6 +279,18 @@ Work items (`<id>` is the work item id):
   only the later revisions of an older item, so an item's whole history is the feed's
   only if its revisions run from 1 to the item's `rev`; otherwise read it with
   `work-item history`.
+- `work-item link-feed` (`--updated-since <iso>`): The project's link change feed, every
+  link between work items added or removed since a date (the reporting work item links
+  API, on both deployments). Azure DevOps records a link change under the item's current
+  revision without moving `System.ChangedDate`, so neither `work-item search
+  --updated-since` nor `work-item feed` shows one; this does. Each entry is `{ rel,
+  attributes: { linkType, sourceId, targetId, isActive, changedDate, changedOperation,
+  changedBy, ... } }` as Azure DevOps reports it: `rel` is the link topology
+  (`System.LinkTypes.Dependency`), `attributes.linkType` the direction from source to
+  target (`System.LinkTypes.Dependency-Forward`), and a removed link has `isActive:
+  false` and `changedOperation: "remove"`. `--updated-since` takes the same date forms as
+  `work-item search`; without it the feed starts at the beginning of the project. Read batch
+  by batch, with `--limit` and `--cursor` like any list.
 - `work-item comments <id>`, `work-item comment <id>` (`--body`): Comments. Listing
   reads the first page only on Server; on Services it returns every comment, following
   continuation tokens, or with `--limit` at most that many and `meta.page.nextCursor`.
@@ -455,7 +467,7 @@ list's `value`, or the whole body).
   which state each column holds.
 
 Paging: `project list`, `pipeline list`, `run list`, `pr list`, `pr builds`,
-`work-item search`, `work-item history`, `work-item feed` and (Services) `work-item comments` return the
+`work-item search`, `work-item history`, `work-item feed`, `work-item link-feed` and (Services) `work-item comments` return the
 whole list by default. With `--limit <n>` they return at most that many and set
 `meta.page.nextCursor`; pass it back as `--cursor`, with the same `--limit`, for the
 next page, until it's `null`. `run list` takes `--limit` or `--top`, not both. Every

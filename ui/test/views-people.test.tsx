@@ -31,27 +31,43 @@ describe('the people view (#292)', () => {
   it('has a card per person in name order, agents included and tagged, and a team strip, and is in the navigation', async () => {
     await open('#/project/checkout-web/people');
     expect(document.querySelector('[data-tab-panel] h1')).toBeNull();
-    expect(within(tabs('checkout-web')).getByRole('link', { name: 'People' }).getAttribute('aria-current')).toBe('page');
+    expect(within(tabs('checkout-web')).getByRole('link', { name: 'Team' }).getAttribute('aria-current')).toBe('page');
+    expect(document.querySelector('[data-team-page="people"]')!.getAttribute('aria-current')).toBe('page');
     expect(cards('People and agents').map((c) => within(c).getByRole('heading', { level: 3 }).textContent)).toEqual(['Ada D.', 'Bo W.', 'Claude']);
     const claude = screen.getByRole('article', { name: 'Claude' });
     expect(within(claude).getByRole('list', { name: 'About Claude' }).textContent).toBe('Agent');
     expect(claude.textContent).toContain('payments-web #51 Retry the address lookup once');
     const ada = screen.getByRole('article', { name: 'Ada D.' });
-    // The accounts are behind the name: one press away, not a line on every card.
-    expect(ada.textContent).not.toContain('ada-dev');
-    await userEvent.click(within(ada).getByRole('button', { name: "About Ada D.'s accounts" }));
-    expect((await screen.findByRole('dialog', { name: "About Ada D.'s accounts" })).textContent).toContain('GitHub ada-dev · Bitbucket 557058:abc12345-0000-0000-0000-000000000020 (Ada D.)');
-    await userEvent.keyboard('{Escape}');
+    // The accounts are one press in with the rest of the card (#657): not an (i) on every card, and not a line on its face.
+    expect(within(ada).queryByRole('button', { name: "About Ada D.'s accounts" })).toBeNull();
+    expect(ada.querySelector('details [data-person-accounts]')!.textContent).toContain('GitHub ada-dev · Bitbucket 557058:abc12345-0000-0000-0000-000000000020 (Ada D.)');
     expect(ada.textContent).toContain('written with Claude');
     expect(within(ada).getByRole('heading', { name: 'Reviews waiting on them' }).nextElementSibling!.textContent).toContain('checkout-sdk #12');
     const team = panel('Team');
     expect(team.textContent).toContain('Limit 2 per person. Nobody is over it.');
-    expect(team.textContent).toContain('Longest: Bitbucket checkout-sdk #12, 1.3 working days.');
+    expect(team.textContent).toContain('Longest: Bitbucket checkout-sdk #12 (opens in a new tab), 1.3 working days.');
     expect(within(team).getByRole('list', { name: 'Unassigned in Sprint 42' }).textContent).toContain('payments-web#45');
     expect(cards("Not in the Toil project's people").map((c) => within(c).getByRole('heading', { level: 3 }).textContent)).toEqual(['Bo W.']);
     expect(document.body.textContent).toContain('1 pull request was written with an agent the Toil project\'s people don\'t name (branch copilot/receipt-currency).');
     // Load, never a score.
     expect(document.querySelector('main')!.textContent).not.toMatch(/\b(score|rank(ed|ing)?|leaderboard|productivity)\b/i);
+  });
+
+  it('folds each card to one summary line, and the sprint\'s unassigned items to their count, so the page scans (principle 11)', async () => {
+    await open('#/project/checkout-web/people');
+    const ada = screen.getByRole('article', { name: 'Ada D.' });
+    const more = ada.querySelector<HTMLDetailsElement>('details[data-person-more]')!;
+    expect(more.open).toBe(false);
+    const summary = more.querySelector('summary')!;
+    expect(summary.querySelector('.sr-only')!.textContent).toMatch(/^Ada D\.: in progress \d+ of 2, in review \d+\. Show the details$/);
+    expect(summary.querySelector('.person-plate')!.textContent).toMatch(/^In progress \d+ of 2In review \d+$/);
+    // The rest is one press in: the board link and the sections live inside the fold.
+    expect(more.querySelector('[aria-label="Ada D.\'s items on the board"]')).toBeTruthy();
+    await userEvent.click(summary);
+    expect(more.open).toBe(true);
+    const unassigned = panel('Team').querySelector<HTMLDetailsElement>('details[data-unassigned-more]')!;
+    expect(unassigned.open).toBe(false);
+    expect(unassigned.querySelector('summary')!.textContent).toMatch(/^Show (the item|the \d+ items)$/);
   });
 
   it('collapses what a card has nothing in into one muted line, with a dash read aloud as none', async () => {
@@ -98,7 +114,10 @@ describe('the people view (#292)', () => {
     const button = within(matches).getByRole('button', { name: 'Map to A. Chen' }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(matches.textContent).toContain('Turned off: This is the preview');
-    expect(document.body.textContent).toContain('1 bot account (svc-renovate) only wrote bots\' pull requests and is left out.');
+    // Which bots were left out is the section's (i) (#657).
+    await userEvent.click(screen.getByRole('button', { name: 'About accounts not in the people' }));
+    expect((await screen.findByRole('dialog', { name: 'About accounts not in the people' })).textContent).toContain('1 bot account (svc-renovate) only wrote bots\' pull requests and is left out.');
+    await userEvent.keyboard('{Escape}');
   });
 
   it('applies a match only when a person presses it, through toil projects person', async () => {
@@ -135,15 +154,15 @@ describe('the people view (#292)', () => {
     expect(await within(bo).findByText(/is mapped to Bo W\. in checkout-web's people\./)).toBeTruthy();
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ command: 'projects person', input: { toilProject: 'checkout-web', name: 'Bo W.', id: [expect.stringMatching(/^(github|bitbucket|jira|ado)=/)] } });
-    await userEvent.click(within(bo).getByRole('button', { name: 'Save to this repository' }));
+    await userEvent.click(within(bo).getByRole('button', { name: 'Save for the team' }));
     expect(await within(bo).findByText(/Nothing was committed/)).toBeTruthy();
     expect(sent[1]).toEqual({ command: 'projects people save', input: { toilProject: 'checkout-web' } });
   });
 
-  it('offers Save to this repository beside the people, behind a disclosure that says which file changes', async () => {
+  it('offers Save for the team beside the people, behind a disclosure that says which file changes', async () => {
     await open('#/project/checkout-web/people');
     const section = screen.getByRole('heading', { level: 2, name: 'People and agents' }).closest('section') as HTMLElement;
-    expect((within(section).getByRole('button', { name: 'Save to this repository' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(section).getByRole('button', { name: 'Save for the team' }) as HTMLButtonElement).disabled).toBe(true);
     expect(section.textContent).not.toContain('.toil/projects');
     // The explanation is the (i) beside the button, not a line or a disclosure on the page.
     expect(section.textContent).not.toContain('Nothing is committed for you.');
@@ -168,7 +187,7 @@ describe('the people view (#292)', () => {
     await open('#/project/card-payments/board/person%3AJ.%20Smith');
     const filter = document.getElementById('board-filter')!;
     expect(filter.textContent).toMatch(/^Showing J\. Smith's items: \d+ items? on this board/);
-    const board = panel('Sprint 42 board');
+    const board = panel('Sprint board');
     const shown = within(board).getAllByRole('listitem').filter((li) => li.classList.contains('card'));
     expect(shown.length).toBeGreaterThan(0);
     for (const card of shown) expect(card.textContent).toContain('J. Smith');

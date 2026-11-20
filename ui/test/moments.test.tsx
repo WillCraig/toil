@@ -454,7 +454,10 @@ describe('in the app', () => {
     await userEvent.click(screen.getByRole('button', { name: /Motion/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'Off' }));
     expect(localStorage.getItem('toil-ui.motion')).toBe('reduced');
-    expect(screen.getByText(/^Nothing moves/)).toBeTruthy();
+    // What the level does is the Motion row's (i) now (#657), not a sentence on the card.
+    expect(screen.getByRole('button', { name: /Motion/ }).textContent).toContain('Off');
+    expect(document.querySelector('.motion-setting')!.textContent).not.toMatch(/Nothing moves/);
+    expect(document.querySelector('.motion-setting [data-help="motion"]')).not.toBeNull();
     expect(document.documentElement.dataset.themeMotion).toBe('off');
     await userEvent.click(screen.getByRole('button', { name: "Preview the theme's moments" }));
     expect(screen.getByRole('menuitem', { name: 'Moment: Done' }).getAttribute('aria-disabled')).toBe('true');

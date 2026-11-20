@@ -20,7 +20,7 @@
 import { nodeWarning } from './core/runtime.js';
 import { homedir } from 'node:os';
 import type { z } from 'zod';
-import type { AnyArea, ChoiceSet } from './core/area.js';
+import { pairingKey, type AnyArea, type ChoiceSet } from './core/area.js';
 import { describeScopes, type DescribedScopes } from './core/scopes.js';
 import { CALLER_LABEL } from './core/audit.js';
 import { commandName, servedOverMcp, toolName, type AnyCommand, type CommandKind } from './core/command.js';
@@ -131,6 +131,15 @@ export interface ConnectionField {
   appliesTo?: readonly string[];
   /** The variants whose connections can't do without it, though it isn't required of every one. */
   requiredFor?: readonly string[];
+  /**
+   * On a pairing setting (`apiTokenFrom`): the secret it borrows from another
+   * area's connection, and when `connections add` and `login` offer that
+   * instead of asking for the secret (as the question `borrow:<key>`, `y` or
+   * `n`): both connections hold every value in `when`, share a host if
+   * `sameHost`, and the lender's secret resolves; `match` names the settings
+   * the borrowed secret only works with. Left out where nothing is offered.
+   */
+  borrows?: { area: string; key: string; when?: Readonly<Record<string, string>>; sameHost?: boolean; match?: readonly string[] };
 }
 
 /**
@@ -154,7 +163,10 @@ export interface Registry {
  * `confirm-name` (type the connection's name to turn writes on), `unwrap:<key>`
  * (the secret for `<key>` is in quotes or starts with `Bearer ` or `token `:
  * `y` stores it without them, `n` as entered; `checkSecret` says which before
- * the call, so a host can ask its person first), for `toil projects onboard`
+ * the call, so a host can ask its person first), `borrow:<key>` (use the
+ * secret for `<key>` from the other area's connection the question names
+ * instead of entering one: `y` or `n`; `ConnectionField.borrows` says when it
+ * is asked), for `toil projects onboard`
  * `create:<section>` (add a connection that toil project section needs: `y` or `n`),
  * `name:<section>` (the new connection's name) and `pin:<section>` (which
  * matching connection the person's own copy uses), and `consent`
@@ -274,6 +286,11 @@ function connectionFields(area: AnyArea): ConnectionField[] {
   const explicit = area.appliesTo as Record<string, string[] | undefined> | undefined;
   const appliesTo = (name: string) => [...new Set([...mentions(name), ...(explicit?.[name] ?? [])])];
   const requiredFor = (name: string) => Object.entries(variants).filter(([, v]) => (v.requires ?? []).includes(name)).map(([k]) => k);
+  const offered = area.shares?.offer ? area.shares : undefined;
+  const borrows = (name: string): ConnectionField['borrows'] => {
+    const key = offered?.keys.find((k) => pairingKey(k) === name);
+    return key === undefined ? undefined : { area: offered!.area.name, key, ...offered!.offer };
+  };
   const field = (name: string, secret: boolean): ConnectionField => {
     const fallback = (area.defaults as Record<string, unknown> | undefined)?.[name];
     return {
@@ -286,6 +303,7 @@ function connectionFields(area: AnyArea): ConnectionField[] {
       ...(choices?.[name] ? { choices: choices[name] as ConnectionChoices } : {}),
       ...(appliesTo(name).length > 0 ? { appliesTo: appliesTo(name) } : {}),
       ...(requiredFor(name).length > 0 ? { requiredFor: requiredFor(name) } : {}),
+      ...(borrows(name) ? { borrows: borrows(name) } : {}),
     };
   };
   return [...settings.map((k) => field(k, false)), ...secretKeys.filter((k) => k in shape).map((k) => field(k, true))];

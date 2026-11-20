@@ -33,6 +33,8 @@ export interface HistoryEntry {
   line: string;
   /** Where it links: an assignment, a toil project, or the Toil projects view. */
   href: string;
+  /** What it asked for is done (an assignment that needed you no longer does): kept, but never counted as unread. */
+  settled?: true;
 }
 
 export interface History {
@@ -51,7 +53,7 @@ export function parseHistory(text: string | null): History {
     const v = JSON.parse(text) as Partial<History> | null;
     // Usage caps are gone; a bell entry saved with their kind is read as the failure it was.
     const entries = (Array.isArray(v?.entries) ? v.entries : []).map((e) => ((e as { kind?: unknown } | null)?.kind === 'cap' ? { ...e, kind: 'failed' as const } : e)).filter(
-      (e): e is HistoryEntry => !!e && typeof e === 'object' && Number.isInteger(e.seq) && typeof e.id === 'string' && typeof e.at === 'string' && KINDS.has(e.kind) && typeof e.title === 'string' && typeof e.line === 'string' && typeof e.href === 'string' && /^#\//.test(e.href),
+      (e): e is HistoryEntry => !!e && typeof e === 'object' && Number.isInteger(e.seq) && typeof e.id === 'string' && typeof e.at === 'string' && KINDS.has(e.kind) && typeof e.title === 'string' && typeof e.line === 'string' && typeof e.href === 'string' && /^#\//.test(e.href) && (e.settled === undefined || e.settled === true),
     );
     return { entries: entries.slice(0, MAX_HISTORY), read: typeof v?.read === 'number' ? v.read : 0 };
   } catch {
@@ -73,7 +75,14 @@ export function added(h: History, add: ReadonlyArray<Omit<HistoryEntry, 'seq'>>)
   return { ...h, entries: [...fresh, ...h.entries].slice(0, MAX_HISTORY) };
 }
 
-export const unread = (h: History): number => h.entries.filter((e) => e.seq > h.read).length;
+/** Whether an entry counts as unread: newer than the last Mark all read, and still about something that waits. */
+export const isUnread = (h: History, e: HistoryEntry) => e.seq > h.read && !e.settled;
+export const unread = (h: History): number => h.entries.filter((e) => isUnread(h, e)).length;
+/** Marks every entry whose id starts with `prefix` settled; the same history when none changes. */
+export function settledBy(h: History, prefix: string): History {
+  if (!h.entries.some((e) => !e.settled && e.id.startsWith(prefix))) return h;
+  return { ...h, entries: h.entries.map((e) => (!e.settled && e.id.startsWith(prefix) ? { ...e, settled: true as const } : e)) };
+}
 export const allRead = (h: History): History => ({ ...h, read: Math.max(h.read, ...h.entries.map((e) => e.seq), 0) });
 
 /** The store the bell reads and the notices and the Sync panel write. */
@@ -81,6 +90,8 @@ export interface HistoryStore {
   get(): History;
   add(entries: ReadonlyArray<Omit<HistoryEntry, 'seq'>>): void;
   markAllRead(): void;
+  /** Settles every entry whose id starts with `prefix`: what it asked for is done. */
+  settle(prefix: string): void;
   subscribe(listener: () => void): () => void;
 }
 
@@ -134,6 +145,11 @@ export function browserHistory(key = HISTORY_KEY): HistoryStore {
       if (next !== now) save(next);
     },
     markAllRead: () => save(allRead(load())),
+    settle: (prefix) => {
+      const now = load();
+      const next = settledBy(now, prefix);
+      if (next !== now) save(next);
+    },
     subscribe: (l) => {
       listeners.add(l);
       return () => listeners.delete(l);

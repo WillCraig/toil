@@ -1,5 +1,5 @@
-// Decides whether a pull request needs CI's long jobs: Toil UI's gate (most of an
-// hour, for its layout check over every view and theme) and the database
+// Decides whether a pull request needs CI's long jobs: Toil UI's gate (its checks,
+// and its layout check over every view and theme in eight shards) and the database
 // integration job. A PR whose every changed file is on the list below skips
 // them; toil's own gate still runs on every PR, so the suites that hold docs to
 // code (bounds, the contract, hygiene, the skill) still check it. The

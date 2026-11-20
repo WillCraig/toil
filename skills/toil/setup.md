@@ -104,6 +104,14 @@ personal access token, or an Atlassian API token for Cloud), and the page of any
 area. Do not wait on the secret in the same turn; ask the person to tell you when
 it is done.
 
+**Jira Cloud and Confluence Cloud on the same site share one API token.** Create the Jira
+connection first and have the person log in to it. When you then create the Confluence one
+with the same `<site>.atlassian.net` URL and email, its result names the Jira connection in
+`secretReusable`: tell the person "Run `toil connections login <confluence>`; it will offer
+to reuse your Jira token, so you don't paste it again" (in Toil UI, choose "The token from
+<jira>"). Never set `apiTokenFrom` yourself. On Data Center each server issues its own
+personal access token, so the person enters one for each.
+
 ## 5. Verify
 
 When they say it is done, run `toil connections test <name>`. A failure names the fix:

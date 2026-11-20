@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_NOW } from '../src/fixtures/execute.ts';
-import { ACTIVITY_DAYS, assignedTo, cardByKey, isPerson, MAX_ACTIVITY, people, readPeople, sinceInStatus, suggest, suggestionLine, type PersonEntry } from '../src/model/people.ts';
+import { ACTIVITY_DAYS, asMapped, assignedTo, cardByKey, isPerson, MAX_ACTIVITY, people, readPeople, sinceInStatus, suggest, suggestionLine, withMappedNames, type PersonEntry } from '../src/model/people.ts';
+import { buildInsights } from '../src/model/work-insights.ts';
+import { initials, hueOf } from '../src/components/avatar.tsx';
 import type { Change, Person, Transition, WorkItem } from '../src/toil.ts';
 import { loaded } from './harness.ts';
 
@@ -234,5 +236,39 @@ describe('the sample Toil projects', () => {
     expect(v.people).toEqual([]);
     expect(v.wipLimit).toBeNull();
     expect(v.unmapped.map((c) => c.who.name)).toEqual(['D. Okafor', 'J. Park', 'K. Nakamura', 'M. Lind']);
+  });
+});
+
+describe('one person with two accounts, on every screen that lists people', () => {
+  // Pat is "pat" in Jira and "pat-ex" in GitHub, and neither system calls them Pat Example.
+  const jiraPat = who('pat', 'pat.e');
+  const ghPat = who('pat-ex', null);
+  const items = [item('PAY-1', { assignee: jiraPat }), { ...item('7'), id: 'github:imagile/web#7', source: { area: 'github', connection: 'github', key: 'imagile/web#7', command: 'github issue list' }, assignee: ghPat }];
+
+  it('names both accounts as the mapped person, with one id, so one avatar with their initials', () => {
+    const a = asMapped([PAT], 'jira', jiraPat)!;
+    const b = asMapped([PAT], 'github', ghPat)!;
+    expect(a).toEqual(b);
+    expect(a).toMatchObject({ id: 'person:Pat Example', name: 'Pat Example' });
+    expect([initials(a), hueOf(a)]).toEqual(['PE', hueOf(b)]);
+    // An account nobody maps, and nobody at all, come back as they are.
+    expect(asMapped([PAT], 'github', who('bo'))).toEqual(who('bo'));
+    expect(asMapped([PAT], 'jira', null)).toBeNull();
+  });
+
+  it("lists the person once in the board's Assignee filter, and the filter keeps both accounts' items", () => {
+    const ins = buildInsights({ items, people: [PAT] }, NOW);
+    expect(ins.valuesIn('assignee')).toEqual([{ key: 'v:person:Pat Example', label: 'Pat Example', count: 2 }]);
+    expect(ins.narrow([{ dimension: 'assignee', op: '=', values: ['Pat Example'] }]).items.map((i) => i.id).sort()).toEqual(['github:imagile/web#7', 'jira:PAY-1']);
+    // Without the mapping they are two people, as the systems name them.
+    expect(ins.valuesIn('assignee')).not.toEqual(buildInsights({ items, people: [] }, NOW).valuesIn('assignee'));
+    expect(buildInsights({ items, people: [] }, NOW).valuesIn('assignee')!.map((v) => v.label).sort()).toEqual(['pat-ex', 'pat.e']);
+  });
+
+  it("names a pull request's author, reviewers and reviews as the mapped person, keeping each account's id for asking a review", () => {
+    const c = withMappedNames(pr(1, { author: ghPat, reviewers: [{ person: ghPat, state: 'PENDING' }], reviews: [{ by: ghPat, state: 'APPROVED', at: NOW }] }), [PAT]);
+    expect([c.author, c.reviewers[0]!.person, c.reviews![0]!.by]).toEqual([who('pat-ex', 'Pat Example'), who('pat-ex', 'Pat Example'), who('pat-ex', 'Pat Example')]);
+    const bo = pr(2, { author: who('bo', 'Bo') });
+    expect(withMappedNames(bo, [PAT])).toEqual(bo);
   });
 });

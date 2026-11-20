@@ -108,7 +108,7 @@ describe('the particle presets', () => {
     const css = readFileSync(join(import.meta.dirname, '..', 'themes', 'crate', 'theme.css'), 'utf8');
     expect(css).toContain('radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--accent) var(--crate-glow-a), transparent), transparent 60vmax)');
     // The dark scheme's glow, the one the site wears; the light scheme sets its own (#507).
-    expect(css).toMatch(/\[data-theme="crate"\] \{[^}]*--crate-glow-a: 14%;/);
+    expect(css).toMatch(/\[data-theme="crate"\] \{[^}]*--crate-glow-a: 8%;/);
     expect(glowAt(0.88 * w, 0, w, h)).toBeCloseTo(1, 5);
     expect(glowAt(0.88 * w, 0.3 * w, w, h)).toBeCloseTo(0.5, 5);
     expect(glowAt(0, h, w, h)).toBe(0);
@@ -194,9 +194,12 @@ describe('the ambient layer', () => {
     expect(layer.querySelector('canvas')).not.toBeNull();
   });
 
-  it("gives Crate only its dust: the grid and the glow are its stylesheet's, and there is no layer at all when motion isn't welcome", () => {
+  it("gives Crate only its dust, off until it is switched on: the grid and the glow are its stylesheet's, and there is no layer at all when motion isn't welcome", () => {
     osMotion(false);
     fakeCanvas();
+    // Crate's theme.json says `"default": "off"`: the page stays still until someone asks for its dust.
+    expect(render(<Ambient theme="crate" scheme="dark" />).container.innerHTML).toBe('');
+    setParticlesOn('crate', true);
     const { container } = render(<Ambient theme="crate" scheme="dark" />);
     expect(container.querySelector('.ambient')!.children).toHaveLength(1);
     expect(container.querySelector('canvas')).not.toBeNull();
@@ -233,6 +236,7 @@ describe('the ambient layer', () => {
   it('stops, canvas and all, when the person reduces motion, and says so on the root for CSS', () => {
     osMotion(false);
     fakeCanvas();
+    setParticlesOn('crate', true);
     const { container } = render(<Ambient theme="crate" scheme="dark" />);
     expect(container.querySelector('canvas')).not.toBeNull();
     expect(document.documentElement.dataset.motion).toBe('full');
@@ -248,6 +252,7 @@ describe('Motion, in Settings', () => {
     osMotion(false);
     fakeCanvas();
     localStorage.setItem('toil-ui.theme', JSON.stringify({ theme: 'crate', scheme: 'system' }));
+    setParticlesOn('crate', true);
     window.location.hash = '#/settings/appearance';
     const { container } = render(<App execute={fixtureExecute().execute} agent={scriptedAgent()} config={fixtureConfig()} now={FIXTURE_NOW} preview />);
     await screen.findByRole('heading', { level: 1 });
@@ -261,7 +266,10 @@ describe('Motion, in Settings', () => {
     expect(localStorage.getItem('toil-ui.motion')).toBe('reduced');
     expect(document.documentElement.dataset.motion).toBe('reduced');
     expect(container.ownerDocument.querySelector('.ambient canvas')).toBeNull();
-    expect(screen.getByText(/Nothing moves/)).toBeTruthy();
+    // What the level does is the Motion row's (i) now (#657), not a sentence on the card.
+    expect(screen.getByRole('button', { name: /Motion/ }).textContent).toContain('Off');
+    expect(document.querySelector('.motion-setting')!.textContent).not.toMatch(/Nothing moves/);
+    expect(document.querySelector('.motion-setting [data-help="motion"]')).not.toBeNull();
   });
 
   it('starts from what this browser remembered', () => {

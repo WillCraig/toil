@@ -1,5 +1,6 @@
 // The isolated home Toil UI runs on real data in, shared by dev-real.mjs (by
-// hand) and verify.mjs (`npm run verify:ui`). In <home> it sets up, once:
+// hand) and verify.mjs (`npm run verify:ui`); demo-home.mjs --launch borrows its
+// toil build and launch helpers. In <home> it sets up, once:
 //   - ~/.toil/config.json with one connection, `github`, to https://api.github.com,
 //     writes off. It holds no token.
 //   - for GitHub (prepareRealHome), the toil project for a repository (named after

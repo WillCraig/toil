@@ -1,5 +1,7 @@
 /* Swimlanes, the group and split menus, the People mix bar and the split modals (#567). Theme tokens only. */
-.dimension-picker .choice-button { min-width: 0; }
+.dimension-picker .choice-button { min-width: 0; max-width: 100%; }
+/* A long label and its menu wrap rather than run past a phone's edge in a wide-lettered theme. */
+.people-tools .control-row__group, .people-tools .dimension-picker { flex-wrap: wrap; min-width: 0; max-width: 100%; }
 .dimension-picker__unread { margin-inline-start: auto; padding-inline-start: 1rem; }
 .dimension-picker .menu-item[data-disabled] { cursor: default; color: var(--muted); }
 

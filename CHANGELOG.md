@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.1.0-beta.6](https://github.com/imagile-dev/toil/compare/v0.1.0-beta.5...v0.1.0-beta.6) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* MCP tools and the ./api take only the new field names (inputFile, holidaysFile, verdictsFile, backtestFile, revisedFile, path, out), and the MCP classify prompt's argument is inputFile. The CLI still reads every old spelling for at least one beta, with a DEPRECATED_FLAG warning naming the new one. Migrate by renaming the field or flag as docs/command-contract.md, version 4, lists. The contract version is 4.
+
+### Features
+
+* **ado:** the Azure DevOps Services commands demo seeding needed the raw API for ([#618](https://github.com/imagile-dev/toil/issues/618)) ([#621](https://github.com/imagile-dev/toil/issues/621)) ([344667e](https://github.com/imagile-dev/toil/commit/344667e4411ed70aaf58e555d8a43210a39f4a2e))
+* **ado:** work-item tag and untag on Azure DevOps Services ([#618](https://github.com/imagile-dev/toil/issues/618)) ([#627](https://github.com/imagile-dev/toil/issues/627)) ([6cf852d](https://github.com/imagile-dev/toil/commit/6cf852d22f0c4a0b1258ab13b39ae2f218403427))
+* **confluence:** create a space with confluence space create ([#21](https://github.com/imagile-dev/toil/issues/21)) ([#646](https://github.com/imagile-dev/toil/issues/646)) ([de6df7b](https://github.com/imagile-dev/toil/commit/de6df7b4f62bff808fe39d547ba3d67675da9db1))
+* **connections:** offer Jira Cloud's API token to Confluence Cloud on the same site ([#635](https://github.com/imagile-dev/toil/issues/635)) ([#639](https://github.com/imagile-dev/toil/issues/639)) ([6782f55](https://github.com/imagile-dev/toil/commit/6782f55acf823abbbace20d2e96f157f935f45c3))
+* one flag per file idea: --input-file, --&lt;flag&gt;-file, --path, --out ([#622](https://github.com/imagile-dev/toil/issues/622)) ([#637](https://github.com/imagile-dev/toil/issues/637)) ([eee7c35](https://github.com/imagile-dev/toil/commit/eee7c35e0056fbbda0fdccd1356e594c98d9af12))
+* **ui:** show usage without caps ([#572](https://github.com/imagile-dev/toil/issues/572)) ([321d59b](https://github.com/imagile-dev/toil/commit/321d59b2d08650453c79b25f8f5d42a9fca26ca3))
+* work classification, work insights and stored architecture diagrams ([#566](https://github.com/imagile-dev/toil/issues/566), [#567](https://github.com/imagile-dev/toil/issues/567), [#582](https://github.com/imagile-dev/toil/issues/582)) ([#585](https://github.com/imagile-dev/toil/issues/585)) ([250d33c](https://github.com/imagile-dev/toil/commit/250d33c2a0c7c995540a4cd9329d7f5630326487))
+
+
+### Bug Fixes
+
+* **ado:** commit create awaits the files it reads ([#618](https://github.com/imagile-dev/toil/issues/618)) ([#630](https://github.com/imagile-dev/toil/issues/630)) ([0aa45f4](https://github.com/imagile-dev/toil/commit/0aa45f4d818990d9b61fda8493f596bf5b8a0de3))
+* **cli:** keep argument values out of usage errors ([#641](https://github.com/imagile-dev/toil/issues/641)) ([57dc4db](https://github.com/imagile-dev/toil/commit/57dc4db892a367ebca5eadb16a628062e5f88b6f))
+* **cli:** keep one envelope when a result cannot be printed as JSON ([#642](https://github.com/imagile-dev/toil/issues/642)) ([6b9c125](https://github.com/imagile-dev/toil/commit/6b9c125cc33de9b26a163607c98ae52101849fd4))
+* **confluence:** Cloud bodyText decodes every named entity, so "−" reads as "−", not &minus; ([#45](https://github.com/imagile-dev/toil/issues/45)) ([#636](https://github.com/imagile-dev/toil/issues/636)) ([d20453f](https://github.com/imagile-dev/toil/commit/d20453f610b7e27953fe1b322d6be3451c907eaf))
+* **deps:** clear the open dependency advisories, upgrade the site to Astro 7, add Dependabot version updates ([#586](https://github.com/imagile-dev/toil/issues/586)) ([#591](https://github.com/imagile-dev/toil/issues/591)) ([fde850a](https://github.com/imagile-dev/toil/commit/fde850a4751e728fc6403966c4c59a5cd5153f54))
+* first-five-minutes bugs: config writes, piped stdin, refused credentials, the keychain under another HOME ([#617](https://github.com/imagile-dev/toil/issues/617)) ([#624](https://github.com/imagile-dev/toil/issues/624)) ([cbb9d83](https://github.com/imagile-dev/toil/commit/cbb9d8324cb02cfbc6a339737e7f685d0e47ebed))
+* **mcp:** a result that can't be serialized is a tool error, not a -32603 ([#648](https://github.com/imagile-dev/toil/issues/648)) ([bd68b6a](https://github.com/imagile-dev/toil/commit/bd68b6a45b7fa546f7bc263cb144852cc330ae45))
+* **test:** How it's doing tests wait for the loaded panel, not the first one ([#605](https://github.com/imagile-dev/toil/issues/605)) ([#626](https://github.com/imagile-dev/toil/issues/626)) ([6055fc1](https://github.com/imagile-dev/toil/commit/6055fc16e9175103bff6c68264ceffde976fa56a))
+* **test:** two tests that fail on macOS and on a slow runner ([#605](https://github.com/imagile-dev/toil/issues/605)) ([#611](https://github.com/imagile-dev/toil/issues/611)) ([7a4144e](https://github.com/imagile-dev/toil/commit/7a4144e7123e6a021bec17cc58f38bcc62ba15fa))
+* **ui:** stand-up team chips cut long sprint moves inside their box ([#644](https://github.com/imagile-dev/toil/issues/644)) ([#650](https://github.com/imagile-dev/toil/issues/650)) ([f017efc](https://github.com/imagile-dev/toil/commit/f017efcba8ebde3b95176c8ad8b1d55110dc3f87))
+* **ui:** the setup wizard sets Jira up fully, and two screens report honestly ([#576](https://github.com/imagile-dev/toil/issues/576)) ([111b710](https://github.com/imagile-dev/toil/commit/111b7108dda5b53c1b5277f71aeaf576aaebb2a1))
+* unread points are not zero ([#652](https://github.com/imagile-dev/toil/issues/652)) ([#656](https://github.com/imagile-dev/toil/issues/656)) ([44d9a89](https://github.com/imagile-dev/toil/commit/44d9a895ad659df984f8f037b3230ecde72ad223))
+* **util:** jwt decode refuses non-object, non-base64url and non-UTF-8 segments, and names a Bearer prefix ([#632](https://github.com/imagile-dev/toil/issues/632)) ([aedd779](https://github.com/imagile-dev/toil/commit/aedd77979cef635bb6e53e0f731f4d26195e5436))
+
+
+### Performance Improvements
+
+* tests and CI run faster without dropping a check ([#581](https://github.com/imagile-dev/toil/issues/581)) ([eff76f1](https://github.com/imagile-dev/toil/commit/eff76f1f005daed8a933eede0c0fc96d7ab6f8ae))
+
 ## [0.1.0-beta.5](https://github.com/imagile-dev/toil/compare/v0.1.0-beta.4...v0.1.0-beta.5) (2026-11-09)
 
 

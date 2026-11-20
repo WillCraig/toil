@@ -196,7 +196,7 @@ export function hostRunner(o: HostRunnerOptions): Runner {
         workspace = { root: folder };
         modePrompt = implementPrompt(a.toilProject, item, now(), { repo: repo.name, branch });
       } else {
-        modePrompt = readPrompt(a.mode, a.toilProject, item, now());
+        modePrompt = readPrompt(a.mode, a.toilProject, item, now(), a.rules);
       }
       // A renewal (#305) carries what the run it renews left, fenced as data.
       modePrompt = { ...modePrompt, prompt: withEarlierRun(modePrompt.prompt, a.history) };
@@ -248,7 +248,7 @@ export function hostRunner(o: HostRunnerOptions): Runner {
 
       const lines = splitLines(text);
       const by = ADAPTER_NAME[adapter];
-      const answer = finish(lines.text, { toilProject: a.toilProject, prompt: a.mode, by, ledger, writes });
+      const answer = finish(lines.text, { toilProject: a.toilProject, prompt: a.mode, by, ledger, writes, known: [item.id] });
       const report = { parts: answer.parts, citations: answer.citations, unverified: answer.unverified ?? [], warnings: answer.warnings ?? [] };
       const proposals = [...answer.proposals];
       if (a.mode === 'investigate' && report.parts.length && !lines.injection) proposals.push(commentProposal(a.toilProject, item, commentText(report.parts, by), writes));

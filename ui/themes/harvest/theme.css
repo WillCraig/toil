@@ -173,21 +173,12 @@
   border-radius: 0;
 }
 
-/* The board as a farm plot: each column a furrow of tilled soil along its top. */
+/* The board as a farm plot: each column a field of furrows, its state in a tinted header rather than a strip along one edge (#657). */
 [data-theme="harvest"] .column {
   border: 2px solid var(--line);
-  border-top: 10px solid var(--harvest-soil);
   border-radius: 0;
   background-color: var(--bg);
   background-image: repeating-linear-gradient(90deg, var(--harvest-furrow) 0 6px, transparent 6px 12px);
-}
-
-[data-theme="harvest"] .column--in_progress {
-  border-top-color: #4f9a2a;
-}
-
-[data-theme="harvest"] .column--done {
-  border-top-color: #c9932a;
 }
 
 /* A crop in each card's corner, kept clear of the estimate beside it. */
@@ -366,7 +357,6 @@
 }
 
 [data-theme="harvest"] .btn--accent,
-[data-theme="harvest"] .top nav a[aria-current="page"],
 [data-theme="harvest"] button[aria-pressed="true"] {
   background: linear-gradient(180deg, var(--harvest-lit) 0 50%, var(--accent) 50%);
 }

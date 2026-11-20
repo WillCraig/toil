@@ -1,34 +1,50 @@
 // @vitest-environment jsdom
 // Each tab is opened in turn, as a tab would be in a review meeting: briefly, and to confirm it exists.
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CANNED, fixtureExecute } from '../src/fixtures/execute.ts';
 import type { WorkItem } from '../src/toil.ts';
 import { columnSteps, dropVerdict } from '../src/views/Board.tsx';
 import { item, open, panel, tabs, metric, resetBrowserState } from './views-kit.tsx';
+import { fixtureStandards } from '../src/fixtures/standards.ts';
 
 beforeEach(resetBrowserState);
 
 describe('the views on a dashboard (#252, #253)', () => {
   it('flags each card that needs attention on the board, counts them on its tab, and filters to them (#394)', async () => {
     await open('#/project/card-payments/board');
-    const board = panel('Sprint 42 board');
+    const board = panel('Sprint board');
     const cards = () => within(board).getAllByRole('listitem').filter((li) => li.classList.contains('card'));
     const flagged = () => cards().filter((li) => li.classList.contains('card--attention'));
     const keys = () => flagged().map((li) => within(li).getAllByRole('link')[0]!.textContent).sort();
     expect(keys()).toEqual(['PAY-101', 'PAY-102', 'PAY-103', 'PAY-104']);
     expect(flagged()[0]!.querySelector('.card-flag')!.textContent).toBe('Needs attention');
-    expect(within(tabs('card-payments')).getByRole('link', { name: 'Board, 4 items need attention' })).toBeTruthy();
     expect(cards().length).toBeGreaterThan(4);
     await userEvent.click(within(board).getByRole('checkbox', { name: 'Needs attention only (4)' }));
     expect(cards()).toHaveLength(4);
     expect(keys()).toEqual(['PAY-101', 'PAY-102', 'PAY-103', 'PAY-104']);
   });
 
+  it("badges Tickets with the Tickets page's own Blocked figure, said in words, never a count the page doesn't show", async () => {
+    // While the ticket rules aren't read the blocked figure isn't known, so the tab carries no count (principle 12).
+    await open('#/project/card-payments/command-center');
+    const unreadTab = within(tabs('card-payments')).getByRole('link', { name: /^Tickets/ });
+    expect(unreadTab.querySelector('.tab-count')).toBeNull();
+    expect(unreadTab.getAttribute('title')).toMatch(/^Ticket rules not read yet/);
+    cleanup();
+    await open('#/project/card-payments/command-center', { rules: fixtureStandards() });
+    const tab = await waitFor(() => within(tabs('card-payments')).getByRole('link', { name: /^Tickets, \d+ blocked$/ }));
+    const n = /(\d+) blocked/.exec(tab.textContent ?? '')![1];
+    expect(tab.querySelector('.tab-count')!.getAttribute('title')).toBe(`${n} blocked: waiting on another item, done already, outside the Toil project, or failing a ticket rule.`);
+    const tally = screen.getByRole('list', { name: 'Open items by verdict' });
+    const blocked = within(tally).getAllByRole('listitem').find((li) => li.textContent?.includes('Blocked'))!;
+    expect(blocked.querySelector('.team-figure')!.textContent).toBe(n);
+  });
+
   it('puts each sprint item on the board under its status category, with its own status word and insights', async () => {
     await open('#/project/settlement/board');
-    const board = panel('Sprint 42 board');
+    const board = panel('Sprint board');
     const col = (name: string) => within(board).getByRole('region', { name: new RegExp(`^${name}`) });
     const cards = (region: HTMLElement) => within(region).getAllByRole('listitem').filter((li) => li.classList.contains('card'));
     expect(cards(col('To do')).map((c) => within(c).getAllByRole('link')[0]!.textContent)).toEqual(['2303', '2306']);
@@ -46,7 +62,7 @@ describe('the views on a dashboard (#252, #253)', () => {
 
   it('carries no buttons on its cards: the whole card is the handle, named by its key and title', async () => {
     await open('#/project/card-payments/board');
-    const board = panel('Sprint 42 board');
+    const board = panel('Sprint board');
     const cards = within(board).getAllByRole('listitem').filter((li) => li.classList.contains('card'));
     expect(cards.length).toBeGreaterThan(0);
     for (const c of cards) expect(within(c).queryAllByRole('button')).toEqual([]);
@@ -59,7 +75,7 @@ describe('the views on a dashboard (#252, #253)', () => {
 
   it('opens the item on a click anywhere on the card', async () => {
     await open('#/project/card-payments/board');
-    const grip = within(panel('Sprint 42 board')).getByRole('group', { name: 'PAY-102 Store tokens in the vault' });
+    const grip = within(panel('Sprint board')).getByRole('group', { name: 'PAY-102 Store tokens in the vault' });
     await userEvent.click(within(grip).getByText('Store tokens in the vault'));
     await waitFor(() => expect(window.location.hash).toBe(item('card-payments', 'corp-jira:PAY-102')));
   });
@@ -68,7 +84,7 @@ describe('the views on a dashboard (#252, #253)', () => {
     const fixture = fixtureExecute();
     await open('#/project/card-payments/board', { execute: fixture.execute });
     const before = fixture.calls.length;
-    const board = panel('Sprint 42 board');
+    const board = panel('Sprint board');
     const grip = within(board).getByRole('group', { name: 'PAY-102 Store tokens in the vault' });
     fireEvent.contextMenu(grip);
     const menu = await screen.findByRole('menu', { name: 'PAY-102 Store tokens in the vault' });
@@ -85,7 +101,7 @@ describe('the views on a dashboard (#252, #253)', () => {
 
   it('opens the same menu with M on the focused card, and only on the card itself', async () => {
     await open('#/project/card-payments/board');
-    const board = panel('Sprint 42 board');
+    const board = panel('Sprint board');
     const grip = within(board).getByRole('group', { name: 'PAY-102 Store tokens in the vault' });
     within(grip).getByRole('link', { name: 'PAY-102' }).focus();
     await userEvent.keyboard('m');
@@ -121,7 +137,7 @@ describe('the views on a dashboard (#252, #253)', () => {
   // #393: the drop worked, but nothing on screen moved during a drag and the proposal landed out of view.
   it('shows a lifted card as a copy that says what a drop would do, leaving a placeholder in its column', async () => {
     await open('#/project/card-payments/board');
-    const board = panel('Sprint 42 board');
+    const board = panel('Sprint board');
     const grip = within(board).getByRole('group', { name: 'PAY-102 Store tokens in the vault' });
     expect(document.querySelector('[data-drag-overlay]')).toBeNull();
     grip.focus();
@@ -147,7 +163,7 @@ describe('the views on a dashboard (#252, #253)', () => {
 
   it('puts a proposed move where it was made: a ghost in the target column, with Undo and the way to apply it', async () => {
     await open('#/project/card-payments/board');
-    const board = panel('Sprint 42 board');
+    const board = panel('Sprint board');
     const col = (name: string) => within(board).getByRole('region', { name: new RegExp(`^${name}`) });
     const grip = within(board).getByRole('group', { name: 'PAY-102 Store tokens in the vault' });
     fireEvent.contextMenu(grip);
@@ -208,8 +224,19 @@ describe('the views on a dashboard (#252, #253)', () => {
   it('draws the dependency graph, and lists every link in words', async () => {
     await open('#/project/card-payments/dependencies');
     const graph = panel('Links between items');
+    // Both folded, each with its count: the drawing is built only once opened.
+    const drawing = await waitFor(() => {
+      const d = graph.querySelector<HTMLDetailsElement>('details[data-graph-drawing]');
+      expect(d).not.toBeNull();
+      return d!;
+    });
+    const links = graph.querySelector<HTMLDetailsElement>('details[data-graph-links]')!;
+    expect([drawing.open, links.open]).toEqual([false, false]);
+    expect(links.querySelector('summary')!.textContent).toBe('Every link (3)');
+    expect(graph.querySelector('.react-flow')).toBeNull();
+    await userEvent.click(within(drawing).getByText(/^Graph of the links \(\d+ items\)$/));
     await waitFor(() => expect(graph.querySelector('.react-flow')).not.toBeNull());
-    expect([...graph.querySelectorAll(':scope > ul.rows > li')].map((li) => li.textContent)).toEqual([
+    expect([...links.querySelectorAll('ul.rows > li')].map((li) => li.textContent)).toEqual([
       'Jira PAY-101 Tokenise card numbers at the edge blocks Jira PAY-102 Store tokens in the vault (blocks)',
       'Jira PAY-102 Store tokens in the vault blocks Jira PAY-103 Charge a stored token (blocks)',
       'Jira PAY-103 Charge a stored token relates to Jira PAY-107 Retry declined charges once (relates to)',
@@ -226,18 +253,46 @@ describe('the views on a dashboard (#252, #253)', () => {
     expect(svg.querySelectorAll('.gantt-seg--checks')).toHaveLength(1);
     expect(svg.querySelectorAll('.gantt-arrow--chain')).toHaveLength(2);
     expect(svg.querySelector('.gantt-today')).not.toBeNull();
-    expect(within(gantt).getByRole('list', { name: 'Key' }).textContent).toMatch(/In progress.*Blocked.*Checks failing.*Waits on.*Critical chain.*Today/);
+    // Each item's plan, to a flag on its due date; the tooltip names where the date came from.
+    expect(svg.querySelectorAll('.gantt-seg--planned')).toHaveLength(3);
+    expect(svg.querySelectorAll('.gantt-due')).toHaveLength(3);
+    expect(svg.querySelector('.gantt-row title')!.textContent).toContain('due 14 Oct 2026 (the due date in Jira); planned');
+    // The key is folded behind a Key line, so only the chart shows until asked (#657).
+    const key = gantt.querySelector<HTMLDetailsElement>('details[data-gantt-key]')!;
+    expect(key.open).toBe(false);
+    await userEvent.click(within(key).getByText('Key'));
+    expect(key.open).toBe(true);
+    expect(svg.querySelectorAll('.gantt-seg--strong')).toHaveLength(svg.querySelectorAll('.gantt-row--chain .gantt-seg--blocked').length);
+    expect(within(gantt).getByRole('list', { name: 'Key' }).textContent).toMatch(/In progress.*Blocked.*Checks failing.*Planned, to the due date.*Due.*Waits on.*Critical chain.*Today/);
+    // The table is folded under the timeline, its summary counting what it holds.
+    const every = gantt.querySelector<HTMLDetailsElement>('details[data-gantt-every]')!;
+    expect(every.open).toBe(false);
+    expect(every.querySelector('summary')!.textContent).toBe('Every bar and arrow (3 items, 2 arrows)');
     const table = within(gantt).getByRole('table', { name: 'Every bar and waits-on arrow in the blocker timeline' });
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows.map((r) => within(r).getByRole('rowheader').querySelector('.l-table__value')!.textContent)).toEqual(['Jira PAY-101 Tokenise card numbers at the edge', 'Jira PAY-102 Store tokens in the vault', 'Jira PAY-103 Charge a stored token']);
     expect(rows[1]!.textContent).toContain('(estimated)');
     expect(rows[2]!.textContent).toContain('PAY-102, critical chain');
+    // A due date lasts its day: PAY-103 waits on PAY-102, due 15 Oct, so its plan starts as that day ends.
+    expect(rows[2]!.textContent).toContain('16 Oct 2026 (the due date in Jira)Planned from 16 Oct 2026 (after Jira PAY-102 is due), estimated');
+    expect(within(gantt).queryByRole('button', { name: /^Show all/ })).toBeNull();
     expect(gantt.textContent).toContain('Blocked time is estimated');
     // That it is estimated stays beside the timeline; how each part is estimated is one press away, in the (i).
     expect(gantt.querySelector('[data-gantt-estimate]')!.textContent).toMatch(/^Sprint 42, .* to .*\. Blocked time is estimated\.$/);
     expect(gantt.textContent).not.toContain('links carry no date');
     await userEvent.click(within(gantt).getByRole('button', { name: 'About the blocker timeline' }));
     expect((await screen.findByRole('dialog', { name: 'About the blocker timeline' })).textContent).toContain('links carry no date in Jira, Azure DevOps or GitHub');
+  });
+
+  it('shows the critical chain and the longer chains first, and every row on a press', async () => {
+    await open('#/project/sample-team/dependencies');
+    const gantt = panel('Blocker timeline');
+    const rows = () => within(within(gantt).getByRole('table', { name: 'Every bar and waits-on arrow in the blocker timeline' })).getAllByRole('row').slice(1);
+    expect(rows()).toHaveLength(2);
+    expect(gantt.querySelector('svg.gantt')!.getAttribute('aria-label')).toMatch(/^Blocker timeline for .*: 2 of 6 items and 1 waits-on arrow\./);
+    await userEvent.click(within(gantt).getByRole('button', { name: 'Show all 6 items' }));
+    expect(rows()).toHaveLength(6);
+    expect(within(gantt).getByRole('button', { name: 'Show only the chains' })).toBeTruthy();
   });
 
   it('says so when a Toil project has no links to draw', async () => {

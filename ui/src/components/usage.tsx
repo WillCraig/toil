@@ -13,12 +13,20 @@ import { RATES_HREF } from '../format.ts';
 import { EditLink } from './help.tsx';
 import { ADAPTER_LABEL, addUp, compact, dollars, modelKey, modelLabel, totalsBy, usageParts, type AnswerUsage, type UsageRecord } from '../model-usage.ts';
 
-/** What the records used, in one phrase for someone who doesn't read tokens: "about $0.04 of usage" (#552). The breakdown is one fold away. */
-export function usageSummary(records: readonly UsageRecord[]): string {
+/**
+ * What the records used, in one phrase for someone who doesn't read tokens:
+ * "about $0.04 of usage (estimate)", or "Covered by your Claude plan (about
+ * $0.12 of usage)" where a plan pays for it (#552). Null when there is no
+ * dollar figure to say: a line that only says so is left off, and the tokens
+ * stay in the breakdown and the run's details.
+ */
+export function usageSummary(records: readonly UsageRecord[]): string | null {
   const t = addUp(records);
+  if (!records.length || !Object.keys(t.costUsd).length) return null;
   const cost = Object.values(t.costUsd).reduce((a, b) => a + b, 0);
-  if (!records.length) return 'no usage reported';
-  return Object.keys(t.costUsd).length ? `about ${cost < 0.01 ? dollars(cost) : `$${cost.toFixed(2)}`} of usage ${t.plan ? '(not billed on your plan)' : '(estimate)'}` : 'no dollar figure reported';
+  const figure = `about ${cost < 0.01 ? dollars(cost) : `$${cost.toFixed(2)}`} of usage`;
+  const onPlan = records.find((r) => r.plan && typeof r.costUsd === 'number');
+  return onPlan ? `Covered by your ${ADAPTER_LABEL[onPlan.adapter]} plan (${figure})` : `${figure} (estimate)`;
 }
 
 /**
@@ -26,21 +34,28 @@ export function usageSummary(records: readonly UsageRecord[]): string {
  * token breakdown and the quota behind a fold, and any notice out in the
  * open, since a missing dollar figure is never something to open a fold for.
  */
-/** The same line the footer's fold opens from, for a caller that folds it into a line of its own: "about $0.04 of usage", with a sample's label first. */
-export function usageLine(usage: AnswerUsage): string {
-  return `${usage.sample ? 'Sample figures, not from a model. ' : ''}${usageSummary(usage.records)}`;
+/** The same line the footer's fold opens from, for a caller that folds it into a line of its own: "about $0.04 of usage", with a sample's label first. Null with no dollar figure. */
+export function usageLine(usage: AnswerUsage): string | null {
+  const summary = usageSummary(usage.records);
+  return summary && `${usage.sample ? 'Sample figures, not from a model. ' : ''}${summary}`;
 }
 
 export function UsageFooter({ usage }: { usage: AnswerUsage }) {
+  // With no dollar figure the folded line says the tokens instead, never that a figure is missing; the breakdown stays one fold in.
+  const tokens = addUp(usage.records).tokens;
+  const summary = usageSummary(usage.records) ?? (tokens === undefined ? null : `${compact(tokens)} tokens`);
+  if (!summary && usage.notices.length === 0) return null;
   return (
     <div className="usage-footer" role="group" aria-label="What this answer used" data-usage-footer="">
-      <details className="usage-details">
-        <summary className="usage-line">
-          {usage.sample && <span className="usage-sample">Sample figures, not from a model. </span>}
-          {usageSummary(usage.records)}
-        </summary>
-        <UsageBreakdown usage={usage} />
-      </details>
+      {summary && (
+        <details className="usage-details">
+          <summary className="usage-line">
+            {usage.sample && <span className="usage-sample">Sample figures, not from a model. </span>}
+            {summary}
+          </summary>
+          <UsageBreakdown usage={usage} />
+        </details>
+      )}
       <UsageNotices usage={usage} />
     </div>
   );
@@ -103,7 +118,7 @@ export function ChatUsage({ usages }: { usages: AnswerUsage[] }) {
     <details className="chat-usage" aria-label="What this chat used" data-chat-usage="">
       <summary className="usage-line">
         {sample && <span className="usage-sample">Sample figures. </span>}
-        This chat: {usageSummary(records)}
+        This chat: {usageSummary(records) ?? (all.tokens === undefined ? 'what it used' : `${compact(all.tokens)} tokens`)}
       </summary>
       <p className="usage-line">
         {all.tokens === undefined ? 'Tokens not reported' : `${compact(all.tokens)} tokens`}

@@ -23,10 +23,8 @@ export function BoardMovesSetting() {
           </span>
           Apply board moves when I drop a card
         </Checkbox>
+        <Help topic="board-moves" />
       </div>
-      <p className="note">
-        Saved in this browser only. <Help topic="board-moves" />
-      </p>
     </Card>
   );
 }

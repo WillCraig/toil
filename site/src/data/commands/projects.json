@@ -491,5 +491,18 @@
       "--clear <part>",
       "--replace"
     ]
+  },
+  {
+    "name": "standards set",
+    "tool": "projects_standards_set",
+    "description": "Set the ticket rules (standards) a toil project's work is held to",
+    "writes": false,
+    "connection": false,
+    "flags": [
+      "<toil-project>",
+      "--use <standard>",
+      "--replace",
+      "--clear"
+    ]
   }
 ]

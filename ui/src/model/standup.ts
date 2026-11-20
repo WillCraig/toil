@@ -608,25 +608,43 @@ export function presetOf(range: { from: string; to: string }, explicit: boolean,
   return 'custom';
 }
 
-/** A row of the report: one person's one bucket, for the Summary's short list. */
-export interface TopRow {
+/** One bucket of a Summary row: its group (a merged row may hold several), the bucket and its chips. */
+export interface TopPart {
   group: StandupGroup;
   bucket: Bucket;
   chips: Chip[];
 }
 
+/** A row of the Summary's short list: one person, as their heading reads, with the buckets of theirs that made the cut. */
+export interface TopRow {
+  /** The heading, `groupTitle` of its first group: rows that read the same are one row. */
+  title: string;
+  group: StandupGroup;
+  parts: TopPart[];
+}
+
 /**
  * The few rows that matter most, for a card with room for a handful: unanswered questions first,
  * then what is blocked, then what got done, then what is in progress. Next waits for the full
- * page. People keep the report's order within each kind.
+ * page. People keep the report's order within each kind. `limit` counts buckets, and the buckets
+ * of one heading fold into one row, so nobody is listed twice ("Not attributed" with its done
+ * and its in progress is one row with two lines).
  */
 export function topRows(r: StandupReport, limit: number): TopRow[] {
   const rows: TopRow[] = [];
+  let taken = 0;
   for (const bucket of ['comments', 'blocked', 'done', 'progress'] as const) {
     for (const group of r.people) {
+      if (taken >= limit) return rows;
       const lines = bucket === 'comments' ? group.lines.comments.filter((l) => l.comment?.outstanding) : group.lines[bucket];
-      if (lines.length) rows.push({ group, bucket, chips: chipsOf(lines) });
+      if (!lines.length) continue;
+      const title = groupTitle(group);
+      const part = { group, bucket, chips: chipsOf(lines) };
+      const row = rows.find((x) => x.title === title);
+      if (row) row.parts.push(part);
+      else rows.push({ title, group, parts: [part] });
+      taken++;
     }
   }
-  return rows.slice(0, limit);
+  return rows;
 }

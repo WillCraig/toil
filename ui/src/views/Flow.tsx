@@ -6,17 +6,20 @@
  * each of them in a dialog (#394).
  */
 
+import type { ReactNode } from 'react';
 import { Avatar } from '../components/bits.tsx';
+import { Unread } from '../components/unread.tsx';
 import { BurnupChart, CycleScatter, ThroughputSpark } from '../components/charts.tsx';
 import { Cited, ItemLink } from '../components/items.tsx';
-import { describe, type Health } from '../model/sprint.ts';
+import { describe, sprintPoints, type Health, type Tally } from '../model/sprint.ts';
 import { useData, useDerived } from '../data.ts';
 import { dateTime, day, shortKey, sourceLabel } from '../format.ts';
 import { burnup } from '../model/burnup.ts';
+import { pointsOf, unreadItems } from '../../../src/core/brief/points.ts';
 import { aging, cycleTimes, throughput, type Unknown } from '../model/flow.ts';
 import { AGING_PERCENTILE, MIN_CYCLES } from '../model/insights.ts';
 import { useTerm, useWords } from '../skins.tsx';
-import { Empty, TrackerAction } from '../components/empty.tsx';
+import { Empty, PointsAction, TrackerAction } from '../components/empty.tsx';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const daysText = (n: number) => `${round1(n)} ${round1(n) === 1 ? 'day' : 'days'}`;
@@ -44,6 +47,8 @@ export function Burnup() {
   const { health: h } = useDerived();
   const words = useWords();
   if (!h) return <Empty message={words('empty.burnup')} action={<TrackerAction toilProject={toilProject.name} sync={sync} />} />;
+  // A burn-up of points nobody read would draw two flat lines at zero (#652).
+  if (!sprintPoints(h)) return <Empty message={words('empty.points')} action={<PointsAction toilProject={toilProject.name} jira={toilProject.sources.some((s) => s.area.startsWith('jira'))} />} />;
   return <BurnupChart b={burnup(h, now)} sprint={h.sprint.name} />;
 }
 
@@ -143,11 +148,15 @@ export function Aging() {
 }
 
 const pts = (n: number) => `${n} ${n === 1 ? 'point' : 'points'}`;
+const itemsText = (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`;
+/** A tally's note: its items, and how many of them had no points read, so a figure never quietly leaves them out (#652). */
+const tallyNote = (t: Tally) => `points, ${itemsText(t.count)}${t.unestimated && t.points !== null ? `, ${unreadItems(t.unestimated)}` : ''}`;
+const tallyStat = (t: Tally) => (t.points === null ? { value: <Unread />, note: `no points read, ${itemsText(t.count)}` } : { value: String(t.points), note: tallyNote(t) });
 
 /** The sprint in full (#252): its figures, the burn-up, and what is at risk, added and carried over. The Overview's burn-up tile opens it. */
 export function SprintDetail({ h }: { h: Health }) {
   const term = useTerm();
-  const total = h.done.points + h.remaining.points;
+  const p = sprintPoints(h);
   const listed = (kind: 'added' | 'carried') => h.items.filter((i) => h.entries.get(i.id)?.kind === kind);
   return (
     <>
@@ -155,14 +164,16 @@ export function SprintDetail({ h }: { h: Health }) {
         {day(h.sprint.start!)} to {day(h.sprint.end!)}, working days only.
       </p>
       <ul className="stats" aria-label="Sprint figures">
-        <Stat label={term('pointsDone', 'Done')} value={`${h.done.points} of ${total}`} note={`points, ${h.done.count} items`} />
-        <Stat label="Planned" value={String(h.planned.points)} note={`points, ${h.planned.count} items`} />
-        <Stat label="Added mid-sprint" value={String(h.added.points)} note={`points, ${h.added.count} items`} />
-        <Stat label="Carried over" value={String(h.carried.points)} note={`points, ${h.carried.count} items`} />
+        <Stat label={term('pointsDone', 'Done')} value={p ? `${p.done} of ${p.total}` : <Unread />} note={p ? `points, ${itemsText(h.done.count)}${h.scope.unestimated ? `; the sprint has ${unreadItems(h.scope.unestimated)}` : ''}` : `no points read, ${itemsText(h.done.count)}`} />
+        <Stat label="Planned" {...tallyStat(h.planned)} />
+        <Stat label="Added mid-sprint" {...tallyStat(h.added)} />
+        <Stat label="Carried over" {...tallyStat(h.carried)} />
       </ul>
-      <div className="meter" role="img" aria-label={`${h.done.points} of ${total} points done`}>
-        <span style={{ width: `${total ? (100 * h.done.points) / total : 0}%` }} />
-      </div>
+      {p && (
+        <div className="meter" role="img" aria-label={`${p.done} of ${p.total} points done`}>
+          <span style={{ width: `${p.total ? (100 * p.done) / p.total : 0}%` }} />
+        </div>
+      )}
       <Burnup />
       {h.otherUnits.length > 0 && (
         <p className="note">
@@ -207,8 +218,7 @@ export function SprintDetail({ h }: { h: Health }) {
                     <ItemLink id={item.id} withTitle />
                     <p className="evidence">
                       {e.from ? `From ${e.from}` : 'Added'}
-                      {e.at ? ` on ${dateTime(e.at)}` : ''}, {pts(item.estimate?.unit === 'points' ? item.estimate.value : 0)}
-                      {item.estimate ? '' : ' (no estimate)'}. Source: <code>{e.evidence}</code>
+                      {e.at ? ` on ${dateTime(e.at)}` : ''}, {pointsOf(item) === null ? 'no points read' : pts(pointsOf(item)!)}. Source: <code>{e.evidence}</code>
                     </p>
                   </li>
                 );
@@ -223,7 +233,7 @@ export function SprintDetail({ h }: { h: Health }) {
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+function Stat({ label, value, note }: { label: string; value: ReactNode; note: string }) {
   return (
     <li className="stat">
       <span className="stat-label">{label}</span>

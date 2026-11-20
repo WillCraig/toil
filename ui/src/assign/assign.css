@@ -20,18 +20,37 @@
 .assign-card__title { color: var(--ink); }
 .assign-needs { color: var(--ink); font-weight: 600; }
 .assign-stop { color: var(--danger); overflow-wrap: anywhere; }
-.assign-inbox { display: grid; gap: 0.5rem; padding: 0.75rem 1rem; border: 1px solid var(--warn); border-left-width: 4px; border-radius: var(--radius); background: var(--bg); }
+.assign-inbox { display: grid; gap: 0.5rem; padding: 0.75rem 1rem; border: 1px solid var(--edge-warn); border-radius: var(--radius); background: var(--tint-warn); }
 .assign-inbox h3 { margin: 0; }
 .assign-inbox__row span { overflow-wrap: anywhere; }
 .assign-limits summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 .assign-limits__form { display: grid; gap: 0.75rem; max-width: 24rem; }
 .assign-agent h3 { margin: 0; }
 
-.assign-warn { border-left: 4px solid var(--warn); padding-left: 0.75rem; overflow-wrap: anywhere; }
+.assign-warn { padding: 0.5rem 0.75rem; border: 1px solid var(--edge-warn); border-radius: var(--radius); background: var(--tint-warn); overflow-wrap: anywhere; }
 .assign-diff, .assign-detail { margin: 0; padding: 0.5rem 0.6rem; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); font-family: var(--font-mono); font-size: 0.8125rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .assign-detail { max-height: 16rem; overflow: auto; }
 .assign-before { text-decoration: line-through; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
-.assign-after { white-space: pre-wrap; overflow-wrap: anywhere; }
+.assign-after, .assign-was { white-space: pre-wrap; overflow-wrap: anywhere; }
+.assign-was { color: var(--muted); }
+/* A field's diff, line by line (#657, round 4): kept lines plain, a removed line struck and muted, an added one bold with a bar beside it. */
+.assign-lines-diff { display: block; }
+.diff-line { display: block; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 1.4em; }
+.diff-line--del { text-decoration: line-through; color: var(--muted); }
+.diff-line--was { color: var(--muted); }
+.diff-line--add { font-weight: 600; background: var(--tint-ok); padding-left: 0.4rem; }
+/* Sync and check again, under an applied fix: the press, then each rule on the new reading. */
+.check-again { display: grid; gap: 0.4rem; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+.check-again__rules { margin: 0; }
+.check-again--pass { color: var(--ok); font-weight: 600; }
+.check-again--missing { color: var(--warn); }
+.assign-live { margin: 0.75rem 0; color: var(--ink); overflow-wrap: anywhere; }
+.assign-actions--after { margin-top: 1rem; }
+/* A proposal's diff: a narrow Field, then Now and Proposed side by side at equal width. The widths are on the header cells, which a fixed layout reads them from; where the table stacks (layout.css) its header is hidden, so they don't apply there. */
+.assign-diff-table table { table-layout: fixed; }
+.assign-diff-table thead th.assign-diff-field { width: 9rem; }
+.assign-diff-table thead th.assign-diff-value { width: calc((100% - 9rem) / 2); }
+.assign-diff-table th, .assign-diff-table td { vertical-align: top; text-align: left; }
 .assign-record, .assign-transcript { margin-top: 1rem; }
 .assign-record summary, .assign-transcript summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 .assign-lines { display: grid; gap: 0.5rem; padding-left: 1.25rem; margin: 0.5rem 0 0; }
@@ -39,3 +58,24 @@
 .assign-line p { overflow-wrap: anywhere; }
 .assign-line--error strong { color: var(--danger); }
 .assign-line--proposal strong { color: var(--link); }
+
+/* The assignment's head: the one next step first when a proposal waits on the reader, the run's times and figures one press in. */
+.assign-lead { font-weight: 600; margin: 0.25rem 0; }
+.assign-run > summary { min-height: 32px; color: var(--muted); font-size: 0.875rem; }
+.assign-run > .note { margin: 0.25rem 0 0; }
+
+/* "Fix with AI agent" (#657): the rule and what toil found, as label and value pairs. */
+.fix-rule { display: grid; grid-template-columns: minmax(7rem, max-content) 1fr; gap: 0.35rem 1rem; margin: 0; overflow-wrap: anywhere; }
+.fix-rule dt { font-weight: 600; }
+.fix-rule dd { margin: 0; }
+.fix-rule dd p { margin: 0; }
+.fix-rule dd p + p { margin-top: 0.3rem; }
+@media (max-width: 30rem) { .fix-rule { grid-template-columns: 1fr; } .fix-rule dd { margin-bottom: 0.35rem; } }
+.assign-form .agent-notice { display: grid; gap: 0.4rem; padding: 0.6rem 0.75rem; border: 1px solid var(--edge-warn); border-radius: var(--radius); background: var(--tint-warn); }
+.assign-form .agent-notice p { margin: 0; }
+.assign-form .agent-notice summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+
+/* An agent's work on the People view: one line per kind ("Tidy up · 8"), each opening to its runs. */
+.assign-kinds { display: grid; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
+.assign-kind > summary { min-height: 44px; flex-wrap: wrap; gap: 0.25rem 0.5rem; border-radius: var(--radius); }
+.assign-kind .rows { margin-top: 0.25rem; }

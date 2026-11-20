@@ -22,6 +22,9 @@ import { Cache, CacheError, wipeCacheFiles } from './cache.ts';
 import { areasFrom, settingsFrom } from './config.ts';
 import { createUiServer, type ToilProjectRenames } from './server.ts';
 import { ClassifyService, hostAgents, sampleBackend } from './classify.ts';
+import { StandardsService } from './standards.ts';
+import { fixtureStandards } from '../src/fixtures/standards.ts';
+import type { RulesBackend } from '../src/rules.ts';
 import { BoardService, sampleBoard } from './board.ts';
 import { loadMachineSecret, MachineSecretError } from './machine-secret.ts';
 import { ToilProjectAgents } from './agents/toil-project-agents.ts';
@@ -154,13 +157,19 @@ async function main(): Promise<number> {
       return [];
     }
   };
+  // Ticket rules (#657): toil's own check over each toil project's synced items, kept until its next sync; the sample's over its fixtures.
+  const standards: RulesBackend & { reading?: StandardsService['reading'] } = cache
+    ? new StandardsService({ execute, items: (toilProject) => cacheData(cache!, toilProject)?.items() ?? null, syncedAt: (toilProject) => cacheData(cache!, toilProject)?.syncedAt() ?? null })
+    : fixtureStandards();
   const host = cache
     ? new AgentHost({
         dataDir: settings.dataDir,
         version: __TOIL_UI_VERSION__,
         data: (toilProject) => {
           const data = cacheData(cache!, toilProject);
-          return data && worklog ? { ...data, worklog: async (day) => (await worklog!.day(toilProject, day)).page, standup: async (from, to) => (await worklog!.standup(toilProject, from, to)).report } : data;
+          // The readiness tools hold their rule rows to the same check the page reads.
+          const ruled = data && standards.reading ? { ...data, rules: () => standards.reading!(toilProject) } : data;
+          return ruled && worklog ? { ...ruled, worklog: async (day) => (await worklog!.day(toilProject, day)).page, standup: async (from, to) => (await worklog!.standup(toilProject, from, to)).report } : ruled;
         },
         onRun: (run) => worklog?.recordRun(run),
         rounds: (toilProject, label, self) => roundsUsedFor(cache!.runs(toilProject), label, self),
@@ -195,6 +204,8 @@ async function main(): Promise<number> {
       repos: (toilProject) => reposOf(execute, toilProject),
       // The one write an assignment makes, and only on a person's Apply: toil's own command, through its own gate, labelled with the assignment.
       apply: (a, p) => toilExecute(p.command!, { ...p.input, allowWrite: true }, { caller: CALLER, actor: actorOf(a.id) }),
+      // "Fix with AI agent" (#657) is held to the rule as toil checks it now.
+      ruleFor: (toilProject, item, standard, rule) => standards.ruleFor(toilProject, item, standard, rule),
       settings: () => queueSettings(dataDir),
       ...(fingerprints ? { current: (toilProject: string, mode: Parameters<typeof assignmentPrompts>[0]) => fingerprints!.current(toilProject, assignmentPrompts(mode)), restartNeeded: () => fingerprints!.restartNeeded() } : {}),
       now: () => new Date().toISOString(),
@@ -273,6 +284,7 @@ async function main(): Promise<number> {
     classify: cache ? new ClassifyService({ execute, dataDir: settings.dataDir, agents: host ? hostAgents(host) : null, cwd: process.cwd() }) : sampleBackend(),
     // The Board's drop: toil's own command for the move, behind the connection's writes; the sample applies nothing.
     board: cache ? new BoardService({ execute }) : sampleBoard(),
+    standards,
     ...(fingerprints ? { serverStatus: () => fingerprints!.server() } : {}),
     appDir: fileURLToPath(new URL('../app/', import.meta.url)),
     version: __TOIL_UI_VERSION__,

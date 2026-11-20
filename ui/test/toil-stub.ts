@@ -32,7 +32,7 @@ export const JIRA_PAGE = 3;
 export interface StubToil {
   execute: SyncExecute;
   calls: StubCall[];
-  /** Areas whose every call fails, as a tracker that's down would. */
+  /** Areas whose every call fails, as a tracker that's down would, or single commands (`ado work-item link-feed`). */
   failing: Set<string>;
   /** The canned answers, which a test may change between syncs. */
   canned: Canned[];
@@ -46,6 +46,11 @@ export interface StubToil {
   touchAdo(id: number, state: string, at: string): void;
   /** Adds an Azure DevOps work item to the settlement toil project: a copy of the first one, under a new id, with its revisions. */
   addAdo(id: number): void;
+  /**
+   * Adds or removes a blocks link from one Azure DevOps work item to another, as Azure DevOps does (#664): the
+   * relation changes, but the item's rev and System.ChangedDate stay where they were, and only the link feed reports it.
+   */
+  linkAdo(sourceId: number, targetId: number, active: boolean, at: string): void;
   /** Renames the iteration path in every revision of every Azure DevOps work item, as renaming an iteration does in the tracker. */
   renameIteration(from: string, to: string): void;
   reset(): void;
@@ -72,6 +77,8 @@ export function stubToil(): StubToil {
     return { id: r.id, rev: r.rev, fields: { 'System.Id': r.id, 'System.Rev': r.rev, ...fields, 'System.ChangedBy': asText(fields['System.ChangedBy']) } };
   };
   const failing = new Set<string>();
+  // Every link change linkAdo made, as the reporting links feed lists them.
+  const linkChanges: Rec[] = [];
   const find = (command: string, input: Rec) => canned.find((c) => c.command === command && inputKey(c.input) === inputKey(input));
   const sameToilProject = (command: string, input: Rec) => canned.find((c) => c.command === command && c.input.toilProject === input.toilProject);
 
@@ -93,7 +100,7 @@ export function stubToil(): StubToil {
     if (options.readOnly !== true || options.caller !== 'toil-ui') return fail(command, 'WRITE_DISABLED', 'The stub answers read-only toil-ui calls only.', 'Pass readOnly and the toil-ui caller.');
     options.onProgress?.({ type: 'request', method: 'GET', url: `https://${command.split(' ')[0]}.imagile.dev/`, status: 200, durationMs: 1, command, message: `GET ${command}` });
     await Promise.resolve();
-    if (failing.has(command.split(' ')[0]!)) return fail(command, 'HTTP', `${command.split(' ')[0]}.imagile.dev answered 503 Service Unavailable.`, 'Try again when the server is back; toil config test checks the connection.');
+    if (failing.has(command.split(' ')[0]!) || failing.has(command)) return fail(command, 'HTTP', `${command.split(' ')[0]}.imagile.dev answered 503 Service Unavailable.`, 'Try again when the server is back; toil config test checks the connection.');
 
     const { updatedSince, cursor, fields, ...rest } = input;
     const since = typeof updatedSince === 'string' ? Date.parse(updatedSince) : null;
@@ -128,6 +135,9 @@ export function stubToil(): StubToil {
         .map(feedOf)
         .sort((a, b) => Date.parse(String((a.fields as Rec)['System.ChangedDate'])) - Date.parse(String((b.fields as Rec)['System.ChangedDate'])) || Number(a.id) - Number(b.id));
       return ok(command, feed);
+    }
+    if (command === 'ado work-item link-feed') {
+      return ok(command, structuredClone(linkChanges.filter((l) => since === null || Date.parse(String((l.attributes as Rec).changedDate)) >= since)));
     }
     if (command === 'ado work-item get-many' || command === 'github issue get') {
       const exact = find(command, rest);
@@ -199,6 +209,21 @@ export function stubToil(): StubToil {
       search.workItems.push({ ...search.workItems[0]!, id });
       many.value.push({ ...structuredClone(template), id });
       revisions.set(id, structuredClone(revisions.get(template.id)!).map((r) => ({ ...r, id })));
+    },
+    linkAdo(sourceId, targetId, active, at) {
+      const rel = 'System.LinkTypes.Dependency-Forward';
+      const url = `https://ado.imagile.dev/DefaultCollection/_apis/wit/workItems/${targetId}`;
+      const isIt = (r: unknown) => isRec(r) && r.rel === rel && r.url === url;
+      for (const c of canned) {
+        if (c.command !== 'ado work-item get-many') continue;
+        for (const w of (c.data as { value: Array<{ id: number; relations?: unknown[] }> }).value) {
+          if (w.id !== sourceId) continue;
+          const kept = (w.relations ?? []).filter((r) => !isIt(r));
+          w.relations = active ? [...kept, { rel, url, attributes: { isLocked: false, name: 'Successor' } }] : kept;
+        }
+      }
+      // The shape Azure DevOps Services sends (test/fixtures/ado.fixture.ts, feedLink): the topology in rel, the rest under attributes.
+      linkChanges.push({ rel: 'System.LinkTypes.Dependency', attributes: { linkType: rel, sourceId, targetId, changedDate: at, isActive: active, changedOperation: active ? 'create' : 'remove' } });
     },
     renameIteration(from, to) {
       for (const list of revisions.values()) for (const r of list) {

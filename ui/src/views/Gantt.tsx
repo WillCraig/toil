@@ -1,27 +1,35 @@
 /**
  * The blocker Gantt (#396), drawn as plain SVG from src/model/gantt.ts: one
  * row per item that blocks or is blocked, on the sprint's timeline, with its
- * time blocked (hatched), in progress (solid) and failing checks (a thin
+ * time blocked (a light hatch, in a light red on the critical chain; lateness is
+ * the due flag's, filled once the date passes), in progress (solid) and failing checks (a thin
  * strip under the bar), "waits on" arrows from each blocker to what it holds
  * up, the critical chain's arrows drawn heavy and its rows marked, and today
- * as a line. Every mark differs by shape as well as colour, because in some
+ * as a line. Work with a due date also shows its plan, outlined and unfilled,
+ * up to a flag on the due date (filled once the date has passed), and each
+ * tooltip says which tracker the date came from. The chains still holding work
+ * up show first; a button shows every row. Every mark differs by shape as well as colour, because in some
  * themes the danger and accent tokens are the same orange.
  *
- * The drawing is an image with a summary; the table under it is the
- * accessible equivalent, listing every bar and every arrow with links, so no
- * bar needs to be focusable. Narrower than the drawing's minimum width, it
+ * The drawing is an image with a summary; the table under it, folded away
+ * until asked for, is the accessible equivalent, listing every bar and every
+ * arrow with links, so no bar needs to be focusable. The key, folded behind a
+ * Key line so only the chart shows at first, names only the marks the rows on
+ * screen carry. Narrower than the drawing's minimum width, it
  * scrolls sideways inside a declared scroller with a visible cue.
  * A Gantt chart nobody had to update by hand on Friday afternoon.
  */
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { DisclosureBody, SummaryChevron } from '../components/disclosure.tsx';
 import { ItemLink } from '../components/items.tsx';
 import { DataTable, Scroller, type Column } from '../components/layout.tsx';
 import { useData, useDerived } from '../data.ts';
-import { STATUS_CATEGORY_LABEL, day, shortKey } from '../format.ts';
-import { blockerGantt, type Bar, type Gantt, type Segment } from '../model/gantt.ts';
+import { STATUS_CATEGORY_LABEL, day, shortKey, sourceLabel } from '../format.ts';
+import { blockedMarks, blockerGantt, dueEnd, type Bar, type Gantt, type Segment } from '../model/gantt.ts';
 import { VERDICT_LABEL } from '../model/readiness.ts';
 import './gantt.css';
+import { unreadItems } from '../../../src/core/brief/points.ts';
 
 const DAY = 86_400_000;
 const t = (iso: string) => Date.parse(iso);
@@ -68,23 +76,33 @@ function timeText(s: Segment) {
 }
 
 /** One row's words, for its tooltip. */
-function rowWords(bar: Bar, g: Gantt, name: (id: string) => string): string {
+function rowWords(bar: Bar, g: Gantt, name: (id: string) => string, from: (id: string) => string): string {
   const parts = [`${name(bar.id)}${bar.points !== null ? `, ${plural(bar.points, 'point')}` : ''}${bar.done ? ', done' : ''}`];
+  if (!bar.done && !bar.segments.length) parts.push('not started');
   for (const s of bar.segments.filter((x) => x.kind === 'progress')) parts.push(`in progress ${timeText(s)}`);
   for (const s of bar.blocked) parts.push(`blocked by ${name(s.by!)} ${timeText(s)}`);
   for (const s of bar.checks) parts.push(`checks failing since ${s.estimated ? 'about ' : ''}${day(s.start)}`);
   const waits = g.arrows.filter((a) => a.to === bar.id).map((a) => name(a.from));
   if (waits.length) parts.push(`waits on ${waits.join(', ')}`);
+  if (bar.due) parts.push(`${bar.overdue ? 'overdue: was ' : ''}due ${day(bar.due)} (${from(bar.id)})`);
+  if (bar.planned) parts.push(`planned ${timeText(bar.planned)}${bar.planned.by ? `, after ${name(bar.planned.by)} is due` : ''}`);
   if (bar.onChain) parts.push('on the critical chain');
   return parts.join('; ');
 }
 
-function Drawing({ g }: { g: Gantt }) {
+/** Which tracker's field a due date was read from, in words. */
+function dueFrom(byId: Map<string, { source: { area: string } }>, id: string) {
+  const item = byId.get(id);
+  return item ? `the due date in ${sourceLabel(item.source.area)}` : 'its due date';
+}
+
+function Drawing({ g, bars }: { g: Gantt; bars: Bar[] }) {
   const { byId } = useData();
   const { ref, width, narrow } = useWidth(680);
   const L = { ...FULL, ...(narrow ? { label: 150 } : {}) };
   const uid = useId().replace(/[^\w-]/g, '');
   const hatch = `gantt-hatch-${uid}`;
+  const hatchStrong = `gantt-hatch-strong-${uid}`;
   const head = `gantt-head-${uid}`;
   const headChain = `gantt-head-chain-${uid}`;
   const start = t(g.start);
@@ -92,8 +110,8 @@ function Drawing({ g }: { g: Gantt }) {
   const plot = width - L.label - L.right;
   const x = (ms: number) => L.label + (plot * (Math.min(Math.max(ms, start), end) - start)) / Math.max(1, end - start);
   // The rows, then a band under them for the Today label, clear of the day labels above.
-  const height = L.top + g.bars.length * L.row + 18;
-  const rowY = new Map(g.bars.map((b, i) => [b.id, L.top + i * L.row + L.row / 2]));
+  const height = L.top + bars.length * L.row + 18;
+  const rowY = new Map(bars.map((b, i) => [b.id, L.top + i * L.row + L.row / 2]));
   const key = (id: string) => {
     const item = byId.get(id);
     return item ? shortKey(item) : id;
@@ -111,29 +129,35 @@ function Drawing({ g }: { g: Gantt }) {
 
   const nowX = x(t(g.now));
   const chain = g.chain;
-  const summary = `Blocker timeline${g.sprint ? ` for ${g.sprint}` : ''}: ${plural(g.bars.length, 'item')} and ${plural(g.arrows.length, 'waits-on arrow')}.${
-    chain ? ` Critical chain: ${chain.ids.map(key).join(' blocks ')}${chain.byCount ? '' : `, ${plural(chain.points, 'point')}`}.` : ''
+  const shownArrows = g.arrows.filter((a) => rowY.has(a.from) && rowY.has(a.to));
+  const summary = `Blocker timeline${g.sprint ? ` for ${g.sprint}` : ''}: ${bars.length < g.bars.length ? `${bars.length} of ${plural(g.bars.length, 'item')}` : plural(g.bars.length, 'item')} and ${plural(shownArrows.length, 'waits-on arrow')}.${
+    chain ? ` Critical chain: ${chain.ids.map(key).join(' blocks ')}${chain.byCount ? '' : `, ${plural(chain.points, 'point')}${chain.unestimated ? ` (${unreadItems(chain.unestimated)})` : ''}`}.` : ''
   } The table lists every bar and arrow.`;
   const maxChars = Math.floor((L.label - 24) / 7);
   const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, Math.max(1, n - 1))}…` : s);
 
-  // Where a blocker's bar ends: its last segment, else today.
+  // Where a blocker's bar ends: its plan, else its last segment, else today, so an arrow runs from where the blocker is due to where the wait ends.
   const endX = (id: string) => {
-    const bar = g.bars.find((b) => b.id === id);
-    const last = bar?.segments.map((s) => t(s.end)).sort((a, b) => b - a)[0];
+    const bar = bars.find((b) => b.id === id);
+    const last = [...(bar?.segments ?? []), ...(bar?.planned ? [bar.planned] : [])].map((s) => t(s.end)).sort((a, b) => b - a)[0];
     return x(last ?? t(g.now));
   };
 
-  const lanes = new Map([...new Set(g.arrows.map((a) => a.from))].map((id, i) => [id, i % LANES]));
+  const lanes = new Map([...new Set(shownArrows.map((a) => a.from))].map((id, i) => [id, i % LANES]));
+
+  // Where the drawing is wider than its box (a phone), it opens with Today in view, not the sprint's first day (#657).
+  useEffect(() => {
+    const box = ref.current?.parentElement;
+    if (!box || box.scrollWidth <= box.clientWidth) return;
+    box.scrollLeft = Math.max(0, nowX - box.clientWidth * 0.7);
+  }, [nowX, ref]);
 
   return (
     <div ref={ref} className="gantt-measure">
       <svg className="gantt" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={summary} data-gantt="full">
         <defs>
-          <pattern id={hatch} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-            <rect className="gantt-hatch-bg" width="6" height="6" />
-            <line className="gantt-hatch-line" x1="1.5" y1="0" x2="1.5" y2="6" />
-          </pattern>
+          <Hatch id={hatch} />
+          <Hatch id={hatchStrong} strong />
           <marker id={head} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path className="gantt-head" d="M0,0 L8,4 L0,8 z" />
           </marker>
@@ -151,14 +175,14 @@ function Drawing({ g }: { g: Gantt }) {
           </g>
         ))}
 
-        {g.bars.map((bar, i) => {
+        {bars.map((bar, i) => {
           const y = L.top + i * L.row;
           const mid = y + L.row / 2;
           const top = mid - L.bar / 2;
           const item = byId.get(bar.id);
           return (
             <g key={bar.id} className={`gantt-row${bar.onChain ? ' gantt-row--chain' : ''}`}>
-              <title>{rowWords(bar, g, name)}</title>
+              <title>{rowWords(bar, g, name, (id) => dueFrom(byId, id))}</title>
               {bar.onChain && <rect className="gantt-band" x={0} y={y + 1} width={width} height={L.row - 2} />}
               {bar.onChain && <path className="gantt-diamond" d={`M8,${mid - 5} L13,${mid} L8,${mid + 5} L3,${mid} z`} />}
               <text className="gantt-key" x={18} y={mid + 4}>
@@ -167,22 +191,30 @@ function Drawing({ g }: { g: Gantt }) {
                   {cut(item?.title ?? '', Math.max(4, maxChars - key(bar.id).length))}
                 </tspan>
               </text>
-              {bar.segments.map((s, j) => {
+              {[...bar.segments.filter((s) => s.kind === 'progress').map((s) => ({ ...s, strong: false })), ...blockedMarks(bar).map((m) => ({ ...m, kind: 'blocked' as const }))].map((s, j) => {
                 const x1 = x(t(s.start));
                 const x2 = x(t(s.end));
                 // A 2px gap of the surface between touching segments; at least 3px, so a short spell is still a mark.
                 const w = Math.max(3, x2 - x1 - 2);
                 return s.kind === 'blocked' ? (
-                  <rect key={j} className="gantt-seg gantt-seg--blocked" x={x1} y={top} width={w} height={L.bar} rx={3} fill={`url(#${hatch})`} />
+                  <rect key={j} className={`gantt-seg gantt-seg--blocked${s.strong ? ' gantt-seg--strong' : ''}`} x={x1} y={top} width={w} height={L.bar} rx={3} fill={`url(#${s.strong ? hatchStrong : hatch})`} />
                 ) : (
                   <rect key={j} className="gantt-seg gantt-seg--progress" x={x1} y={top} width={w} height={L.bar} rx={3} />
                 );
               })}
+              {bar.planned && (() => {
+                const x1 = x(t(bar.planned.start));
+                return <rect className="gantt-seg gantt-seg--planned" x={x1 + 1} y={top + 1} width={Math.max(3, x(t(bar.planned.end)) - x1 - 2)} height={L.bar - 2} rx={3} />;
+              })()}
+              {/* The flag sits at the end of the due day, where a plan after it starts. */}
+              {bar.due && !bar.done && t(bar.due) >= start && t(bar.due) <= end && (
+                <path className={`gantt-due${bar.overdue ? ' gantt-due--over' : ''}`} d={`M${x(dueEnd(bar.due))},${top + L.bar + 3} V${top - 4} l7,3 l-7,3`} />
+              )}
               {bar.checks.map((s, j) => {
                 const x1 = x(t(s.start));
                 return <rect key={`c${j}`} className="gantt-seg gantt-seg--checks" x={x1} y={top + L.bar + 3} width={Math.max(3, x(t(s.end)) - x1)} height={4} rx={2} />;
               })}
-              {!bar.segments.length && !bar.done && (
+              {!bar.segments.length && !bar.planned && !bar.done && (
                 <text className="gantt-none" x={L.label + 4} y={mid + 4}>
                   Not started
                 </text>
@@ -192,7 +224,7 @@ function Drawing({ g }: { g: Gantt }) {
           );
         })}
 
-        {g.arrows.map((a) => {
+        {shownArrows.map((a) => {
           const y1 = rowY.get(a.from);
           const y2 = rowY.get(a.to);
           if (y1 === undefined || y2 === undefined) return null;
@@ -220,27 +252,42 @@ function Drawing({ g }: { g: Gantt }) {
   );
 }
 
-/** The key, each mark drawn as it is in the chart, so none is told apart by colour alone. */
-function Legend({ g }: { g: Gantt }) {
+/** The hatch blocked time is filled with: light by default, a light red on the critical chain. */
+function Hatch({ id, strong = false }: { id: string; strong?: boolean }) {
+  return (
+    <pattern id={id} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <rect className="gantt-hatch-bg" width="6" height="6" />
+      <line className={`gantt-hatch-line${strong ? ' gantt-hatch-line--strong' : ''}`} x1="1.5" y1="0" x2="1.5" y2="6" />
+    </pattern>
+  );
+}
+
+/** The key: only the marks the rows on screen carry, each drawn as it is in the chart, so none is told apart by colour alone. */
+function Legend({ g, bars }: { g: Gantt; bars: Bar[] }) {
   const uid = useId().replace(/[^\w-]/g, '');
   const swatch = (children: ReactNode) => (
     <svg className="gantt-swatch" width="28" height="14" viewBox="0 0 28 14" aria-hidden="true">
       <defs>
-        <pattern id={`lh-${uid}`} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-          <rect className="gantt-hatch-bg" width="6" height="6" />
-          <line className="gantt-hatch-line" x1="1.5" y1="0" x2="1.5" y2="6" />
-        </pattern>
+        <Hatch id={`lh-${uid}`} />
+        <Hatch id={`lhs-${uid}`} strong />
       </defs>
       {children}
     </svg>
   );
+  const ids = new Set(bars.map((b) => b.id));
+  const marks = bars.flatMap(blockedMarks);
+  const arrows = g.arrows.filter((a) => ids.has(a.from) && ids.has(a.to));
   return (
     <ul className="gantt-legend" aria-label="Key">
-      <li>{swatch(<rect className="gantt-seg gantt-seg--progress" x="1" y="2" width="26" height="10" rx="3" />)} In progress</li>
-      <li>{swatch(<rect className="gantt-seg gantt-seg--blocked" x="1" y="2" width="26" height="10" rx="3" fill={`url(#lh-${uid})`} />)} Blocked</li>
-      <li>{swatch(<rect className="gantt-seg gantt-seg--checks" x="1" y="5" width="26" height="4" rx="2" />)} Checks failing</li>
-      <li>{swatch(<path className="gantt-arrow" d="M2,7 H24" />)} Waits on (points at the item that waits)</li>
-      {g.chain && <li>{swatch(<><path className="gantt-diamond" d="M6,2 L11,7 L6,12 L1,7 z" /><path className="gantt-arrow gantt-arrow--chain" d="M14,7 H27" /></>)} Critical chain</li>}
+      {bars.some((b) => b.segments.some((s) => s.kind === 'progress')) && <li>{swatch(<rect className="gantt-seg gantt-seg--progress" x="1" y="2" width="26" height="10" rx="3" />)} In progress</li>}
+      {marks.some((m) => !m.strong) && <li>{swatch(<rect className="gantt-seg gantt-seg--blocked" x="1" y="2" width="26" height="10" rx="3" fill={`url(#lh-${uid})`} />)} Blocked</li>}
+      {marks.some((m) => m.strong) && <li>{swatch(<rect className="gantt-seg gantt-seg--blocked gantt-seg--strong" x="1" y="2" width="26" height="10" rx="3" fill={`url(#lhs-${uid})`} />)} Blocked, on the critical chain</li>}
+      {bars.some((b) => b.checks.length) && <li>{swatch(<rect className="gantt-seg gantt-seg--checks" x="1" y="5" width="26" height="4" rx="2" />)} Checks failing</li>}
+      {bars.some((b) => b.planned) && <li>{swatch(<rect className="gantt-seg gantt-seg--planned" x="2" y="3" width="24" height="8" rx="3" />)} Planned, to the due date</li>}
+      {bars.some((b) => b.due && !b.done && !b.overdue) && <li>{swatch(<path className="gantt-due" d="M8,13 V1 l7,3 l-7,3" />)} Due</li>}
+      {bars.some((b) => b.overdue && !b.done) && <li>{swatch(<path className="gantt-due gantt-due--over" d="M8,13 V1 l7,3 l-7,3" />)} Past its due date</li>}
+      {arrows.length > 0 && <li>{swatch(<path className="gantt-arrow" d="M2,7 H24" />)} Waits on (points at the item that waits)</li>}
+      {g.chain && bars.some((b) => b.onChain) && <li>{swatch(<><path className="gantt-diamond" d="M6,2 L11,7 L6,12 L1,7 z" /><path className="gantt-arrow gantt-arrow--chain" d="M14,7 H27" /></>)} Critical chain</li>}
       <li>{swatch(<line className="gantt-today" x1="14" x2="14" y1="0" y2="14" />)} Today</li>
     </ul>
   );
@@ -267,7 +314,7 @@ function Dates({ list, by }: { list: Segment[]; by?: boolean }) {
 }
 
 /** Every bar and every arrow, in words and links: the chart's accessible equivalent. */
-function GanttTable({ g }: { g: Gantt }) {
+function GanttTable({ g, bars }: { g: Gantt; bars: Bar[] }) {
   const { byId } = useData();
   const columns: Array<Column<Bar>> = [
     { header: 'Item', label: 'Item', rowHeader: true, cell: (b) => <ItemLink id={b.id} withTitle /> },
@@ -282,6 +329,21 @@ function GanttTable({ g }: { g: Gantt }) {
     { header: 'In progress', label: 'In progress', cell: (b) => <Dates list={b.segments.filter((s) => s.kind === 'progress')} /> },
     { header: 'Blocked', label: 'Blocked', cell: (b) => <Dates list={b.blocked} by /> },
     { header: 'Checks failing', label: 'Checks failing', cell: (b) => <Dates list={b.checks} /> },
+    {
+      header: 'Due',
+      label: 'Due',
+      cell: (b) =>
+        b.due ? (
+          <>
+            {day(b.due)}
+            {b.overdue && ', passed'}
+            <span className="field"> ({dueFrom(byId, b.id)})</span>
+            {b.planned && <div className="field">Planned from {day(b.planned.start)}{b.planned.by ? <> (after <ItemLink id={b.planned.by} /> is due)</> : ' (today)'}, estimated</div>}
+          </>
+        ) : (
+          <span className="note">No due date</span>
+        ),
+    },
     {
       header: 'Waits on',
       label: 'Waits on',
@@ -304,7 +366,7 @@ function GanttTable({ g }: { g: Gantt }) {
     { header: 'Critical chain', label: 'Critical chain', cell: (b) => (b.onChain ? 'Yes' : 'No') },
     { header: 'Ready to start', label: 'Ready to start', cell: (b) => (b.ready ? VERDICT_LABEL[b.ready] : <span className="note">Started</span>) },
   ];
-  return <DataTable label="Every bar and arrow" caption="Every bar and waits-on arrow in the blocker timeline" columns={columns} rows={g.bars} rowKey={(b) => b.id} wide />;
+  return <DataTable label="Every bar and arrow" caption="Every bar and waits-on arrow in the blocker timeline" columns={columns} rows={bars} rowKey={(b) => b.id} wide />;
 }
 
 function ChainLine({ g }: { g: Gantt }) {
@@ -319,7 +381,7 @@ function ChainLine({ g }: { g: Gantt }) {
           <ItemLink id={id} />
         </span>
       ))}
-      , {c.byCount ? `${plural(c.ids.length, 'item')} (no item on a chain has points, so the longest)` : `${plural(c.points, 'point')} in ${plural(c.ids.length, 'item')}`}.
+      , {c.byCount ? `${plural(c.ids.length, 'item')} (no item on a chain has points, so the longest)` : `${plural(c.points, 'point')} in ${plural(c.ids.length, 'item')}${c.unestimated ? `, ${c.unestimated} of them with no points read` : ''}`}.
     </p>
   );
 }
@@ -327,21 +389,51 @@ function ChainLine({ g }: { g: Gantt }) {
 /** The Dependencies tab's Gantt: the chart, its key, what is estimated, and the table. */
 export function BlockerGantt() {
   const g = useGantt();
+  const [all, setAll] = useState(false);
   if (!g.bars.length) return <p className="note">Nothing in this Toil project blocks anything that is still open.</p>;
+  const focus = new Set(g.focus);
+  const bars = all ? g.bars : g.bars.filter((b) => focus.has(b.id));
+  const hidden = g.bars.length - g.focus.length;
+  const shownIds = new Set(bars.map((b) => b.id));
   return (
     <div className="gantt-panel">
       <ChainLine g={g} />
-      <Legend g={g} />
+      <details className="gantt-keybox" data-gantt-key="">
+        <summary>
+          <SummaryChevron />
+          <span>Key</span>
+        </summary>
+        <DisclosureBody>
+          <Legend g={g} bars={bars} />
+        </DisclosureBody>
+      </details>
       <Scroller label="The timeline drawing" hint="Scroll sideways for the whole sprint." className="gantt-scroll">
-        <Drawing g={g} />
+        <Drawing g={g} bars={bars} />
       </Scroller>
+      {hidden > 0 && (
+        <p className="gantt-more">
+          {all ? `Showing all ${plural(g.bars.length, 'item')}.` : `Showing the critical chain and the longer chains still holding work up: ${g.focus.length} of ${plural(g.bars.length, 'item')}.`}{' '}
+          <button type="button" className="btn btn--small" onClick={() => setAll(!all)}>
+            {all ? 'Show only the chains' : `Show all ${g.bars.length} items`}
+          </button>
+        </p>
+      )}
       {/* That blocked time is estimated qualifies every bar, so it stays beside the drawing; how each part is estimated is in the (i). */}
       <p className="note" data-gantt-estimate="">
         {g.sprint ? `${g.sprint}, ${day(g.start)} to ${day(g.end)}.` : 'No current sprint: the timeline spans the items’ own dates.'} Blocked time is estimated.
       </p>
       {g.cycle && <p className="failure">These blocks links form a loop, so the order of the rows is approximate.</p>}
-      <h3>Every bar and arrow</h3>
-      <GanttTable g={g} />
+      <details className="deps-more" data-gantt-every="">
+        <summary>
+          <SummaryChevron />
+          <span>
+            Every bar and arrow ({plural(bars.length, 'item')}, {plural(g.arrows.filter((a) => shownIds.has(a.from) && shownIds.has(a.to)).length, 'arrow')})
+          </span>
+        </summary>
+        <DisclosureBody>
+          <GanttTable g={g} bars={bars} />
+        </DisclosureBody>
+      </details>
     </div>
   );
 }

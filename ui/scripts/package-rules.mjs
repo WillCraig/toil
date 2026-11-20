@@ -3,8 +3,8 @@
 // test/package.test.ts (on every test run). One list, two inspectors, and
 // neither of them has ever asked for a cover sheet.
 
-import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { delimiter, dirname, isAbsolute, join } from 'node:path';
 
 /** The server, the built app, and the three files every package carries. */
 export const REQUIRED = ['package.json', 'README.md', 'LICENSE', 'NOTICE', 'dist/server/toil-ui.js', 'dist/app/index.html'];
@@ -16,15 +16,28 @@ export function allowed(path) {
 
 /**
  * npm's own CLI, to run through node: no shell, and the same on every OS.
- * Under `npm run` it's npm_execpath; otherwise the copy beside node.
+ * Under `npm run` it's npm_execpath; otherwise the copy beside node, and
+ * failing that the `npm` a shell would find on PATH, followed through its
+ * symlink (Homebrew keeps npm outside node's own folder).
  */
-export function npmCli() {
-  const fromEnv = process.env.npm_execpath;
+export function npmCli(env = process.env, execPath = process.execPath) {
+  const fromEnv = env.npm_execpath;
   if (fromEnv && /npm-cli\.js$/.test(fromEnv)) return fromEnv;
-  const dir = dirname(process.execPath);
+  const dir = dirname(execPath);
   const candidates = [join(dir, 'node_modules', 'npm', 'bin', 'npm-cli.js'), join(dir, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')];
-  const found = candidates.find((c) => existsSync(c));
-  if (!found) throw new Error(`Can't find npm's CLI beside ${process.execPath}; run this through npm run.`);
+  // Absolute PATH entries only, as git.ts does: a relative one would let the working directory pick npm.
+  for (const entry of (env.PATH ?? env.Path ?? '').split(delimiter).filter((e) => isAbsolute(e))) {
+    const npm = join(entry, 'npm');
+    if (!existsSync(npm)) continue;
+    try {
+      const real = realpathSync(npm);
+      candidates.push(/npm-cli\.js$/.test(real) ? real : join(dirname(real), 'npm-cli.js'));
+    } catch {
+      // a dangling link: keep looking
+    }
+  }
+  const found = candidates.find((c) => /npm-cli\.js$/.test(c) && existsSync(c));
+  if (!found) throw new Error(`Can't find npm's CLI beside ${execPath} or on PATH; run this through npm run.`);
   return found;
 }
 

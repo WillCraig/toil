@@ -289,6 +289,112 @@
     "variantBy": "deployment"
   },
   {
+    "name": "confluence",
+    "description": "Confluence Data Center and Confluence Cloud: pages, spaces, CQL search, comments, labels and attachments",
+    "connection": [
+      {
+        "name": "baseUrl",
+        "description": "Confluence root: the Data Center server (https://confluence.imagile.dev), or the Cloud site without /wiki (https://<your-site>.atlassian.net)",
+        "secret": false,
+        "password": false,
+        "default": null,
+        "required": true,
+        "choices": {
+          "options": [
+            {
+              "label": "Your Atlassian site",
+              "value": null,
+              "when": {
+                "deployment": "cloud"
+              },
+              "compose": {
+                "prefix": "https://",
+                "suffix": ".atlassian.net",
+                "label": "Site name",
+                "placeholder": "example-site"
+              }
+            },
+            {
+              "label": "Your Confluence server",
+              "value": null,
+              "when": {
+                "deployment": "server"
+              },
+              "placeholder": "https://confluence.imagile.dev"
+            }
+          ]
+        }
+      },
+      {
+        "name": "deployment",
+        "description": "Which Confluence this is: \"server\" for Data Center (the default), or \"cloud\" for Confluence Cloud",
+        "secret": false,
+        "password": false,
+        "default": "server",
+        "required": false,
+        "choices": {
+          "question": "Which one is it?",
+          "required": true,
+          "options": [
+            {
+              "label": "Cloud",
+              "value": "cloud",
+              "hosts": [
+                "*.atlassian.net"
+              ]
+            },
+            {
+              "label": "Data Center",
+              "value": "server"
+            }
+          ]
+        }
+      },
+      {
+        "name": "email",
+        "description": "Confluence Cloud only: the email address of the Atlassian account the API token belongs to",
+        "secret": false,
+        "password": false,
+        "default": null,
+        "required": false,
+        "appliesTo": [
+          "cloud"
+        ],
+        "requiredFor": [
+          "cloud"
+        ]
+      },
+      {
+        "name": "apiTokenFrom",
+        "description": "The jira connection to take apiToken from when this connection has none",
+        "secret": false,
+        "password": false,
+        "default": null,
+        "required": false,
+        "borrows": {
+          "area": "jira",
+          "key": "apiToken",
+          "when": {
+            "deployment": "cloud"
+          },
+          "sameHost": true,
+          "match": [
+            "email"
+          ]
+        }
+      },
+      {
+        "name": "apiToken",
+        "description": "Data Center: a personal access token. Cloud: an Atlassian account API token",
+        "secret": true,
+        "password": false,
+        "default": null,
+        "required": true
+      }
+    ],
+    "variantBy": "deployment"
+  },
+  {
     "name": "github",
     "description": "GitHub and GitHub Enterprise Server: pull requests, reviews, comments, checks, labels, assignees, issues and projects",
     "connection": [

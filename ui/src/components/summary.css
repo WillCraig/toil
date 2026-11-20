@@ -13,21 +13,36 @@
 .sum-basis { margin: 0; color: var(--muted); font-size: 0.875rem; }
 .sum-why { margin: 0; max-width: 40rem; color: var(--ink); font-size: clamp(1.05rem, 1rem + 0.35vw, 1.25rem); line-height: 1.45; text-wrap: pretty; }
 .sum-how { font-size: 0.9375rem; }
-.sum-how > summary { display: inline-flex; align-items: center; min-height: 44px; color: var(--link); cursor: pointer; }
+.sum-how > summary { cursor: pointer; list-style: none; }
+.sum-how > summary::-webkit-details-marker { display: none; }
 .sum-how ul { margin: 0.1rem 0 0; padding-left: 1.2rem; max-width: 40rem; color: var(--muted); display: grid; gap: 0.4rem; }
 
 .sum-needs { display: grid; gap: 0.5rem; }
-.sum-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+/* Cards in a row share its height (#657): the face's words at the top, an action such as Fix with AI agent pinned to the
+   bottom. Each card's line on why is cut to its first sentence (cardWhy), so the shared height leaves no tall gap. */
+.sum-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 0.75rem; align-items: stretch; }
 @media (min-width: 62rem) {
   .sum-cards { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
 }
-.sum-card { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; padding: 1rem 1.1rem; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); }
-.sum-kicker { display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--muted); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.sum-card { display: flex; flex-direction: column; min-width: 0; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); }
+/* The whole card is the button: its face is the hit area, and the frame darkens on hover like any button's. */
+.sum-card__hit, .sum-card__body { position: relative; display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; padding: 1rem 2.4rem 1rem 1.1rem; color: var(--ink); text-decoration: none; border-radius: var(--radius); }
+.sum-card__body { padding-right: 1.1rem; }
+.sum-card__hit, .sum-card__body { flex: 1 1 auto; }
+.sum-card:has(.sum-card__hit:hover) { border-color: var(--ink); }
+.sum-card__hit:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sum-card__chevron { position: absolute; top: 1rem; right: 0.9rem; color: var(--muted); }
+.sum-card__action { margin-top: auto; padding: 0 1.1rem 1rem; }
+.sum-badge-row { margin: 0; }
+.sum-badge { display: inline-flex; align-items: center; padding: 0.05rem 0.55rem; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); color: var(--muted); font-size: 0.75rem; font-weight: 600; }
+.sum-kicker { display: flex; align-items: center; gap: 0.5rem; margin: 0; color: var(--muted); font-size: 0.875rem; font-weight: 600; }
+/* The Summary's section headings, Needs attention and Where the work goes: sentence case, a heading rather than a kicker (#657). */
+.sum-section-head { margin: 0 0 0.25rem; font-size: 1.15rem; font-family: var(--font-display); font-weight: 600; color: var(--ink); }
 .sum-kicker .sum-shape { width: 0.95rem; height: 0.95rem; }
 .sum-card[data-tone='danger'] .sum-shape { color: var(--danger); }
 .sum-card[data-tone='warn'] .sum-shape { color: var(--warn); }
 .sum-card[data-tone='ok'] .sum-shape { color: var(--ok); }
-.sum-card__title { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; line-height: 1.3; text-wrap: balance; overflow-wrap: anywhere; }
+.sum-card__title { display: block; margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; line-height: 1.3; text-wrap: balance; overflow-wrap: anywhere; }
 .sum-card__why { margin: 0; line-height: 1.45; text-wrap: pretty; }
 .sum-card__more { margin: 0; color: var(--muted); font-size: 0.875rem; }
 .sum-key { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
@@ -38,12 +53,9 @@
 
 
 
-.briefing__full > summary { display: inline-flex; align-items: center; min-height: 44px; color: var(--link); cursor: pointer; }
 .briefing__full[open] > summary { margin-bottom: 0.5rem; }
 .briefing__full > .briefing__meta { margin-bottom: 0.9rem; }
 .briefing__full > * + * { margin-top: 1.25rem; }
-.sum-card__title a { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 0.2em; }
-.sum-card__title a:hover { text-decoration-color: currentColor; }
 .sum-howrow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.25rem; }
 .sum-howrow > .sum-how { flex: 0 1 auto; min-width: 0; }
 
@@ -58,3 +70,6 @@
 .sum-person { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
 .sum-person__name { font-weight: 700; white-space: nowrap; flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .sum-person__account { color: var(--muted); font-size: 0.8125rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sum-drill { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; margin: 0; }
+.sum-drill__note { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; margin: 0; }
+.sum-drill__note .reason__dot { flex: none; }

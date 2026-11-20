@@ -1,4 +1,5 @@
 import type { Change, StatusCategory, WorkItem } from '../owi/types.js';
+import { pointsPhrase, sumPoints } from './points.js';
 import { calendarDays, DAY, round1, workingDays } from './time.js';
 
 /**
@@ -98,8 +99,8 @@ export interface BriefItem {
   why: string;
   /** What the sentence rests on: OWI fields and change ids. */
   evidence: string[];
-  /** The open items it holds up, directly or down a chain, and their points. */
-  holds: { items: number; points: number };
+  /** The open items it holds up, directly or down a chain, and their points: null when it holds items and none has points read (#652); `unestimated` of them have none read and are left out. */
+  holds: { items: number; points: number | null; unestimated: number };
   changes: BriefChange[];
 }
 
@@ -120,7 +121,8 @@ export interface SprintFacts {
   end: string;
   /** Working days. */
   days: { total: number; gone: number; left: number };
-  points: { total: number; done: number; left: number };
+  /** Points read: null when no item in the sprint has points read (#652); `unestimated` items have none read and are left out. */
+  points: { total: number | null; done: number | null; left: number | null; unestimated: number };
   /** Points done a working day so far, and how many of the points left land at that pace; null until a quarter of the sprint has gone. */
   pace: number | null;
   projected: number | null;
@@ -173,8 +175,6 @@ function heldBy(id: string, byId: ReadonlyMap<string, WorkItem>): WorkItem[] {
   return out;
 }
 
-const pointsOf = (i: WorkItem) => (i.estimate?.unit === 'points' ? i.estimate.value : 0);
-
 /** A sprint's end: one given as midnight exactly is the start of its last day (Azure DevOps' finishDate), so the end of that day. */
 const endOf = (end: string) => (/T00:00:00(\.0+)?Z$/.test(end) ? new Date(Date.parse(end) + DAY).toISOString() : end);
 
@@ -198,15 +198,18 @@ function sprintFacts(items: readonly WorkItem[], asOf: string): SprintFacts | nu
   if (!it?.start || !it.end) return null;
   // Two trackers may each have a "Sprint 42"; only the one with these dates is this sprint.
   const inIt = items.filter((i) => i.iteration?.name === it.name && i.iteration.start === it.start && i.iteration.end === it.end);
-  const total = inIt.reduce((n, i) => n + pointsOf(i), 0);
-  const done = inIt.filter((i) => !open(i)).reduce((n, i) => n + pointsOf(i), 0);
+  // Points read only (#652): with none read every figure is null; once any are, done takes the read points of what's done,
+  // a real 0 when none of those has points, since every point read is either done or left.
+  const all_ = sumPoints(inIt);
+  const total = all_.points;
+  const done = total === null ? null : (sumPoints(inIt.filter((i) => !open(i))).points ?? 0);
   const end = endOf(it.end);
   const all = workingDays(it.start, end);
   const gone = Math.min(all, workingDays(it.start, asOf));
   // Stories land late in a sprint, so a pace is only read once a quarter of it (and at least a day) has gone.
-  const pace = gone >= Math.max(1, all / 4) ? done / gone : null;
-  const projected = pace === null ? null : Math.min(total - done, pace * (all - gone));
-  return { name: it.name, start: it.start, end: it.end, days: { total: round1(all), gone: round1(gone), left: round1(all - gone) }, points: { total, done, left: total - done }, pace: pace === null ? null : round1(pace), projected: projected === null ? null : round1(projected) };
+  const pace = total !== null && done !== null && gone >= Math.max(1, all / 4) ? done / gone : null;
+  const projected = pace === null || total === null || done === null ? null : Math.min(total - done, pace * (all - gone));
+  return { name: it.name, start: it.start, end: it.end, days: { total: round1(all), gone: round1(gone), left: round1(all - gone) }, points: { total, done, left: total === null || done === null ? null : total - done, unestimated: all_.unestimated }, pace: pace === null ? null : round1(pace), projected: projected === null ? null : round1(projected) };
 }
 
 interface Finding {
@@ -283,11 +286,19 @@ function briefChange(c: Change): BriefChange {
   return { id: c.id, repo: c.repo, title: c.title, url: c.url, state: c.state, checks: c.checks };
 }
 
+/** What an item holds up: the points read, null when none were (#652), and how many items had none. */
+function holdsOf(held: readonly WorkItem[]): BriefItem['holds'] {
+  const s = sumPoints(held);
+  return { items: held.length, points: s.points, unestimated: s.unestimated };
+}
+
 /** The line under a reason's name: how much it holds up. */
 function lineFor(lens: LensId, items: BriefItem[], t: number | null, wipLimit: number | null): string {
-  const pts = items.reduce((n, i) => n + (i.points ?? 0), 0);
   const held = items.reduce((n, i) => n + i.holds.items, 0);
-  const ptsPart = pts ? `, ${pointsText(pts)}` : '';
+  const read = items.filter((i) => i.points !== null);
+  // Items with no points read are said as such, never summed as 0 (#652); with none read the figure is left out.
+  const pts = pointsPhrase({ points: read.length ? read.reduce((n, i) => n + i.points!, 0) : null, unestimated: items.length - read.length });
+  const ptsPart = pts ? `, ${pts}` : '';
   switch (lens) {
     case 'failing':
       return `${plural(items.length, 'item')}${held ? `, holding up ${held} more` : ''}${ptsPart}`;
@@ -310,7 +321,8 @@ function lineFor(lens: LensId, items: BriefItem[], t: number | null, wipLimit: n
 function recommend(reason: BriefReason): { text: string; items: string[] } {
   const top = reason.items[0];
   if (!top) return { text: reason.text ?? reason.label, items: [] };
-  const holds = top.holds.items ? `: it holds up ${plural(top.holds.items, 'item')}${top.holds.points ? ` (${pointsText(top.holds.points)})` : ''}` : '';
+  const pts = pointsPhrase(top.holds);
+  const holds = top.holds.items ? `: it holds up ${plural(top.holds.items, 'item')}${pts ? ` (${pts})` : ''}` : '';
   const first = cite(top.id);
   switch (reason.lens) {
     case 'failing':
@@ -346,7 +358,7 @@ export function brief(input: BriefInput): Brief {
   for (const setting of settings.lenses) {
     const def = lensDef(setting.id);
     const t = setting.threshold ?? def.threshold;
-    const skip = !setting.on ? null : setting.id === 'ready' ? 'Readiness is worked out in Toil UI, not from OWI records.' : setting.id === 'load' && settings.wipLimit === null ? 'The toil project sets no WIP limit (toil projects wip-limit).' : setting.id === 'sprint' && !sprint ? 'No item is in a sprint running now.' : setting.id === 'sprint' && sprint!.points.total === 0 ? 'No item in the sprint has a points estimate.' : null;
+    const skip = !setting.on ? null : setting.id === 'ready' ? 'Readiness is worked out in Toil UI, not from OWI records.' : setting.id === 'load' && settings.wipLimit === null ? 'The toil project sets no WIP limit (toil projects wip-limit).' : setting.id === 'sprint' && !sprint ? 'No item is in a sprint running now.' : setting.id === 'sprint' && sprint!.points.total === null ? 'No points were read for any item in the sprint.' : null;
     const checked = setting.on && skip === null;
     // A lens that ran still says which items it couldn't test, so "nothing found" never hides "nothing read".
     const missing = checked ? items.filter((i) => (open(i) || setting.id === 'drift') && untestable(setting.id, i, changesOf(i.id))) : [];
@@ -357,14 +369,14 @@ export function brief(input: BriefInput): Brief {
 
     if (setting.id === 'sprint') {
       const s = sprint!;
-      if (s.projected === null || s.projected >= s.points.left - 0.01 || s.points.left <= 0) continue;
+      if (s.points.total === null || s.points.done === null || s.points.left === null || s.projected === null || s.projected >= s.points.left - 0.01 || s.points.left <= 0) continue;
       reasons.push({
         lens: 'sprint',
         label: def.label,
         severity: def.severity,
         line: `${pointsText(s.points.left)} left, ${daysText(s.days.left, 'working days')}, ${s.projected > 0 ? `about ${round1(s.projected)} land` : 'none land'} at this pace`,
         items: [],
-        text: `${s.name} has done ${pointsText(s.points.done)} of ${s.points.total} in ${daysText(s.days.gone, 'working days')}, ${s.pace} a day. At that pace ${s.projected > 0 ? `about ${round1(s.projected)}` : 'none'} of the ${pointsText(s.points.left)} left land by ${new Date(Date.parse(endOf(s.end)) - 1).toISOString().slice(0, 10)}.`,
+        text: `${s.name} has done ${pointsText(s.points.done)} of ${s.points.total} in ${daysText(s.days.gone, 'working days')}, ${s.pace} a day. At that pace ${s.projected > 0 ? `about ${round1(s.projected)}` : 'none'} of the ${pointsText(s.points.left)} left land by ${new Date(Date.parse(endOf(s.end)) - 1).toISOString().slice(0, 10)}.${s.points.unestimated ? ` ${plural(s.points.unestimated, 'item')} with no points read ${s.points.unestimated === 1 ? 'is' : 'are'} left out.` : ''}`,
       });
       continue;
     }
@@ -388,12 +400,13 @@ export function brief(input: BriefInput): Brief {
         points: item.estimate?.unit === 'points' ? item.estimate.value : null,
         why: f.why,
         evidence: f.evidence,
-        holds: { items: held.length, points: held.reduce((n, h) => n + pointsOf(h), 0) },
+        holds: holdsOf(held),
         changes: f.changes.map(briefChange),
       });
     }
     if (!found.length) continue;
-    found.sort((a, b) => b.holds.items - a.holds.items || b.holds.points - a.holds.points);
+    // For the order only, unread points weigh nothing; no figure is shown from this.
+    found.sort((a, b) => b.holds.items - a.holds.items || (b.holds.points ?? 0) - (a.holds.points ?? 0));
     for (const f of found) taken.add(f.id);
     reasons.push({ lens: setting.id, label: def.label, severity: def.severity, line: lineFor(setting.id, found, t, settings.wipLimit), items: found, text: null });
   }
