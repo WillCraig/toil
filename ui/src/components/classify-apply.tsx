@@ -47,6 +47,21 @@ function changeText(c: PlanGroupView['changes'][number]): string {
   return parts.join(' · ');
 }
 
+/**
+ * One change's title, cut to its cell with the whole of it on hover, and a press away on touch: the title is
+ * what a person approves, so it opens inline rather than sending them to the item (`expand`, #649).
+ */
+function ApplyTitle({ title }: { title: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <td className="apply__title" title={title} data-truncate="expand" data-truncate-open={expanded || undefined}>
+      <Button className="apply__title-toggle" aria-expanded={expanded} aria-label={`${expanded ? 'Show less of' : 'Show the whole title'}: ${title}`} onPress={() => setExpanded(!expanded)}>
+        {title}
+      </Button>
+    </td>
+  );
+}
+
 /** One connection's changes as a compact table, a line each: item, title, category, change. Past ten it folds, with the count on the button. */
 function Changes({ g, ins }: { g: PlanGroupView; ins: ReturnType<typeof useWorkInsights> }) {
   const [all, setAll] = useState(false);
@@ -69,9 +84,7 @@ function Changes({ g, ins }: { g: PlanGroupView; ins: ReturnType<typeof useWorkI
               <th scope="row" className="apply__key">
                 {c.key}
               </th>
-              <td className="apply__title" title={c.title} data-truncate="">
-                {c.title}
-              </td>
+              <ApplyTitle title={c.title} />
               <td className="apply__category">{nameOf(ins, c.category)}</td>
               <td className="apply__what">{changeText(c)}</td>
             </tr>

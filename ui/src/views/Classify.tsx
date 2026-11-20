@@ -135,7 +135,7 @@ function Row({ row, onAnswer, onAccept, follow }: { row: NeedsRow; onAnswer: (va
   return (
     <li className="sortrow" data-row={row.item.id} data-kind={row.kind} tabIndex={0} onKeyDown={onKeyDown} aria-label={`${row.item.source.key} ${row.item.title}`}>
       <div className="sortrow__what">
-        <p className="sortrow__head" title={row.item.title} data-truncate="">
+        <p className="sortrow__head" title={row.item.title} data-truncate="detail">
           <ItemLink id={row.item.id} withTitle />
         </p>
         {tag && (

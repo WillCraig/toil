@@ -181,6 +181,14 @@ describe('the stand-up on the Summary', () => {
     // A name stays on one line; an account after it is a muted suffix with the whole text on hover, never part of the name.
     for (const n of card.querySelectorAll('.sum-person__name')) expect(n.textContent).not.toContain('(');
     for (const a of card.querySelectorAll('.sum-person__account')) expect(a.closest('.sum-person')!.getAttribute('title')).toContain(a.textContent!);
+    // And a press away on touch, where the hover never comes (#649): the account opens inline.
+    for (const a of card.querySelectorAll('.sum-person__account')) expect(a.getAttribute('data-truncate')).toBe('expand');
+    const account = card.querySelector<HTMLElement>('.sum-person__account');
+    if (account) {
+      await userEvent.click(account);
+      expect(account.getAttribute('data-truncate-open')).toBe('true');
+      expect(account.getAttribute('aria-expanded')).toBe('true');
+    }
     expect(card.querySelector('[data-standup-more]')).toBeNull();
     expect(within(card).getByRole('link', { name: 'Open the full stand-up' }).getAttribute('href')).toBe('#/project/card-payments/standup');
     // Right under the answer and the needs-attention cards, before the fold.
