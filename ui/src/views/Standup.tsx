@@ -289,6 +289,38 @@ function SubjectRow({ chip, children }: { chip: Chip; children?: ReactNode }) {
   );
 }
 
+/**
+ * A chip, cut to its row with the whole fact on hover, and a press away on touch (`expand`, #649,
+ * ui/README.md, Cut-off text): More opens every line of the fact, wrapped, in the chip; Less folds it back.
+ * `visible` is what the folded chip already shows, so a chip that hides nothing grows no toggle.
+ */
+function ExpandableChip({ report, chip, className, visible, cited, outstanding, children }: { report: StandupReport; chip: Chip; className: string; visible: string; cited?: boolean; outstanding?: boolean; children: ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
+  const full = chipTitle(report, chip);
+  const flat = (s: string) => s.replace(/\s+/g, ' ').trim().length;
+  // More than the folded chip shows, or enough of it that a phone's row cuts it (the layout check holds a cut chip to having the toggle).
+  const needs = flat(full) > flat(visible) || flat(visible) > 40;
+  return (
+    <span className={className} data-truncate="expand" data-truncate-open={expanded || undefined} data-cited={cited || undefined} data-outstanding={outstanding || undefined} id={`fact-${chip.key}`} title={full}>
+      {children}
+      {needs && (
+        <Button className="standup-fold standup-chip__toggle" aria-expanded={expanded} aria-label={`${expanded ? 'Show less of' : 'Show the whole of'} ${chip.label}${chip.title ? ` ${chip.title}` : ''}`} onPress={() => setExpanded(!expanded)}>
+          {expanded ? 'Less' : 'More'}
+        </Button>
+      )}
+      {expanded && (
+        <span className="standup-chip__full" data-truncate-full="">
+          {full.split('\n').map((line, i) => (
+            <span key={i} className="standup-chip__line">
+              {line}
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function ChipView({ report, chip, bucket, cited }: { report: StandupReport; chip: Chip; bucket: Bucket; cited: Set<string> }) {
   const isCited = chip.lines.some((l) => cited.has(l.fact));
   const ids = chip.lines.slice(1).map((l) => <span key={l.fact} id={`fact-${l.fact}`} />);
@@ -297,7 +329,7 @@ function ChipView({ report, chip, bucket, cited }: { report: StandupReport; chip
     const url = httpUrl(chip.url);
     const excerpt = `“${shorten(chip.texts[0] ?? '', EXCERPT_CHARS)}”`;
     return (
-      <span className="standup-chip standup-chip--comment" data-truncate="" id={`fact-${chip.key}`} data-cited={isCited || undefined} data-outstanding={c.outstanding || undefined} title={chipTitle(report, chip)}>
+      <ExpandableChip report={report} chip={chip} className="standup-chip standup-chip--comment" visible={`${chip.label} ${excerpt}`} cited={isCited} outstanding={c.outstanding}>
         {c.outstanding && (
           <span className="standup-q" role="img" aria-label="Unanswered question" title="A question nobody has answered">
             <HelpIcon size={16} />
@@ -312,11 +344,11 @@ function ChipView({ report, chip, bucket, cited }: { report: StandupReport; chip
             <span className="sr-only">The comment in its tracker</span>
           </ExternalLink>
         )}
-      </span>
+      </ExpandableChip>
     );
   }
   return (
-    <span className="standup-chip" data-truncate="" id={`fact-${chip.key}`} data-cited={isCited || undefined} title={chipTitle(report, chip)}>
+    <ExpandableChip report={report} chip={chip} className="standup-chip" visible={`${chip.label} ${chip.title ?? ''} ${bucket === 'blocked' && chip.texts[0] ? shorten(chip.texts[0], 40) : ''}`} cited={isCited}>
       <SubjectRow chip={chip}>{chip.title && <span className="standup-title">{chip.title}</span>}</SubjectRow>
       {bucket === 'blocked' && chip.texts[0] && (
         <span className="badge standup-why" title={chip.texts[0]}>
@@ -324,7 +356,7 @@ function ChipView({ report, chip, bucket, cited }: { report: StandupReport; chip
         </span>
       )}
       {ids}
-    </span>
+    </ExpandableChip>
   );
 }
 
@@ -409,11 +441,11 @@ function TeamLine({ report, cited }: { report: StandupReport; cited: Set<string>
     <div className="standup-team" id="standup-team" data-standup-team="">
       <span className="standup-team__sprint">{report.sprintLine ?? (report.asOf ? 'No current sprint' : 'Sprint not read yet')}</span>
       {shown.map((c) => (
-        <span key={c.key} className="standup-chip" data-truncate="" id={`fact-${c.key}`} data-cited={c.lines.some((l) => cited.has(l.fact)) || undefined} title={chipTitle(report, c)}>
+        <ExpandableChip key={c.key} report={report} chip={c} className="standup-chip" visible={`${c.label} ${c.texts[0] ?? ''}`} cited={c.lines.some((l) => cited.has(l.fact))}>
           <SubjectRow chip={c}>
             <span className="standup-title">{c.texts[0] ?? ''}</span>
           </SubjectRow>
-        </span>
+        </ExpandableChip>
       ))}
       {chips.length > ROW_CHIPS && (
         <Button className="standup-fold" aria-expanded={all} onPress={() => setAll(!all)}>

@@ -544,6 +544,28 @@ own ids (`jira:SCRUM-15`) and token counts stay off cards.
 A new page opens at its top with focus on its heading, which draws no ring: the ring is for a keyboard's own focus
 (`focusQuietly` in `src/App.tsx`).
 
+## Cut-off text
+
+Long text is cut to fit with a declared truncation, `data-truncate` (principle 11, #649): the text is clipped by its
+box, and the whole value stays in its `title`. A tooltip is hover, though, and a touch screen has no hover, so the cut
+end must stay reachable with a finger, in one press or with none. Detail is layered, never removed: the `title` may
+stay as the hover shortcut, but it is never the only way in.
+
+Every `data-truncate` element names its way in, as the attribute's value, and the layout check
+(`scripts/layout-check.mjs`) verifies the way is really there, so a title-only truncation fails the run:
+
+- **`expand`** — pressing a toggle in the truncation (a button with `aria-expanded`) opens the whole value inline,
+  wrapped in place, and pressing it again folds it back. The stand-up chips, the Toil project bar's description, a
+  stand-up card's account name, an approval card's item titles and a ticket chip with nowhere to go use this.
+- **`detail`** — the truncation is, holds or sits inside a link, and pressing it opens the view where the whole
+  value shows in full: a ticket chip opens its item, a Classify row's head holds its item link.
+- **`copy`** — a Copy button beside the truncation copies the whole value, as `Path` and `Url`
+  (`src/components/layout.tsx`) already did.
+
+No other value, and no bare `data-truncate`, is allowed. When none of the three fits, the text is not truncated:
+it wraps, as the Classify rows, the approval titles and the project description already do at phone widths. A new
+`data-truncate` picks one of the three in the same change, and the check holds it to the one it picked.
+
 ## Tables and rows
 
 The pattern every table follows (`DataTable` in `src/components/layout.tsx`; the Waiting now table is the model):

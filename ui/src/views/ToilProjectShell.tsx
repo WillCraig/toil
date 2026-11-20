@@ -148,9 +148,7 @@ export function ToilProjectShell({ tab, heading, team, back, peek = null, items 
               <p className="toil-project-bar__desc">
                 <Editable bare field="description" toilProject={toilProject.name} value={toilProject.description} config={config ?? null} onSaved={described ?? (() => undefined)}>
                   {toilProject.description ? (
-                    <span className="toil-project-bar__desc-text" title={toilProject.description} data-truncate="">
-                      {toilProject.description}
-                    </span>
+                    <DescText description={toilProject.description} name={toilProject.name} />
                   ) : (
                     <span className="note">No description</span>
                   )}
@@ -228,6 +226,21 @@ export function ToilProjectShell({ tab, heading, team, back, peek = null, items 
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The Toil project's description, cut to the bar's line with the whole of it on hover, and a press away on
+ * touch: pressing it opens the whole description wrapped in place (`expand`, #649, ui/README.md, Cut-off text).
+ */
+function DescText({ description, name }: { description: string; name: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <span className="toil-project-bar__desc-text" title={description} data-truncate="expand" data-truncate-open={expanded || undefined}>
+      <Button className="toil-project-bar__desc-toggle" aria-expanded={expanded} aria-label={`${expanded ? 'Show less of' : 'Show the whole description of'} ${name}`} onPress={() => setExpanded(!expanded)}>
+        {description}
+      </Button>
+    </span>
   );
 }
 
