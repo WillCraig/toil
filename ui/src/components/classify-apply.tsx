@@ -55,7 +55,7 @@ function ApplyTitle({ title }: { title: string }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <td className="apply__title" title={title} data-truncate="expand" data-truncate-open={expanded || undefined}>
-      <Button className="apply__title-toggle" aria-expanded={expanded} aria-label={`${expanded ? 'Show less of' : 'Show the whole title'}: ${title}`} onPress={() => setExpanded(!expanded)}>
+      <Button className="apply__title-toggle" aria-expanded={expanded} aria-label={`${title} (${expanded ? 'show less' : 'show the whole title'})`} onPress={() => setExpanded(!expanded)}>
         {title}
       </Button>
     </td>

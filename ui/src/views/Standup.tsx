@@ -304,7 +304,7 @@ function ExpandableChip({ report, chip, className, visible, cited, outstanding, 
     <span className={className} data-truncate="expand" data-truncate-open={expanded || undefined} data-cited={cited || undefined} data-outstanding={outstanding || undefined} id={`fact-${chip.key}`} title={full}>
       {children}
       {needs && (
-        <Button className="standup-fold standup-chip__toggle" aria-expanded={expanded} aria-label={`${expanded ? 'Show less of' : 'Show the whole of'} ${chip.label}${chip.title ? ` ${chip.title}` : ''}`} onPress={() => setExpanded(!expanded)}>
+        <Button className="standup-fold standup-chip__toggle" aria-expanded={expanded} aria-label={`${expanded ? 'Less' : 'More'}: ${chip.label}${chip.title ? ` ${chip.title}` : ''}`} onPress={() => setExpanded(!expanded)}>
           {expanded ? 'Less' : 'More'}
         </Button>
       )}

@@ -237,7 +237,7 @@ function DescText({ description, name }: { description: string; name: string }) 
   const [expanded, setExpanded] = useState(false);
   return (
     <span className="toil-project-bar__desc-text" title={description} data-truncate="expand" data-truncate-open={expanded || undefined}>
-      <Button className="toil-project-bar__desc-toggle" aria-expanded={expanded} aria-label={`${expanded ? 'Show less of' : 'Show the whole description of'} ${name}`} onPress={() => setExpanded(!expanded)}>
+      <Button className="toil-project-bar__desc-toggle" aria-expanded={expanded} aria-label={`${description} (${expanded ? 'show less' : `show the whole description of ${name}`})`} onPress={() => setExpanded(!expanded)}>
         {description}
       </Button>
     </span>
