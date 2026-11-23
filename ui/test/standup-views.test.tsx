@@ -242,14 +242,20 @@ describe('write it up and export, one row of buttons below (#657)', () => {
     const long = chips.find((c) => c.querySelector('.standup-title')!.textContent === 'moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura')!;
     expect(long).toBeTruthy();
     expect(long.getAttribute('data-truncate')).toBe('expand');
-    expect(long.title).toContain('moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura');
-    // On touch the tooltip never shows (#649), so More opens the whole fact in the chip, by name included.
+    const sentence = 'moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura';
+    expect(long.title).toContain(sentence);
+    // On touch the tooltip never shows (#649). More opens what the row does not already show: not the key, not the sentence.
     const toggle = within(long).getByRole('button', { name: /^More:/ });
+    expect(toggle.textContent).toBe('More');
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     await userEvent.click(toggle);
     expect(long.getAttribute('data-truncate-open')).toBe('true');
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    expect(long.querySelector('[data-truncate-full]')!.textContent).toContain('moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura');
+    const opened = long.querySelector('[data-truncate-full]')!.textContent!;
+    expect(opened).not.toContain(sentence);
+    expect(opened).not.toContain(long.querySelector('.standup-key')!.textContent!);
+    expect(opened).toMatch(/UTC/);
+    expect(long.textContent!.split(sentence).length - 1).toBe(1);
     await userEvent.click(toggle);
     expect(long.hasAttribute('data-truncate-open')).toBe(false);
     expect(long.querySelector('[data-truncate-full]')).toBeNull();

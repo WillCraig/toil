@@ -13,7 +13,9 @@
 //     text): a tooltip never shows on a touch screen, so every
 //     `data-truncate` names the way in that works without hover, and this
 //     check verifies it in the page: `expand` (a press on its toggle, a
-//     button with `aria-expanded` inside it, opens the whole value inline),
+//     button with `aria-expanded` inside it, opens the whole value inline;
+//     the line that ellipsizes is `[data-truncate-text]`, and a cut there
+//     counts even when the box around it fits),
 //     `detail` (it is, holds or sits inside a link, and pressing it opens
 //     the view where the whole value shows), or `copy` (a Copy button
 //     beside it copies the whole value, as Path and Url do). A bare
@@ -263,8 +265,9 @@ export function inspect(cards, headerFits) {
     const way = el.getAttribute('data-truncate');
     if (way === 'expand') {
       const toggle = el.matches('button[aria-expanded], [role="button"][aria-expanded]') ? el : el.querySelector('button[aria-expanded], [role="button"][aria-expanded]');
-      // A chip that cuts nothing in this box hides nothing, so it needs no toggle yet; one that does, does.
-      const clipped = el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+      // The box often fits while the ellipsized line inside it (`data-truncate-text`) does not. Either being cut hides text.
+      const overflows = (node) => node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1;
+      const clipped = overflows(el) || [...el.querySelectorAll('[data-truncate-text]')].some((node) => overflows(node));
       if (!toggle && clipped) add('truncate-touch', el, 'data-truncate="expand" cuts its text in this box and has no toggle to press: no button with aria-expanded in it opens the whole value inline');
     } else if (way === 'detail') {
       const link = el.matches('a[href]') ? el : (el.querySelector('a[href]') ?? el.closest('a[href]'));

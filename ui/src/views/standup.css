@@ -51,7 +51,7 @@
 .standup-chip__toggle { flex: none; }
 .standup-chip__full { flex: 1 1 100%; display: grid; gap: 0.1rem; min-width: 0; padding: 0.15rem 0.35rem 0.3rem; white-space: normal; overflow-wrap: anywhere; color: var(--ink); }
 .standup-chip__line { display: block; }
-.standup-chip[data-truncate-open] .standup-title, .standup-chip[data-truncate-open] .standup-excerpt { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.standup-chip[data-truncate-open] .standup-title, .standup-chip[data-truncate-open] .standup-excerpt, .standup-chip[data-truncate-open] .standup-why { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .standup-fold { align-self: flex-start; font: inherit; font-size: 0.8125rem; color: var(--link, var(--accent)); background: none; border: 0; padding: 0.05rem 0.3rem; cursor: pointer; border-radius: 0.3rem; }
 .standup-fold:hover { text-decoration: underline; }
 

@@ -44,6 +44,17 @@ describe('the layout check on cut-off text (#649)', () => {
     expect(inspect('[data-card]', true).filter((f) => f.kind === 'truncate-touch')).toEqual([]);
   });
 
+  it('fails an expand truncation whose text line is cut even when the box itself is not', () => {
+    document.body.innerHTML = '<main><span data-truncate="expand" title="long"><span data-truncate-text="">long title that the box fits around</span></span></main>';
+    cut(document.querySelector('[data-truncate-text]')!);
+    const findings = inspect('[data-card]', true).filter((f) => f.kind === 'truncate-touch');
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.detail).toMatch(/no toggle to press/);
+    document.body.innerHTML = '<main><span data-truncate="expand" title="long"><span data-truncate-text="">long title</span><button aria-expanded="false">More</button></span></main>';
+    cut(document.querySelector('[data-truncate-text]')!);
+    expect(inspect('[data-card]', true).filter((f) => f.kind === 'truncate-touch')).toEqual([]);
+  });
+
   it('passes a detail truncation on, in or around a link, and fails one with no link to press', () => {
     expect(touchFindings('<a data-truncate="detail" href="#/item/1" title="the whole long value">the whole…</a>')).toEqual([]);
     expect(touchFindings('<p data-truncate="detail" title="the whole long value"><a href="#/item/1">the whole…</a></p>')).toEqual([]);

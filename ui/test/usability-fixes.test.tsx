@@ -14,6 +14,7 @@ import { SkinProvider, skinsFor } from '../src/skins.tsx';
 import { Dashboard } from '../src/views/Dashboard.tsx';
 import { ToilProjectShell } from '../src/views/ToilProjectShell.tsx';
 import { Graph } from '../src/views/Graph.tsx';
+import { cutTruncateBoxes } from './cut-boxes.ts';
 import { loaded } from './harness.ts';
 
 /**
@@ -93,15 +94,32 @@ describe('the project header', () => {
     expect(about.lastElementChild).toBe(more);
     expect(document.querySelectorAll('[data-edit], .edit-pencil')).toHaveLength(0);
     expect(screen.queryByRole('button', { name: /Rename/ })).toBeNull();
-    // The description itself is a press that opens the whole of it in place (#649), never an edit.
-    const desc = screen.getByRole('button', { name: /\(show the whole description of card-payments\)$/ });
-    await userEvent.click(desc);
-    expect(desc.getAttribute('aria-expanded')).toBe('true');
-    expect(desc.closest('.toil-project-bar__desc-text')!.getAttribute('data-truncate-open')).toBe('true');
+    // A description that fits stays text, not a tab stop (#649). A cut one grows More; that press is the next test.
+    const desc = document.querySelector('.toil-project-bar__desc-text')!;
+    expect(desc.getAttribute('data-truncate')).toBe('expand');
+    expect(desc.querySelector('.toil-project-bar__desc-value')!.textContent!.length).toBeGreaterThan(0);
+    expect(within(desc as HTMLElement).queryByRole('button')).toBeNull();
     await userEvent.click(more);
     const edit = (await screen.findByRole('menu')).querySelector('[data-edit-project]')!;
     expect(edit.getAttribute('href')).toBe('#/settings/projects/card-payments/sources');
     expect(edit.textContent).toBe('Edit card-payments');
+  });
+
+  it('opens a cut description from More, and Less folds it (#649)', async () => {
+    const restore = cutTruncateBoxes();
+    try {
+      await header();
+      const desc = document.querySelector<HTMLElement>('.toil-project-bar__desc-text')!;
+      const more = within(desc).getByRole('button', { name: /^More:/ });
+      expect(more.textContent).toBe('More');
+      await userEvent.click(more);
+      expect(desc.getAttribute('data-truncate-open')).toBe('true');
+      expect(more.getAttribute('aria-expanded')).toBe('true');
+      await userEvent.click(more);
+      expect(desc.hasAttribute('data-truncate-open')).toBe(false);
+    } finally {
+      restore();
+    }
   });
 });
 

@@ -1,0 +1,6 @@
+/* More sits beside the line it opens (#649). The word is the control; the line stays text.
+   Underline only on hover: at rest an in-app action is not drawn as a link. The focus ring is the app's own. */
+
+.truncate-line { display: inline-flex; align-items: baseline; gap: 0.25rem; min-width: 0; max-width: 100%; }
+.truncate-more { flex: none; align-self: baseline; font: inherit; font-size: 0.8125rem; line-height: inherit; color: var(--link, var(--accent)); background: none; border: 0; padding: 0.05rem 0.3rem; cursor: pointer; border-radius: 0.3rem; }
+.truncate-more:hover { text-decoration: underline; text-underline-offset: 0.15em; }

@@ -20,6 +20,7 @@ import { DataContext, type Data } from '../src/data.ts';
 import type { ToilProjectData } from '../src/load.ts';
 import { SkinProvider, skinsFor } from '../src/skins.tsx';
 import { Classify } from '../src/views/Classify.tsx';
+import { cutTruncateBoxes } from './cut-boxes.ts';
 import { loaded } from './harness.ts';
 
 /**
@@ -461,28 +462,36 @@ describe('Apply', () => {
   };
 
   it("shows every change before anything is written: the item, the label from and to, and the command, and says a sample can't write", async () => {
-    await accepted(fixtureClassify());
-    const card = await until<HTMLElement>('[data-apply]');
-    await waitFor(() => expect(card.querySelectorAll('[data-change]').length).toBeGreaterThan(3));
-    // A compact table, one line an item: item, title, category, change. The sentence is said once, and every change is in the text.
-    const first = card.querySelector<HTMLElement>('[data-change]')!;
-    expect(within(card).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Item', 'Title', 'Category', 'Change']);
-    const cells = [...first.children].map((c) => c.textContent!);
-    expect(cells[0]).toMatch(/^SHOP-\d+$/);
-    expect(cells[2]).toMatch(/^(Feature|Keep the lights on)$/);
-    expect(cells[3]).toMatch(/^(\+ (feature|ktlo)|\w+ \u2192 (feature|ktlo))/);
-    // The title is cut to its cell, and what a person approves is a press away on touch (#649): it opens in the cell.
-    const titleCell = first.children[1] as HTMLElement;
-    expect(titleCell.getAttribute('data-truncate')).toBe('expand');
-    const titleToggle = within(first).getByRole('button', { name: /\(show the whole title\)$/ });
-    await act(async () => void fireEvent.click(titleToggle));
-    expect(titleCell.getAttribute('data-truncate-open')).toBe('true');
-    expect(titleToggle.getAttribute('aria-expanded')).toBe('true');
-    expect(card.textContent!.match(/Nothing is written until you press Apply\./g)).toHaveLength(1);
-    expect(document.querySelector("[data-pending]")!.textContent!.match(/Nothing is written until you press Apply./g)).toHaveLength(1);
-    expect(card.querySelector('.apply__command code')!.textContent).toMatch(/^toil jira issue categorize .*--allow-write$/);
-    expect(card.querySelector('[data-sample-cannot-write]')!.textContent).toMatch(/This is sample data, so nothing here can be written/);
-    expect((within(card).getByRole('button', { name: /^Apply \d+ changes$/ }) as HTMLButtonElement).disabled).toBe(true);
+    const restore = cutTruncateBoxes();
+    try {
+      await accepted(fixtureClassify());
+      const card = await until<HTMLElement>('[data-apply]');
+      await waitFor(() => expect(card.querySelectorAll('[data-change]').length).toBeGreaterThan(3));
+      // A compact table, one line an item: item, title, category, change. The sentence is said once, and every change is in the text.
+      const first = card.querySelector<HTMLElement>('[data-change]')!;
+      expect(within(card).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Item', 'Title', 'Category', 'Change']);
+      const cells = [...first.children].map((c) => c.textContent!);
+      expect(cells[0]).toMatch(/^SHOP-\d+$/);
+      expect(cells[2]).toMatch(/^(Feature|Keep the lights on)$/);
+      expect(cells[3]).toMatch(/^(\+ (feature|ktlo)|\w+ \u2192 (feature|ktlo))/);
+      // The title stays text. More beside it opens the whole title in the cell when the line is cut (#649).
+      const titleCell = first.children[1] as HTMLElement;
+      const line = titleCell.querySelector<HTMLElement>('[data-truncate]')!;
+      expect(line.getAttribute('data-truncate')).toBe('expand');
+      expect(titleCell.querySelector('.apply__title-text')!.textContent!.length).toBeGreaterThan(0);
+      const titleToggle = within(line).getByRole('button', { name: /^More:/ });
+      expect(titleToggle.textContent).toBe('More');
+      await act(async () => void fireEvent.click(titleToggle));
+      expect(line.getAttribute('data-truncate-open')).toBe('true');
+      expect(titleToggle.getAttribute('aria-expanded')).toBe('true');
+      expect(card.textContent!.match(/Nothing is written until you press Apply\./g)).toHaveLength(1);
+      expect(document.querySelector("[data-pending]")!.textContent!.match(/Nothing is written until you press Apply./g)).toHaveLength(1);
+      expect(card.querySelector('.apply__command code')!.textContent).toMatch(/^toil jira issue categorize .*--allow-write$/);
+      expect(card.querySelector('[data-sample-cannot-write]')!.textContent).toMatch(/This is sample data, so nothing here can be written/);
+      expect((within(card).getByRole('button', { name: /^Apply \d+ changes$/ }) as HTMLButtonElement).disabled).toBe(true);
+    } finally {
+      restore();
+    }
   });
 
   it('folds a long list after ten changes with Show all, and shows every change once opened', async () => {

@@ -554,9 +554,13 @@ stay as the hover shortcut, but it is never the only way in.
 Every `data-truncate` element names its way in, as the attribute's value, and the layout check
 (`scripts/layout-check.mjs`) verifies the way is really there, so a title-only truncation fails the run:
 
-- **`expand`** — pressing a toggle in the truncation (a button with `aria-expanded`) opens the whole value inline,
-  wrapped in place, and pressing it again folds it back. The stand-up chips, the Toil project bar's description, a
-  stand-up card's account name, an approval card's item titles and a ticket chip with nowhere to go use this.
+- **`expand`** — a More control in the truncation (a button whose word is More or Less, with `aria-expanded`) opens
+  the whole value inline, wrapped in place, and pressing it again folds it back. The text stays text. The control
+  is there when the line is cut, or while it is open, so a line that already fits takes no extra Tab stop. A cut
+  is the box, or the ellipsized line it marks with `data-truncate-text` when the box around that line still fits.
+  The control uses the stand-up's More: the link colour, an underline on hover, and the app's focus ring. The
+  stand-up chips, the Toil project bar's description, a stand-up card's account name, an approval card's item
+  titles and a ticket chip with nowhere to go use this.
 - **`detail`** — the truncation is, holds or sits inside a link, and pressing it opens the view where the whole
   value shows in full: a ticket chip opens its item, a Classify row's head holds its item link.
 - **`copy`** — a Copy button beside the truncation copies the whole value, as `Path` and `Url`

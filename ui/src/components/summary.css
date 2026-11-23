@@ -69,9 +69,11 @@
 /* A person on the Summary's stand-up card: the name stays on one line, the account after it is small, muted and truncated. */
 .sum-person { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
 .sum-person__name { font-weight: 700; white-space: nowrap; flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.sum-person__account { color: var(--muted); font-size: 0.8125rem; font: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Opened by its own press (#649): the whole account, wrapped in place. */
-.sum-person__account[data-truncate-open] { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+/* `font` resets every font longhand, so the size is named after it. Named first, the account reads at body size. */
+.sum-person__account { font: inherit; font-size: 0.8125rem; color: var(--muted); min-width: 0; }
+.sum-person__account-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Opened by More (#649): the whole account, wrapped in place. */
+.sum-person__account[data-truncate-open] .sum-person__account-text { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .sum-drill { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; margin: 0; }
 .sum-drill__note { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; margin: 0; }
 .sum-drill__note .reason__dot { flex: none; }

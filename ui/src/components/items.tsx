@@ -239,7 +239,9 @@ export function TicketChip({ id, detail = false }: { id: string; detail?: boolea
   const body = (
     <>
       <span className="ticket-chip__key">{key}</span>{' '}
-      <span className="ticket-chip__title">{title}</span>
+      <span className="ticket-chip__title" data-truncate-text="">
+        {title}
+      </span>
       <span className="sr-only">, </span>
       <span className={`ticket-chip__status ticket-chip__status--${tone}`}>{status}</span>
     </>

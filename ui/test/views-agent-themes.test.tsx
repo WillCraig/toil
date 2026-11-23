@@ -123,7 +123,7 @@ describe('keyboard and focus', () => {
 describe('themes', () => {
   it('opens in Crate, switches to Plain without changing the layout, and remembers the choice (#277)', async () => {
     await open('#/project/card-payments');
-    // The stand-up card's rows (and their account buttons, #649) are in before the list is taken, so a card still folding can't read as a layout change.
+    // The stand-up card's rows are in before the list is taken, so a card still folding can't read as a layout change.
     await waitFor(() => expect(document.querySelector('[data-standup-card] [data-standup-counts]')).toBeTruthy());
     const before = screen.getAllByRole('button').map((b) => b.textContent);
     expect(document.documentElement.dataset.theme).toBe('crate');

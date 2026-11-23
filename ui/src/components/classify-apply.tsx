@@ -26,6 +26,7 @@ import { sourceLabel } from '../format.ts';
 import { useWords } from '../skins.tsx';
 import type { WorkItem } from '../toil.ts';
 import { NavButton } from './nav-button.tsx';
+import { TruncateLine } from './truncate.tsx';
 
 /** Why a connection's changes can't be applied yet, in words, with where to put it right. */
 export const WRITES_OFF = (connection: string) => `Changes to ${connection} are switched off, so nothing can be written there yet. Turn them on for ${connection} under Settings, Connections, then come back and apply.`;
@@ -48,16 +49,13 @@ function changeText(c: PlanGroupView['changes'][number]): string {
 }
 
 /**
- * One change's title, cut to its cell with the whole of it on hover, and a press away on touch: the title is
- * what a person approves, so it opens inline rather than sending them to the item (`expand`, #649).
+ * One change's title, cut to its cell with the whole of it on hover. The title stays text: More beside it
+ * opens the whole title in the cell, and only when the line is cut (`expand`, #649).
  */
 function ApplyTitle({ title }: { title: string }) {
-  const [expanded, setExpanded] = useState(false);
   return (
-    <td className="apply__title" title={title} data-truncate="expand" data-truncate-open={expanded || undefined}>
-      <Button className="apply__title-toggle" aria-expanded={expanded} aria-label={`${title} (${expanded ? 'show less' : 'show the whole title'})`} onPress={() => setExpanded(!expanded)}>
-        {title}
-      </Button>
+    <td className="apply__title">
+      <TruncateLine text={title} className="apply__title-line" textClassName="apply__title-text" />
     </td>
   );
 }
