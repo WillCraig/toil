@@ -13,7 +13,7 @@
  * ways to take it away. Fifteen minutes, standing, with the minutes already taken.
  */
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Button, Form, Input, Label, TextField } from 'react-aria-components';
 import type { Answer } from '../agent.ts';
 import { PersonGlyph } from '../components/avatar.tsx';
@@ -23,6 +23,7 @@ import { Help } from '../components/help.tsx';
 import { SummaryChevron } from '../components/disclosure.tsx';
 import { NavButton } from '../components/nav-button.tsx';
 import { ExternalLink } from '../components/external-link.tsx';
+import { linesBeyond, useLineCut } from '../components/truncate.tsx';
 import { ProposalCard } from '../components/proposal.tsx';
 import { useData } from '../data.ts';
 import { AGENT_SETTINGS_HREF, itemHref, sourceLabel, standupHref, worklogHref } from '../format.ts';
@@ -289,6 +290,47 @@ function SubjectRow({ chip, children }: { chip: Chip; children?: ReactNode }) {
   );
 }
 
+/**
+ * A chip, cut to its row with the whole fact on hover, and a press away on touch (`expand`, #649,
+ * ui/README.md, Cut-off text). More opens what the row does not already show; Less folds it back.
+ * The toggle is there when a fact line is still hidden, or when the line is actually cut in its box.
+ */
+function ExpandableChip({ report, chip, className, cited, outstanding, children }: { report: StandupReport; chip: Chip; className: string; cited?: boolean; outstanding?: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [beyond, setBeyond] = useState<string[]>([]);
+  const full = chipTitle(report, chip);
+  const cut = useLineCut(ref, full);
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const copy = root.cloneNode(true) as HTMLElement;
+    for (const node of copy.querySelectorAll('.standup-chip__toggle, [data-truncate-full]')) node.remove();
+    const next = linesBeyond(full, copy.textContent ?? '');
+    setBeyond((prev) => (prev.length === next.length && prev.every((line, i) => line === next[i]) ? prev : next));
+  }, [full]);
+  const needs = expanded || beyond.length > 0 || cut;
+  return (
+    <span ref={ref} className={className} data-truncate="expand" data-truncate-open={expanded || undefined} data-cited={cited || undefined} data-outstanding={outstanding || undefined} id={`fact-${chip.key}`} title={full}>
+      {children}
+      {needs && (
+        <Button className="standup-fold standup-chip__toggle" aria-expanded={expanded} aria-label={`${expanded ? 'Less' : 'More'}: ${chip.label}${chip.title ? ` ${chip.title}` : ''}`} onPress={() => setExpanded(!expanded)}>
+          {expanded ? 'Less' : 'More'}
+        </Button>
+      )}
+      {expanded && beyond.length > 0 && (
+        <span className="standup-chip__full" data-truncate-full="">
+          {beyond.map((line, i) => (
+            <span key={i} className="standup-chip__line">
+              {line}
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function ChipView({ report, chip, bucket, cited }: { report: StandupReport; chip: Chip; bucket: Bucket; cited: Set<string> }) {
   const isCited = chip.lines.some((l) => cited.has(l.fact));
   const ids = chip.lines.slice(1).map((l) => <span key={l.fact} id={`fact-${l.fact}`} />);
@@ -297,14 +339,16 @@ function ChipView({ report, chip, bucket, cited }: { report: StandupReport; chip
     const url = httpUrl(chip.url);
     const excerpt = `“${shorten(chip.texts[0] ?? '', EXCERPT_CHARS)}”`;
     return (
-      <span className="standup-chip standup-chip--comment" data-truncate="" id={`fact-${chip.key}`} data-cited={isCited || undefined} data-outstanding={c.outstanding || undefined} title={chipTitle(report, chip)}>
+      <ExpandableChip report={report} chip={chip} className="standup-chip standup-chip--comment" cited={isCited} outstanding={c.outstanding}>
         {c.outstanding && (
           <span className="standup-q" role="img" aria-label="Unanswered question" title="A question nobody has answered">
             <HelpIcon size={16} />
           </span>
         )}
         <SubjectRow chip={chip}>
-          <span className="standup-excerpt">{excerpt}</span>
+          <span className="standup-excerpt" data-truncate-text="">
+            {excerpt}
+          </span>
         </SubjectRow>
         {c.outstanding && <span className="badge standup-wait">{c.ageDays ? `no reply, ${c.ageDays} d` : 'no reply yet'}</span>}
         {url && (
@@ -312,19 +356,25 @@ function ChipView({ report, chip, bucket, cited }: { report: StandupReport; chip
             <span className="sr-only">The comment in its tracker</span>
           </ExternalLink>
         )}
-      </span>
+      </ExpandableChip>
     );
   }
   return (
-    <span className="standup-chip" data-truncate="" id={`fact-${chip.key}`} data-cited={isCited || undefined} title={chipTitle(report, chip)}>
-      <SubjectRow chip={chip}>{chip.title && <span className="standup-title">{chip.title}</span>}</SubjectRow>
+    <ExpandableChip report={report} chip={chip} className="standup-chip" cited={isCited}>
+      <SubjectRow chip={chip}>
+        {chip.title && (
+          <span className="standup-title" data-truncate-text="">
+            {chip.title}
+          </span>
+        )}
+      </SubjectRow>
       {bucket === 'blocked' && chip.texts[0] && (
-        <span className="badge standup-why" title={chip.texts[0]}>
+        <span className="badge standup-why" title={chip.texts[0]} data-truncate-text="">
           {shorten(chip.texts[0], 40)}
         </span>
       )}
       {ids}
-    </span>
+    </ExpandableChip>
   );
 }
 
@@ -409,11 +459,13 @@ function TeamLine({ report, cited }: { report: StandupReport; cited: Set<string>
     <div className="standup-team" id="standup-team" data-standup-team="">
       <span className="standup-team__sprint">{report.sprintLine ?? (report.asOf ? 'No current sprint' : 'Sprint not read yet')}</span>
       {shown.map((c) => (
-        <span key={c.key} className="standup-chip" data-truncate="" id={`fact-${c.key}`} data-cited={c.lines.some((l) => cited.has(l.fact)) || undefined} title={chipTitle(report, c)}>
+        <ExpandableChip key={c.key} report={report} chip={c} className="standup-chip" cited={c.lines.some((l) => cited.has(l.fact))}>
           <SubjectRow chip={c}>
-            <span className="standup-title">{c.texts[0] ?? ''}</span>
+            <span className="standup-title" data-truncate-text="">
+              {c.texts[0] ?? ''}
+            </span>
           </SubjectRow>
-        </span>
+        </ExpandableChip>
       ))}
       {chips.length > ROW_CHIPS && (
         <Button className="standup-fold" aria-expanded={all} onPress={() => setAll(!all)}>

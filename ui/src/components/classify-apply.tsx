@@ -26,6 +26,7 @@ import { sourceLabel } from '../format.ts';
 import { useWords } from '../skins.tsx';
 import type { WorkItem } from '../toil.ts';
 import { NavButton } from './nav-button.tsx';
+import { TruncateLine } from './truncate.tsx';
 
 /** Why a connection's changes can't be applied yet, in words, with where to put it right. */
 export const WRITES_OFF = (connection: string) => `Changes to ${connection} are switched off, so nothing can be written there yet. Turn them on for ${connection} under Settings, Connections, then come back and apply.`;
@@ -45,6 +46,18 @@ function changeText(c: PlanGroupView['changes'][number]): string {
   else parts.push(`${c.labelsFrom.join(', ')} → ${to || 'none'}`);
   if (c.field) parts.push(`field ${c.field.name}: ${c.field.from === undefined ? 'not read' : (c.field.from ?? 'empty')} → ${c.field.to}`);
   return parts.join(' · ');
+}
+
+/**
+ * One change's title, cut to its cell with the whole of it on hover. The title stays text: More beside it
+ * opens the whole title in the cell, and only when the line is cut (`expand`, #649).
+ */
+function ApplyTitle({ title }: { title: string }) {
+  return (
+    <td className="apply__title">
+      <TruncateLine text={title} className="apply__title-line" textClassName="apply__title-text" />
+    </td>
+  );
 }
 
 /** One connection's changes as a compact table, a line each: item, title, category, change. Past ten it folds, with the count on the button. */
@@ -69,9 +82,7 @@ function Changes({ g, ins }: { g: PlanGroupView; ins: ReturnType<typeof useWorkI
               <th scope="row" className="apply__key">
                 {c.key}
               </th>
-              <td className="apply__title" title={c.title} data-truncate="">
-                {c.title}
-              </td>
+              <ApplyTitle title={c.title} />
               <td className="apply__category">{nameOf(ins, c.category)}</td>
               <td className="apply__what">{changeText(c)}</td>
             </tr>

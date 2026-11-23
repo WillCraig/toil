@@ -18,6 +18,7 @@ import { PersonGlyph } from './icons.tsx';
 import { dayOf } from '../model/worklog.ts';
 import { NotRead, useStandupReport } from '../views/Standup.tsx';
 import { NavButton } from './nav-button.tsx';
+import { TruncateLine } from './truncate.tsx';
 import type { Bucket } from '../model/standup.ts';
 import type { WorklogApi } from '../worklog.ts';
 import '../views/standup.css';
@@ -33,7 +34,8 @@ function countText(bucket: Bucket, n: number): string {
 
 /**
  * A person on the card: the name on one line, then the account the stand-up page writes after it ("bitbucket achen") in small
- * muted text that truncates, with the whole text on hover. The words are the model's own `groupTitle`, split at its parenthesis.
+ * muted text that truncates, with the whole text on hover. More beside it opens the whole account, and only when the
+ * line is cut (#649, ui/README.md, Cut-off text). The words are the model's own `groupTitle`, split at its parenthesis.
  */
 function CardName({ group }: { group: StandupGroup }) {
   const full = groupTitle({ ...group, kind: 'human' });
@@ -44,7 +46,7 @@ function CardName({ group }: { group: StandupGroup }) {
     <span className="sum-person" data-kind={group.kind} title={suffix ? full : undefined}>
       <PersonGlyph agent={group.kind === 'agent'} />
       <span className="sum-person__name">{name}</span>
-      {suffix && <span className="sum-person__account" title={suffix} data-truncate="">{suffix}</span>}
+      {suffix && <TruncateLine text={suffix} className="sum-person__account" textClassName="sum-person__account-text" />}
       {group.kind === 'agent' && <span className="sr-only"> (agent)</span>}
     </span>
   );

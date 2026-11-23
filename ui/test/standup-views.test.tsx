@@ -241,8 +241,24 @@ describe('write it up and export, one row of buttons below (#657)', () => {
     const chips = [...document.querySelectorAll<HTMLElement>('[data-standup-team] .standup-chip')];
     const long = chips.find((c) => c.querySelector('.standup-title')!.textContent === 'moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura')!;
     expect(long).toBeTruthy();
-    expect(long.hasAttribute('data-truncate')).toBe(true);
-    expect(long.title).toContain('moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura');
+    expect(long.getAttribute('data-truncate')).toBe('expand');
+    const sentence = 'moved from Payments\\Sprint 41 to Payments\\Sprint 42, by K. Nakamura';
+    expect(long.title).toContain(sentence);
+    // On touch the tooltip never shows (#649). More opens what the row does not already show: not the key, not the sentence.
+    const toggle = within(long).getByRole('button', { name: /^More:/ });
+    expect(toggle.textContent).toBe('More');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    await userEvent.click(toggle);
+    expect(long.getAttribute('data-truncate-open')).toBe('true');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const opened = long.querySelector('[data-truncate-full]')!.textContent!;
+    expect(opened).not.toContain(sentence);
+    expect(opened).not.toContain(long.querySelector('.standup-key')!.textContent!);
+    expect(opened).toMatch(/UTC/);
+    expect(long.textContent!.split(sentence).length - 1).toBe(1);
+    await userEvent.click(toggle);
+    expect(long.hasAttribute('data-truncate-open')).toBe(false);
+    expect(long.querySelector('[data-truncate-full]')).toBeNull();
   });
 
   it('exports the range as a Markdown file through the API', async () => {

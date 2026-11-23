@@ -7,8 +7,20 @@
 //   - any element whose content is wider than its box (scrollWidth more than
 //     clientWidth + 1), unless it is a declared scroller (`data-scroller`,
 //     which DataTable and the other scrollers carry with their cue and focus)
-//     or a declared truncation (`data-truncate`, Path and Url, which keep the
-//     whole value in a tooltip and a copy button);
+//     or a declared truncation (`data-truncate`, see the touch rule below);
+//   - a declared truncation that keeps its whole value only in a `title`
+//     tooltip (`truncate-touch`, #649). The rule (ui/README.md, Cut-off
+//     text): a tooltip never shows on a touch screen, so every
+//     `data-truncate` names the way in that works without hover, and this
+//     check verifies it in the page: `expand` (a press on its toggle, a
+//     button with `aria-expanded` inside it, opens the whole value inline;
+//     the line that ellipsizes is `[data-truncate-text]`, and a cut there
+//     counts even when the box around it fits),
+//     `detail` (it is, holds or sits inside a link, and pressing it opens
+//     the view where the whole value shows), or `copy` (a Copy button
+//     beside it copies the whole value, as Path and Url do). A bare
+//     `data-truncate`, any other value, or a named way the page doesn't
+//     actually offer fails the run;
 //   - a child box reaching past the edge of its card (`data-card`);
 //   - something fixed to the bottom of the screen covering the end of the
 //     page once it is scrolled all the way down;
@@ -198,7 +210,7 @@ const personalOnce = () => (PERSONAL_CACHE ??= personalNeedles());
  * What runs in the page: one pass over the layout, returning findings. It is
  * sent as source, so it may use only what the page has.
  */
-function inspect(cards, headerFits) {
+export function inspect(cards, headerFits) {
   const findings = [];
   const add = (kind, el, detail) => findings.push({ kind, at: el ? describe(el) : 'page', detail });
   function describe(el) {
@@ -242,6 +254,31 @@ function inspect(cards, headerFits) {
     // Visually hidden (React Aria's hidden inputs): a 1px box, clipped on purpose.
     if (el.clientWidth <= 1 && el.clientHeight <= 1) continue;
     if (el.scrollWidth > el.clientWidth + 1) add('overflow', el, `content ${el.scrollWidth}px wide in a ${el.clientWidth}px box (overflow-x: ${style.overflowX})`);
+  }
+
+  // Cut-off text stays reachable on touch (#649, ui/README.md, Cut-off text): a `title` tooltip never
+  // shows there, so each `data-truncate` names its way in and the way must be in the page, not just named.
+  // Form-filling the hover box was never going to reach the people the box was hiding the text from.
+  for (const el of document.querySelectorAll('[data-truncate]')) {
+    const style = getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || el.closest('[aria-hidden="true"]')) continue;
+    const way = el.getAttribute('data-truncate');
+    if (way === 'expand') {
+      const toggle = el.matches('button[aria-expanded], [role="button"][aria-expanded]') ? el : el.querySelector('button[aria-expanded], [role="button"][aria-expanded]');
+      // The box often fits while the ellipsized line inside it (`data-truncate-text`) does not. Either being cut hides text.
+      const overflows = (node) => node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1;
+      const clipped = overflows(el) || [...el.querySelectorAll('[data-truncate-text]')].some((node) => overflows(node));
+      if (!toggle && clipped) add('truncate-touch', el, 'data-truncate="expand" cuts its text in this box and has no toggle to press: no button with aria-expanded in it opens the whole value inline');
+    } else if (way === 'detail') {
+      const link = el.matches('a[href]') ? el : (el.querySelector('a[href]') ?? el.closest('a[href]'));
+      if (!link?.getAttribute('href')) add('truncate-touch', el, 'data-truncate="detail" has no link to press: it is not, does not hold and is not inside an <a href>, so nothing opens the view with the whole value');
+    } else if (way === 'copy') {
+      const box = el.closest('.l-path') ?? el.parentElement;
+      const button = box ? [...box.querySelectorAll('button')].find((b) => /^Copy /.test(b.getAttribute('aria-label') ?? '')) : null;
+      if (!button) add('truncate-touch', el, 'data-truncate="copy" has no Copy button beside it to copy the whole value');
+    } else {
+      add('truncate-touch', el, `data-truncate="${way ?? ''}" keeps its whole value only in a tooltip, which a touch screen never shows: name the way in without hover (expand, detail or copy)`);
+    }
   }
 
   for (const card of document.querySelectorAll(cards)) {

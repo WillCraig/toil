@@ -9,6 +9,7 @@ import { FIXTURE_NOW, fixtureExecute } from '../src/fixtures/execute.ts';
 import { fixtureWorklog } from '../src/fixtures/worklog.ts';
 import type { WorklogApi } from '../src/worklog.ts';
 import { setPrefs } from '../src/briefing-prefs.ts';
+import { cutTruncateBoxes } from './cut-boxes.ts';
 
 /**
  * The Summary tab leads with the answer (#552): the status sentence as the
@@ -180,13 +181,44 @@ describe('the stand-up on the Summary', () => {
     expect(card.querySelector('.standup-chip')).toBeNull();
     // A name stays on one line; an account after it is a muted suffix with the whole text on hover, never part of the name.
     for (const n of card.querySelectorAll('.sum-person__name')) expect(n.textContent).not.toContain('(');
-    for (const a of card.querySelectorAll('.sum-person__account')) expect(a.closest('.sum-person')!.getAttribute('title')).toContain(a.textContent!);
+    const accounts = [...card.querySelectorAll<HTMLElement>('.sum-person__account')];
+    expect(accounts.length).toBeGreaterThan(0);
+    for (const a of accounts) {
+      const text = a.querySelector('.sum-person__account-text')!.textContent!;
+      expect(text.length).toBeGreaterThan(0);
+      expect(a.closest('.sum-person')!.getAttribute('title')).toContain(text);
+      // A line that fits is text, not a tab stop (#649).
+      expect(a.getAttribute('data-truncate')).toBe('expand');
+      expect(within(a).queryByRole('button')).toBeNull();
+    }
     expect(card.querySelector('[data-standup-more]')).toBeNull();
     expect(within(card).getByRole('link', { name: 'Open the full stand-up' }).getAttribute('href')).toBe('#/project/card-payments/standup');
     // Right under the answer and the needs-attention cards, before the fold.
     const order = [...region.children].map((c) => c.getAttribute('data-standup-card') !== null ? 'card' : c.matches('[data-full-briefing]') ? 'full' : '');
     expect(order.indexOf('card')).toBeGreaterThan(-1);
     expect(order.indexOf('card')).toBeLessThan(order.indexOf('full'));
+  });
+
+  it('opens a cut account from More, and Less folds it (#649)', async () => {
+    const restore = cutTruncateBoxes();
+    try {
+      const region = await withLog(fixtureWorklog());
+      const card = await waitFor(() => {
+        const c = region.querySelector('[data-standup-card]') as HTMLElement;
+        expect(c.querySelectorAll('.sum-person__account').length).toBeGreaterThan(0);
+        return c;
+      });
+      const account = card.querySelector<HTMLElement>('.sum-person__account')!;
+      const more = within(account).getByRole('button', { name: /^More:/ });
+      expect(more.textContent).toBe('More');
+      await userEvent.click(more);
+      expect(account.getAttribute('data-truncate-open')).toBe('true');
+      expect(more.getAttribute('aria-expanded')).toBe('true');
+      await userEvent.click(more);
+      expect(account.hasAttribute('data-truncate-open')).toBe(false);
+    } finally {
+      restore();
+    }
   });
 
   it('says not read yet, with Sync now, when no sync has read the days, and never nothing happened', async () => {

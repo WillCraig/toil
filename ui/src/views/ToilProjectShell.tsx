@@ -33,6 +33,7 @@ import { Scroller, useMediaQuery } from '../components/layout.tsx';
 import { Hint } from '../components/term.tsx';
 import { MoreIcon } from '../components/icons.tsx';
 import { NavButton } from '../components/nav-button.tsx';
+import { TruncateLine } from '../components/truncate.tsx';
 import { useAgentsPanelOpen } from '../assign/panel-choice.ts';
 import { AgentsSidebar, useAgentsSummary } from '../assign/sidebar.tsx';
 import { AssignModal } from '../assign/views.tsx';
@@ -148,9 +149,7 @@ export function ToilProjectShell({ tab, heading, team, back, peek = null, items 
               <p className="toil-project-bar__desc">
                 <Editable bare field="description" toilProject={toilProject.name} value={toilProject.description} config={config ?? null} onSaved={described ?? (() => undefined)}>
                   {toilProject.description ? (
-                    <span className="toil-project-bar__desc-text" title={toilProject.description} data-truncate="">
-                      {toilProject.description}
-                    </span>
+                    <DescText description={toilProject.description} />
                   ) : (
                     <span className="note">No description</span>
                   )}
@@ -229,6 +228,14 @@ export function ToilProjectShell({ tab, heading, team, back, peek = null, items 
       </div>
     </div>
   );
+}
+
+/**
+ * The Toil project's description, cut to the bar's line with the whole of it on hover. The description stays
+ * text: More beside it opens the whole of it, and only when the line is cut (`expand`, #649, ui/README.md, Cut-off text).
+ */
+function DescText({ description }: { description: string }) {
+  return <TruncateLine text={description} className="toil-project-bar__desc-text" textClassName="toil-project-bar__desc-value" />;
 }
 
 /**

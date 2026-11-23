@@ -29,7 +29,7 @@
 .classify__rows-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; }
 .classify__rows-head > .sortrows__legend { margin-inline-start: auto; }
 .sortrows__legend { margin: 0; }
-/* One line a row: the title (cut short, whole on hover), then the segmented choices, then the (i). Stacked at phone width. */
+/* One line a row: the title (cut short, whole on hover, and its item link opens the whole title: `detail`, #649), then the segmented choices, then the (i). Stacked at phone width. */
 .sortrows { display: grid; margin: 0.5rem 0 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: var(--radius); background: var(--raised); }
 .sortrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0.25rem 0.75rem; padding: 0.3rem 0.5rem 0.3rem 0.75rem; border-top: 1px solid var(--line); min-width: 0; }
 .sortrow:first-child { border-top: 0; }
@@ -69,6 +69,9 @@
 .apply__table th:nth-child(4) { width: 16rem; }
 .apply__table th.apply__key { font-weight: 600; }
 .apply__table td.apply__title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+/* The title stays text. More, beside the line, opens the whole title in the cell (#649). */
+.apply__title-text { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.apply__title-line[data-truncate-open] .apply__title-text { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
 @media (max-width: 40rem) {
   .apply__table, .apply__table tbody { display: block; }
   .apply__table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
@@ -76,6 +79,7 @@
   .apply__table th, .apply__table td { padding: 0; border: 0; }
   .apply__table th:nth-child(n) { width: auto; }
   .apply__table td.apply__title { white-space: normal; overflow: visible; }
+  .apply__title-text { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
   .apply__category { grid-column: 1; color: var(--muted); }
   .apply__what { grid-column: 2; }
 }
