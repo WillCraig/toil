@@ -7,16 +7,16 @@
 <text x="326" y="904" font-size="14" font-weight="bold" text-anchor="start" fill="#444444">Online Bookshop</text><text x="326" y="918.9" font-size="11" text-anchor="start" fill="#444444">[Software System]</text>
 </g>
 <g class="c4-relationships">
-<path d="M390,151 L390,151.5 Q390,152 421.5,226 L453,300" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path d="M390,151 L390,151.5 Q390,152 394.7,163 L453,300" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path d="M770.5,152 L733,300" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path d="M453,402 L584.8,522" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path d="M733,402 L584.8,522" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path d="M584.8,624 L815.2,744" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path d="M584.8,624 L364.9,684 Q145,744 145,749.5 L145,755" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path d="M1013,402 L983,462 Q952.9,522 952.9,573 L952.9,573 Q952.9,624 884.1,684 L815.2,744" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path d="M1013,402 L579,462 Q145,522 145,522.5 L145,523" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path d="M1013,402 L1185.7,462 Q1358.5,522 1358.5,522.5 L1358.5,523" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path d="M145,523 L145,522.5 Q145,522 198.5,462 L198.5,462 Q252,402 252,351 L252,351 Q252,300 321,226 L321,226 Q390,152 390,151.5 L390,151" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path d="M584.8,624 L156.6,740.8 Q145,744 145,749.5 L145,755" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path d="M1013,402 L958.3,511.3 Q952.9,522 952.9,534 L952.9,612 Q952.9,624 943.9,631.9 L815.2,744" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path d="M1013,402 L156.9,520.4 Q145,522 145,522.5 L145,523" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path d="M1013,402 L1347.1,518.1 Q1358.5,522 1358.5,522.5 L1358.5,523" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path d="M145,523 L145,522.5 Q145,522 153,513 L244,411 Q252,402 252,390 L252,312 Q252,300 260.2,291.2 L381.8,160.8 Q390,152 390,151.5 L390,151" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 </g>
 <g id="customer" class="c4-person"><rect x="275" y="51" width="230" height="100" rx="28" fill="#08427b" stroke="#073b6f" stroke-width="1.5"/><text x="390" y="87.6" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff">Customer</text><text x="390" y="102.9" font-size="11" text-anchor="middle" fill="#ffffff">[Person]</text><text x="390" y="126.5" font-size="12" text-anchor="middle" fill="#ffffff">Browses and buys books online</text></g>
 <g id="staff" class="c4-person"><rect x="655.5" y="50" width="230" height="102" rx="28" fill="#08427b" stroke="#073b6f" stroke-width="1.5"/><text x="770.5" y="79.6" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff">Bookshop staff</text><text x="770.5" y="94.9" font-size="11" text-anchor="middle" fill="#ffffff">[Person]</text><text x="770.5" y="118.5" font-size="12" text-anchor="middle" fill="#ffffff">Keeps the catalogue and handles</text><text x="770.5" y="134.5" font-size="12" text-anchor="middle" fill="#ffffff">orders</text></g>
@@ -33,18 +33,18 @@
 <text x="421.3" y="216" font-size="11" text-anchor="middle" fill="#444444">Browses and buys books</text><text x="421.3" y="230" font-size="11" text-anchor="middle" fill="#444444">using</text><text x="421.3" y="243.2" font-size="10" text-anchor="middle" fill="#444444">[HTTPS]</text>
 <rect x="688.8" y="210.5" width="125.8" height="31" fill="#ffffff" fill-opacity="0.85"/>
 <text x="751.7" y="223.4" font-size="11" text-anchor="middle" fill="#444444">Manages the shop using</text><text x="751.7" y="236.6" font-size="10" text-anchor="middle" fill="#444444">[HTTPS]</text>
-<rect x="470.7" y="446.5" width="96.5" height="31" fill="#ffffff" fill-opacity="0.85"/>
-<text x="518.9" y="459.4" font-size="11" text-anchor="middle" fill="#444444">Makes API calls to</text><text x="518.9" y="472.6" font-size="10" text-anchor="middle" fill="#444444">[JSON/HTTPS]</text>
-<rect x="610.7" y="446.5" width="96.5" height="31" fill="#ffffff" fill-opacity="0.85"/>
-<text x="658.9" y="459.4" font-size="11" text-anchor="middle" fill="#444444">Makes API calls to</text><text x="658.9" y="472.6" font-size="10" text-anchor="middle" fill="#444444">[JSON/HTTPS]</text>
+<rect x="407.8" y="440.5" width="96.5" height="31" fill="#ffffff" fill-opacity="0.85"/>
+<text x="456.1" y="453.4" font-size="11" text-anchor="middle" fill="#444444">Makes API calls to</text><text x="456.1" y="466.6" font-size="10" text-anchor="middle" fill="#444444">[JSON/HTTPS]</text>
+<rect x="663.2" y="449.5" width="96.5" height="31" fill="#ffffff" fill-opacity="0.85"/>
+<text x="711.4" y="462.4" font-size="11" text-anchor="middle" fill="#444444">Makes API calls to</text><text x="711.4" y="475.6" font-size="10" text-anchor="middle" fill="#444444">[JSON/HTTPS]</text>
 <rect x="635.8" y="668.5" width="128.3" height="31" fill="#ffffff" fill-opacity="0.85"/>
 <text x="700" y="681.4" font-size="11" text-anchor="middle" fill="#444444">Reads from and writes to</text><text x="700" y="694.6" font-size="10" text-anchor="middle" fill="#444444">[SQL]</text>
 <rect x="309.5" y="669.9" width="100.1" height="31" fill="#ffffff" fill-opacity="0.85"/>
 <text x="359.6" y="682.9" font-size="11" text-anchor="middle" fill="#444444">Charges cards with</text><text x="359.6" y="696.1" font-size="10" text-anchor="middle" fill="#444444">[JSON/HTTPS]</text>
 <rect x="895.2" y="581.8" width="115.4" height="31" fill="#ffffff" fill-opacity="0.85"/>
 <text x="952.9" y="594.7" font-size="11" text-anchor="middle" fill="#444444">Polls for paid orders in</text><text x="952.9" y="607.9" font-size="10" text-anchor="middle" fill="#444444">[SQL]</text>
-<rect x="760.3" y="422.5" width="146" height="31" fill="#ffffff" fill-opacity="0.85"/>
-<text x="833.3" y="435.5" font-size="11" text-anchor="middle" fill="#444444">Sends confirmations through</text><text x="833.3" y="448.7" font-size="10" text-anchor="middle" fill="#444444">[SMTP]</text>
+<rect x="250.7" y="470.6" width="146" height="31" fill="#ffffff" fill-opacity="0.85"/>
+<text x="323.7" y="483.5" font-size="11" text-anchor="middle" fill="#444444">Sends confirmations through</text><text x="323.7" y="496.7" font-size="10" text-anchor="middle" fill="#444444">[SMTP]</text>
 <rect x="1126.7" y="446.7" width="119.1" height="31" fill="#ffffff" fill-opacity="0.85"/>
 <text x="1186.2" y="459.6" font-size="11" text-anchor="middle" fill="#444444">Sends orders to ship to</text><text x="1186.2" y="472.8" font-size="10" text-anchor="middle" fill="#444444">[AMQP]</text>
 <rect x="177.8" y="321.2" width="148.4" height="18" fill="#ffffff" fill-opacity="0.85"/>

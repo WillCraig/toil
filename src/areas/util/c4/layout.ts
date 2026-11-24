@@ -15,7 +15,7 @@ import { typeLine, type ComputedView, type Element, type How } from './view.js';
  * 5. Routing: down out of the source, straight through each row a long edge
  *    passes at its dummy's place, and into the target, so arrows bend only in
  *    the gaps between rows; then a label spot on each edge that keeps clear of
- *    boxes where one exists.
+ *    boxes, and of other arrows, where one exists.
  *
  * Text is sized from fixed per-character widths for Helvetica (Arial has the
  * same metrics), the one font the SVG asks for, so a layout is the same on
@@ -608,6 +608,44 @@ export function intersects(a: Rect, b: Rect, margin = 0): boolean {
 
 const overlapArea = (a: Rect, b: Rect) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
 
+/** How far in from a border a line counts as inside, in pixels: the tolerance the layout check uses too (verify.ts). */
+const INSIDE = 1;
+
+/**
+ * Whether the segment from `a` to `b` passes through the inside of `r`, more
+ * than the tolerance in from its border (Liang-Barsky clipping). Touching the
+ * border, or running along it, doesn't count. The one geometry the label
+ * placement below and the layout check in verify.ts share, so a spot the
+ * placement calls clear of an arrow is one the check passes.
+ */
+export function segmentCrosses(r: Rect, a: Point, b: Point): boolean {
+  const x0 = r.x + INSIDE;
+  const y0 = r.y + INSIDE;
+  const x1 = r.x + r.width - INSIDE;
+  const y1 = r.y + r.height - INSIDE;
+  if (x1 <= x0 || y1 <= y0) return false;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  let t0 = 0;
+  let t1 = 1;
+  for (const [p, q] of [
+    [-dx, a.x - x0],
+    [dx, x1 - a.x],
+    [-dy, a.y - y0],
+    [dy, y1 - a.y],
+  ] as const) {
+    if (p === 0) {
+      if (q <= 0) return false;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 >= t1) return false;
+  }
+  return t1 - t0 > 1e-9;
+}
+
 /** The point `t` of the way along a polyline, by length. */
 function along(points: Point[], t: number): Point {
   const lengths = points.slice(1).map((p, i) => Math.hypot(p.x - points[i]!.x, p.y - points[i]!.y));
@@ -622,15 +660,32 @@ function along(points: Point[], t: number): Point {
   return points[0]!;
 }
 
+/** The whole edge, nearest the middle first: the spots searched before giving up on a label clear of other arrows. */
+const WHOLE_EDGE = Array.from({ length: 39 }, (_, i) => (i + 1) / 40).sort((a, b) => Math.abs(a - 0.5) - Math.abs(b - 0.5) || a - b);
+
 /**
  * A spot for each edge's label: tried at points along the edge, centred on it
  * and then beside it, taking the first that touches no box and no label
- * already placed. With none clear, the least-overlapping spot is used, and
- * the layout check reports it.
+ * already placed. A spot that also touches no other arrow is preferred
+ * (#584): when that first pick sits on another arrow, the whole edge is
+ * searched, nearest the middle first, for one clear of boxes, labels and
+ * arrows alike. With none clear, the first pick stands — the
+ * least-overlapping spot when boxes crowd every spot — and the layout check
+ * reports it.
  */
 export function placeLabels(edges: EdgeRoute[], boxes: readonly Rect[]): void {
   const placed: Rect[] = [];
-  for (const e of edges) {
+  // Each arrow's bounding box first, so a spot is tested in full only against the arrows that reach it.
+  const bounds: Rect[] = edges.map((e) => {
+    const xs = e.points.map((p) => p.x);
+    const ys = e.points.map((p) => p.y);
+    const [x, y] = [Math.min(...xs), Math.min(...ys)];
+    return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+  });
+  const touchesArrow = (rect: Rect, own: number): boolean =>
+    edges.some((o, j) => j !== own && intersects(rect, bounds[j]!) && o.points.slice(1).some((p, k) => segmentCrosses(rect, o.points[k]!, p)));
+  for (let index = 0; index < edges.length; index++) {
+    const e = edges[index]!;
     const lines: TextLine[] = [
       ...(e.description ? wrapText(e.description, LABEL_WIDTH, EDGE_LABEL).map((text) => ({ text, size: EDGE_LABEL, bold: false })) : []),
       ...(e.technology ? [{ text: `[${e.technology}]`, size: EDGE_TECH, bold: false }] : []),
@@ -638,14 +693,30 @@ export function placeLabels(edges: EdgeRoute[], boxes: readonly Rect[]): void {
     if (lines.length === 0) continue;
     const w = linesWidth(lines) + 6;
     const h = linesHeight(lines) + 4;
+    const shifts = [0, w / 2 + 8, -(w / 2 + 8)];
+    const at = (t: number, shift: number): Rect => {
+      const p = along(e.points, t);
+      return { x: p.x + shift - w / 2, y: p.y - h / 2, width: w, height: h };
+    };
+    const costOf = (rect: Rect): number => [...boxes, ...placed].reduce((sum, b) => sum + overlapArea(rect, { x: b.x - 4, y: b.y - 4, width: b.width + 8, height: b.height + 8 }), 0);
     let best: { rect: Rect; cost: number } | undefined;
     search: for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8]) {
-      const p = along(e.points, t);
-      for (const shift of [0, w / 2 + 8, -(w / 2 + 8)]) {
-        const rect = { x: p.x + shift - w / 2, y: p.y - h / 2, width: w, height: h };
-        const cost = [...boxes, ...placed].reduce((sum, b) => sum + overlapArea(rect, { x: b.x - 4, y: b.y - 4, width: b.width + 8, height: b.height + 8 }), 0);
+      for (const shift of shifts) {
+        const rect = at(t, shift);
+        const cost = costOf(rect);
         if (!best || cost < best.cost) best = { rect, cost };
         if (cost === 0) break search;
+      }
+    }
+    if (best!.cost > 0 || touchesArrow(best!.rect, index)) {
+      clear: for (const t of WHOLE_EDGE) {
+        for (const shift of shifts) {
+          const rect = at(t, shift);
+          if (costOf(rect) === 0 && !touchesArrow(rect, index)) {
+            best = { rect, cost: 0 };
+            break clear;
+          }
+        }
       }
     }
     e.label = { lines, rect: best!.rect };

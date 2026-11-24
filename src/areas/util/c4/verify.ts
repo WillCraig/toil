@@ -1,20 +1,22 @@
 import { parseXml, XmlSyntaxError } from '../kit/xml.js';
-import { intersects, type Layout, type Point, type Rect } from './layout.js';
+import { intersects, segmentCrosses, type Layout, type Point, type Rect } from './layout.js';
 import { XML_FORBIDDEN } from './svg.js';
+
+export { segmentCrosses };
 
 /**
  * The renderer checks its own drawing before handing it over: no two boxes
  * overlap, every child sits inside its boundary (and nothing else does),
  * every arrow starts and ends on the right boxes, no arrow passes behind a
- * box it doesn't join, and no label covers a box. This runs beside the
- * layout in the bounded worker, so it returns plain counts, and the command
- * turns them into `data.verified` and a C4_LAYOUT_CHECK warning per failed
- * check (kit/verify.ts). Quality assurance, in the traditional sense, would
- * have been a meeting about this.
+ * box it doesn't join, no label covers a box, and no label sits on another
+ * arrow's line. This runs beside the layout in the bounded worker, so it
+ * returns plain counts, and the command turns them into `data.verified` and
+ * a C4_LAYOUT_CHECK warning per failed check (kit/verify.ts). Quality
+ * assurance, in the traditional sense, would have been a meeting about this.
  */
 
 /** The checks, in the order they're reported. */
-export const LAYOUT_CHECKS = ['boxes.apart', 'children.inBoundary', 'edges.touchBoxes', 'edges.clearOfBoxes', 'labels.clearOfBoxes'] as const;
+export const LAYOUT_CHECKS = ['boxes.apart', 'children.inBoundary', 'edges.touchBoxes', 'edges.clearOfBoxes', 'labels.clearOfBoxes', 'labels.clearOfArrows'] as const;
 export type LayoutCheck = (typeof LAYOUT_CHECKS)[number];
 
 /** One check over the whole drawing: how many times it ran, how many failed, and the first few failures. */
@@ -41,40 +43,7 @@ export function onBorder(r: Rect, p: Point): boolean {
   return inOuter && !inInner;
 }
 
-/**
- * Whether the segment from `a` to `b` passes through the inside of `r`, more
- * than the tolerance in from its border (Liang-Barsky clipping). Touching the
- * border, or running along it, doesn't count.
- */
-export function segmentCrosses(r: Rect, a: Point, b: Point): boolean {
-  const x0 = r.x + TOLERANCE;
-  const y0 = r.y + TOLERANCE;
-  const x1 = r.x + r.width - TOLERANCE;
-  const y1 = r.y + r.height - TOLERANCE;
-  if (x1 <= x0 || y1 <= y0) return false;
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  let t0 = 0;
-  let t1 = 1;
-  for (const [p, q] of [
-    [-dx, a.x - x0],
-    [dx, x1 - a.x],
-    [-dy, a.y - y0],
-    [dy, y1 - a.y],
-  ] as const) {
-    if (p === 0) {
-      if (q <= 0) return false;
-      continue;
-    }
-    const t = q / p;
-    if (p < 0) t0 = Math.max(t0, t);
-    else t1 = Math.min(t1, t);
-    if (t0 >= t1) return false;
-  }
-  return t1 - t0 > 1e-9;
-}
-
-/** Every check over a finished layout, with counts. Pure, and quadratic in boxes at worst, which the view limits keep small. */
+/** Every check over a finished layout, with counts. Pure, and quadratic in boxes and arrows at worst, which the view limits keep small. */
 export function verifyLayout(layout: Layout): CheckRun[] {
   const runs = new Map<LayoutCheck, CheckRun>(LAYOUT_CHECKS.map((check) => [check, { check, checked: 0, failed: 0, failures: [] }]));
   const record = (check: LayoutCheck, ok: boolean, at: string, message: () => string) => {
@@ -118,6 +87,18 @@ export function verifyLayout(layout: Layout): CheckRun[] {
   for (const e of layout.edges) {
     if (!e.label) continue;
     for (const n of nodes) record('labels.clearOfBoxes', !intersects(e.label.rect, n), `${e.from} -> ${e.to}, ${n.id}`, () => `the label of ${e.from} -> ${e.to} covers "${n.id}"`);
+  }
+
+  // Every label against every other arrow: its own arrow runs under it by design, no other may.
+  for (let i = 0; i < layout.edges.length; i++) {
+    const e = layout.edges[i]!;
+    if (!e.label) continue;
+    for (let j = 0; j < layout.edges.length; j++) {
+      if (j === i) continue;
+      const o = layout.edges[j]!;
+      const crossed = o.points.slice(1).some((p, k) => segmentCrosses(e.label!.rect, o.points[k]!, p));
+      record('labels.clearOfArrows', !crossed, `${e.from} -> ${e.to}, ${o.from} -> ${o.to}`, () => `the label of ${e.from} -> ${e.to} sits on the arrow ${o.from} -> ${o.to}`);
+    }
   }
   return [...runs.values()];
 }

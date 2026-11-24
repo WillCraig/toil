@@ -315,6 +315,7 @@ describe('util c4 commands', () => {
       ['edges.touchBoxes', 'passed'],
       ['edges.clearOfBoxes', 'passed'],
       ['labels.clearOfBoxes', 'passed'],
+      ['labels.clearOfArrows', 'passed'],
       ['svg.wellFormed', 'passed'],
       ['text.width', 'approximated'],
     ]);
