@@ -4,11 +4,10 @@
  * zod-free layout the CLI's own `util c4 render` uses, imported from source
  * as the briefing imports its own) places every box and bends every arrow,
  * and this file draws what it returns as React elements: rectangles, paths
- * and text, never injected markup. The shapes follow `util/c4/svg.ts`, with two
- * differences: the view's title is not drawn (the page's heading is it), and an
- * arrow's corners are rounded over a short run (RADIUS), so the curve stays
- * within a few pixels of the line toil's layout checked, where the file's own
- * corners cut across half of each segment and can clip a box.
+ * and text, never injected markup. The shapes follow `util/c4/svg.ts`, with one
+ * difference: the view's title is not drawn (the page's heading is it). An
+ * arrow's corners are rounded over a short run (RADIUS) in both (#584), so the
+ * curve stays within a few pixels of the line toil's layout checked.
  *
  * How each thing is known is on the drawing (principle 4): an inferred box has
  * a dashed outline and an inferred arrow a dotted line, and one that says
@@ -172,17 +171,19 @@ export function layoutOf(view: ComputedView): Layout {
 
 /**
  * toil's own checks of a drawing (`verifyLayout`, the ones `util c4 render` runs), as one short line when any failed,
- * and null when none did (principle 4: a picture that is wrong says so). It does not look for a label sitting on another
- * arrow's line, which those checks don't either.
+ * and null when none did (principle 4: a picture that is wrong says so). A label sitting on another arrow's line is
+ * one of them (#584).
  */
 export function layoutNotice(layout: Layout): string | null {
   const failed = (...checks: string[]) => verifyLayout(layout).filter((r) => checks.includes(r.check)).reduce((sum, r) => sum + r.failed, 0);
   const arrows = failed('edges.clearOfBoxes');
   const labels = failed('labels.clearOfBoxes');
+  const onArrows = failed('labels.clearOfArrows');
   const boxes = failed('boxes.apart', 'children.inBoundary', 'edges.touchBoxes');
   const found = [
     arrows ? `${arrows} ${arrows === 1 ? 'arrow passes' : 'arrows pass'} behind a box` : '',
     labels ? `${labels} ${labels === 1 ? 'label covers' : 'labels cover'} a box` : '',
+    onArrows ? `${onArrows} ${onArrows === 1 ? 'label sits' : 'labels sit'} on another arrow` : '',
     boxes ? `${boxes} ${boxes === 1 ? 'box or arrow is' : 'boxes or arrows are'} out of place` : '',
   ].filter(Boolean);
   return found.length ? `${found.join(', ')}: toil's layout couldn't draw this view cleanly.` : null;

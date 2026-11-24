@@ -4,12 +4,12 @@
 <rect width="100%" height="100%" fill="#ffffff"/>
 <text x="425" y="32" font-size="20" font-weight="bold" text-anchor="middle" fill="#000000">System context: Online Bookshop</text>
 <g class="c4-relationships">
-<path d="M233.7,151 L233.7,151.5 Q233.7,152 330,212 L426.2,272" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path d="M233.7,151 L233.7,151.5 Q233.7,152 243.9,158.3 L426.2,272" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path d="M513.7,152 L426.2,272" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path d="M426.2,390 L425,510" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path d="M426.2,390 L145,510" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 <path d="M426.2,390 L705,510" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
-<path d="M145,510 L180.7,450 Q216.5,390 216.5,331 L216.5,331 Q216.5,272 225.1,212 L225.1,212 Q233.7,152 233.7,151.5 L233.7,151" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<path d="M145,510 L210.3,400.3 Q216.5,390 216.5,378 L216.5,284 Q216.5,272 218.2,260.1 L232,163.9 Q233.7,152 233.7,151.5 L233.7,151" fill="none" stroke="#707070" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
 </g>
 <g id="customer" class="c4-person"><rect x="118.7" y="51" width="230" height="100" rx="28" fill="#08427b" stroke="#073b6f" stroke-width="1.5"/><text x="233.7" y="87.6" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff">Customer</text><text x="233.7" y="102.9" font-size="11" text-anchor="middle" fill="#ffffff">[Person]</text><text x="233.7" y="126.5" font-size="12" text-anchor="middle" fill="#ffffff">Browses and buys books online</text></g>
 <g id="staff" class="c4-person"><rect x="398.7" y="50" width="230" height="102" rx="28" fill="#08427b" stroke="#073b6f" stroke-width="1.5"/><text x="513.7" y="79.6" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff">Bookshop staff</text><text x="513.7" y="94.9" font-size="11" text-anchor="middle" fill="#ffffff">[Person]</text><text x="513.7" y="118.5" font-size="12" text-anchor="middle" fill="#ffffff">Keeps the catalogue and handles</text><text x="513.7" y="134.5" font-size="12" text-anchor="middle" fill="#ffffff">orders</text></g>

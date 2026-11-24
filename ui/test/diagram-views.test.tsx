@@ -177,6 +177,28 @@ describe('the picture, fitted', () => {
     await waitFor(() => expect(document.querySelector('[data-diagram-legend]')).not.toBeNull());
     expect(document.querySelector('[data-diagram-notice]')).toBeNull();
   });
+
+  it("says so, in the same one line, when a label sits on another arrow's line (#584)", () => {
+    const layout = layoutOf(view('card-payments', 'containers'));
+    expect(layoutNotice(layout)).toBeNull();
+    // The same layout with the first label moved onto the middle of another arrow's longest stretch.
+    const labelled = layout.edges.findIndex((e) => e.label);
+    const other = layout.edges.find((e, i) => i !== labelled)!;
+    const lengths = other.points.slice(1).map((p, k) => Math.hypot(p.x - other.points[k]!.x, p.y - other.points[k]!.y));
+    const k = lengths.indexOf(Math.max(...lengths));
+    const [a, b] = [other.points[k]!, other.points[k + 1]!];
+    const broken = {
+      ...layout,
+      edges: layout.edges.map((e, i) => {
+        if (i !== labelled) return e;
+        const rect = e.label!.rect;
+        return { ...e, label: { ...e.label!, rect: { ...rect, x: (a.x + b.x) / 2 - rect.width / 2, y: (a.y + b.y) / 2 - rect.height / 2 } } };
+      }),
+    };
+    const notice = layoutNotice(broken)!;
+    expect(notice).toMatch(/labels? (sit|sits) on another arrow.*couldn't draw this view cleanly\.$/);
+    expect(notice.length).toBeLessThan(160);
+  });
 });
 
 describe('the limits', () => {

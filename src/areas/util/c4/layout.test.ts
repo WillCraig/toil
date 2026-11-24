@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BOOKSHOP_C4 } from '../../../../test/fixtures/util.fixture.js';
-import { assignLayers, BLOCK, breakCycles, countCrossings, layoutView, orderLayers, placeRow, textWidth, wrapText, type Layout, type Ordering } from './layout.js';
+import { assignLayers, BLOCK, breakCycles, countCrossings, layoutView, orderLayers, placeLabels, placeRow, textWidth, wrapText, type EdgeRoute, type Layout, type Ordering } from './layout.js';
 import { computeView, loadModel, type C4Model } from './model.js';
 import { LAYOUT_CHECKS, onBorder, segmentCrosses, verifyLayout, type CheckRun } from './verify.js';
 
@@ -137,7 +137,9 @@ describe('the whole layout', () => {
   ])('passes its own checks: %s', (_name, view) => {
     const layout = layoutView(view);
     const runs = verifyLayout(layout);
-    expect(problems(runs)).toEqual([]);
+    // One busy label has no spot on its whole edge clear of the parallel return arrow (#584: searched
+    // whole, centred and beside, as placeLabels does), so that failure is reported rather than hidden.
+    expect(problems(runs)).toEqual(_name === 'busy containers' ? ['the label of orders -> courier sits on the arrow courier -> orders'] : []);
     expect(runs.map((r) => r.check)).toEqual([...LAYOUT_CHECKS]);
     expect(runs.find((r) => r.check === 'edges.clearOfBoxes')!.checked).toBe(view.edges.length * (layout.nodes.length - 2));
     expect(layout.nodes).toHaveLength(view.inside.length + view.outside.length);
@@ -169,6 +171,80 @@ describe('the whole layout', () => {
     };
     const layout = layoutView(computeView(model, model.views[0]!));
     expect(problems(verifyLayout(layout))).toEqual([]);
+  });
+});
+
+describe('labels keep clear of other arrows (#584)', () => {
+  /** The labelled arrows whose label another arrow's line runs through, named. */
+  const labelHits = (edges: EdgeRoute[]): string[] =>
+    edges.flatMap((edge, i) =>
+      edge.label ? edges.filter((o, j) => j !== i && o.points.slice(1).some((p, k) => segmentCrosses(edge.label!.rect, o.points[k]!, p))).map((o) => `${edge.from} -> ${edge.to} on ${o.from} -> ${o.to}`) : [],
+    );
+
+  it('moves a label off another arrow crossing the middle of its edge', () => {
+    const labelled: EdgeRoute = { from: 'a', to: 'b', description: 'Calls', points: [{ x: 0, y: 0 }, { x: 400, y: 0 }] };
+    const crossing: EdgeRoute = { from: 'c', to: 'd', points: [{ x: 200, y: -100 }, { x: 200, y: 100 }] };
+    const edges = [labelled, crossing];
+    placeLabels(edges, []);
+    expect(labelled.label).toBeDefined();
+    expect(labelHits(edges)).toEqual([]);
+  });
+
+  it('searches the whole edge: a clear spot exists only near its far end', () => {
+    const labelled: EdgeRoute = { from: 'a', to: 'b', description: 'Calls', points: [{ x: 0, y: 0 }, { x: 400, y: 0 }] };
+    // A fence of arrows crossing every 15px from x=5 to x=350: every spot the old search tried
+    // (0.2 to 0.8 along the edge, centred or beside it) has a line through it; past x=350 has none.
+    const blockers: EdgeRoute[] = Array.from({ length: 24 }, (_, k) => ({ from: `x${k}`, to: `y${k}`, points: [{ x: 5 + 15 * k, y: -50 }, { x: 5 + 15 * k, y: 50 }] }));
+    const edges = [labelled, ...blockers];
+    placeLabels(edges, []);
+    expect(labelHits(edges)).toEqual([]);
+  });
+
+  it("keeps today's centred pick when no spot on the edge is clear of the other arrow", () => {
+    const labelled: EdgeRoute = { from: 'a', to: 'b', description: 'Calls', points: [{ x: 0, y: 0 }, { x: 200, y: 0 }] };
+    // Another arrow on the very same line, longer than this edge: every spot sits on it.
+    const sameLine: EdgeRoute = { from: 'c', to: 'd', points: [{ x: -100, y: 0 }, { x: 300, y: 0 }] };
+    placeLabels([labelled, sameLine], []);
+    const rect = labelled.label!.rect;
+    expect(rect.x + rect.width / 2).toBeCloseTo(100);
+    expect(rect.y + rect.height / 2).toBeCloseTo(0);
+  });
+
+  it('the dense views lay out with no label on another arrow, bar the one busy label with no clear spot', () => {
+    for (const view of [views(BOOKSHOP_C4)[1]!, views(BOOKSHOP_C4)[2]!]) {
+      expect(labelHits(layoutView(view).edges), view.key).toEqual([]);
+    }
+    // orders and courier point at each other, their arrows run 28px apart, and the 114px label
+    // has no centred or beside spot on its whole edge clear of boxes, labels and that return
+    // arrow: today's pick stands there, and labels.clearOfArrows reports it (above).
+    expect(labelHits(layoutView(views(BUSY_C4)[0]!).edges)).toEqual(['orders -> courier on courier -> orders']);
+  });
+
+  it('a synthetic dense containers view (19 boxes, 29 arrows) keeps its labels off other arrows', () => {
+    // Three layers of four containers, each wired to the next layer straight and reversed, so the
+    // diagonals cross in the gaps; people in, five outside systems out, and four long arrows over a layer.
+    const layer = (p: string) => [0, 1, 2, 3].map((i) => ({ id: `${p}${i}`, name: `${p.toUpperCase()} ${i}`, technology: 'Node.js', description: `Layer ${p} job ${i}` }));
+    const rel = (source: string, destination: string) => ({ source, destination, description: 'Calls', technology: 'HTTPS' });
+    const model: C4Model = {
+      people: [{ id: 'u1', name: 'User one' }, { id: 'u2', name: 'User two' }],
+      systems: [
+        { id: 'sys', name: 'Dense system', containers: [...layer('a'), ...layer('b'), ...layer('d')] },
+        ...[0, 1, 2, 3, 4].map((i) => ({ id: `ext${i}`, name: `Outside ${i}`, external: true })),
+      ],
+      relationships: [
+        rel('u1', 'a0'), rel('u1', 'a1'), rel('u2', 'a2'), rel('u2', 'a3'),
+        ...[0, 1, 2, 3].flatMap((i) => [rel(`a${i}`, `b${i}`), rel(`a${i}`, `b${3 - i}`)]),
+        ...[0, 1, 2, 3].flatMap((i) => [rel(`b${i}`, `d${i}`), rel(`b${i}`, `d${3 - i}`)]),
+        rel('d0', 'ext0'), rel('d1', 'ext1'), rel('d2', 'ext2'), rel('d3', 'ext3'), rel('d0', 'ext4'),
+        ...[0, 1, 2, 3].map((i) => rel(`a${i}`, `d${3 - i}`)),
+      ],
+      views: [{ key: 'containers', type: 'container', scope: 'sys', title: 'Containers: Dense system' }],
+    };
+    const view = computeView(model, model.views[0]!);
+    expect(view.edges.length).toBe(29);
+    const layout = layoutView(view);
+    expect(layout.nodes.length).toBe(19);
+    expect(labelHits(layout.edges)).toEqual([]);
   });
 });
 
@@ -219,6 +295,23 @@ describe('the self-check catches a broken layout', () => {
     const runs = verifyLayout(layout);
     expect(failed(runs)).toEqual(['labels.clearOfBoxes']);
     expect(problems(runs)).toEqual([`the label of ${edge.from} -> ${edge.to} covers "${box.id}"`]);
+  });
+
+  it('a label over another arrow', () => {
+    const layout = good();
+    const edge = layout.edges.find((x) => x.label)!;
+    const other = layout.edges.find((x) => x !== edge)!;
+    // The label moved onto the middle of the other arrow's longest stretch.
+    const lengths = other.points.slice(1).map((p, k) => Math.hypot(p.x - other.points[k]!.x, p.y - other.points[k]!.y));
+    const k = lengths.indexOf(Math.max(...lengths));
+    const [a, b] = [other.points[k]!, other.points[k + 1]!];
+    edge.label!.rect.x = (a.x + b.x) / 2 - edge.label!.rect.width / 2;
+    edge.label!.rect.y = (a.y + b.y) / 2 - edge.label!.rect.height / 2;
+    const runs = verifyLayout(layout);
+    expect(failed(runs)).toContain('labels.clearOfArrows');
+    expect(problems(runs)).toContain(`the label of ${edge.from} -> ${edge.to} sits on the arrow ${other.from} -> ${other.to}`);
+    const labelled = layout.edges.filter((x) => x.label).length;
+    expect(runs.find((r) => r.check === 'labels.clearOfArrows')!.checked).toBe(labelled * (layout.edges.length - 1));
   });
 
   it('an arrow routed behind a box it does not join', () => {

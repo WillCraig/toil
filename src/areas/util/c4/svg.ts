@@ -65,15 +65,23 @@ function nodeSvg(box: NodeBox): string {
   return `<g id="${xml(box.id)}" class="c4-${el.kind}">${shape}${textBlock(box.lines, x + w / 2, textTop, colour.font)}</g>`;
 }
 
-/** A polyline with its corners rounded: straight to each segment's midpoint, then a curve through the corner. */
+/** How far from a corner an arrow starts to turn: short, so the drawn curve stays beside the straight line the layout checked (#584). Toil UI's diagram page draws the same cap. */
+const RADIUS = 12;
+
+/** A polyline with its corners rounded over at most `RADIUS`, or half the shorter segment. */
 function pathData(points: Point[]): string {
   if (points.length < 3) return `M${points.map((p) => `${n(p.x)},${n(p.y)}`).join(' L')}`;
-  const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const toward = (p: Point, q: Point, by: number): Point => {
+    const length = Math.hypot(q.x - p.x, q.y - p.y);
+    return length === 0 ? p : { x: p.x + ((q.x - p.x) / length) * by, y: p.y + ((q.y - p.y) / length) * by };
+  };
+  const dist = (p: Point, q: Point) => Math.hypot(q.x - p.x, q.y - p.y);
   let d = `M${n(points[0]!.x)},${n(points[0]!.y)}`;
   for (let i = 1; i < points.length - 1; i++) {
-    const m = mid(points[i - 1]!, points[i]!);
-    const next = mid(points[i]!, points[i + 1]!);
-    d += ` L${n(m.x)},${n(m.y)} Q${n(points[i]!.x)},${n(points[i]!.y)} ${n(next.x)},${n(next.y)}`;
+    const [a, p, b] = [points[i - 1]!, points[i]!, points[i + 1]!];
+    const from = toward(p, a, Math.min(RADIUS, dist(a, p) / 2));
+    const to = toward(p, b, Math.min(RADIUS, dist(p, b) / 2));
+    d += ` L${n(from.x)},${n(from.y)} Q${n(p.x)},${n(p.y)} ${n(to.x)},${n(to.y)}`;
   }
   const last = points.at(-1)!;
   return `${d} L${n(last.x)},${n(last.y)}`;

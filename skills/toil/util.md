@@ -1306,7 +1306,8 @@ One view of a C4 architecture model: `render` draws it as SVG, `mermaid` writes 
 as Mermaid's C4 syntax (GitHub draws a ```` ```mermaid ```` block inline), and `d2`
 writes it as D2 text. `render` lays the diagram out itself, with a layered layout
 made for C4 views: people on the top row, the scope's children together inside
-their dashed boundary, and each relationship's label placed clear of the boxes.
+their dashed boundary, and each relationship's label placed clear of the boxes
+and, where a spot on its arrow allows, clear of the other arrows.
 Nothing is installed or run, and nothing goes over the network.
 
 ```bash
@@ -1395,6 +1396,7 @@ and `data.verified` lists each check:
 | `edges.touchBoxes` | Every arrow starts on its source's border and ends on its target's |
 | `edges.clearOfBoxes` | No arrow passes behind a box it doesn't join |
 | `labels.clearOfBoxes` | No label covers a box |
+| `labels.clearOfArrows` | No label sits on another arrow's line |
 | `svg.wellFormed` | The SVG parses as XML and holds no character XML forbids. A control character in the model's text (other than tab and line breaks), U+FFFE, U+FFFF or a lone surrogate is drawn as U+FFFD |
 | `text.width` | Always `approximated`: text is measured with Helvetica's widths, which Arial shares |
 
